@@ -12,8 +12,8 @@
 void read_loadavg(void)
 {
   const char *path = "/proc/loadavg";
-  struct stats *ps_stats = NULL;
   FILE *file = NULL;
+  struct stats *ps_stats = NULL;
 
   file = fopen(path, "r");
   if (file == NULL) {
@@ -23,7 +23,7 @@ void read_loadavg(void)
 
   ps_stats = get_current_stats(ST_PS, NULL);
   if (ps_stats == NULL) {
-    ERROR("cannot get ps_stats: %m\n");
+    ERROR("cannot set ps_stats: %m\n");
     goto out;
   }
 

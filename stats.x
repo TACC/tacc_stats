@@ -1,3 +1,6 @@
 X(ST_PS)
 X(ST_CPU)
 X(ST_MEM)
+X(ST_VM)
+X(ST_IB)
+X(ST_JOB)

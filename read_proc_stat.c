@@ -67,6 +67,8 @@ void read_proc_stat(void)
   while (getline(&line, &line_size, file) >= 0) {
     char *key, *rest = line;
     key = strsep(&rest, " ");
+    if (*key == 0 || rest == NULL)
+      continue;
 
     if (strncmp(key, "cpu", 3) == 0) {
       read_proc_stat_cpu(key + 3, rest);

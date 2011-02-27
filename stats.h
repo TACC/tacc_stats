@@ -17,5 +17,11 @@ void stats_set_unit(struct stats *s, char *key, unsigned long long val, const ch
 void read_proc_stat(void);
 void read_loadavg();
 void read_meminfo(void);
+void read_vmstat(void);
+void read_jobid();
+void read_ib_stats();
+
+int read_single(const char *path, unsigned long long *dest);
+int read_key_value(const char *path, struct stats *stats);
 
 #endif
