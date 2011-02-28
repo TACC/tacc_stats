@@ -44,7 +44,7 @@ void read_ib_stats(void)
   ib_stats = get_current_stats(ST_IB, NULL);
   if (ib_stats == NULL) {
     ERROR("cannot get ib_stats: %m\n");
-    return;
+    goto out;
   }
 
   while (getline(&line, &line_size, pipe) >= 0) {

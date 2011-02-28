@@ -48,7 +48,7 @@ static void read_meminfo_node(char *node)
   }
 
   while (getline(&line, &line_size, file) >= 0) {
-    char key[80], unit[80];
+    char key[81], unit[81];
     unsigned long long val = 0;
 
     key[0] = 0;
