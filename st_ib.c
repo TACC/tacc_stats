@@ -51,8 +51,15 @@ static void read_ib_stats(struct stats_type *type)
     char *key, *rest = line;
     unsigned long long val;
 
+    /* Older versions of perfquery write errors to stdout.  To make
+       sure we're not parsing error messages, we check that the line
+       has the goofy KEY:......VALUE format. */
+
     key = strsep(&rest, ":");
     if (*key == 0 || rest == NULL)
+      continue;
+
+    if (*rest != '.')
       continue;
 
     while (*rest == '.')
@@ -63,7 +70,7 @@ static void read_ib_stats(struct stats_type *type)
     if (errno != 0)
       continue;
 
-    /* Data vaules are counted in units of 4 octets. */
+    /* Data values are counted in units of 4 octets. */
     if (strcmp(key, "XmtData") == 0 || strcmp(key, "RcvData") == 0)
       val *= 4;
 

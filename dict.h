@@ -20,12 +20,13 @@ struct dict {
 };
 
 int dict_init(struct dict *dict, size_t count);
+void dict_destroy(struct dict *dict);
+
 struct dict_entry *dict_ref(struct dict *dict, hash_t hash, const char *key);
 int dict_set(struct dict *dict, struct dict_entry *ent, hash_t hash, char *key);
 char *dict_remv(struct dict *dict, struct dict_entry *ent, int may_resize);
 struct dict_entry *dict_for_each(struct dict *dict, size_t *i);
 /* void dict_resize(struct dict *dict, int force); */
-/* void dict_destroy(struct dict *dict); */
 
 char *dict_lookup(struct dict *dict, const char *key);
 char **dict_search(struct dict *dict, char *key);

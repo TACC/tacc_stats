@@ -59,6 +59,11 @@ int dict_init(struct dict *dict, size_t count)
   return 0;
 }
 
+void dict_destroy(struct dict *dict)
+{
+  free(dict->d_table);
+}
+
 int dict_resize(struct dict *dict, size_t new_table_size)
 {
   struct dict_entry *table, *old_table;

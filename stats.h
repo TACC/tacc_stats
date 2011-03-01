@@ -1,5 +1,6 @@
 #ifndef _STATS_H_
 #define _STATS_H_
+#include <stdlib.h>
 #include "dict.h"
 
 enum {
@@ -8,18 +9,20 @@ enum {
 #undef X
 };
 
-struct stats {
-  /* Type? */
-  struct dict st_dict;
-  char st_id[];
-};
-
 struct stats_type {
   char *st_name;
   void (**st_read)(struct stats_type *type);
   char **st_print_schema;
   struct dict st_current_dict;
 };
+
+struct stats {
+  struct stats_type *st_type;
+  struct dict st_dict;
+  char st_id[];
+};
+
+void read_stats(void);
 
 struct stats *get_current_stats(struct stats_type *type, const char *id);
 void stats_set(struct stats *s, char *key, unsigned long long val);
