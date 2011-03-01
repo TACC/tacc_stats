@@ -25,7 +25,7 @@
 //   return x;
 // }
 
-hash_t strhash(const char *s)
+hash_t dict_strhash(const char *s)
 {
   const unsigned char *p = (const unsigned char *) s;
   hash_t x = *p << 7;
@@ -35,7 +35,7 @@ hash_t strhash(const char *s)
 
   x ^= p - (const unsigned char *) s;
 
-  return x;
+  return x & ~DICT_HASH_DUMMY;
 }
 
 #define DICT_TABLE_SIZE_MIN 8
@@ -139,7 +139,7 @@ struct dict_entry *dict_ref(struct dict *dict, hash_t hash, const char *key)
 
 char *dict_lookup(struct dict *dict, const char *key)
 {
-  hash_t hash = strhash(key) & ~DICT_HASH_DUMMY;
+  hash_t hash = dict_strhash(key);
   struct dict_entry *ent = dict_ref(dict, hash, key);
 
   if (ent->d_hash & DICT_HASH_DUMMY) /* Do we need this? */
@@ -150,7 +150,7 @@ char *dict_lookup(struct dict *dict, const char *key)
 
 char **dict_search(struct dict *dict, char *key)
 {
-  hash_t hash = strhash(key) & ~DICT_HASH_DUMMY;
+  hash_t hash = dict_strhash(key);
   struct dict_entry *ent = dict_ref(dict, hash, key);
 
   if (ent->d_key == NULL) {

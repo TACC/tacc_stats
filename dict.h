@@ -3,8 +3,7 @@
 #include <stddef.h>
 
 typedef unsigned long hash_t;
-
-hash_t strhash(const char *s);
+hash_t dict_strhash(const char *s);
 
 #define DICT_HASH_DUMMY (((hash_t) 1) << (8 * sizeof(hash_t) - 1))
 
