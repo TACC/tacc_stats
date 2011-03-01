@@ -2,6 +2,8 @@
 #include "stats.h"
 #include "trace.h"
 
+int read_single(const char *path, unsigned long long *dest);
+
 void read_jobid(void)
 {
   struct stats *job_stats = NULL;
@@ -17,3 +19,8 @@ void read_jobid(void)
 
   stats_set(job_stats, "jobid", jobid);
 }
+
+struct stats_type ST_JOB_TYPE = {
+  .st_name = "ST_JOB",
+  .st_read = { &read_jobid, NULL, },
+};

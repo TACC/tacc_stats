@@ -5,6 +5,10 @@
 #include "stats.h"
 #include "trace.h"
 
+struct stats_type ST_IB_TYPE = {
+  .st_name = "ST_IB",
+};
+
 const char *ib_stats_cmd = "/opt/ofed/sbin/perfquery -r";
 
 // $ perfquery

@@ -2,6 +2,8 @@
 #include "stats.h"
 #include "trace.h"
 
+void read_key_value(const char *path, struct stats *stats);
+
 void read_vmstat(void)
 {
   struct stats *vm_stats = NULL;
