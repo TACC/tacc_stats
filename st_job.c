@@ -23,4 +23,5 @@ static void read_jobid(struct stats_type *type)
 struct stats_type ST_JOB_TYPE = {
   .st_name = "ST_JOB",
   .st_read = (void (*[])()) { &read_jobid, NULL, },
+  .st_schema = (char *[]) { "jobid", NULL, },
 };

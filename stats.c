@@ -18,34 +18,6 @@ struct stats_type *stats_type[] = {
 
 size_t nr_stats_types = sizeof(stats_type) / sizeof(stats_type[0]);
 
-static void init_types(void) __attribute__((constructor));
-
-static void init_types(void)
-{
-  size_t i;
-
-  for (i = 0; i < nr_stats_types; i++) {
-    struct stats_type *type = stats_type[i];
-    if (dict_init(&type->st_current_dict, 0) < 0)
-      /* XXX */;
-  }
-}
-
-void read_stats(void)
-{
-  size_t i, j;
-
-  for (i = 0; i < nr_stats_types; i++) {
-    struct stats_type *type = stats_type[i];
-    for (j = 0; ; j++) {
-      void (*read)(struct stats_type *) = type->st_read[j];
-      if (read == NULL)
-        break;
-      (*read)(type);
-    }
-  }
-}
-
 static struct stats *stats_create(struct stats_type *type, const char *id)
 {
   struct stats *stats;
@@ -112,7 +84,7 @@ struct st_pair {
   char p_key[];
 };
 
-struct st_pair *stats_ref(struct stats *stats, char *key)
+struct st_pair *stats_ref(struct stats *stats, char *key, int create)
 {
   struct st_pair *pair = NULL;
   struct dict_entry *ent;
@@ -122,6 +94,9 @@ struct st_pair *stats_ref(struct stats *stats, char *key)
   ent = dict_ref(&stats->st_dict, hash, key);
   if (ent->d_key != NULL)
     return (struct st_pair *) (ent->d_key - sizeof(*pair));
+
+  if (!create)
+    return NULL;
 
   pair = malloc(sizeof(*pair) + strlen(key) + 1);
   if (pair == NULL) {
@@ -148,7 +123,7 @@ void stats_set(struct stats *stats, char *key, unsigned long long val)
   TRACE("%s %s %s %s %llu\n",
         __func__, stats->st_type->st_name, stats->st_id, key, val);
 
-  pair = stats_ref(stats, key);
+  pair = stats_ref(stats, key, 1);
   if (pair != NULL)
     pair->p_val = val;
 }
@@ -160,7 +135,7 @@ void stats_inc(struct stats *stats, char *key, unsigned long long val)
   TRACE("%s %s %s %s %llu\n",
         __func__, stats->st_type->st_name, stats->st_id, key, val);
 
-  pair = stats_ref(stats, key);
+  pair = stats_ref(stats, key, 1);
   if (pair != NULL)
     pair->p_val += val;
 }
@@ -184,4 +159,32 @@ void stats_set_unit(struct stats *stats, char *key, unsigned long long val, cons
         __func__, stats->st_type->st_name, stats->st_id, key, val, unit, mult);
 
   stats_set(stats, key, val * mult);
+}
+
+static void init_types(void) __attribute__((constructor));
+
+static void init_types(void)
+{
+  size_t i;
+
+  for (i = 0; i < nr_stats_types; i++) {
+    struct stats_type *type = stats_type[i];
+    if (dict_init(&type->st_current_dict, 0) < 0)
+      /* XXX */;
+  }
+}
+
+void read_stats(void)
+{
+  size_t i, j;
+
+  for (i = 0; i < nr_stats_types; i++) {
+    struct stats_type *type = stats_type[i];
+    for (j = 0; ; j++) {
+      void (*read)(struct stats_type *) = type->st_read[j];
+      if (read == NULL)
+        break;
+      (*read)(type);
+    }
+  }
 }

@@ -12,7 +12,7 @@ enum {
 struct stats_type {
   char *st_name;
   void (**st_read)(struct stats_type *type);
-  char **st_print_schema;
+  char **st_schema;
   struct dict st_current_dict;
 };
 

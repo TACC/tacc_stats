@@ -97,4 +97,5 @@ static void read_lustre_stats(struct stats_type *type)
 struct stats_type ST_LUSTRE_TYPE = {
   .st_name = "ST_LUSTRE",
   .st_read = (void (*[])()) { &read_lustre_stats, NULL, },
+  .st_schema = (char *[]) { "read_bytes", "write_bytes", NULL, },
 };

@@ -98,7 +98,20 @@ static void read_loadavg(struct stats_type *type)
     fclose(file);
 }
 
+// $ cat /proc/stat
+// cpu ...
+// ...
+// intr ...
+// ctxt 15088509272
+// btime 1288194676
+// processes 2591587
+// procs_running 17
+// procs_blocked 0
+
 struct stats_type ST_PS_TYPE = {
   .st_name = "ST_PS",
   .st_read = (void (*[])()) { &read_proc_stat, &read_loadavg, NULL, },
+  .st_schema = (char *[]) {
+    "btime", "ctxt", "processes", "load_1", "load_5", "load_15", NULL,
+  },
 };

@@ -86,4 +86,8 @@ static void read_ib_stats(struct stats_type *type)
 struct stats_type ST_IB_TYPE = {
   .st_name = "ST_IB",
   .st_read = (void (*[])()) { &read_ib_stats, NULL, },
+  .st_schema = (char *[]) {
+    "RcvPkts", "XmtPkts", "RvcData", "XmtData", NULL,
+  },
+  /* .st_rename */
 };

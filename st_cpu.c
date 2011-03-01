@@ -78,4 +78,7 @@ static void read_proc_stat(struct stats_type *type)
 struct stats_type ST_CPU_TYPE = {
   .st_name = "ST_CPU",
   .st_read = (void (*[])()) { &read_proc_stat, NULL, },
+  .st_schema = (char *[]) {
+    "user", "nice", "system", "idle", "iowait", "irq", "softirq", NULL,
+  },
 };
