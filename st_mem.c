@@ -69,7 +69,7 @@ static void read_meminfo_node(char *node)
   free(path);
 }
 
-void read_meminfo(void)
+static void read_meminfo(void)
 {
   const char *base_path = NUMA_BASE_PATH;
   DIR *dir = NULL;
@@ -88,3 +88,7 @@ void read_meminfo(void)
   if (dir != NULL)
     closedir(dir);
 }
+
+struct stats_type ST_MEM_TYPE = {
+  .st_name = "ST_MEM",
+};

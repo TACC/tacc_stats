@@ -44,7 +44,7 @@ static void read_proc_stat_cpu(char *cpu, char *rest)
   stats_set(cpu_stats, "steal", steal);
 }
 
-void read_proc_stat(void)
+static void read_proc_stat(void)
 {
   const char *path = "/proc/stat";
   FILE *file = NULL;
@@ -70,18 +70,10 @@ void read_proc_stat(void)
     if (*key == 0 || rest == NULL)
       continue;
 
-    if (strncmp(key, "cpu", 3) == 0) {
-      read_proc_stat_cpu(key + 3, rest);
-      continue;
-    }
-
-    if (strcmp(key, "intr") == 0)
+    if (strncmp(key, "cpu", 3) != 0)
       continue;
 
-    errno = 0;
-    unsigned long long val = strtoull(rest, NULL, 0);
-    if (errno == 0)
-      stats_set(ps_stats, key, val);
+    read_proc_stat_cpu(key + 3, rest);
   }
 
  out:
@@ -89,3 +81,7 @@ void read_proc_stat(void)
   if (file != NULL)
     fclose(file);
 }
+
+struct stats_type ST_CPU_TYPE = {
+  .st_name = "ST_CPU",
+};

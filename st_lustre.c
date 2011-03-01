@@ -94,3 +94,7 @@ void read_lustre_stats(void)
   if (base_dir != NULL)
     closedir(base_dir);
 }
+
+struct stats_type ST_LUSTRE_TYPE = {
+  .st_name = "ST_LUSTRE",
+};

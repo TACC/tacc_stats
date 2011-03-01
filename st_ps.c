@@ -9,7 +9,51 @@
 #include "stats.h"
 #include "trace.h"
 
-void read_loadavg(void)
+static void read_proc_stat(void)
+{
+  const char *path = "/proc/stat";
+  FILE *file = NULL;
+  struct stats *ps_stats = NULL;
+  char *line = NULL;
+  size_t line_size = 0;
+
+  file = fopen(path, "r");
+  if (file == NULL) {
+    ERROR("cannot open `%s': %m\n", path);
+    goto out;
+  }
+
+  ps_stats = get_current_stats(ST_PS, NULL);
+  if (ps_stats == NULL) {
+    ERROR("cannot get ps_stats: %m\n");
+    goto out;
+  }
+
+  while (getline(&line, &line_size, file) >= 0) {
+    char *key, *rest = line;
+    key = strsep(&rest, " ");
+    if (*key == 0 || rest == NULL)
+      continue;
+
+    if (strncmp(key, "cpu", 3) == 0)
+      continue;
+
+    if (strcmp(key, "intr") == 0)
+      continue;
+
+    errno = 0;
+    unsigned long long val = strtoull(rest, NULL, 0);
+    if (errno == 0)
+      stats_set(ps_stats, key, val);
+  }
+
+ out:
+  free(line);
+  if (file != NULL)
+    fclose(file);
+}
+
+static void read_loadavg(void)
 {
   const char *path = "/proc/loadavg";
   FILE *file = NULL;
@@ -53,3 +97,7 @@ void read_loadavg(void)
   if (file != NULL)
     fclose(file);
 }
+
+struct stats_type ST_PS_TYPE = {
+  .st_name = "ST_PS",
+};

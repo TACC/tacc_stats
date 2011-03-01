@@ -20,14 +20,41 @@ struct stats_type *stats_type[] = {
 struct stats *get_current_stats(int type, const char *id)
 {
   struct stats_type *stats_type = stats_type[type];
-
   if (id == NULL)
-  /* TRACE("get_current_stats %s %s\n", st_name[type], id); */
+    id = "-";
 
-  ref = dict_search(.st_current_dict, id);
-  if (*ref == id) {
-  }
+  TRACE("get_current_stats %s %s\n", stats_type->st_name, id);
 
-  return ((struct stats *) *ref) - 1;
+  return (struct stats *) id;
 }
 
+void stats_set(struct stats *st, char *key, unsigned long long val)
+{
+  const char *id = (const char*) st;
+  TRACE("stats_set %s %s %llu\n", id, key, val);
+}
+
+void stats_int(struct stats *st, char *key, unsigned long long val)
+{
+  const char *id = (const char*) st;
+  TRACE("stats_inc %s %s %llu\n", id, key, val);
+}
+
+void stats_set_unit(struct stats *st, char *key, unsigned long long val, const char *unit)
+{
+  const char *id = (const char*) st;
+  unsigned long long mult = 1;
+
+  if (strcasecmp(unit, "KB") == 0)
+    mult = 1ULL << 10;
+  else if (strcasecmp(unit, "MB") == 0)
+    mult = 1ULL << 20;
+  else if (strcasecmp(unit, "GB") == 0)
+    mult = 1ULL << 30;
+  else if (strcasecmp(unit, "TB") == 0)
+    mult = 1ULL << 40;
+  else if (strlen(unit) != 0)
+    ERROR("unknown unit `%s'\n", unit);
+
+  TRACE("stats_set_unit %s %s %llu %s %llu\n", id, key, val, unit, mult);
+}

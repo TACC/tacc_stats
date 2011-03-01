@@ -4,7 +4,7 @@
 
 void read_key_value(const char *path, struct stats *stats);
 
-void read_vmstat(void)
+static void read_vmstat(void)
 {
   struct stats *vm_stats = NULL;
 
@@ -16,3 +16,7 @@ void read_vmstat(void)
 
   read_key_value("/proc/vmstat", vm_stats);
 }
+
+struct stats_type ST_VM_TYPE = {
+  .st_name = "ST_VM",
+};
