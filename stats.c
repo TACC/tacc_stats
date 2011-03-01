@@ -32,7 +32,7 @@ void stats_set(struct stats *st, char *key, unsigned long long val)
   TRACE("stats_set %s %s %llu\n", id, key, val);
 }
 
-void stats_int(struct stats *st, char *key, unsigned long long val)
+void stats_inc(struct stats *st, char *key, unsigned long long val)
 {
   const char *id = (const char*) st;
   TRACE("stats_inc %s %s %llu\n", id, key, val);
