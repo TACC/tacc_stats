@@ -84,7 +84,7 @@ struct st_pair {
   char p_key[];
 };
 
-struct st_pair *stats_ref(struct stats *stats, char *key, int create)
+struct st_pair *stats_ref(struct stats *stats, const char *key, int create)
 {
   struct st_pair *pair = NULL;
   struct dict_entry *ent;
@@ -126,6 +126,14 @@ void stats_set(struct stats *stats, char *key, unsigned long long val)
   pair = stats_ref(stats, key, 1);
   if (pair != NULL)
     pair->p_val = val;
+}
+
+unsigned long long stats_get(struct stats *stats, const char *key)
+{
+  struct st_pair *pair = stats_ref(stats, key, 0);
+  if (pair == NULL)
+    return 0;
+  return pair->p_val;
 }
 
 void stats_inc(struct stats *stats, char *key, unsigned long long val)
@@ -174,7 +182,7 @@ static void init_types(void)
   }
 }
 
-void read_stats(void)
+void read_all_stats(void)
 {
   size_t i, j;
 
@@ -185,6 +193,32 @@ void read_stats(void)
       if (read == NULL)
         break;
       (*read)(type);
+    }
+  }
+}
+
+void print_all_stats(FILE *file, const char *prefix)
+{
+  size_t i;
+  for (i = 0; i < nr_stats_types; i++) {
+    struct stats_type *type = stats_type[i];
+
+    if (type->st_schema == NULL || *type->st_schema == NULL)
+        continue; /* Empty schema. */
+
+    size_t j = 0;
+    struct dict_entry *ent;
+    while ((ent = dict_for_each(&type->st_current_dict, &j)) != NULL) {
+      struct stats *stats = (struct stats *) ent->d_key - 1;
+      char **key = type->st_schema;
+
+      if (prefix != NULL)
+        fprintf(file, "%s ", prefix);
+      fprintf(file, "%s", type->st_name);
+
+      for (; *key != NULL; key++)
+        fprintf(file, " %llu", stats_get(stats, *key));
+      fprintf(file, "\n");
     }
   }
 }

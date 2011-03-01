@@ -4,7 +4,8 @@
 
 int main(int argc, char *argv[])
 {
-  read_stats();
+  read_all_stats();
+  print_all_stats(stdout, NULL);
 
   return 0;
 }
