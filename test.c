@@ -2,28 +2,32 @@
 #include <stdio.h>
 #include <malloc.h>
 #include <string.h>
-#include "stats.h"
-#include "trace.h"
+#include "dict.h"
 
 int main(int argc, char *argv[])
 {
-  // uname()
+  struct dict dict;
+  dict_init(&dict, 0);
 
-  read_proc_stat();
-  read_loadavg();
-  read_meminfo();
-  read_vmstat();
+  while (1) {
+    char *line = NULL;
+    size_t line_size = 0;
 
-  // /proc/schedstat
-  // /proc/diskstats
-  // /proc/net/dev read_net_dev()
-  // /proc/net/rpc/nfs
-  // /proc/net/sockstat
+    if (getline(&line, &line_size, stdin) <= 0)
+      break;
 
-  // read_mlx4()
-  // read_lustre()
+    char *s = strchr(line, '\n');
+    if (s != NULL)
+      *s = 0;
 
-  read_jobid();
+    dict_search(&dict, line);
+  }
+
+  size_t i = 0;
+  const char *key;
+
+  while ((key = dict_for_each(&dict, &i)) != NULL)
+    printf("%s\n", key);
 
   return 0;
 }

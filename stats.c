@@ -3,7 +3,6 @@
 #include <stdlib.h>
 #include <string.h>
 #include "stats.h"
-#include "stats-type.h"
 #include "trace.h"
 #include "dict.h"
 
@@ -17,13 +16,12 @@ struct stats_type *stats_type[] = {
 #undef X
 };
 
-struct stats *get_current_stats(int type, const char *id)
+struct stats *get_current_stats(struct stats_type *type, const char *id)
 {
-  struct stats_type *stats_type = stats_type[type];
   if (id == NULL)
     id = "-";
 
-  TRACE("get_current_stats %s %s\n", stats_type->st_name, id);
+  TRACE("get_current_stats %s %s\n", type->st_name, id);
 
   return (struct stats *) id;
 }

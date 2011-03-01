@@ -16,12 +16,12 @@ struct stats {
 
 struct stats_type {
   char *st_name;
-  void (**st_read)(void);
+  void (**st_read)(struct stats_type *type);
   char **st_print_schema;
   struct dict st_current_dict;
 };
 
-struct stats *get_current_stats(int type, const char *id);
+struct stats *get_current_stats(struct stats_type *type, const char *id);
 void stats_set(struct stats *s, char *key, unsigned long long val);
 void stats_set_unit(struct stats *s, char *key, unsigned long long val, const char *unit);
 void stats_inc(struct stats *s, char *key, unsigned long long val);
