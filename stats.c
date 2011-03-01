@@ -184,16 +184,32 @@ static void init_types(void)
 
 void read_all_stats(void)
 {
-  size_t i, j;
-
+  size_t i;
   for (i = 0; i < nr_stats_types; i++) {
     struct stats_type *type = stats_type[i];
-    for (j = 0; ; j++) {
-      void (*read)(struct stats_type *) = type->st_read[j];
-      if (read == NULL)
-        break;
+
+    void (**read)(struct stats_type *);
+    for (read = type->st_read; *read != NULL; read++)
       (*read)(type);
-    }
+  }
+}
+
+void print_stats_type(FILE *file, const char *prefix, struct stats_type *type)
+{
+  size_t j = 0;
+  struct dict_entry *ent;
+
+  while ((ent = dict_for_each(&type->st_current_dict, &j)) != NULL) {
+    struct stats *stats = (struct stats *) ent->d_key - 1;
+    char **key = type->st_schema;
+
+    if (prefix != NULL)
+      fprintf(file, "%s ", prefix);
+    fprintf(file, "%s %s", type->st_name, stats->st_id);
+
+    for (; *key != NULL; key++)
+      fprintf(file, " %llu", stats_get(stats, *key));
+    fprintf(file, "\n");
   }
 }
 
@@ -206,19 +222,6 @@ void print_all_stats(FILE *file, const char *prefix)
     if (type->st_schema == NULL || *type->st_schema == NULL)
         continue; /* Empty schema. */
 
-    size_t j = 0;
-    struct dict_entry *ent;
-    while ((ent = dict_for_each(&type->st_current_dict, &j)) != NULL) {
-      struct stats *stats = (struct stats *) ent->d_key - 1;
-      char **key = type->st_schema;
-
-      if (prefix != NULL)
-        fprintf(file, "%s ", prefix);
-      fprintf(file, "%s %s", type->st_name, stats->st_id);
-
-      for (; *key != NULL; key++)
-        fprintf(file, " %llu", stats_get(stats, *key));
-      fprintf(file, "\n");
-    }
+    print_stats_type(file, prefix, type);
   }
 }
