@@ -112,6 +112,7 @@ struct dict_entry *dict_ref(struct dict *dict, hash_t hash, const char *key)
   i = hash & mask;
   ent = &table[i];
 
+  /* TODO Check for ent->d_hash == hash first. */
   if (ent->d_hash & DICT_HASH_DUMMY)
     dummy = ent;
   else if (ent->d_key == NULL)
@@ -135,6 +136,52 @@ struct dict_entry *dict_ref(struct dict *dict, hash_t hash, const char *key)
 
     perturb >>= PERTURB_SHIFT;
   }
+}
+
+int dict_set(struct dict *dict, struct dict_entry *ent, hash_t hash, char *key)
+{
+  if (ent->d_key == NULL) {
+    if (!(ent->d_hash & DICT_HASH_DUMMY)) {
+      size_t table_size = dict->d_mask + 1;
+      size_t load = dict->d_load + 1;
+
+      if (2 * table_size <= 3 * load) {
+        size_t count = dict->d_count + 1;
+        while (table_size < DICT_TABLE_SIZE_MAX && 2 * table_size <= 3 * count)
+          table_size *= 2;
+
+        if (count >= table_size)
+          return -1;
+
+        if (dict_resize(dict, table_size) < 0)
+          return -1;
+
+        ent = dict_ref(dict, hash, key);
+      }
+      dict->d_load++;
+    }
+
+    ent->d_hash = hash;
+    ent->d_key = key;
+    dict->d_count++;
+  }
+
+  return 0;
+}
+
+char *dict_remv(struct dict *dict, struct dict_entry *ent, int may_resize)
+{
+  char *key = ent->d_key;
+  if (key != NULL) {
+    ent->d_hash = DICT_HASH_DUMMY;
+    ent->d_key = NULL;
+    dict->d_count--;
+    if (may_resize) {
+      /* TODO Shrink table if needed. */
+    }
+  }
+
+  return key;
 }
 
 char *dict_lookup(struct dict *dict, const char *key)
@@ -182,7 +229,7 @@ char **dict_search(struct dict *dict, char *key)
   return &ent->d_key;
 }
 
-char *dict_for_each(struct dict *dict, size_t *i)
+struct dict_entry *dict_for_each(struct dict *dict, size_t *i)
 {
   struct dict_entry *table = dict->d_table;
   size_t table_size = dict->d_mask + 1;
@@ -191,7 +238,7 @@ char *dict_for_each(struct dict *dict, size_t *i)
     struct dict_entry *ent = &table[*i];
     (*i)++;
     if (ent->d_key != NULL)
-      return ent->d_key;
+      return ent;
   }
 
   return NULL;
