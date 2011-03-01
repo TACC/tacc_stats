@@ -214,7 +214,7 @@ void print_all_stats(FILE *file, const char *prefix)
 
       if (prefix != NULL)
         fprintf(file, "%s ", prefix);
-      fprintf(file, "%s", type->st_name);
+      fprintf(file, "%s %s", type->st_name, stats->st_id);
 
       for (; *key != NULL; key++)
         fprintf(file, " %llu", stats_get(stats, *key));
