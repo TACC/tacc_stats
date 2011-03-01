@@ -4,12 +4,12 @@
 
 int read_single(const char *path, unsigned long long *dest);
 
-void read_jobid(void)
+static void read_jobid(struct stats_type *type)
 {
   struct stats *job_stats = NULL;
   unsigned long long jobid = 0;
 
-  job_stats = get_current_stats(ST_JOB, NULL);
+  job_stats = get_current_stats(type, NULL);
   if (job_stats == NULL) {
     ERROR("cannot get job_stats: %m\n");
     return;

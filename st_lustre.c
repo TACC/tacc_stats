@@ -8,9 +8,8 @@
 
 #define OSC_BASE "/proc/fs/lustre/osc"
 
-void read_lustre_target_stats(const char *fs_name, const char *osc)
+static void read_lustre_target_stats(struct stats *fs_stats, const char *osc)
 {
-  struct stats *fs_stats = NULL;
   char *path = NULL;
   FILE *file = NULL;
   char *line = NULL;
@@ -24,12 +23,6 @@ void read_lustre_target_stats(const char *fs_name, const char *osc)
   file = fopen(path, "r");
   if (file == NULL) {
     ERROR("cannot open `%s': %m\n");
-    goto out;
-  }
-
-  fs_stats = get_current_stats(ST_LUSTRE, fs_name);
-  if (fs_stats == NULL) {
-    ERROR("cannot get filesystem stats for `%s': %m\n", fs_name);
     goto out;
   }
 
@@ -58,7 +51,7 @@ void read_lustre_target_stats(const char *fs_name, const char *osc)
   free(line);
 }
 
-void read_lustre_stats(void)
+static void read_lustre_stats(struct stats_type *type)
 {
   const char *base_path = OSC_BASE;
   DIR *base_dir = NULL;
@@ -87,7 +80,13 @@ void read_lustre_stats(void)
       *dash = 0;
     }
 
-    read_lustre_target_stats(fs_name, ent->d_name);
+    struct stats *fs_stats = get_current_stats(type, fs_name);
+    if (fs_stats == NULL) {
+      ERROR("cannot get filesystem stats for `%s': %m\n", fs_name);
+      continue;
+    }
+
+    read_lustre_target_stats(fs_stats, ent->d_name);
   }
 
  out:

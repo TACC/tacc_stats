@@ -12,23 +12,12 @@
 
 #define NUMA_BASE_PATH "/sys/devices/system/node"
 
-static void read_meminfo_node(char *node)
+static void read_meminfo_node(struct stats *stats, char *node)
 {
   char *path = NULL;
   FILE *file = NULL;
-  struct stats *node_stats = NULL;
   char *line = NULL;
   size_t line_size = 0;
-
-  /* Ignore anything not matching [0-9]+. */
-  char *s = node;
-
-  if (*s == 0)
-    return;
-
-  for (; *s != 0; s++)
-    if (!isdigit(*s))
-      return;
 
   if (asprintf(&path, "%s/node%s/meminfo", NUMA_BASE_PATH, node) < 0) {
     ERROR("cannot create path: %m\n");
@@ -38,12 +27,6 @@ static void read_meminfo_node(char *node)
   file = fopen(path, "r");
   if (file == NULL) {
     ERROR("cannot open `%s': %m\n", path);
-    goto out;
-  }
-
-  node_stats = get_current_stats(ST_MEM, node);
-  if (node_stats == NULL) {
-    ERROR("cannot get node_stats: %m\n");
     goto out;
   }
 
@@ -59,7 +42,7 @@ static void read_meminfo_node(char *node)
     if (key[0] == 0)
       continue;
 
-    stats_set_unit(node_stats, key, val, unit);
+    stats_set_unit(stats, key, val, unit);
   }
 
  out:
@@ -69,7 +52,7 @@ static void read_meminfo_node(char *node)
   free(path);
 }
 
-static void read_meminfo(void)
+static void read_meminfo(struct stats_type *type)
 {
   const char *base_path = NUMA_BASE_PATH;
   DIR *dir = NULL;
@@ -80,8 +63,26 @@ static void read_meminfo(void)
 
   struct dirent *ent;
   while ((ent = readdir(dir)) != NULL) {
-    if (strncmp(ent->d_name, "node", 4) == 0)
-      read_meminfo_node(ent->d_name + 4);
+    if (strncmp(ent->d_name, "node", 4) != 0)
+      continue;
+
+    const char *node = ent->d_name + 4;
+
+    /* Ignore anything not matching [0-9]+. */
+    char *s = node;
+    if (*s == 0)
+      continue;
+    for (; *s != 0; s++)
+      if (!isdigit(*s))
+        continue;
+
+    struct stats *stats = get_current_stats(type, node);
+    if (stats == NULL) {
+      ERROR("cannot get node_stats: %m\n");
+      continue;
+    }
+
+    read_meminfo_node(stats, node);
   }
 
  out:

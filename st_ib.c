@@ -5,10 +5,6 @@
 #include "stats.h"
 #include "trace.h"
 
-struct stats_type ST_IB_TYPE = {
-  .st_name = "ST_IB",
-};
-
 const char *ib_stats_cmd = "/opt/ofed/sbin/perfquery -r";
 
 // $ perfquery
@@ -32,7 +28,7 @@ const char *ib_stats_cmd = "/opt/ofed/sbin/perfquery -r";
 // XmtPkts:.........................22945597
 // RcvPkts:.........................26264095
 
-void read_ib_stats(void)
+static void read_ib_stats(struct stats_type *type)
 {
   struct stats *ib_stats = NULL;
   FILE *pipe = NULL;
@@ -45,7 +41,7 @@ void read_ib_stats(void)
     goto out;
   }
 
-  ib_stats = get_current_stats(ST_IB, NULL);
+  ib_stats = get_current_stats(type, NULL); /* Use port number as id? */
   if (ib_stats == NULL) {
     ERROR("cannot get ib_stats: %m\n");
     goto out;
@@ -79,3 +75,8 @@ void read_ib_stats(void)
   if (pipe != NULL)
     pclose(pipe);
 }
+
+struct stats_type ST_IB_TYPE = {
+  .st_name = "ST_IB",
+};
+

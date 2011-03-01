@@ -9,7 +9,7 @@
 #include "stats.h"
 #include "trace.h"
 
-static void read_proc_stat(void)
+static void read_proc_stat(struct stats_type *type)
 {
   const char *path = "/proc/stat";
   FILE *file = NULL;
@@ -23,7 +23,7 @@ static void read_proc_stat(void)
     goto out;
   }
 
-  ps_stats = get_current_stats(ST_PS, NULL);
+  ps_stats = get_current_stats(type, NULL);
   if (ps_stats == NULL) {
     ERROR("cannot get ps_stats: %m\n");
     goto out;
@@ -53,7 +53,7 @@ static void read_proc_stat(void)
     fclose(file);
 }
 
-static void read_loadavg(void)
+static void read_loadavg(struct stats_type *type)
 {
   const char *path = "/proc/loadavg";
   FILE *file = NULL;
@@ -65,7 +65,7 @@ static void read_loadavg(void)
     goto out;
   }
 
-  ps_stats = get_current_stats(ST_PS, NULL);
+  ps_stats = get_current_stats(type, NULL);
   if (ps_stats == NULL) {
     ERROR("cannot set ps_stats: %m\n");
     goto out;

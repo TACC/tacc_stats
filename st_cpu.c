@@ -9,7 +9,7 @@
 #include "stats.h"
 #include "trace.h"
 
-static void read_proc_stat_cpu(char *cpu, char *rest)
+static void read_proc_stat_cpu(struct stats_type *type, char *cpu, char *rest)
 {
   /* Ignore the totals line and anything not matching [0-9]+. */
   char *s = cpu;
@@ -21,7 +21,7 @@ static void read_proc_stat_cpu(char *cpu, char *rest)
     if (!isdigit(*s))
       return;
 
-  struct stats *cpu_stats = get_current_stats(ST_CPU, cpu);
+  struct stats *cpu_stats = get_current_stats(type, cpu);
   if (cpu_stats == NULL) {
     ERROR("cannot set cpu stats: %m\n");
     return;
@@ -44,23 +44,16 @@ static void read_proc_stat_cpu(char *cpu, char *rest)
   stats_set(cpu_stats, "steal", steal);
 }
 
-static void read_proc_stat(void)
+static void read_proc_stat(struct stats_type *type)
 {
   const char *path = "/proc/stat";
   FILE *file = NULL;
-  struct stats *ps_stats = NULL;
   char *line = NULL;
   size_t line_size = 0;
 
   file = fopen(path, "r");
   if (file == NULL) {
     ERROR("cannot open `%s': %m\n", path);
-    goto out;
-  }
-
-  ps_stats = get_current_stats(ST_PS, NULL);
-  if (ps_stats == NULL) {
-    ERROR("cannot get ps_stats: %m\n");
     goto out;
   }
 
@@ -73,7 +66,7 @@ static void read_proc_stat(void)
     if (strncmp(key, "cpu", 3) != 0)
       continue;
 
-    read_proc_stat_cpu(key + 3, rest);
+    read_proc_stat_cpu(type, key + 3, rest);
   }
 
  out:
