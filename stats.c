@@ -16,6 +16,23 @@ struct stats_type *stats_type[] = {
 #undef X
 };
 
+size_t nr_stats_types = sizeof(stats_type) / sizeof(stats_type[0]);
+
+void read_stats(void)
+{
+  size_t i, j;
+
+  for (i = 0; i < nr_stats_types; i++) {
+    struct stats_type *type = stats_type[i];
+    for (j = 0; ; j++) {
+      void (*read)(struct stats_type *) = type->st_read[j];
+      if (read == NULL)
+        break;
+      (*read)(type);
+    }
+  }
+}
+
 struct stats *get_current_stats(struct stats_type *type, const char *id)
 {
   if (id == NULL)

@@ -22,7 +22,7 @@ static void read_lustre_target_stats(struct stats *fs_stats, const char *osc)
 
   file = fopen(path, "r");
   if (file == NULL) {
-    ERROR("cannot open `%s': %m\n");
+    ERROR("cannot open `%s': %m\n", path);
     goto out;
   }
 
@@ -96,4 +96,5 @@ static void read_lustre_stats(struct stats_type *type)
 
 struct stats_type ST_LUSTRE_TYPE = {
   .st_name = "ST_LUSTRE",
+  .st_read = (void (*[])()) { &read_lustre_stats, NULL, },
 };

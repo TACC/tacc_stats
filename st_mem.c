@@ -12,7 +12,7 @@
 
 #define NUMA_BASE_PATH "/sys/devices/system/node"
 
-static void read_meminfo_node(struct stats *stats, char *node)
+static void read_meminfo_node(struct stats *stats, const char *node)
 {
   char *path = NULL;
   FILE *file = NULL;
@@ -69,7 +69,7 @@ static void read_meminfo(struct stats_type *type)
     const char *node = ent->d_name + 4;
 
     /* Ignore anything not matching [0-9]+. */
-    char *s = node;
+    const char *s = node;
     if (*s == 0)
       continue;
     for (; *s != 0; s++)
@@ -92,4 +92,5 @@ static void read_meminfo(struct stats_type *type)
 
 struct stats_type ST_MEM_TYPE = {
   .st_name = "ST_MEM",
+  .st_read = (void (*[])()) { &read_meminfo, NULL, },
 };

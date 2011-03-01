@@ -100,4 +100,5 @@ static void read_loadavg(struct stats_type *type)
 
 struct stats_type ST_PS_TYPE = {
   .st_name = "ST_PS",
+  .st_read = (void (*[])()) { &read_proc_stat, &read_loadavg, NULL, },
 };
