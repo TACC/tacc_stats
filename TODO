@@ -26,7 +26,6 @@ dict_allow_resize()
 /proc/schedstat (maybe)
 /proc/slabinfo
 
-/proc/net/dev
 /proc/net/rpc/nfs
 
 /proc/net/rpc/nfsd
