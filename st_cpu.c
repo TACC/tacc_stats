@@ -9,7 +9,7 @@
 #include "stats.h"
 #include "trace.h"
 
-static void read_proc_stat_cpu(struct stats_type *type, char *cpu, char *rest)
+static void collect_proc_stat_cpu(struct stats_type *type, char *cpu, char *rest)
 {
   /* Ignore the totals line and anything not matching [0-9]+. */
   char *s = cpu;
@@ -44,7 +44,7 @@ static void read_proc_stat_cpu(struct stats_type *type, char *cpu, char *rest)
   stats_set(cpu_stats, "steal", steal);
 }
 
-static void read_proc_stat(struct stats_type *type)
+static void collect_proc_stat(struct stats_type *type)
 {
   const char *path = "/proc/stat";
   FILE *file = NULL;
@@ -66,7 +66,7 @@ static void read_proc_stat(struct stats_type *type)
     if (strncmp(key, "cpu", 3) != 0)
       continue;
 
-    read_proc_stat_cpu(type, key + 3, rest);
+    collect_proc_stat_cpu(type, key + 3, rest);
   }
 
  out:
@@ -77,7 +77,7 @@ static void read_proc_stat(struct stats_type *type)
 
 struct stats_type ST_CPU_TYPE = {
   .st_name = "ST_CPU",
-  .st_collect = (void (*[])()) { &read_proc_stat, NULL, },
+  .st_collect = (void (*[])()) { &collect_proc_stat, NULL, },
   .st_schema = (char *[]) {
     "user", "nice", "system", "idle", "iowait", "irq", "softirq", NULL,
   },

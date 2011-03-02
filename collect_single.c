@@ -5,7 +5,7 @@
 #include "stats.h"
 #include "trace.h"
 
-int read_single(const char *path, unsigned long long *dest)
+int collect_single(unsigned long long *dest, const char *path)
 {
   int rc = -1;
   FILE *file = NULL;

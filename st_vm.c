@@ -2,9 +2,9 @@
 #include "stats.h"
 #include "trace.h"
 
-void read_key_value(const char *path, struct stats *stats);
+void collect_key_value_file(struct stats *stats, const char *path);
 
-static void read_vmstat(struct stats_type *type)
+static void collect_vmstat(struct stats_type *type)
 {
   struct stats *vm_stats = NULL;
 
@@ -14,7 +14,7 @@ static void read_vmstat(struct stats_type *type)
     return;
   }
 
-  read_key_value("/proc/vmstat", vm_stats);
+  collect_key_value_file(vm_stats, "/proc/vmstat");
 }
 
 // $ cat /proc/vmstat
@@ -72,6 +72,6 @@ static void read_vmstat(struct stats_type *type)
 
 struct stats_type ST_VM_TYPE = {
   .st_name = "ST_VM",
-  .st_collect = (void (*[])()) { &read_vmstat, NULL, },
+  .st_collect = (void (*[])()) { &collect_vmstat, NULL, },
   .st_schema = (char *[]) { NULL, },
 };

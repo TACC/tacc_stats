@@ -5,7 +5,7 @@
 #include "stats.h"
 #include "trace.h"
 
-int read_key_value(const char *path, struct stats *stats)
+int collect_key_value_file(struct stats *stats, const char *path)
 {
   int rc = 0;
   FILE *file = NULL;

@@ -2,9 +2,9 @@
 #include "stats.h"
 #include "trace.h"
 
-int read_single(const char *path, unsigned long long *dest);
+int collect_single(unsigned long long *dest, const char *path);
 
-static void read_jobid(struct stats_type *type)
+static void collect_jobid(struct stats_type *type)
 {
   struct stats *job_stats = NULL;
   unsigned long long jobid = 0;
@@ -15,13 +15,13 @@ static void read_jobid(struct stats_type *type)
     return;
   }
 
-  read_single("/var/run/TACC_jobid", &jobid);
+  collect_single(&jobid, "/var/run/TACC_jobid");
 
   stats_set(job_stats, "jobid", jobid);
 }
 
 struct stats_type ST_JOB_TYPE = {
   .st_name = "ST_JOB",
-  .st_collect = (void (*[])()) { &read_jobid, NULL, },
+  .st_collect = (void (*[])()) { &collect_jobid, NULL, },
   .st_schema = (char *[]) { "jobid", NULL, },
 };

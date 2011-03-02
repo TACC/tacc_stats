@@ -8,7 +8,7 @@
 
 #define OSC_BASE "/proc/fs/lustre/osc"
 
-static void read_lustre_target_stats(struct stats *fs_stats, const char *osc)
+static void collect_osc_stats(struct stats *fs_stats, const char *osc)
 {
   char *path = NULL;
   FILE *file = NULL;
@@ -51,7 +51,7 @@ static void read_lustre_target_stats(struct stats *fs_stats, const char *osc)
   free(line);
 }
 
-static void read_lustre_stats(struct stats_type *type)
+static void collect_lustre_stats(struct stats_type *type)
 {
   const char *base_path = OSC_BASE;
   DIR *base_dir = NULL;
@@ -86,7 +86,7 @@ static void read_lustre_stats(struct stats_type *type)
       continue;
     }
 
-    read_lustre_target_stats(fs_stats, ent->d_name);
+    collect_osc_stats(fs_stats, ent->d_name);
   }
 
  out:
@@ -96,6 +96,6 @@ static void read_lustre_stats(struct stats_type *type)
 
 struct stats_type ST_LUSTRE_TYPE = {
   .st_name = "ST_LUSTRE",
-  .st_collect = (void (*[])()) { &read_lustre_stats, NULL, },
+  .st_collect = (void (*[])()) { &collect_lustre_stats, NULL, },
   .st_schema = (char *[]) { "read_bytes", "write_bytes", NULL, },
 };

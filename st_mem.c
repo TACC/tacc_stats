@@ -14,7 +14,7 @@
 
 #define NUMA_BASE_PATH "/sys/devices/system/node"
 
-static void read_meminfo_node(struct stats *stats, const char *node)
+static void collect_meminfo_node(struct stats *stats, const char *node)
 {
   char *path = NULL;
   FILE *file = NULL;
@@ -54,7 +54,7 @@ static void read_meminfo_node(struct stats *stats, const char *node)
   free(path);
 }
 
-static void read_meminfo(struct stats_type *type)
+static void collect_meminfo(struct stats_type *type)
 {
   const char *base_path = NUMA_BASE_PATH;
   DIR *dir = NULL;
@@ -84,7 +84,7 @@ static void read_meminfo(struct stats_type *type)
       continue;
     }
 
-    read_meminfo_node(stats, node);
+    collect_meminfo_node(stats, node);
   }
 
  out:
@@ -117,6 +117,6 @@ static void read_meminfo(struct stats_type *type)
 
 struct stats_type ST_MEM_TYPE = {
   .st_name = "ST_MEM",
-  .st_collect = (void (*[])()) { &read_meminfo, NULL, },
+  .st_collect = (void (*[])()) { &collect_meminfo, NULL, },
   .st_schema = (char *[]) { "MemTotal", "MemUsed", "FilePages", "AnonPages", "Slab", NULL, },
 };

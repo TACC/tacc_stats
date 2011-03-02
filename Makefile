@@ -1,7 +1,7 @@
 CC = gcc
 CFLAGS = -Wall
 CPPFLAGS = $(CDEBUG)
-OBJS := test.o stats.o dict.o read_key_value.o read_single.o st_cpu.o st_ib.o st_job.o st_lustre.o st_mem.o st_ps.o st_vm.o
+OBJS := test.o stats.o dict.o collect_key_value_file.o collect_single.o st_cpu.o st_ib.o st_job.o st_lustre.o st_mem.o st_ps.o st_vm.o
 
 test: $(OBJS)
 

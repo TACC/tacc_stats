@@ -9,7 +9,7 @@
 #include "stats.h"
 #include "trace.h"
 
-static void read_proc_stat(struct stats_type *type)
+static void collect_proc_stat(struct stats_type *type)
 {
   const char *path = "/proc/stat";
   FILE *file = NULL;
@@ -53,7 +53,7 @@ static void read_proc_stat(struct stats_type *type)
     fclose(file);
 }
 
-static void read_loadavg(struct stats_type *type)
+static void collect_loadavg(struct stats_type *type)
 {
   const char *path = "/proc/loadavg";
   FILE *file = NULL;
@@ -110,7 +110,7 @@ static void read_loadavg(struct stats_type *type)
 
 struct stats_type ST_PS_TYPE = {
   .st_name = "ST_PS",
-  .st_collect = (void (*[])()) { &read_proc_stat, &read_loadavg, NULL, },
+  .st_collect = (void (*[])()) { &collect_proc_stat, &collect_loadavg, NULL, },
   .st_schema = (char *[]) {
     "btime", "ctxt", "processes", "load_1", "load_5", "load_15", NULL,
   },

@@ -28,7 +28,7 @@ const char *ib_stats_cmd = "/opt/ofed/sbin/perfquery -r";
 // XmtPkts:.........................22945597
 // RcvPkts:.........................26264095
 
-static void read_ib_stats(struct stats_type *type)
+static void collect_ib_stats(struct stats_type *type)
 {
   struct stats *ib_stats = NULL;
   FILE *pipe = NULL;
@@ -85,7 +85,7 @@ static void read_ib_stats(struct stats_type *type)
 
 struct stats_type ST_IB_TYPE = {
   .st_name = "ST_IB",
-  .st_collect = (void (*[])()) { &read_ib_stats, NULL, },
+  .st_collect = (void (*[])()) { &collect_ib_stats, NULL, },
   .st_schema = (char *[]) {
     "RcvPkts", "XmtPkts", "RvcData", "XmtData", NULL,
   },
