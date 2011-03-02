@@ -26,7 +26,8 @@ struct stats {
 
 struct stats_type *name_to_type(const char *name);
 
-void read_all_stats(void);
+void collect_all(void);
+
 void print_all_stats(FILE *file, const char *prefix);
 
 struct stats *get_current_stats(struct stats_type *type, const char *id);

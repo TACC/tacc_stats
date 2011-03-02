@@ -196,15 +196,17 @@ static void init_types(void)
   }
 }
 
-void read_all_stats(void)
+/* Collection. */
+
+void collect_all(void)
 {
   size_t i;
   for (i = 0; i < nr_types; i++) {
     struct stats_type *type = type_table[i];
 
-    void (**read)(struct stats_type *);
-    for (read = type->st_collect; *read != NULL; read++)
-      (*read)(type);
+    void (**collect)(struct stats_type *);
+    for (collect = type->st_collect; *collect != NULL; collect++)
+      (*collect)(type);
   }
 }
 
