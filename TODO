@@ -1,3 +1,7 @@
+RRDtool.
+
+Time format specifier.
+
 schema {
   name
   descr
@@ -6,7 +10,7 @@ schema {
 
 Specify schema via external file.
 
-Identifying which are cumulative.
+Identifying which values are cumulative.
 
 Enabling, disabling types.
 
@@ -18,8 +22,16 @@ stats_put(), get_c, put_c.
 
 collect_key_value_dir(stats, path)
 
+Torture test memory management.
+
+Torture test dictionary.
 dict_resize()
 dict_allow_resize()
+
+Signal or direct execution driven collection for start/end of job.
+May require locking.
+
+Output file, directory naming.
 
 /proc/buddyinfo
 /proc/diskstats

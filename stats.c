@@ -235,6 +235,8 @@ int serialize_file_header(FILE *file)
           hostname, utsname.sysname, utsname.release, utsname.version,
           utsname.machine);
   /* TODO Schema. */
+
+  return 0;
 }
 
 /* Printing. */
