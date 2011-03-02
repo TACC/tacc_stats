@@ -1,0 +1,45 @@
+schema {
+  name
+  descr
+  rename
+}
+
+Specify schema via external file.
+
+Identifying which are cumulative.
+
+Enabling, disabling types.
+
+Set id in ST_IB.
+
+Escaping of whitespace, other garbage, in ids.
+
+stats_put(), get_c, put_c.
+
+collect_key_value_dir(stats, path)
+
+dict_resize()
+dict_allow_resize()
+
+/proc/buddyinfo
+/proc/diskstats
+/proc/schedstat (maybe)
+/proc/slabinfo
+
+/proc/net/dev
+/proc/net/rpc/nfs
+
+/proc/net/rpc/nfsd
+/proc/net/sockstat[6]
+/proc/net/snmp (maybe)
+
+/proc/sys/fs/{aio-nr,dentry-state,file-nr,inode-nr,inode-state}
+
+/sys/devices/system/node/node*/numastat
+
+Replace perfquery with libibmad, preformance_reset_via().
+/sys/class/infiniband/mlx4_0/diag_counters/*
+/sys/class/infiniband/mlx4_0/ports/*/counters/*
+/sys/class/infiniband/mlx4_0/device/mlx4_0/[12]/cm*/*
+
+perfctrs
