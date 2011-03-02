@@ -6,17 +6,31 @@
 #include "trace.h"
 #include "dict.h"
 
-#define X(t) extern struct stats_type t##_TYPE;
+#define X(T) extern struct stats_type T##_TYPE;
 #include "stats.x"
 #undef X
 
-struct stats_type *stats_type[] = {
-#define X(t) [t] = &t##_TYPE,
+struct stats_type *type_table[] = {
+#define X(T) [T] = &T##_TYPE,
 #include "stats.x"
 #undef X
 };
 
-size_t nr_stats_types = sizeof(stats_type) / sizeof(stats_type[0]);
+size_t nr_types = sizeof(type_table) / sizeof(type_table[0]);
+
+static int name_to_type_cmp(const void *name, const void *memb)
+{
+  struct stats_type **type = (struct stats_type **) memb;
+
+  return strcmp(name, (*type)->st_name);
+}
+
+struct stats_type *name_to_type(const char *name)
+{
+  return bsearch(name, type_table,
+                 nr_types, sizeof(type_table[0]),
+                 &name_to_type_cmp);
+}
 
 static struct stats *stats_create(struct stats_type *type, const char *id)
 {
@@ -175,8 +189,8 @@ static void init_types(void)
 {
   size_t i;
 
-  for (i = 0; i < nr_stats_types; i++) {
-    struct stats_type *type = stats_type[i];
+  for (i = 0; i < nr_types; i++) {
+    struct stats_type *type = type_table[i];
     if (dict_init(&type->st_current_dict, 0) < 0)
       /* XXX */;
   }
@@ -185,8 +199,8 @@ static void init_types(void)
 void read_all_stats(void)
 {
   size_t i;
-  for (i = 0; i < nr_stats_types; i++) {
-    struct stats_type *type = stats_type[i];
+  for (i = 0; i < nr_types; i++) {
+    struct stats_type *type = type_table[i];
 
     void (**read)(struct stats_type *);
     for (read = type->st_read; *read != NULL; read++)
@@ -216,8 +230,8 @@ void print_stats_type(FILE *file, const char *prefix, struct stats_type *type)
 void print_all_stats(FILE *file, const char *prefix)
 {
   size_t i;
-  for (i = 0; i < nr_stats_types; i++) {
-    struct stats_type *type = stats_type[i];
+  for (i = 0; i < nr_types; i++) {
+    struct stats_type *type = type_table[i];
 
     if (type->st_schema == NULL || *type->st_schema == NULL)
         continue; /* Empty schema. */
