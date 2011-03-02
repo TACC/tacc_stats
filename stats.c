@@ -203,7 +203,7 @@ void read_all_stats(void)
     struct stats_type *type = type_table[i];
 
     void (**read)(struct stats_type *);
-    for (read = type->st_read; *read != NULL; read++)
+    for (read = type->st_collect; *read != NULL; read++)
       (*read)(type);
   }
 }

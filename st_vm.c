@@ -72,6 +72,6 @@ static void read_vmstat(struct stats_type *type)
 
 struct stats_type ST_VM_TYPE = {
   .st_name = "ST_VM",
-  .st_read = (void (*[])()) { &read_vmstat, NULL, },
+  .st_collect = (void (*[])()) { &read_vmstat, NULL, },
   .st_schema = (char *[]) { NULL, },
 };

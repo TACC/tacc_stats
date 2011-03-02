@@ -117,6 +117,6 @@ static void read_meminfo(struct stats_type *type)
 
 struct stats_type ST_MEM_TYPE = {
   .st_name = "ST_MEM",
-  .st_read = (void (*[])()) { &read_meminfo, NULL, },
+  .st_collect = (void (*[])()) { &read_meminfo, NULL, },
   .st_schema = (char *[]) { "MemTotal", "MemUsed", "FilePages", "AnonPages", "Slab", NULL, },
 };

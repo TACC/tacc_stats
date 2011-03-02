@@ -13,7 +13,7 @@ enum {
 
 struct stats_type {
   char *st_name;
-  void (**st_read)(struct stats_type *type);
+  void (**st_collect)(struct stats_type *type);
   char **st_schema;
   struct dict st_current_dict;
 };
@@ -23,6 +23,8 @@ struct stats {
   struct dict st_dict;
   char st_id[];
 };
+
+struct stats_type *name_to_type(const char *name);
 
 void read_all_stats(void);
 void print_all_stats(FILE *file, const char *prefix);
