@@ -2,9 +2,20 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
+#include <unistd.h>
+#include <limits.h>
+#include <sys/utsname.h>
 #include "stats.h"
 #include "trace.h"
 #include "dict.h"
+
+time_t current_time;
+struct utsname utsname;
+char hostname[HOST_NAME_MAX + 1]; /* Try to get FQDN. */
+
+#define TACC_STATS_PROGRAM "tacc_stats"
+#define TACC_STATS_VERSION "1.0.0"
 
 #define X(T) extern struct stats_type T##_TYPE;
 #include "stats.x"
@@ -17,6 +28,23 @@ struct stats_type *type_table[] = {
 };
 
 size_t nr_types = sizeof(type_table) / sizeof(type_table[0]);
+
+static void init(void) __attribute__((constructor));
+static void init(void)
+{
+  current_time = time(0);
+  uname(&utsname);
+  gethostname(hostname, sizeof(hostname));
+
+  /* Initialize types. */
+  size_t i;
+
+  for (i = 0; i < nr_types; i++) {
+    struct stats_type *type = type_table[i];
+    if (dict_init(&type->st_current_dict, 0) < 0)
+      /* XXX */;
+  }
+}
 
 static int name_to_type_cmp(const void *name, const void *memb)
 {
@@ -183,18 +211,6 @@ void stats_set_unit(struct stats *stats, char *key, unsigned long long val, cons
   stats_set(stats, key, val * mult);
 }
 
-static void init_types(void) __attribute__((constructor));
-
-static void init_types(void)
-{
-  size_t i;
-
-  for (i = 0; i < nr_types; i++) {
-    struct stats_type *type = type_table[i];
-    if (dict_init(&type->st_current_dict, 0) < 0)
-      /* XXX */;
-  }
-}
 
 /* Collection. */
 
@@ -209,6 +225,19 @@ void collect_all(void)
       (*collect)(type);
   }
 }
+
+/* Serialization. */
+
+int serialize_file_header(FILE *file)
+{
+  fprintf(file, "%s %s\n%s %s %s %s %s\n",
+          TACC_STATS_PROGRAM, TACC_STATS_VERSION,
+          hostname, utsname.sysname, utsname.release, utsname.version,
+          utsname.machine);
+  /* TODO Schema. */
+}
+
+/* Printing. */
 
 void print_stats_type(FILE *file, const char *prefix, struct stats_type *type)
 {
