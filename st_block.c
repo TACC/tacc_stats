@@ -10,6 +10,10 @@
 #include "stats.h"
 #include "trace.h"
 
+/* Need to account for units.  According to block/stat.txt, in
+/sys/block/DEV/stat sector means 512B (as opposed to real sector size
+of device). */
+
 static void collect_block_dev(struct stats_type *type, const char *dev)
 {
   char path[80];
