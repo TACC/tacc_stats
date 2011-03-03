@@ -7,8 +7,11 @@
 #include "collect.h"
 #include "trace.h"
 
-/* Fields for mlx4, mthca: */
+const char *perfquery = "/opt/ofed/sbin/perfquery";
 
+/* TODO *_data values count 4 octets. */
+
+/* Fields for mlx4, mthca: */
 #define IB_KEYS \
   X(excessive_buffer_overrun_errors), \
   X(link_downed), \
@@ -72,7 +75,7 @@ static void collect_ib_dev(struct stats_type *type, const char *dev)
     file = NULL;
 
     /* Call perfquery to clear stats.  Blech! */
-    snprintf(cmd, sizeof(cmd), "/opt/ofed/sbin/perfquery -R %#x %d", lid, port);
+    snprintf(cmd, sizeof(cmd), "%s -R %#x %d", perfquery, lid, port);
     TRACE("system `%s'\n", cmd);
     system(cmd);
 
