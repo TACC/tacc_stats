@@ -3,67 +3,82 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
+#include <dirent.h>
 #include <errno.h>
 #include <malloc.h>
 #include <ctype.h>
 #include "stats.h"
 #include "trace.h"
 
-static void collect_diskstats(struct stats_type *type)
+static void collect_block_dev(struct stats_type *type, const char *dev)
 {
-  const char *path = "/proc/diskstats";
+  char path[80];
   FILE *file = NULL;
-  char *line = NULL;
-  size_t line_size = 0;
 
+  snprintf(path, sizeof(path), "/sys/block/%s/stat", dev);
   file = fopen(path, "r");
   if (file == NULL) {
     ERROR("cannot open `%s': %m\n", path);
     goto out;
   }
 
-  /* /proc/diskstats fields:
-     major minor name rd_reqs rd_merges rd_sectors rd_ms
-                      wr_reqs wr_merges wr_sectors wr_ms
-                      cur_reqs io_ms io_avg_ms */
-  /* We ignore major and minor. */
-
 #define BLOCK_KEYS \
   X(rd_reqs), X(rd_merges), X(rd_sectors), X(rd_ms), \
   X(wr_reqs), X(wr_merges), X(wr_sectors), X(wr_ms), \
   X(cur_reqs), X(io_ms), X(io_avg_ms)
 
-  while (getline(&line, &line_size, file) >= 0) {
-    char dev[32];
 #define X(K) K
-    unsigned long long BLOCK_KEYS;
+  unsigned long long BLOCK_KEYS;
 #undef X
 
 #define X(K) &K
-    if (sscanf(line, "%*u %*u %31s "
-               "%llu %llu %llu %llu %llu %llu %llu %llu %llu %llu %llu",
-               dev, BLOCK_KEYS) != 12)
-      continue;
+  if (fscanf(file, "%llu %llu %llu %llu %llu %llu %llu %llu %llu %llu %llu",
+             BLOCK_KEYS) != 11)
+    goto out;
 #undef X
 
-    struct stats *stats = get_current_stats(type, dev);
-    if (stats == NULL)
-      continue;
+  struct stats *stats = get_current_stats(type, dev);
+  if (stats == NULL)
+    goto out;
 
 #define X(K) stats_set(stats, #K, K)
-    BLOCK_KEYS;
+  BLOCK_KEYS;
 #undef X
-  }
 
  out:
-  free(line);
   if (file != NULL)
     fclose(file);
 }
 
+static void collect_block(struct stats_type *type)
+{
+  const char *path = "/sys/block";
+  DIR *dir = NULL;
+
+  dir = opendir(path);
+  if (dir == NULL) {
+    ERROR("cannot open `%s': %m\n", path);
+    goto out;
+  }
+
+  struct dirent *ent;
+  while ((ent = readdir(dir)) != NULL) {
+    if (ent->d_name[0] == '.')
+      continue;
+    /* Ignore ram*.  FIXME Make this a config. */
+    if (strncmp(ent->d_name, "ram", 3) == 0)
+      continue;
+    collect_block_dev(type, ent->d_name);
+  }
+
+ out:
+  if (dir != NULL)
+    closedir(dir);
+}
+
 struct stats_type ST_BLOCK_TYPE = {
   .st_name = "ST_BLOCK",
-  .st_collect = (void (*[])()) { &collect_diskstats, NULL, },
+  .st_collect = (void (*[])()) { &collect_block, NULL, },
   .st_schema = (char *[]) {
 #define X(K) #K
     BLOCK_KEYS, NULL,
