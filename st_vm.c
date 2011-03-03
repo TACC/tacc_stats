@@ -67,8 +67,49 @@ static void collect_vmstat(struct stats_type *type)
 // allocstall 18265
 // pgrotated 18
 
+#define VM_KEYS \
+  X(nr_dirty), \
+  X(nr_writeback), \
+  X(nr_unstable), \
+  X(nr_page_table_pages), \
+  X(nr_mapped), \
+  X(nr_slab), \
+  X(pgpgin), \
+  X(pgpgout), \
+  X(pswpin), \
+  X(pswpout), \
+  X(pgalloc_high), \
+  X(pgalloc_normal), \
+  X(pgalloc_dma), \
+  X(pgfree), \
+  X(pgactivate), \
+  X(pgdeactivate), \
+  X(pgfault), \
+  X(pgmajfault), \
+  X(pgrefill_high), \
+  X(pgrefill_normal), \
+  X(pgrefill_dma), \
+  X(pgsteal_high), \
+  X(pgsteal_normal), \
+  X(pgsteal_dma), \
+  X(pgscan_kswapd_high), \
+  X(pgscan_kswapd_normal), \
+  X(pgscan_kswapd_dma), \
+  X(pgscan_direct_high), \
+  X(pgscan_direct_normal), \
+  X(pgscan_direct_dma), \
+  X(pginodesteal), \
+  X(slabs_scanned), \
+  X(kswapd_steal), \
+  X(kswapd_inodesteal), \
+  X(pageoutrun), \
+  X(allocstall), \
+  X(pgrotated)
+
 struct stats_type ST_VM_TYPE = {
   .st_name = "ST_VM",
   .st_collect = (void (*[])()) { &collect_vmstat, NULL, },
-  .st_schema = (char *[]) { NULL, },
+#define X(K) #K
+  .st_schema = (char *[]) { VM_KEYS, NULL, },
+#undef X
 };
