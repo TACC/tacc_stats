@@ -5,12 +5,6 @@
 #include <stdio.h>
 #include "dict.h"
 
-enum {
-#define X(t) t ,
-#include "stats.x"
-#undef X
-};
-
 struct stats_type {
   char *st_name;
   void (**st_collect)(struct stats_type *type);

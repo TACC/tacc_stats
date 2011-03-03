@@ -22,7 +22,7 @@ char hostname[HOST_NAME_MAX + 1]; /* Try to get FQDN. */
 #undef X
 
 struct stats_type *type_table[] = {
-#define X(T) [T] = &T##_TYPE,
+#define X(T) &T##_TYPE,
 #include "stats.x"
 #undef X
 };
