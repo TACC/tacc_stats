@@ -40,27 +40,40 @@
 #define IA32_PERF_CTR_BASE 0xC1
 #define IA32_PERF_EVT_BASE 0x186
 
-int amd = 1; /* FIXME */
-
 static int perf_access(char *cpu, int *nr_ctrs, unsigned *ctr_base, unsigned *evt_base)
 {
   char cpuid_path[80];
   int cpuid_fd = -1;
   int rc = -1;
 
-  if (amd) {
-    *nr_ctrs = 4;
-    *ctr_base = AMD64_PERF_CTR_BASE;
-    *evt_base = AMD64_PERF_CTR_BASE;
-    return 0;
-  }
-
-  /* Read /dev/cpuid/cpu/cpuid for number of counters on cpu. */
+  /* Open /dev/cpuid/cpu/cpuid. */
   snprintf(cpuid_path, sizeof(cpuid_path), "/dev/cpu/%s/cpuid", cpu);
   cpuid_fd = open(cpuid_path, O_RDONLY);
   if (cpuid_fd < 0) {
     ERROR("cannot open `%s': %m\n", cpuid_path);
     goto out;
+  }
+
+  /* Get cpu vendor. */
+  uint32_t buf[4];
+  if (pread(cpuid_fd, buf, sizeof(buf), 0x0) < 0) {
+    ERROR("cannot read cpu vendor through `%s': %m\n", cpuid_path);
+    goto out;
+  }
+  buf[0] = buf[2], buf[2] = buf[3], buf[3] = buf[0];
+  TRACE("vendor `%.12s'\n", (char*) buf + 4);
+
+  if (strncmp((char*) buf + 4, "AuthenticAMD", 12) == 0) {
+    *nr_ctrs = 4;
+    *ctr_base = AMD64_PERF_CTR_BASE;
+    *evt_base = AMD64_PERF_EVT_BASE;
+    rc = 0;
+    goto out;
+  }
+
+  if (strncmp((char*) buf + 4, "GenuineIntel", 12) != 0) {
+    ERROR("unsupported cpu vendor `%.12s'\n", (char*) buf + 4);
+    goto out; /* CentaurHauls? */
   }
 
   uint32_t eax;
@@ -103,7 +116,7 @@ static void collect_perf_cpu(struct stats_type *type, char *cpu)
     goto out;
   }
 
-  /* Read msr's. */
+  /* Read MSRs. */
   snprintf(msr_path, sizeof(msr_path), "/dev/cpu/%s/msr", cpu);
   msr_fd = open(msr_path, O_RDONLY);
   if (msr_fd < 0) {
@@ -126,7 +139,7 @@ static void collect_perf_cpu(struct stats_type *type, char *cpu)
     char id[80];
     struct stats *stats;
 
-    snprintf(id, sizeof(id), "%s.%d", cpu, i); /* XXX Composite id formatting. */
+    snprintf(id, sizeof(id), "%s.%d", cpu, i); /* XXX */
     stats = get_current_stats(type, id);
     if (stats == NULL)
       continue;
