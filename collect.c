@@ -73,7 +73,6 @@ int collect_key_value_dir(struct stats *stats, const char *dir_path)
 {
   int rc = 0;
   DIR *dir = NULL;
-  char *path = NULL;
 
   dir = opendir(dir_path);
   if (dir == NULL) {
@@ -84,26 +83,27 @@ int collect_key_value_dir(struct stats *stats, const char *dir_path)
 
   struct dirent *ent;
   while ((ent = readdir(dir)) != NULL) {
-    free(path);
-    path = NULL;
+    char *path = NULL;
 
     if (ent->d_name[0] == '.')
-      continue;
+      goto next;
 
     if (asprintf(&path, "%s/%s", dir_path, ent->d_name) < 0) {
       ERROR("cannot allocate path: %m\n");
-      continue;
+      goto next;
     }
 
     unsigned long long val = 0;
     if (collect_single(&val, path) < 0)
-      continue;
+      goto next;
 
     stats_set(stats, ent->d_name, val);
+
+  next:
+    free(path);
   }
 
  out:
-  free(path);
   if (dir != NULL)
     closedir(dir);
 
