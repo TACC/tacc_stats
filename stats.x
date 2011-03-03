@@ -1,3 +1,4 @@
+X(ST_BLOCK)
 X(ST_CPU)
 X(ST_IB)
 X(ST_JOB)
