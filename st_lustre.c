@@ -81,10 +81,8 @@ static void collect_lustre_stats(struct stats_type *type)
     }
 
     struct stats *fs_stats = get_current_stats(type, fs_name);
-    if (fs_stats == NULL) {
-      ERROR("cannot get filesystem stats for `%s': %m\n", fs_name);
+    if (fs_stats == NULL)
       continue;
-    }
 
     collect_osc_stats(fs_stats, ent->d_name);
   }

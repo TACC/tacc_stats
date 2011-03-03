@@ -42,10 +42,8 @@ static void collect_ib_stats(struct stats_type *type)
   }
 
   ib_stats = get_current_stats(type, NULL); /* Use port number as id? */
-  if (ib_stats == NULL) {
-    ERROR("cannot get ib_stats: %m\n");
+  if (ib_stats == NULL)
     goto out;
-  }
 
   while (getline(&line, &line_size, pipe) >= 0) {
     char *key, *rest = line;
@@ -89,5 +87,4 @@ struct stats_type ST_IB_TYPE = {
   .st_schema = (char *[]) {
     "RcvPkts", "XmtPkts", "RvcData", "XmtData", NULL,
   },
-  /* .st_rename */
 };

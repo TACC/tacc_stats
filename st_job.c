@@ -10,10 +10,8 @@ static void collect_jobid(struct stats_type *type)
   unsigned long long jobid = 0;
 
   job_stats = get_current_stats(type, NULL);
-  if (job_stats == NULL) {
-    ERROR("cannot get job_stats: %m\n");
+  if (job_stats == NULL)
     return;
-  }
 
   collect_single(&jobid, "/var/run/TACC_jobid");
 

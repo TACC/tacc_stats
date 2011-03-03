@@ -79,10 +79,8 @@ static void collect_meminfo(struct stats_type *type)
         continue;
 
     struct stats *stats = get_current_stats(type, node);
-    if (stats == NULL) {
-      ERROR("cannot get node_stats: %m\n");
+    if (stats == NULL)
       continue;
-    }
 
     collect_meminfo_node(stats, node);
   }

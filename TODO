@@ -1,6 +1,3 @@
-Don't ERROR when get_current_stats() returns NULL---so we can
-optionally ignore certain devices,....
-
 RRDtool.
 
 Time format specifier.

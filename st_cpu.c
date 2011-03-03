@@ -22,10 +22,8 @@ static void collect_proc_stat_cpu(struct stats_type *type, char *cpu, char *rest
       return;
 
   struct stats *cpu_stats = get_current_stats(type, cpu);
-  if (cpu_stats == NULL) {
-    ERROR("cannot set cpu stats: %m\n");
+  if (cpu_stats == NULL)
     return;
-  }
 
   unsigned long long user = 0, nice = 0, system = 0, idle = 0,
     iowait = 0, irq = 0, softirq = 0, steal = 0;

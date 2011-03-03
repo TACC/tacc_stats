@@ -9,10 +9,8 @@ static void collect_vmstat(struct stats_type *type)
   struct stats *vm_stats = NULL;
 
   vm_stats = get_current_stats(type, NULL);
-  if (vm_stats == NULL) {
-    ERROR("cannot get vm_stats: %m\n");
+  if (vm_stats == NULL)
     return;
-  }
 
   collect_key_value_file(vm_stats, "/proc/vmstat");
 }

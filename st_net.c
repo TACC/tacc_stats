@@ -58,10 +58,8 @@ static void collect_net_dev(struct stats_type *type)
 #undef X
 
     struct stats *stats = get_current_stats(type, iface);
-    if (stats == NULL) {
-      ERROR("cannot get net dev stats: %m\n");
+    if (stats == NULL)
       continue;
-    }
 
 #define X(K) stats_set(stats, #K, K)
     NET_DEV_KEYS;
