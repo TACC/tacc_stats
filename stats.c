@@ -46,18 +46,25 @@ static void init(void)
   }
 }
 
-static int name_to_type_cmp(const void *name, const void *memb)
-{
-  struct stats_type **type = (struct stats_type **) memb;
+// static int name_to_type_cmp(const void *name, const void *memb)
+// {
+//   struct stats_type **type = (struct stats_type **) memb;
 
-  return strcmp(name, (*type)->st_name);
-}
+//   return strcmp(name, (*type)->st_name);
+// }
 
 struct stats_type *name_to_type(const char *name)
 {
-  return bsearch(name, type_table,
-                 nr_types, sizeof(type_table[0]),
-                 &name_to_type_cmp);
+//   return bsearch(name, type_table,
+//                  nr_types, sizeof(type_table[0]),
+//                  &name_to_type_cmp);
+  int i;
+  for (i = 0; i < nr_types; i++) {
+    if (strcmp(name, type_table[i]->st_name) == 0)
+      return type_table[i];
+  }
+
+  return NULL;
 }
 
 static struct stats *stats_create(struct stats_type *type, const char *id)
@@ -214,16 +221,18 @@ void stats_set_unit(struct stats *stats, char *key, unsigned long long val, cons
 
 /* Collection. */
 
+void collect_type(struct stats_type *type)
+{
+  void (**collect)(struct stats_type *);
+  for (collect = type->st_collect; *collect != NULL; collect++)
+    (*collect)(type);
+}
+
 void collect_all(void)
 {
   size_t i;
-  for (i = 0; i < nr_types; i++) {
-    struct stats_type *type = type_table[i];
-
-    void (**collect)(struct stats_type *);
-    for (collect = type->st_collect; *collect != NULL; collect++)
-      (*collect)(type);
-  }
+  for (i = 0; i < nr_types; i++)
+    collect_type(type_table[i]);
 }
 
 /* Serialization. */
