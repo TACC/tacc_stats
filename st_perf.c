@@ -44,6 +44,7 @@ static int perf_access(char *cpu, int *nr_ctrs, unsigned *ctr_base, unsigned *ev
 {
   char cpuid_path[80];
   int cpuid_fd = -1;
+  uint32_t buf[4];
   int rc = -1;
 
   /* Open /dev/cpuid/cpu/cpuid. */
@@ -55,13 +56,12 @@ static int perf_access(char *cpu, int *nr_ctrs, unsigned *ctr_base, unsigned *ev
   }
 
   /* Get cpu vendor. */
-  uint32_t buf[4];
   if (pread(cpuid_fd, buf, sizeof(buf), 0x0) < 0) {
     ERROR("cannot read cpu vendor through `%s': %m\n", cpuid_path);
     goto out;
   }
   buf[0] = buf[2], buf[2] = buf[3], buf[3] = buf[0];
-  TRACE("vendor `%.12s'\n", (char*) buf + 4);
+  TRACE("cpu %s, vendor `%.12s'\n", cpu, (char*) buf + 4);
 
   if (strncmp((char*) buf + 4, "AuthenticAMD", 12) == 0) {
     *nr_ctrs = 4;
@@ -76,15 +76,40 @@ static int perf_access(char *cpu, int *nr_ctrs, unsigned *ctr_base, unsigned *ev
     goto out; /* CentaurHauls? */
   }
 
-  uint32_t eax;
-  if (pread(cpuid_fd, &eax, sizeof(eax), 0x0A) < 0) {
+  if (pread(cpuid_fd, buf, sizeof(buf), 0x0A) < 0) {
     ERROR("cannot read `%s': %m\n", cpuid_path);
     goto out;
   }
 
-  *nr_ctrs = (eax >> 8) & 0xff;
-  *ctr_base = IA32_PERF_CTR_BASE;
-  *evt_base = IA32_PERF_EVT_BASE;
+  TRACE("cpu %s, buf %08x %08x %08x %08x\n", cpu, buf[0], buf[1], buf[2], buf[3]);
+
+  /* TODO Uncore. */
+
+  int perf_ver = buf[0] & 0xff;
+  TRACE("cpu %s, perf_ver %d\n", cpu, perf_ver);
+  switch (perf_ver) {
+  case 0:
+    ERROR("perf monitoring capability is not supported\n");
+    goto out;
+  case 1:
+    *nr_ctrs = (buf[0] >> 8) & 0xff;
+    *ctr_base = IA32_PERF_CTR_BASE;
+    *evt_base = IA32_PERF_EVT_BASE;
+    break;
+  case 2:
+    /* Fixed counters buf[3] & 0x1f. */
+    break;
+  case 3:
+    *nr_ctrs = (buf[0] >> 8) & 0xff;
+    *ctr_base = IA32_PERF_CTR_BASE;
+    *evt_base = IA32_PERF_EVT_BASE;
+    break;
+  default:
+    ERROR("unsupported perf monitoring version %d\n", perf_ver);
+    goto out;
+  }
+
+  rc = 0;
 
  out:
   if (cpuid_fd >= 0)
