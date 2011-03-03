@@ -1,8 +1,7 @@
 #define _GNU_SOURCE
 #include "stats.h"
 #include "trace.h"
-
-int collect_single(unsigned long long *dest, const char *path);
+#include "collect.h"
 
 static void collect_jobid(struct stats_type *type)
 {

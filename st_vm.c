@@ -1,8 +1,7 @@
 #define _GNU_SOURCE
 #include "stats.h"
 #include "trace.h"
-
-void collect_key_value_file(struct stats *stats, const char *path);
+#include "collect.h"
 
 static void collect_vmstat(struct stats_type *type)
 {
