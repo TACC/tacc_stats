@@ -3,81 +3,131 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
+#include <dirent.h>
 #include <errno.h>
 #include <malloc.h>
 #include <ctype.h>
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <linux/if.h>
 #include "stats.h"
+#include "collect.h"
 #include "trace.h"
 
-static void collect_net_dev(struct stats_type *type)
-{
-  const char *path = "/proc/net/dev";
-  FILE *file = NULL;
-  char *line = NULL;
-  size_t line_size = 0;
+#define NET_KEYS \
+  X(collisions), \
+  X(multicast), \
+  X(rx_bytes), \
+  X(rx_compressed), \
+  X(rx_crc_errors), \
+  X(rx_dropped), \
+  X(rx_errors), \
+  X(rx_fifo_errors), \
+  X(rx_frame_errors), \
+  X(rx_length_errors), \
+  X(rx_missed_errors), \
+  X(rx_over_errors), \
+  X(rx_packets), \
+  X(tx_aborted_errors), \
+  X(tx_bytes), \
+  X(tx_carrier_errors), \
+  X(tx_compressed), \
+  X(tx_dropped), \
+  X(tx_errors), \
+  X(tx_fifo_errors), \
+  X(tx_heartbeat_errors), \
+  X(tx_packets), \
+  X(tx_window_errors)
 
-  file = fopen(path, "r");
-  if (file == NULL) {
-    ERROR("cannot open `%s': %m\n", path);
+static void collect_net_dev(struct stats_type *type, const char *dev)
+{
+  struct stats *stats = NULL;
+  char path[80];
+
+  stats = get_current_stats(type, dev);
+  if (stats == NULL)
+    return;
+
+  snprintf(path, sizeof(path), "/sys/class/net/%s/statistics", dev);
+  collect_key_value_dir(stats, path);
+}
+
+static void collect_net(struct stats_type *type)
+{
+  const char *dir_path = "/sys/class/net";
+  DIR *dir = NULL;
+
+  dir = opendir(dir_path);
+  if (dir == NULL) {
+    ERROR("cannot open `%s': %m\n", dir_path);
     goto out;
   }
 
-  /* It's just horrible. (Lots of space taken out.) */
-  // $ cat /proc/net/dev
-  // Inter-|   Receive                                             |  Transmit
-  //  face |bytes packets errs drop fifo frame compressed multicast|bytes    packets errs drop fifo colls carrier compressed
-  //     lo:206258552443 1056240623 0 0 0 0 0 0 206258552443 1056240623 0 0 0 0 0 0
-  // ...
+  struct dirent *ent;
+  while ((ent = readdir(dir)) != NULL) {
+    unsigned int flags;
+    char flags_path[80];
+    FILE *flags_file = NULL;
 
-#define NET_DEV_KEYS \
-  X(rx_bytes), X(rx_packets), X(rx_errors), X(rx_drop), X(rx_fifo), X(rx_frame), X(rx_compressed), X(rx_multicast), \
-  X(tx_bytes), X(tx_packets), X(tx_errors), X(tx_drop), X(tx_fifo), X(tx_collisions), X(tx_carrier), X(tx_compressed)
+    if (ent->d_name[0] == '.')
+      goto next;
 
-  /* Burn first two lines. */
-  getline(&line, &line_size, file);
-  getline(&line, &line_size, file);
+    /* Only collect if dev is up. */
+    snprintf(flags_path, sizeof(flags_path), "/sys/class/net/%s/flags", ent->d_name);
+    flags_file = fopen(flags_path, "r");
+    if (flags_file == NULL) {
+      ERROR("cannot open `%s'; %m\n", flags_path);
+      goto next;
+    }
 
-  while (getline(&line, &line_size, file) >= 0) {
-    char *iface, *rest = line;
-    iface = strsep(&rest, ":");
-    while (*iface == ' ')
-      iface++;
-    if (*iface == 0 || rest == NULL)
-      continue;
+    if (fscanf(flags_file, "%x", &flags) != 1) {
+      ERROR("cannot read flags for device `%s'\n", ent->d_name);
+      goto next;
+    }
 
-#define X(K) K
-    unsigned long long NET_DEV_KEYS;
+#define NET_FLAGS \
+  X(IFF_UP), \
+  X(IFF_BROADCAST), \
+  X(IFF_DEBUG), \
+  X(IFF_LOOPBACK), \
+  X(IFF_POINTOPOINT), \
+  X(IFF_NOTRAILERS), \
+  X(IFF_RUNNING), \
+  X(IFF_NOARP), \
+  X(IFF_PROMISC), \
+  X(IFF_ALLMULTI), \
+  X(IFF_MASTER), \
+  X(IFF_SLAVE), \
+  X(IFF_MULTICAST), \
+  X(IFF_VOLATILE), \
+  X(IFF_PORTSEL), \
+  X(IFF_AUTOMEDIA), \
+  X(IFF_DYNAMIC)
+
+#define X(F) ((flags & F) ? " " #F : "")
+    TRACE("dev %s, flags %u%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s)\n",
+          ent->d_name, flags, NET_FLAGS);
 #undef X
 
-#define X(K) &K
-    if (sscanf(rest,
-               "%llu %llu %llu %llu %llu %llu %llu %llu"
-               "%llu %llu %llu %llu %llu %llu %llu %llu",
-               NET_DEV_KEYS) != 16)
-      continue;
-#undef X
+    if ((flags & IFF_UP) == 0)
+      goto next;
 
-    struct stats *stats = get_current_stats(type, iface);
-    if (stats == NULL)
-      continue;
+    collect_net_dev(type, ent->d_name);
 
-#define X(K) stats_set(stats, #K, K)
-    NET_DEV_KEYS;
-#undef X
+  next:
+    if (flags_file != NULL)
+      fclose(flags_file);
   }
 
  out:
-  free(line);
-  if (file != NULL)
-    fclose(file);
+  if (dir != NULL)
+    closedir(dir);
 }
 
 struct stats_type ST_NET_TYPE = {
   .st_name = "ST_NET",
-  .st_collect = (void (*[])()) { &collect_net_dev, NULL, },
-  .st_schema = (char *[]) {
+  .st_collect = (void (*[])()) { &collect_net, NULL, },
 #define X(K) #K
-    NET_DEV_KEYS, NULL,
+  .st_schema = (char *[]) { NET_KEYS, NULL, },
 #undef X
-  },
 };
