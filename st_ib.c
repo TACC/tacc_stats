@@ -7,7 +7,7 @@
 #include "collect.h"
 #include "trace.h"
 
-const char *perfquery = "/opt/ofed/sbin/perfquery";
+const char *perfquery = "/opt/ofed/bin/perfquery";
 
 /* TODO *_data values count 4 octets. */
 
