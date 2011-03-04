@@ -21,8 +21,14 @@
 // are monitored.  All of the events are specified in section 3.14
 // [Performance Counter Events].
 
-#define AMD64_PERF_CTR_BASE 0xC0010004
-#define AMD64_PERF_EVT_BASE 0xC0010000
+#define AMD64_PERF_CTL0 0xC0010000
+#define AMD64_PERF_CTL1 0xC0010001
+#define AMD64_PERF_CTL2 0xC0010002
+#define AMD64_PERF_CTL3 0xC0010003
+#define AMD64_PERF_CTR0 0xC0010004
+#define AMD64_PERF_CTR1 0xC0010005
+#define AMD64_PERF_CTR2 0xC0010006
+#define AMD64_PERF_CTR3 0xC0010007
 
 // $ ls -l /dev/cpu/0
 // total 0
@@ -37,8 +43,52 @@
 // of MSR address space. Each performance event select register is paired with a
 // corresponding performance counter in the 0C1H address block.
 
-#define IA32_PERF_CTR_BASE 0xC1
-#define IA32_PERF_EVT_BASE 0x186
+#define IA32_PMC0 0xC1 /* CPUID.0AH: EAX[15:8] > 0 */
+#define IA32_PMC1 0xC2 /* CPUID.0AH: EAX[15:8] > 1 */
+#define IA32_PMC2 0xC3 /* CPUID.0AH: EAX[15:8] > 2 */
+#define IA32_PMC3 0xC4 /* CPUID.0AH: EAX[15:8] > 3 */
+
+#define IA32_PERFEVTSEL0 0x186 /* CPUID.0AH: EAX[15:8] > 0 */
+#define IA32_PERFEVTSEL1 0x187 /* CPUID.0AH: EAX[15:8] > 1 */
+#define IA32_PERFEVTSEL2 0x188 /* CPUID.0AH: EAX[15:8] > 2 */
+#define IA32_PERFEVTSEL3 0x189 /* CPUID.0AH: EAX[15:8] > 3 */
+
+#define IA32_FIXED_CTR0 0x309 /* Instr_Retired.Any, CPUID.0AH: EDX[4:0] > 0 */
+#define IA32_FIXED_CTR1 0x30A /* CPU_CLK_Unhalted.Core, CPUID.0AH: EDX[4:0] > 1 */
+#define IA32_FIXED_CTR2 0x30B /* CPU_CLK_Unhalted.Ref, CPUID.0AH: EDX[4:0] > 2 */
+#define IA32_FIXED_CTR_CTRL 0x38D /* CPUID.0AH: EAX[7:0] > 1 */
+#define IA32_PERF_GLOBAL_STATUS 0x38E
+#define IA32_PERF_GLOBAL_CTRL 0x38F
+#define IA32_PERF_GLOBAL_OVF_CTRL 0x390
+
+/* B.4.1 Additional MSRs In the Intel Xeon Processors 5500 and 3400
+   Series.  These also apply to Core i7 and i5 processor family CPUID
+   signature of 06_1AH, 06_1EH and 06_1FH. */
+
+#define MSR_UNCORE_PERF_GLOBAL_CTRL     0x391
+#define MSR_UNCORE_PERF_GLOBAL_STATUS   0x392
+#define MSR_UNCORE_PERF_GLOBAL_OVF_CTRL 0x393
+#define MSR_UNCORE_FIXED_CTR0           0x394 /* Uncore clock. */
+#define MSR_UNCORE_FIXED_CTR_CTRL       0x395
+#define MSR_UNCORE_ADDR_OPCODE_MATCH    0x396
+
+#define MSR_UNCORE_PMC0 0x3B0 /* CHECKME */
+#define MSR_UNCORE_PMC1 0x3B1
+#define MSR_UNCORE_PMC2 0x3B2
+#define MSR_UNCORE_PMC3 0x3B3
+#define MSR_UNCORE_PMC4 0x3B4
+#define MSR_UNCORE_PMC5 0x3B5
+#define MSR_UNCORE_PMC6 0x3B6
+#define MSR_UNCORE_PMC7 0x3B7
+
+#define MSR_UNCORE_PERFEVTSEL0 0x3C0 /* CHECKME */
+#define MSR_UNCORE_PERFEVTSEL1 0x3C1
+#define MSR_UNCORE_PERFEVTSEL2 0x3C2
+#define MSR_UNCORE_PERFEVTSEL3 0x3C3
+#define MSR_UNCORE_PERFEVTSEL4 0x3C4
+#define MSR_UNCORE_PERFEVTSEL5 0x3C5
+#define MSR_UNCORE_PERFEVTSEL6 0x3C6
+#define MSR_UNCORE_PERFEVTSEL7 0x3C7
 
 static int perf_access(char *cpu, int *nr_ctrs, unsigned *ctr_base, unsigned *evt_base)
 {
@@ -65,8 +115,8 @@ static int perf_access(char *cpu, int *nr_ctrs, unsigned *ctr_base, unsigned *ev
 
   if (strncmp((char*) buf + 4, "AuthenticAMD", 12) == 0) {
     *nr_ctrs = 4;
-    *ctr_base = AMD64_PERF_CTR_BASE;
-    *evt_base = AMD64_PERF_EVT_BASE;
+    *ctr_base = AMD64_PERF_CTR0;
+    *evt_base = AMD64_PERF_CTL0;
     rc = 0;
     goto out;
   }
@@ -83,7 +133,8 @@ static int perf_access(char *cpu, int *nr_ctrs, unsigned *ctr_base, unsigned *ev
 
   TRACE("cpu %s, buf %08x %08x %08x %08x\n", cpu, buf[0], buf[1], buf[2], buf[3]);
 
-  /* TODO Uncore. */
+  *ctr_base = IA32_PMC0;
+  *evt_base = IA32_PERFEVTSEL0;
 
   int perf_ver = buf[0] & 0xff;
   TRACE("cpu %s, perf_ver %d\n", cpu, perf_ver);
@@ -93,16 +144,13 @@ static int perf_access(char *cpu, int *nr_ctrs, unsigned *ctr_base, unsigned *ev
     goto out;
   case 1:
     *nr_ctrs = (buf[0] >> 8) & 0xff;
-    *ctr_base = IA32_PERF_CTR_BASE;
-    *evt_base = IA32_PERF_EVT_BASE;
     break;
   case 2:
-    /* Fixed counters buf[3] & 0x1f. */
+    /* Bits 0 through 4 of CPUID.0AH.EDX indicates the number of
+       fixed-function performance counters available per core. */
     break;
   case 3:
     *nr_ctrs = (buf[0] >> 8) & 0xff;
-    *ctr_base = IA32_PERF_CTR_BASE;
-    *evt_base = IA32_PERF_EVT_BASE;
     break;
   default:
     ERROR("unsupported perf monitoring version %d\n", perf_ver);
