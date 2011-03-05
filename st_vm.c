@@ -108,7 +108,7 @@ static void collect_vmstat(struct stats_type *type)
 
 struct stats_type ST_VM_TYPE = {
   .st_name = "ST_VM",
-  .st_collect = (void (*[])()) { &collect_vmstat, NULL, },
+  .st_collect = &collect_vmstat,
 #define X(K) #K
   .st_schema = (char *[]) { VM_KEYS, NULL, },
 #undef X

@@ -253,6 +253,6 @@ static void collect_perf(struct stats_type *type)
 
 struct stats_type ST_PERF_TYPE = {
   .st_name = "ST_PERF",
-  .st_collect = (void (*[])()) { &collect_perf, NULL, },
+  .st_collect = &collect_perf,
   .st_schema = (char *[]) { "ctr", "evt", NULL, },
 };

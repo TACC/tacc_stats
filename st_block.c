@@ -82,7 +82,7 @@ static void collect_block(struct stats_type *type)
 
 struct stats_type ST_BLOCK_TYPE = {
   .st_name = "ST_BLOCK",
-  .st_collect = (void (*[])()) { &collect_block, NULL, },
+  .st_collect = &collect_block,
   .st_schema = (char *[]) {
 #define X(K) #K
     BLOCK_KEYS, NULL,

@@ -223,8 +223,9 @@ void stats_set_unit(struct stats *stats, char *key, unsigned long long val, cons
 
 void collect_type(struct stats_type *type)
 {
-  void (**collect)(struct stats_type *);
-  for (collect = type->st_collect; *collect != NULL; collect++)
+  void (*collect)(struct stats_type *) = type->st_collect;
+
+  if (collect != NULL)
     (*collect)(type);
 }
 

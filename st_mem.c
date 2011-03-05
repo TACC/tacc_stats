@@ -150,7 +150,7 @@ static void collect_mem(struct stats_type *type)
 
 struct stats_type ST_MEM_TYPE = {
   .st_name = "ST_MEM",
-  .st_collect = (void (*[])()) { &collect_mem, NULL, },
+  .st_collect = &collect_mem,
 #define X(K) #K
   .st_schema = (char *[]) { MEM_KEYS, NULL, },
 #undef X

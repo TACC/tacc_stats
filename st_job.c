@@ -19,6 +19,6 @@ static void collect_jobid(struct stats_type *type)
 
 struct stats_type ST_JOB_TYPE = {
   .st_name = "ST_JOB",
-  .st_collect = (void (*[])()) { &collect_jobid, NULL, },
+  .st_collect = &collect_jobid,
   .st_schema = (char *[]) { "jobid", NULL, },
 };

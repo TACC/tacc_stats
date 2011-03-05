@@ -111,7 +111,7 @@ static void collect_ib(struct stats_type *type)
 
 struct stats_type ST_IB_TYPE = {
   .st_name = "ST_IB",
-  .st_collect = (void (*[])()) { &collect_ib, NULL, },
+  .st_collect = &collect_ib,
 #define X(K) #K
   .st_schema = (char *[]) { IB_KEYS, NULL, },
 #undef X

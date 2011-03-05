@@ -7,7 +7,7 @@
 
 struct stats_type {
   char *st_name;
-  void (**st_collect)(struct stats_type *type);
+  void (*st_collect)(struct stats_type *type);
   char **st_schema;
   struct dict st_current_dict;
 };

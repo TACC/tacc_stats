@@ -75,7 +75,7 @@ static void collect_proc_stat(struct stats_type *type)
 
 struct stats_type ST_CPU_TYPE = {
   .st_name = "ST_CPU",
-  .st_collect = (void (*[])()) { &collect_proc_stat, NULL, },
+  .st_collect = &collect_proc_stat,
   .st_schema = (char *[]) {
     "user", "nice", "system", "idle", "iowait", "irq", "softirq", NULL,
   },
