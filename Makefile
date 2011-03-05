@@ -3,7 +3,7 @@ CFLAGS = -Wall -Werror
 CPPFLAGS = -g -DDEBUG
 
 ST_OBJS := st_block.o st_cpu.o st_ib.o st_job.o st_lustre.o st_mem.o st_net.o \
- st_perf.o st_ps.o st_vm.o
+ st_perf_amd64.o st_ps.o st_vm.o
 OBJS := stats.o dict.o collect.o test.o test-loop.o $(ST_OBJS)
 
 all: test test-loop
