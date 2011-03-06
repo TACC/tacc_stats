@@ -14,9 +14,6 @@ time_t current_time;
 struct utsname utsname;
 char hostname[HOST_NAME_MAX + 1]; /* Try to get FQDN. */
 
-#define TACC_STATS_PROGRAM "tacc_stats"
-#define TACC_STATS_VERSION "1.0.0"
-
 #define X(T) extern struct stats_type T##_TYPE;
 #include "stats.x"
 #undef X
