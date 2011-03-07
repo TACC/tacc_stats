@@ -9,8 +9,13 @@
 #define TRACE(fmt,arg...) ((void) 0)
 #endif
 
+#ifdef DEBUG
 #define ERROR(fmt,arg...) \
-  fprintf(stderr, "%s:%s:%d: "fmt, program_invocation_short_name, __func__, __LINE__, ##arg)
+  fprintf(stderr, "%s:%d: "fmt, __func__, __LINE__, ##arg)
+#else
+#define ERROR(fmt,arg...) \
+  fprintf(stderr, "%s: "fmt, program_invocation_short_name, ##arg)
+#endif
 
 #define FATAL(fmt,arg...) do { \
     ERROR(fmt, ##arg);         \
