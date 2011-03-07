@@ -10,6 +10,7 @@
 #include "stats.h"
 #include "stats_file.h"
 #include "trace.h"
+#include "readstr.h"
 
 void usage(void)
 {
@@ -27,9 +28,10 @@ void usage(void)
 
 int main(int argc, char *argv[])
 {
-  char *lock_file_path = "/var/run/tacc_stats_lock";
+  const char *lock_file_path = "/var/run/tacc_stats_lock";
+  const char *stats_file_path = "/var/run/tacc_stats_current";
+  const char *jobid_file_path = "/var/run/TACC_jobid";
   int lock_file_fd = -1;
-  char *stats_file_path = "/var/run/tacc_stats_current";
   FILE *stats_file = NULL;
   char **type_list = NULL;
   size_t type_count = 0;
@@ -111,6 +113,7 @@ int main(int argc, char *argv[])
     }
   }
 
+  jobid = readstr(jobid_file_path);
   stats_file_wr_rec(stats_file, stats_file_path, jobid);
 
   if (fclose(stats_file) < 0)

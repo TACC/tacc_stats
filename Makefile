@@ -4,11 +4,11 @@ CPPFLAGS = -g -DDEBUG
 
 ST_OBJS := st_block.o st_cpu.o st_ib.o st_job.o st_lustre.o st_mem.o st_net.o \
  st_perf_amd64.o st_ps.o st_vm.o
-OBJS := stats.o dict.o collect.o split.o stats_file.o main.o test.o test-loop.o $(ST_OBJS)
+OBJS := stats.o dict.o collect.o split.o readstr.o stats_file.o main.o test.o test-loop.o $(ST_OBJS)
 
 all: main test test-loop
 
-main: main.o stats.o dict.o collect.o split.o stats_file.o $(ST_OBJS)
+main: main.o stats.o dict.o collect.o split.o readstr.o stats_file.o $(ST_OBJS)
 
 test: test.o stats.o dict.o collect.o split.o stats_file.o $(ST_OBJS)
 
