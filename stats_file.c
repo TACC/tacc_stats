@@ -112,19 +112,16 @@ int stats_file_rd_hdr(FILE *file, const char *path)
   return rc;
 }
 
-int stats_file_wr_hdr(FILE *file, const char *path)
+int stats_file_wr_hdr(FILE *file, const char *path, const char *jobid)
 {
   struct utsname uts_buf;
   uname(&uts_buf);
 
-// char hostname[HOST_NAME_MAX + 1]; /* Try to get FQDN. */
-// gethostname(hostname, sizeof(hostname));
-
   fprintf(file, "%s %s\n", TACC_STATS_PROGRAM, TACC_STATS_VERSION);
-  fprintf(file, "#uname %s %s %s %s %s\n", uts_buf.sysname, uts_buf.nodename,
-          uts_buf.release, uts_buf.version, uts_buf.machine);
-  /* jobid */
-  /* hostname */
+  fprintf(file, "#jobid %s\n", jobid);
+  fprintf(file, "#hostname %s\n", uts_buf.nodename);
+  fprintf(file, "#uname %s %s %s %s\n", uts_buf.sysname, uts_buf.machine,
+          uts_buf.release, uts_buf.version);
 
   /* Write schema. */
   size_t i = 0;
