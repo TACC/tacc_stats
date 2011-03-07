@@ -32,8 +32,6 @@ struct stats_type *stats_type_for_each(size_t *i);
 void stats_type_collect(struct stats_type *type);
 void stats_type_wr_stats(struct stats_type *type, FILE *file);
 
-int tacc_stats_config(char *str);
-
 struct stats *get_current_stats(struct stats_type *type, const char *dev);
 void stats_set(struct stats *s, char *key, unsigned long long val);
 void stats_set_unit(struct stats *s, char *key, unsigned long long val, const char *unit);
