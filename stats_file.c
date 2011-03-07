@@ -112,7 +112,7 @@ int stats_file_rd_hdr(FILE *file, const char *path)
   return rc;
 }
 
-int stats_file_wr_hdr(FILE *file, const char *path, const char *jobid)
+int stats_file_wr_hdr(FILE *file, const char *path)
 {
   struct utsname uts_buf;
   uname(&uts_buf);
@@ -121,8 +121,6 @@ int stats_file_wr_hdr(FILE *file, const char *path, const char *jobid)
   fprintf(file, "#hostname %s\n", uts_buf.nodename);
   fprintf(file, "#uname %s %s %s %s\n", uts_buf.sysname, uts_buf.machine,
           uts_buf.release, uts_buf.version);
-  if (jobid != NULL)
-    fprintf(file, "#jobid %s\n", jobid);
 
   size_t i = 0;
   struct stats_type *type;
@@ -157,9 +155,12 @@ void stats_type_wr_stats(struct stats_type *type, FILE *file)
   }
 }
 
-int stats_file_wr_rec(FILE *file, const char *path)
+int stats_file_wr_rec(FILE *file, const char *path, const char *jobid)
 {
-  fprintf(file, "\n%ld\n", (long) current_time);
+  if (jobid == NULL)
+    jobid = "0";
+
+  fprintf(file, "\n%ld %s\n", (long) current_time, jobid);
 
   size_t i = 0;
   struct stats_type *type;

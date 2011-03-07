@@ -80,7 +80,7 @@ int main(int argc, char *argv[])
 
   if (stat_buf.st_size == 0) {
     /* The stats file is empty. */
-    if (stats_file_wr_hdr(stats_file, stats_file_path, jobid) < 0)
+    if (stats_file_wr_hdr(stats_file, stats_file_path) < 0)
       FATAL("cannot write header to stats file `%s'\n", stats_file_path);
   } else {
     if (stats_file_rd_hdr(stats_file, stats_file_path) < 0)
@@ -111,7 +111,7 @@ int main(int argc, char *argv[])
     }
   }
 
-  stats_file_wr_rec(stats_file, stats_file_path);
+  stats_file_wr_rec(stats_file, stats_file_path, jobid);
 
   if (fclose(stats_file) < 0)
     ERROR("error closing `%s': %m\n", stats_file_path);

@@ -34,7 +34,7 @@ int main(int argc, char *argv[])
       }
     }
 
-    stats_file_wr_rec(stdout, "stdout");
+    stats_file_wr_rec(stdout, "stdout", NULL);
     fflush(stdout);
     sleep(10);
   }
