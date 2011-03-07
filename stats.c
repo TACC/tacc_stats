@@ -71,24 +71,24 @@ struct stats_type *stats_type_for_each(size_t *i)
   return type;
 }
 
-static struct stats *stats_create(struct stats_type *type, const char *id)
+static struct stats *stats_create(struct stats_type *type, const char *dev)
 {
   struct stats *stats;
 
-  stats = malloc(sizeof(*stats) + strlen(id) + 1);
+  stats = malloc(sizeof(*stats) + strlen(dev) + 1);
   if (stats == NULL)
     return NULL;
 
   memset(stats, 0, sizeof(*stats));
 
-  stats->st_type = type;
+  stats->s_type = type;
 
-  if (dict_init(&stats->st_dict, 0) < 0) {
+  if (dict_init(&stats->s_dict, 0) < 0) {
     free(stats);
     return NULL;
   }
 
-  strcpy(stats->st_id, id);
+  strcpy(stats->s_dev, dev);
 
   return stats;
 }
@@ -96,34 +96,34 @@ static struct stats *stats_create(struct stats_type *type, const char *id)
 static void stats_free(struct stats *stats)
 {
   if (stats != NULL) {
-    dict_destroy(&stats->st_dict);
+    dict_destroy(&stats->s_dict);
     free(stats);
   }
 }
 
-struct stats *get_current_stats(struct stats_type *type, const char *id)
+struct stats *get_current_stats(struct stats_type *type, const char *dev)
 {
   struct stats *stats = NULL;
   struct dict_entry *ent;
   hash_t hash;
 
-  if (id == NULL)
-    id = "-";
+  if (dev == NULL)
+    dev = "-";
 
-  TRACE("get_current_stats %s %s\n", type->st_name, id);
+  TRACE("get_current_stats %s %s\n", type->st_name, dev);
 
-  hash = dict_strhash(id);
-  ent = dict_ref(&type->st_current_dict, hash, id);
+  hash = dict_strhash(dev);
+  ent = dict_ref(&type->st_current_dict, hash, dev);
   if (ent->d_key != NULL)
     return (struct stats *) ent->d_key - 1;
 
-  stats = stats_create(type, id);
+  stats = stats_create(type, dev);
   if (stats == NULL) {
     ERROR("stats_create: %m\n");
     return NULL;
   }
 
-  if (dict_set(&type->st_current_dict, ent, hash, stats->st_id) < 0) {
+  if (dict_set(&type->st_current_dict, ent, hash, stats->s_dev) < 0) {
     ERROR("dict_set: %m\n");
     stats_free(stats);
     return NULL;
@@ -144,7 +144,7 @@ struct st_pair *stats_ref(struct stats *stats, const char *key, int create)
   hash_t hash;
 
   hash = dict_strhash(key);
-  ent = dict_ref(&stats->st_dict, hash, key);
+  ent = dict_ref(&stats->s_dict, hash, key);
   if (ent->d_key != NULL)
     return (struct st_pair *) (ent->d_key - sizeof(*pair));
 
@@ -160,7 +160,7 @@ struct st_pair *stats_ref(struct stats *stats, const char *key, int create)
   pair->p_val = 0;
   strcpy(pair->p_key, key);
 
-  if (dict_set(&stats->st_dict, ent, hash, pair->p_key) < 0) {
+  if (dict_set(&stats->s_dict, ent, hash, pair->p_key) < 0) {
     ERROR("dict_set: %m\n");
     free(pair);
     return NULL;
@@ -173,8 +173,8 @@ void stats_set(struct stats *stats, char *key, unsigned long long val)
 {
   struct st_pair *pair;
 
-  TRACE("%s %s %s %s %llu\n",
-        __func__, stats->st_type->st_name, stats->st_id, key, val);
+  TRACE("%s %s %s %llu\n",
+        stats->s_type->st_name, stats->s_dev, key, val);
 
   pair = stats_ref(stats, key, 1);
   if (pair != NULL)
@@ -193,8 +193,8 @@ void stats_inc(struct stats *stats, char *key, unsigned long long val)
 {
   struct st_pair *pair;
 
-  TRACE("%s %s %s %s %llu\n",
-        __func__, stats->st_type->st_name, stats->st_id, key, val);
+  TRACE("%s %s %s %llu\n",
+        stats->s_type->st_name, stats->s_dev, key, val);
 
   pair = stats_ref(stats, key, 1);
   if (pair != NULL)
@@ -216,8 +216,8 @@ void stats_set_unit(struct stats *stats, char *key, unsigned long long val, cons
   else if (strlen(unit) != 0)
     ERROR("unknown unit `%s'\n", unit);
 
-  TRACE("%s %s %s %s %llu %s %llu\n",
-        __func__, stats->st_type->st_name, stats->st_id, key, val, unit, mult);
+  TRACE("%s %s %s %llu %s %llu\n",
+       stats->s_type->st_name, stats->s_dev, key, val, unit, mult);
 
   stats_set(stats, key, val * mult);
 }

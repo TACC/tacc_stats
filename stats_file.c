@@ -145,7 +145,7 @@ void stats_type_wr_stats(struct stats_type *type, FILE *file)
   while ((ent = dict_for_each(&type->st_current_dict, &i)) != NULL) {
     struct stats *stats = (struct stats *) ent->d_key - 1;
 
-    fprintf(file, "%s %s", type->st_name, stats->st_id);
+    fprintf(file, "%s %s", type->st_name, stats->s_dev);
 
     char **key;
     for (key = type->st_schema; *key != NULL; key++)

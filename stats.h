@@ -19,9 +19,9 @@ struct stats_type {
 };
 
 struct stats {
-  struct stats_type *st_type;
-  struct dict st_dict;
-  char st_id[];
+  struct stats_type *s_type;
+  struct dict s_dict;
+  char s_dev[];
 };
 
 extern time_t current_time;
@@ -34,7 +34,7 @@ void stats_type_wr_stats(struct stats_type *type, FILE *file);
 
 int tacc_stats_config(char *str);
 
-struct stats *get_current_stats(struct stats_type *type, const char *id);
+struct stats *get_current_stats(struct stats_type *type, const char *dev);
 void stats_set(struct stats *s, char *key, unsigned long long val);
 void stats_set_unit(struct stats *s, char *key, unsigned long long val, const char *unit);
 void stats_inc(struct stats *s, char *key, unsigned long long val);
