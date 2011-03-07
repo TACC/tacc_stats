@@ -5,14 +5,9 @@
 #include <time.h>
 #include <unistd.h>
 #include <limits.h>
-#include <sys/utsname.h>
 #include "stats.h"
 #include "trace.h"
 #include "dict.h"
-
-time_t current_time;
-struct utsname utsname;
-char hostname[HOST_NAME_MAX + 1]; /* Try to get FQDN. */
 
 #define X(T) extern struct stats_type T##_TYPE;
 #include "stats.x"
@@ -24,19 +19,19 @@ struct stats_type *type_table[] = {
 #undef X
 };
 
-size_t nr_types = sizeof(type_table) / sizeof(type_table[0]);
+time_t current_time;
+
+size_t nr_stats_types = sizeof(type_table) / sizeof(type_table[0]);
 
 static void init(void) __attribute__((constructor));
 static void init(void)
 {
   current_time = time(0);
-  uname(&utsname);
-  gethostname(hostname, sizeof(hostname));
 
   /* Initialize types. */
   size_t i;
 
-  for (i = 0; i < nr_types; i++) {
+  for (i = 0; i < nr_stats_types; i++) {
     struct stats_type *type = type_table[i];
     if (dict_init(&type->st_current_dict, 0) < 0)
       /* XXX */;
@@ -53,15 +48,27 @@ static void init(void)
 struct stats_type *name_to_type(const char *name)
 {
 //   return bsearch(name, type_table,
-//                  nr_types, sizeof(type_table[0]),
+//                  nr_stats_types, sizeof(type_table[0]),
 //                  &name_to_type_cmp);
   int i;
-  for (i = 0; i < nr_types; i++) {
+  for (i = 0; i < nr_stats_types; i++) {
     if (strcmp(name, type_table[i]->st_name) == 0)
       return type_table[i];
   }
 
   return NULL;
+}
+
+struct stats_type *stats_type_for_each(size_t *i)
+{
+  struct stats_type *type = NULL;
+
+  if (*i < nr_stats_types) {
+    type = type_table[*i];
+    (*i)++;
+  }
+
+  return type;
 }
 
 static struct stats *stats_create(struct stats_type *type, const char *id)
@@ -215,67 +222,10 @@ void stats_set_unit(struct stats *stats, char *key, unsigned long long val, cons
   stats_set(stats, key, val * mult);
 }
 
-
-/* Collection. */
-
-void collect_type(struct stats_type *type)
+void stats_type_collect(struct stats_type *type)
 {
   void (*collect)(struct stats_type *) = type->st_collect;
 
   if (collect != NULL)
     (*collect)(type);
-}
-
-void collect_all(void)
-{
-  size_t i;
-  for (i = 0; i < nr_types; i++)
-    collect_type(type_table[i]);
-}
-
-/* Serialization. */
-
-int serialize_file_header(FILE *file)
-{
-  fprintf(file, "%s %s\n%s %s %s %s %s\n",
-          TACC_STATS_PROGRAM, TACC_STATS_VERSION,
-          hostname, utsname.sysname, utsname.release, utsname.version,
-          utsname.machine);
-  /* TODO Schema. */
-
-  return 0;
-}
-
-/* Printing. */
-
-void print_stats_type(FILE *file, const char *prefix, struct stats_type *type)
-{
-  size_t j = 0;
-  struct dict_entry *ent;
-
-  while ((ent = dict_for_each(&type->st_current_dict, &j)) != NULL) {
-    struct stats *stats = (struct stats *) ent->d_key - 1;
-    char **key = type->st_schema;
-
-    if (prefix != NULL)
-      fprintf(file, "%s ", prefix);
-    fprintf(file, "%s %s", type->st_name, stats->st_id);
-
-    for (; *key != NULL; key++)
-      fprintf(file, " %llu", stats_get(stats, *key));
-    fprintf(file, "\n");
-  }
-}
-
-void print_all_stats(FILE *file, const char *prefix)
-{
-  size_t i;
-  for (i = 0; i < nr_types; i++) {
-    struct stats_type *type = type_table[i];
-
-    if (type->st_schema == NULL || *type->st_schema == NULL)
-        continue; /* Empty schema. */
-
-    print_stats_type(file, prefix, type);
-  }
 }

@@ -3,6 +3,7 @@
 #define _STATS_H_
 #include <stdlib.h>
 #include <stdio.h>
+#include <time.h>
 #include "dict.h"
 #include "trace.h"
 
@@ -11,7 +12,7 @@
 
 struct stats_type {
   char *st_name;
-  int (*st_config)(struct stats_type *type, char *str);
+  int (*st_rd_config)(struct stats_type *type, char *str);
   void (*st_collect)(struct stats_type *type);
   char **st_schema;
   struct dict st_current_dict;
@@ -23,38 +24,20 @@ struct stats {
   char st_id[];
 };
 
+extern time_t current_time;
+
 struct stats_type *name_to_type(const char *name);
+struct stats_type *stats_type_for_each(size_t *i);
 
-void collect_all(void);
-void collect_type(struct stats_type *type);
-void print_all_stats(FILE *file, const char *prefix);
+void stats_type_collect(struct stats_type *type);
+void stats_type_wr_stats(struct stats_type *type, FILE *file);
+
 int tacc_stats_config(char *str);
-
-static inline int stats_type_config(struct stats_type *type, char *str)
-{
-  if (type->st_config == NULL) {
-    ERROR("type `%s' has no config method\n", type->st_name); /* XXX */
-    return -1;
-  }
-
-  return (*type->st_config)(type, str);
-}
-
-static inline int stats_type_set_schema(struct stats_type *type, char *str)
-{
-  /* TODO */
-  return 0;
-}
-
-static inline int stats_type_set_devices(struct stats_type *type, char *str)
-{
-  /* TODO */
-  return 0;
-}
 
 struct stats *get_current_stats(struct stats_type *type, const char *id);
 void stats_set(struct stats *s, char *key, unsigned long long val);
 void stats_set_unit(struct stats *s, char *key, unsigned long long val, const char *unit);
 void stats_inc(struct stats *s, char *key, unsigned long long val);
+unsigned long long stats_get(struct stats *stats, const char *key);
 
 #endif
