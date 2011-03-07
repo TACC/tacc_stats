@@ -45,15 +45,15 @@ int main(int argc, char *argv[])
   int type_count = 0;
 
   struct option opts[] = {
-    { "begin",      1, 0, 'b' },
-    { "end",        1, 0, 'e' },
-    { "stats-file", 1, 0, 'f' },
-    { "help",       0, 0, 'h' },
-    { NULL,         0, 0, 0 },
+    { "begin", 1, 0, 'b' },
+    { "end", 1, 0, 'e' },
+    { "file", 1, 0, 'f' },
+    { "help", 0, 0, 'h' },
+    { NULL, 0, 0, 0 },
   };
 
   int c;
-  while ((c = getopt_long(argc, argv, "b:e:h", opts, 0)) != -1) {
+  while ((c = getopt_long(argc, argv, "b:e:f:h", opts, 0)) != -1) {
     switch (c) {
     case 'b':
       jobid = optarg;

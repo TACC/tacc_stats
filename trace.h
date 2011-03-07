@@ -10,7 +10,7 @@
 #endif
 
 #define ERROR(fmt,arg...) \
-  fprintf(stderr, "%s: "fmt, program_invocation_short_name, ##arg)
+  fprintf(stderr, "%s:%s:%d: "fmt, program_invocation_short_name, __func__, __LINE__, ##arg)
 
 #define FATAL(fmt,arg...) do { \
     ERROR(fmt, ##arg);         \

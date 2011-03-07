@@ -11,6 +11,8 @@
 #include "trace.h"
 #include "split.h"
 
+#define SPACE_CHARS " \t\n\v\f\r"
+
 int stats_file_rd_hdr(FILE *file, const char *path)
 {
   int rc = 0;
@@ -23,13 +25,13 @@ int stats_file_rd_hdr(FILE *file, const char *path)
   }
 
   line = buf;
-  char *prog = strsep(&line, " ");
+  char *prog = strsep(&line, SPACE_CHARS);
   if (prog == NULL || strcmp(prog, TACC_STATS_PROGRAM) != 0) {
     ERROR("file `%s' is not in %s format\n", path, TACC_STATS_PROGRAM);
     goto err;
   }
 
-  char *vers = strsep(&line, " ");
+  char *vers = strsep(&line, SPACE_CHARS);
   if (vers == NULL || strverscmp(vers, TACC_STATS_VERSION) > 0) {
     ERROR("file `%s' is has unsupported version `%s'\n", path, vers != NULL ? vers : "NULL");
     goto err;
@@ -46,13 +48,20 @@ int stats_file_rd_hdr(FILE *file, const char *path)
     line = buf;
 
     int c = *(line++);
+    if (c == '\n')
+      break; /* End of header. */
+
+    if (c == '#')
+      continue; /* Comment. */
+
     if (c == '$') {
       /* TODO if (tacc_stats_config(line) < 0)
          goto err; */
       continue;
     }
 
-    char *name = strsep(&line, " ");
+    /* Otherwise line is a directive to be processed by a type. */
+    char *name = strsep(&line, SPACE_CHARS);
     if (*name == 0 || line == NULL) {
       line = "";
       ERROR("%s:%d: bad directive `%c%s %s'\n", path, nr, c, name, line);
@@ -65,7 +74,7 @@ int stats_file_rd_hdr(FILE *file, const char *path)
       goto err;
     }
 
-    TRACE("%s:%d: %c %s %s\n", path, nr, c, name, line);
+    TRACE("%s:%d: c %c, name %s, rest %s\n", path, nr, c, name, line);
     switch (c) {
     case '.':
       if (type->st_rd_config == NULL) {
@@ -83,8 +92,6 @@ int stats_file_rd_hdr(FILE *file, const char *path)
       }
       break;
     case '@': /* TODO */
-      break;
-    case '#':
       break;
     default:
       ERROR("%s:%d: bad directive `%c%s %s'\n", path, nr, c, name, line);
