@@ -118,15 +118,16 @@ int stats_file_wr_hdr(FILE *file, const char *path, const char *jobid)
   uname(&uts_buf);
 
   fprintf(file, "%s %s\n", TACC_STATS_PROGRAM, TACC_STATS_VERSION);
-  fprintf(file, "#jobid %s\n", jobid);
   fprintf(file, "#hostname %s\n", uts_buf.nodename);
   fprintf(file, "#uname %s %s %s %s\n", uts_buf.sysname, uts_buf.machine,
           uts_buf.release, uts_buf.version);
+  if (jobid != NULL)
+    fprintf(file, "#jobid %s\n", jobid);
 
-  /* Write schema. */
   size_t i = 0;
   struct stats_type *type;
   while ((type = stats_type_for_each(&i)) != NULL) {
+    /* Write schema. */
     fprintf(file, "!%s", type->st_name);
 
     char **key;
