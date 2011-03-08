@@ -140,8 +140,6 @@ static int begin_perf_cpu(char *cpu, uint64_t event[4])
   | (1UL << 17) /* Count in OS mode (CPL > 0). */ \
   | (1UL << 22) /* Enable. */ \
   | ((event_select & 0xF00) << 24) \
-  /* | (1UL << 40) */ /* Count in guest mode. */ \
-  /* | (1UL << 41) */ /* Count in host mode. */ \
   )
 
 #define DRAMaccesses   PERF_EVENT(0xE0, 0x07) /* DCT0 only */
