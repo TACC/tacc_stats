@@ -12,6 +12,7 @@
 
 struct stats_type {
   char *st_name;
+  int (*st_begin)(struct stats_type *type);
   int (*st_rd_config)(struct stats_type *type, char *str);
   void (*st_collect)(struct stats_type *type);
   char **st_schema;

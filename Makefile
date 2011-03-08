@@ -1,6 +1,7 @@
 CC = gcc
-CFLAGS = -Wall -Werror
-CPPFLAGS = # -g -DDEBUG
+CFLAGS = -Wall -Werror # -pg
+CPPFLAGS = -DDEBUG # -g
+LDFLAGS = # -pg
 
 ST_OBJS := st_block.o st_cpu.o st_ib.o st_lustre.o st_mem.o st_net.o \
  st_perf_amd64.o st_ps.o st_vm.o

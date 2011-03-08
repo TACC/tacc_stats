@@ -54,6 +54,7 @@ int main(int argc, char *argv[])
     }
   }
 
+  /* TODO Protect against duplicates in type_list. */
   type_list = argv + optind;
   type_count = argc - optind;
 
@@ -82,6 +83,13 @@ int main(int argc, char *argv[])
 
   if (stat_buf.st_size == 0) {
     /* The stats file is empty. */
+    /* Fire all st_begin callbacks. */
+    size_t i = 0;
+    struct stats_type *type;
+    while ((type = stats_type_for_each(&i)) != NULL) {
+      if (type->st_begin != NULL)
+        (*type->st_begin)(type);
+    }
     if (stats_file_wr_hdr(stats_file, stats_file_path) < 0)
       FATAL("cannot write header to stats file `%s'\n", stats_file_path);
   } else {
@@ -94,13 +102,12 @@ int main(int argc, char *argv[])
 
   if (type_count == 0) {
     /* Collect all. */
-    struct stats_type *type;
     size_t i = 0;
+    struct stats_type *type;
     while ((type = stats_type_for_each(&i)) != NULL)
       stats_type_collect(type);
   } else {
     /* Collect only types in list. */
-    /* TODO Protect against duplicates in type_list. */
     int i;
     for (i = 0; i < type_count; i++) {
       struct stats_type *type;
