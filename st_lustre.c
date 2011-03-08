@@ -93,7 +93,7 @@ static void collect_lustre_stats(struct stats_type *type)
 }
 
 struct stats_type ST_LUSTRE_TYPE = {
-  .st_name = "ST_LUSTRE",
+  .st_name = "lustre",
   .st_collect = &collect_lustre_stats,
   .st_schema = (char *[]) { "read_bytes", "write_bytes", NULL, },
 };

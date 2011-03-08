@@ -237,7 +237,7 @@ static void collect_perf(struct stats_type *type)
 }
 
 struct stats_type ST_PERF_AMD64_TYPE = {
-  .st_name = "ST_PERF_AMD64",
+  .st_name = "perf_amd64",
   .st_begin = &begin_perf,
   .st_collect = &collect_perf,
 #define X(K) #K

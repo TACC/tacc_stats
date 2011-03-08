@@ -106,7 +106,7 @@ static void collect_ps(struct stats_type *type)
 }
 
 struct stats_type ST_PS_TYPE = {
-  .st_name = "ST_PS",
+  .st_name = "ps",
   .st_collect = &collect_ps,
   .st_schema = (char *[]) {
     "btime", "ctxt", "processes", "load_1", "load_5", "load_15", "nr_running", "nr_threads", NULL,

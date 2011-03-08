@@ -125,7 +125,7 @@ static void collect_net(struct stats_type *type)
 }
 
 struct stats_type ST_NET_TYPE = {
-  .st_name = "ST_NET",
+  .st_name = "net",
   .st_collect = &collect_net,
 #define X(K) #K
   .st_schema = (char *[]) { NET_KEYS, NULL, },
