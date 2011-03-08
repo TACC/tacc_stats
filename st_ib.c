@@ -76,8 +76,9 @@ static void collect_ib_dev(struct stats_type *type, const char *dev)
 
     /* Call perfquery to clear stats.  Blech! */
     snprintf(cmd, sizeof(cmd), "%s -R %#x %d", perfquery, lid, port);
-    int rc = system(cmd);
-    TRACE("system `%s' returned %d\n", cmd, rc);
+    int cmd_rc = system(cmd);
+    if (cmd_rc != 0)
+      ERROR("`%s' exited with status %d\n", cmd, cmd_rc);
 
   next:
     if (file != NULL)
