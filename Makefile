@@ -1,6 +1,6 @@
 CC = gcc
 CFLAGS = -Wall -Werror
-CPPFLAGS = -g -DDEBUG
+CPPFLAGS = # -g -DDEBUG
 
 ST_OBJS := st_block.o st_cpu.o st_ib.o st_lustre.o st_mem.o st_net.o \
  st_perf_amd64.o st_ps.o st_vm.o
@@ -27,4 +27,4 @@ stats.h: stats.x
 
 .PHONY: clean
 clean:
-	rm -f test $(OBJS) $(OBJS:%.o=.%.d)
+	rm -f main test test-loop $(OBJS) $(OBJS:%.o=.%.d)
