@@ -1,20 +1,20 @@
 CC = gcc
 CFLAGS = -Wall -Werror # -pg
-CPPFLAGS = -DDEBUG # -g
+CPPFLAGS = # -DDEBUG -g
 LDFLAGS = # -pg
 
 ST_OBJS := st_block.o st_cpu.o st_ib.o st_lustre.o st_mem.o st_net.o \
  st_perf_amd64.o st_ps.o st_vm.o
 OBJS :=  $(ST_OBJS) stats.o dict.o collect.o split.o readstr.o stats_file.o \
- main.o test.o test-loop.o
+ tacc_stats.o test.o loop.o
 
-all: main test test-loop
+all: tacc_stats test loop
 
-main: main.o stats.o dict.o collect.o split.o readstr.o stats_file.o $(ST_OBJS)
+tacc_stats: tacc_stats.o stats.o dict.o collect.o split.o readstr.o stats_file.o $(ST_OBJS)
 
 test: test.o stats.o dict.o collect.o split.o stats_file.o $(ST_OBJS)
 
-test-loop: test-loop.o stats.o dict.o collect.o split.o stats_file.o $(ST_OBJS)
+loop: loop.o stats.o dict.o collect.o split.o stats_file.o $(ST_OBJS)
 
 -include $(OBJS:%.o=.%.d)
 
@@ -28,4 +28,4 @@ stats.h: stats.x
 
 .PHONY: clean
 clean:
-	rm -f main test test-loop $(OBJS) $(OBJS:%.o=.%.d)
+	rm -f tacc_stats test loop $(OBJS) $(OBJS:%.o=.%.d)
