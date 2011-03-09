@@ -1,0 +1,2 @@
+# Collect every 10 minutes.
+*/10 * * * * root /usr/local/bin/tacc_stats
