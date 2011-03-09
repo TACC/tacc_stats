@@ -11,6 +11,7 @@
 #define TACC_STATS_VERSION "1.0.0"
 
 struct stats_type {
+  unsigned int st_enabled:1, st_selected:1;
   char *st_name;
   int (*st_begin)(struct stats_type *type);
   int (*st_rd_config)(struct stats_type *type, char *str);

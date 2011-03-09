@@ -90,6 +90,7 @@ int stats_file_rd_hdr(FILE *file, const char *path)
         ERROR("cannot parse schema: %m\n");
         goto err;
       }
+      type->st_enabled = 1;
       break;
     case '@': /* TODO */
       break;
@@ -125,6 +126,9 @@ int stats_file_wr_hdr(FILE *file, const char *path)
   size_t i = 0;
   struct stats_type *type;
   while ((type = stats_type_for_each(&i)) != NULL) {
+    if (!type->st_enabled)
+      continue;
+
     /* Write schema. */
     fprintf(file, "!%s", type->st_name);
 
@@ -155,17 +159,15 @@ void stats_type_wr_stats(struct stats_type *type, FILE *file)
   }
 }
 
-int stats_file_wr_rec(FILE *file, const char *path, const char *jobid)
+int stats_file_wr_rec(FILE *file, const char *path)
 {
-  if (jobid == NULL)
-    jobid = "0";
-
-  fprintf(file, "\n%ld %s\n", (long) current_time, jobid);
+  fprintf(file, "\n%ld\n", (long) current_time);
 
   size_t i = 0;
   struct stats_type *type;
   while ((type = stats_type_for_each(&i)) != NULL)
-    stats_type_wr_stats(type, file);
+    if (type->st_enabled && type->st_selected)
+      stats_type_wr_stats(type, file);
 
   return 0;
 }
