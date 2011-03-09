@@ -5,6 +5,7 @@
 #include <unistd.h>
 #include <ctype.h>
 #include <limits.h>
+#include <stdarg.h>
 #include <sys/utsname.h>
 #include "stats.h"
 #include "stats_file.h"
@@ -170,4 +171,16 @@ int stats_file_wr_rec(FILE *file, const char *path)
       stats_type_wr_stats(type, file);
 
   return 0;
+}
+
+int stats_file_printf(FILE *file, const char *path, const char *fmt, ...)
+{
+  int rc;
+  va_list args;
+
+  va_start(args, fmt);
+  rc = vfprintf(file, fmt, args);
+  va_end(args);
+
+  return rc;
 }

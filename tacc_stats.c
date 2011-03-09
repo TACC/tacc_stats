@@ -8,6 +8,7 @@
 #include <signal.h>
 #include <errno.h>
 #include <ctype.h>
+#include <malloc.h>
 #include <sys/types.h>
 #include <sys/stat.h>
 #include "stats.h"
@@ -153,6 +154,81 @@ static int tacc_stats_collect(char **arg_list, size_t arg_count)
   return rc;
 }
 
+char *join(char **list, size_t count, const char *delim)
+{
+  size_t len = 0;
+  char *str = NULL, *dest;
+  const char *src;
+  int i;
+
+  if (count > 0)
+    len = strlen(list[0]);
+
+  for (i = 1; i < count; i++)
+    len += strlen(delim) + strlen(list[i]);
+
+  str = malloc(len + 1);
+  if (str == NULL)
+    goto out;
+
+  dest = str;
+
+  if (count > 0) {
+    src = list[0];
+    while (*src != 0)
+      *(dest++) = *(src++);
+  }
+
+  for (i = 1; i < count; i++) {
+    src = delim;
+    while (*src != 0)
+      *(dest++) = *(src++);
+    src = list[i];
+    while (*src != 0)
+      *(dest++) = *(src++);
+  }
+
+  *dest = 0;
+ out:
+  return str;
+}
+
+static int tacc_stats_mark(char **arg_list, size_t arg_count)
+{
+  int rc = -1;
+  char *str = NULL, *iter, *line;
+
+  str = join(arg_list, arg_count, " ");
+  if (str == NULL) {
+    ERROR("%m\n");
+    goto out;
+  }
+
+  if (stats_path == NULL)
+    stats_path = current_path;
+
+  if (stats_file == NULL)
+    stats_file = fopen(stats_path, "r+");
+
+  if (stats_file == NULL) {
+    ERROR("cannot open `%s': %m\n", stats_path);
+    goto out;
+  }
+
+  fseek(stats_file, 0, SEEK_END);
+  /* TODO Check size of stat_file. */
+
+  iter = str;
+  while ((line = strsep(&str, "\n")) != NULL)
+    if (stats_file_printf(stats_file, stats_path, "#%s\n", line) < 0)
+      goto out;
+
+  rc = 0;
+ out:
+  free(str);
+  return rc;
+}
+
 static int tacc_stats_begin(char **arg_list, size_t arg_count)
 {
   int rc = -1;
@@ -268,16 +344,15 @@ static int tacc_stats_end(char **arg_list, size_t arg_count)
 typedef int (*cmd_handler_t)(char **, size_t);
 cmd_handler_t get_cmd_handler(const char *cmd)
 {
+  /* XXX */
   if (strcmp(cmd, "begin") == 0)
     return &tacc_stats_begin;
   if (strcmp(cmd, "collect") == 0)
     return &tacc_stats_collect;
   if (strcmp(cmd, "end") == 0)
     return &tacc_stats_end;
-//   else if (strcmp(cmd, "comment") == 0)
-//     cmd = cmd_comment;
-//   else if (strcmp(cmd, "write") == 0)
-//     cmd = cmd_write;
+  if (strcmp(cmd, "mark") == 0)
+    return &tacc_stats_mark;
   return NULL;
 }
 
@@ -315,7 +390,7 @@ int main(int argc, char *argv[])
   }
 
   if (!(optind < argc))
-    usage(1);
+    FATAL("must specify a command\n");
 
   const char *cmd = argv[optind];
   char **cmd_arg_list = argv + optind + 1;
