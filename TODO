@@ -1,3 +1,24 @@
+stats.c
+  Why is bsearch() broken?
+
+ST_PERF
+  AMD sanity check.
+  Uncore counters on Nehalem, Westmere, ...
+  /sys/devices/system/cpu/cpuN/topology/core_id == 0
+
+ib
+  Could replace perfquery with libibmad, preformance_reset_via().
+  Consider /sys/class/infiniband/mlx4_0/diag_counters/*.
+  Move active check to parent.
+  Use different FILE*s for different files.
+
+block
+  Easy way to ignore inactive devices?
+
+lustre
+  MDS.
+  More keys.
+
 RRDtool.
 
 Time format specifier.
@@ -8,19 +29,21 @@ schema {
   rename
 }
 
-Specify schema via external file.
+More /sys, less /proc.
+
+Skip dirents with d_name[0] == '.'.
+
+Track which stats/values were actually set.
+
+Replace asnprintf() with snprintf().
 
 Identifying which values are cumulative.
 
 Enabling, disabling types.
 
-Set id in ST_IB.
-
 Escaping of whitespace, other garbage, in ids.
 
 stats_put(), get_c, put_c.
-
-collect_key_value_dir(stats, path)
 
 Torture test memory management.
 
@@ -28,29 +51,35 @@ Torture test dictionary.
 dict_resize()
 dict_allow_resize()
 
-Signal or direct execution driven collection for start/end of job.
-May require locking.
+Direct execution driven collection for start/end of job.  May require
+locking.
 
 Output file, directory naming.
 
-/proc/buddyinfo
-/proc/diskstats
-/proc/schedstat (maybe)
-/proc/slabinfo
+MAYBE ST_NFS
+  /proc/net/rpc/nfs
 
-/proc/net/rpc/nfs
+MAYBE ST_NFS6
+  /proc/net/rpc/nfsd
 
-/proc/net/rpc/nfsd
-/proc/net/sockstat[6]
-/proc/net/snmp (maybe)
+MAYBE
+  /proc/sys/fs/dentry-state
+  $ cat /proc/sys/fs/dentry-state
+  1669793 1648474 45 0 0 0
 
-/proc/sys/fs/{aio-nr,dentry-state,file-nr,inode-nr,inode-state}
+  This file contains six numbers, nr_dentry, nr_unused, age_limit (age
+  in seconds), want_pages (pages requested by system) and two dummy
+  values.  nr_dentry seems to be 0 all the time.  nr_unused seems to be
+  the number of unused dentries.  age_limit is the age in seconds after
+  which dcache entries can be reclaimed when memory is short and
+  want_pages is nonzero when the kernel has called shrink_dcache_pages()
+  and the dcache isn't pruned yet.
 
-/sys/devices/system/node/node*/numastat
+MAYBE
+  /proc/sys/fs/{aio-nr,file-nr,inode-nr,inode-state}
+  /proc/buddyinfo
+  /proc/schedstat (Mostly unavailable.)
+  /proc/slabinfo
+  /proc/net/sockstat[6]
+  /proc/net/snmp
 
-Replace perfquery with libibmad, preformance_reset_via().
-/sys/class/infiniband/mlx4_0/diag_counters/*
-/sys/class/infiniband/mlx4_0/ports/*/counters/*
-/sys/class/infiniband/mlx4_0/device/mlx4_0/[12]/cm*/*
-
-perfctrs

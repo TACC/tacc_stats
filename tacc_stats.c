@@ -67,6 +67,7 @@ int main(int argc, char *argv[])
     .l_start = SEEK_SET,
   };
 
+  /* TODO Set alarm. */
   if (fcntl(lock_file_fd, F_SETLK, &lock) < 0)
     FATAL("cannot lock `%s': %m\n", lock_file_path);
 
