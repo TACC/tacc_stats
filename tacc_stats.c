@@ -5,6 +5,8 @@
 #include <unistd.h>
 #include <fcntl.h>
 #include <getopt.h>
+#include <signal.h>
+#include <errno.h>
 #include <sys/types.h>
 #include <sys/stat.h>
 #include "stats.h"
@@ -12,7 +14,68 @@
 #include "trace.h"
 #include "readstr.h"
 
-void usage(void)
+const char *lock_path = "/var/run/tacc_stats_lock";
+const char *stats_path = "/var/run/tacc_stats_current";
+const char *jobid_path = "/var/run/TACC_jobid";
+int lock_timeout = 30;
+int lock_fd = -1;
+FILE *stats_file = NULL;
+const char *jobid = NULL;
+
+static void lock_alrm_handler(int sig)
+{
+}
+
+static int lock(void)
+{
+  int rc = 0;
+  void (*prev_alrm_handler)(int) = SIG_ERR;
+
+  struct flock flock = {
+    .l_type = F_WRLCK,
+    .l_start = SEEK_SET,
+  };
+
+  if (lock_fd < 0)
+    lock_fd = open(lock_path, O_WRONLY|O_CREAT, 0600);
+
+  if (lock_fd < 0) {
+    ERROR("cannot open `%s': %m\n", lock_path);
+    rc = -1;
+    goto out;
+  }
+
+  prev_alrm_handler = signal(SIGALRM, &lock_alrm_handler);
+  alarm(lock_timeout);
+
+  if (fcntl(lock_fd, F_SETLK, &flock) < 0) {
+    if (errno == EINTR)
+      errno = ETIMEDOUT;
+    ERROR("cannot lock `%s': %m\n", lock_path);
+    rc = -1;
+    goto out;
+  }
+
+ out:
+  alarm(0);
+  if (prev_alrm_handler != SIG_ERR)
+    signal(SIGALRM, prev_alrm_handler);
+
+  return rc;
+}
+
+static void unlock(void)
+{
+  struct flock flock = {
+    .l_type = F_UNLCK,
+    .l_start = SEEK_SET,
+  };
+
+  if (fcntl(lock_fd, F_SETLK, &flock) < 0)
+    ERROR("cannot unlock `%s': %m\n", lock_path);
+}
+
+static void usage(void)
 {
   fprintf(stderr,
           "Usage: %s [OPTION]... [TYPE]...\n"
@@ -28,14 +91,8 @@ void usage(void)
 
 int main(int argc, char *argv[])
 {
-  const char *lock_file_path = "/var/run/tacc_stats_lock";
-  const char *stats_file_path = "/var/run/tacc_stats_current";
-  const char *jobid_file_path = "/var/run/TACC_jobid";
-  int lock_file_fd = -1;
-  FILE *stats_file = NULL;
   char **type_list = NULL;
   size_t type_count = 0;
-  const char *jobid = NULL;
 
   struct option opts[] = {
     { "help", 0, 0, 'h' },
@@ -58,29 +115,19 @@ int main(int argc, char *argv[])
   type_list = argv + optind;
   type_count = argc - optind;
 
-  lock_file_fd = open(lock_file_path, O_WRONLY|O_CREAT, 0600);
-  if (lock_file_fd < 0)
-    FATAL("cannot open `%s': %m\n", lock_file_path);
+  if (lock() < 0)
+    FATAL("cannot acquire lock: %m\n");
 
-  struct flock lock = {
-    .l_type = F_WRLCK,
-    .l_start = SEEK_SET,
-  };
-
-  /* TODO Set alarm. */
-  if (fcntl(lock_file_fd, F_SETLK, &lock) < 0)
-    FATAL("cannot lock `%s': %m\n", lock_file_path);
-
-  stats_file = fopen(stats_file_path, "r+");
+  stats_file = fopen(stats_path, "r+");
   if (stats_file == NULL) {
     if (errno == ENOENT)
       exit(0); /* OK just exit. */
-    FATAL("cannot open `%s': %m\n", stats_file_path);
+    FATAL("cannot open `%s': %m\n", stats_path);
   }
 
   struct stat stat_buf;
   if (fstat(fileno(stats_file), &stat_buf) < 0)
-    FATAL("cannot stat `%s': %m\n", stats_file_path);
+    FATAL("cannot stat `%s': %m\n", stats_path);
 
   if (stat_buf.st_size == 0) {
     /* The stats file is empty. */
@@ -91,11 +138,11 @@ int main(int argc, char *argv[])
       if (type->st_begin != NULL)
         (*type->st_begin)(type);
     }
-    if (stats_file_wr_hdr(stats_file, stats_file_path) < 0)
-      FATAL("cannot write header to stats file `%s'\n", stats_file_path);
+    if (stats_file_wr_hdr(stats_file, stats_path) < 0)
+      FATAL("cannot write header to stats file `%s'\n", stats_path);
   } else {
-    if (stats_file_rd_hdr(stats_file, stats_file_path) < 0)
-      FATAL("cannot read header from stats file `%s'\n", stats_file_path);
+    if (stats_file_rd_hdr(stats_file, stats_path) < 0)
+      FATAL("cannot read header from stats file `%s'\n", stats_path);
   }
 
   fflush(stats_file); /* Does fseek() do this for us? */
@@ -121,11 +168,13 @@ int main(int argc, char *argv[])
     }
   }
 
-  jobid = readstr(jobid_file_path);
-  stats_file_wr_rec(stats_file, stats_file_path, jobid);
+  jobid = readstr(jobid_path);
+  stats_file_wr_rec(stats_file, stats_path, jobid);
 
   if (fclose(stats_file) < 0)
-    ERROR("error closing `%s': %m\n", stats_file_path);
+    ERROR("error closing `%s': %m\n", stats_path);
+
+  unlock();
 
   return 0;
 }
