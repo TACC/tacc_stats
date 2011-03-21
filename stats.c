@@ -169,7 +169,7 @@ struct st_pair *stats_ref(struct stats *stats, const char *key, int create)
   return pair;
 }
 
-void stats_set(struct stats *stats, char *key, unsigned long long val)
+void stats_set(struct stats *stats, const char *key, unsigned long long val)
 {
   struct st_pair *pair;
 
@@ -189,7 +189,7 @@ unsigned long long stats_get(struct stats *stats, const char *key)
   return pair->p_val;
 }
 
-void stats_inc(struct stats *stats, char *key, unsigned long long val)
+void stats_inc(struct stats *stats, const char *key, unsigned long long val)
 {
   struct st_pair *pair;
 
@@ -201,7 +201,7 @@ void stats_inc(struct stats *stats, char *key, unsigned long long val)
     pair->p_val += val;
 }
 
-void stats_set_unit(struct stats *stats, char *key, unsigned long long val, const char *unit)
+void stats_set_unit(struct stats *stats, const char *key, unsigned long long val, const char *unit)
 {
   unsigned long long mult = 1;
 

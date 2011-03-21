@@ -276,6 +276,7 @@ static int tacc_stats_begin(char **arg_list, size_t arg_count)
   stats_path = path; /* XXX Mem. */
   path = NULL;
 
+  /* Enable the types specified in arg_list. */
   for (i = 0; i < arg_count; i++) {
     type = name_to_type(arg_list[i]);
     if (type == NULL) {

@@ -35,9 +35,9 @@ void stats_type_collect(struct stats_type *type);
 void stats_type_wr_stats(struct stats_type *type, FILE *file);
 
 struct stats *get_current_stats(struct stats_type *type, const char *dev);
-void stats_set(struct stats *s, char *key, unsigned long long val);
-void stats_set_unit(struct stats *s, char *key, unsigned long long val, const char *unit);
-void stats_inc(struct stats *s, char *key, unsigned long long val);
+void stats_set(struct stats *s, const char *key, unsigned long long val);
+void stats_set_unit(struct stats *s, const char *key, unsigned long long val, const char *unit);
+void stats_inc(struct stats *s, const char *key, unsigned long long val);
 unsigned long long stats_get(struct stats *stats, const char *key);
 
 #endif
