@@ -8,6 +8,20 @@
 #include "stats.h"
 #include "trace.h"
 
+/* /proc manpage says units are units of 1/sysconf(_SC_CLK_TCK)
+   second.  sysconf(_SC_CLK_TCK) seems to always be 100. */
+
+/* We ignore steal and guest. */
+
+#define CPU_KEYS \
+  X(user, "event,unit=cs", "time in user mode"), \
+  X(nice, "event,unit=cs", "time in user mode with low priority"), \
+  X(system, "event,unit=cs", "time in system mode"), \
+  X(idle, "event,unit=cs", "time in idle task"), \
+  X(iowait, "event,unit=cs", "time in I/O wait"), \
+  X(irq, "event,unit=cs", "time in IRQ"), \
+  X(softirq, "event,unit=cs", "time in softIRQ")
+
 static void collect_proc_stat_cpu(struct stats_type *type, char *cpu, char *rest)
 {
   /* Ignore the totals line and anything not matching [0-9]+. */
@@ -24,21 +38,17 @@ static void collect_proc_stat_cpu(struct stats_type *type, char *cpu, char *rest
   if (cpu_stats == NULL)
     return;
 
-  unsigned long long user = 0, nice = 0, system = 0, idle = 0,
-    iowait = 0, irq = 0, softirq = 0, steal = 0;
+#define X(k,r...) k = 0
+  unsigned long long CPU_KEYS;
+#undef X
 
-  sscanf(rest, "%llu %llu %llu %llu %llu %llu %llu %llu",
-         &user, &nice, &system, &idle,
-         &iowait, &irq, &softirq, &steal);
+#define X(k,r...) &k
+  sscanf(rest, "%llu %llu %llu %llu %llu %llu %llu", CPU_KEYS);
+#undef X
 
-  stats_set(cpu_stats, "user", user);
-  stats_set(cpu_stats, "nice", nice);
-  stats_set(cpu_stats, "system", system);
-  stats_set(cpu_stats, "idle", idle);
-  stats_set(cpu_stats, "iowait", iowait);
-  stats_set(cpu_stats, "irq", irq);
-  stats_set(cpu_stats, "softirq", softirq);
-  stats_set(cpu_stats, "steal", steal);
+#define X(k,r...) stats_set(cpu_stats, #k, k)
+  CPU_KEYS;
+#undef X
 }
 
 static void collect_proc_stat(struct stats_type *type)
@@ -75,7 +85,7 @@ static void collect_proc_stat(struct stats_type *type)
 struct stats_type ST_CPU_TYPE = {
   .st_name = "cpu",
   .st_collect = &collect_proc_stat,
-  .st_schema = (char *[]) {
-    "user", "nice", "system", "idle", "iowait", "irq", "softirq", NULL,
-  },
+#define X(k,r...) #k
+  .st_schema = (char *[]) { CPU_KEYS, NULL, },
+#undef X
 };
