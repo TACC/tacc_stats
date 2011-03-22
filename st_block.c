@@ -1,4 +1,3 @@
-#define _GNU_SOURCE
 #include <stddef.h>
 #include <string.h>
 #include <dirent.h>
@@ -25,7 +24,7 @@ static void collect_block_dev(struct stats_type *type, const char *dev)
   char path[80];
   snprintf(path, sizeof(path), "/sys/block/%s/stat", dev);
 
-#define X(K) #K
+#define X(k,r...) #k
   collect_key_list(stats, path, BLOCK_KEYS, NULL);
 #undef X
 }
@@ -59,7 +58,7 @@ static void collect_block(struct stats_type *type)
 struct stats_type ST_BLOCK_TYPE = {
   .st_name = "block",
   .st_collect = &collect_block,
-#define X(K) #K
+#define X(k,r...) #k
   .st_schema = (char *[]) { BLOCK_KEYS, NULL, },
 #undef X
 };
