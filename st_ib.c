@@ -12,23 +12,23 @@ const char *perfquery = "/opt/ofed/bin/perfquery";
 
 /* Fields for mlx4, mthca: */
 #define IB_KEYS \
-  X(excessive_buffer_overrun_errors), \
-  X(link_downed), \
-  X(link_error_recovery), \
-  X(local_link_integrity_errors), \
-  X(port_rcv_constraint_errors), \
-  X(port_rcv_data), \
-  X(port_rcv_errors), \
-  X(port_rcv_packets), \
-  X(port_rcv_remote_physical_errors), \
-  X(port_rcv_switch_relay_errors), \
-  X(port_xmit_constraint_errors), \
-  X(port_xmit_data), \
-  X(port_xmit_discards), \
-  X(port_xmit_packets), \
-  X(port_xmit_wait), \
-  X(symbol_error), \
-  X(VL15_dropped)
+  X(excessive_buffer_overrun_errors, "event", ""), \
+  X(link_downed, "event", ""), \
+  X(link_error_recovery, "event", ""), \
+  X(local_link_integrity_errors, "event", ""), \
+  X(port_rcv_constraint_errors, "event", ""), \
+  X(port_rcv_data, "event,unit=4B", ""), \
+  X(port_rcv_errors, "event", ""), \
+  X(port_rcv_packets, "event", ""), \
+  X(port_rcv_remote_physical_errors, "event", ""), \
+  X(port_rcv_switch_relay_errors, "event", ""), \
+  X(port_xmit_constraint_errors, "event", ""), \
+  X(port_xmit_data, "event,unit=4B", ""), \
+  X(port_xmit_discards, "event", ""), \
+  X(port_xmit_packets, "event", ""), \
+  X(port_xmit_wait, "event", ""), \
+  X(symbol_error, "event", ""), \
+  X(VL15_dropped, "event", "")
 
 static void collect_ib_dev(struct stats_type *type, const char *dev)
 {
@@ -112,7 +112,7 @@ static void collect_ib(struct stats_type *type)
 struct stats_type ST_IB_TYPE = {
   .st_name = "ib",
   .st_collect = &collect_ib,
-#define X(K) #K
+#define X(k,r...) #k
   .st_schema = (char *[]) { IB_KEYS, NULL, },
 #undef X
 };
