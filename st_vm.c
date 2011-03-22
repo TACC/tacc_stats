@@ -1,4 +1,4 @@
-#define _GNU_SOURCE
+#include <stddef.h>
 #include "stats.h"
 #include "trace.h"
 #include "collect.h"

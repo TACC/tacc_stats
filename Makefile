@@ -1,6 +1,6 @@
 CC = gcc
 CFLAGS = -Wall -Werror # -pg
-CPPFLAGS = # -DDEBUG -g
+CPPFLAGS = -D_GNU_SOURCE # -DDEBUG -g
 LDFLAGS = # -pg
 
 ST_OBJS := st_block.o st_cpu.o st_fs.o st_ib.o st_lustre.o st_mem.o st_net.o \

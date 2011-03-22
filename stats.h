@@ -1,4 +1,3 @@
-#define _GNU_SOURCE
 #ifndef _STATS_H_
 #define _STATS_H_
 #include <stdlib.h>
