@@ -14,29 +14,29 @@
 #include "trace.h"
 
 #define NET_KEYS \
-  X(collisions), \
-  X(multicast), \
-  X(rx_bytes), \
-  X(rx_compressed), \
-  X(rx_crc_errors), \
-  X(rx_dropped), \
-  X(rx_errors), \
-  X(rx_fifo_errors), \
-  X(rx_frame_errors), \
-  X(rx_length_errors), \
-  X(rx_missed_errors), \
-  X(rx_over_errors), \
-  X(rx_packets), \
-  X(tx_aborted_errors), \
-  X(tx_bytes), \
-  X(tx_carrier_errors), \
-  X(tx_compressed), \
-  X(tx_dropped), \
-  X(tx_errors), \
-  X(tx_fifo_errors), \
-  X(tx_heartbeat_errors), \
-  X(tx_packets), \
-  X(tx_window_errors)
+  X(collisions, "event", ""), \
+  X(multicast, "event", ""), \
+  X(rx_bytes, "event,unit=B", ""), \
+  X(rx_compressed, "event", ""), \
+  X(rx_crc_errors, "event", ""), \
+  X(rx_dropped, "event", ""), \
+  X(rx_errors, "event", ""), \
+  X(rx_fifo_errors, "event", ""), \
+  X(rx_frame_errors, "event", ""), \
+  X(rx_length_errors, "event", ""), \
+  X(rx_missed_errors, "event", ""), \
+  X(rx_over_errors, "event", ""), \
+  X(rx_packets, "event", ""), \
+  X(tx_aborted_errors, "event", ""), \
+  X(tx_bytes, "event,unit=B", ""), \
+  X(tx_carrier_errors, "event", ""), \
+  X(tx_compressed, "event", ""), \
+  X(tx_dropped, "event", ""), \
+  X(tx_errors, "event", ""), \
+  X(tx_fifo_errors, "event", ""), \
+  X(tx_heartbeat_errors, "event", ""), \
+  X(tx_packets, "event", ""), \
+  X(tx_window_errors, "event", "")
 
 static void collect_net_dev(struct stats_type *type, const char *dev)
 {
@@ -126,7 +126,7 @@ static void collect_net(struct stats_type *type)
 struct stats_type ST_NET_TYPE = {
   .st_name = "net",
   .st_collect = &collect_net,
-#define X(K) #K
+#define X(k,r...) #k
   .st_schema = (char *[]) { NET_KEYS, NULL, },
 #undef X
 };
