@@ -4,7 +4,7 @@ CPPFLAGS = -D_GNU_SOURCE # -DDEBUG -g
 LDFLAGS = # -pg
 
 ST_OBJS := st_block.o st_cpu.o st_fs.o st_ib.o st_lustre.o st_mem.o st_net.o \
- st_perf_amd64.o st_ps.o st_vm.o
+ st_perf_amd64.o st_perf_nehalem.o st_ps.o st_vm.o
 OBJS :=  $(ST_OBJS) stats.o dict.o collect.o split.o readstr.o stats_file.o \
  tacc_stats.o test.o loop.o
 
