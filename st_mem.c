@@ -43,6 +43,12 @@
 // local_node 24910136
 // other_node 41244896
 
+/* On 2.6.18-194.32.1 files in /dev/shm show up as FilePages in
+   nodeN/meminfo and as Cached in /proc/meminfo. */
+
+/* Dirty, Writeback, AnonPages, Mapped, Slab, PageTables,
+   NFS_Unstable, Bounce. */
+
 #define MEM_KEYS \
   X(MemTotal), \
   X(MemFree), \
@@ -150,7 +156,7 @@ static void collect_mem(struct stats_type *type)
 struct stats_type ST_MEM_TYPE = {
   .st_name = "mem",
   .st_collect = &collect_mem,
-#define X(K) #K
+#define X(k,r...) #k
   .st_schema = (char *[]) { MEM_KEYS, NULL, },
 #undef X
 };
