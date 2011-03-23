@@ -42,28 +42,28 @@
 #define MSR_UNCORE_PERFEVTSEL7 0x3C7
 
 #define KEYS \
-  X(UNCORE_PERF_GLOBAL_CTRL, "", ""), \
-  X(UNCORE_PERF_GLOBAL_STATUS, "", ""), \
-  X(UNCORE_PERF_GLOBAL_OVF_CTRL, "", ""), \
-  X(UNCORE_FIXED_CTR0, "event", ""), \
-  X(UNCORE_FIXED_CTR_CTRL, "", ""), \
-  X(UNCORE_ADDR_OPCODE_MATCH, "", ""), \
-  X(UNCORE_PMC0, "event", ""), \
-  X(UNCORE_PMC1, "event", ""), \
-  X(UNCORE_PMC2, "event", ""), \
-  X(UNCORE_PMC3, "event", ""), \
-  X(UNCORE_PMC4, "event", ""), \
-  X(UNCORE_PMC5, "event", ""), \
-  X(UNCORE_PMC6, "event", ""), \
-  X(UNCORE_PMC7, "event", ""), \
-  X(UNCORE_PERFEVTSEL0, "", ""), \
-  X(UNCORE_PERFEVTSEL1, "", ""), \
-  X(UNCORE_PERFEVTSEL2, "", ""), \
-  X(UNCORE_PERFEVTSEL3, "", ""), \
-  X(UNCORE_PERFEVTSEL4, "", ""), \
-  X(UNCORE_PERFEVTSEL5, "", ""), \
-  X(UNCORE_PERFEVTSEL6, "", ""), \
-  X(UNCORE_PERFEVTSEL7, "", "")
+  X(PERF_GLOBAL_CTRL, "", ""), \
+  X(PERF_GLOBAL_STATUS, "", ""), \
+  X(PERF_GLOBAL_OVF_CTRL, "", ""), \
+  X(FIXED_CTR0, "event", ""), \
+  X(FIXED_CTR_CTRL, "", ""), \
+  X(ADDR_OPCODE_MATCH, "", ""), \
+  X(PMC0, "event", ""), \
+  X(PMC1, "event", ""), \
+  X(PMC2, "event", ""), \
+  X(PMC3, "event", ""), \
+  X(PMC4, "event", ""), \
+  X(PMC5, "event", ""), \
+  X(PMC6, "event", ""), \
+  X(PMC7, "event", ""), \
+  X(PERFEVTSEL0, "", ""), \
+  X(PERFEVTSEL1, "", ""), \
+  X(PERFEVTSEL2, "", ""), \
+  X(PERFEVTSEL3, "", ""), \
+  X(PERFEVTSEL4, "", ""), \
+  X(PERFEVTSEL5, "", ""), \
+  X(PERFEVTSEL6, "", ""), \
+  X(PERFEVTSEL7, "", "")
 
 /* XXX Also defined in perf_intel. */
 static int cpu_is_nehalem(char *cpu)
@@ -167,8 +167,8 @@ static void collect_uncore_cpu(struct stats_type *type, char *cpu)
 #define X(k,r...) \
   ({ \
     uint64_t val = 0; \
-    if (pread(msr_fd, &val, sizeof(val), MSR_##k) < 0) \
-      ERROR("cannot read `%s' (%08X) through `%s': %m\n", #k, MSR_##k, msr_path); \
+    if (pread(msr_fd, &val, sizeof(val), MSR_UNCORE_##k) < 0) \
+      ERROR("cannot read `%s' (%08X) through `%s': %m\n", #k, MSR_UNCORE_##k, msr_path); \
     else \
       stats_set(stats, #k, val); \
   })
