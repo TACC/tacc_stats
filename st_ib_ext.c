@@ -93,8 +93,13 @@ static void collect_hca_port(struct stats_type *type, const char *hca, int port)
   int state = -1;
   unsigned int lid = -1;
 
+  snprintf(dev, sizeof(dev), "%s/%d", hca, port);
+  stats = get_current_stats(type, dev);
+  if (stats == NULL)
+    return;
+
   /* Check that device is active. .../state should read "4: ACTIVE." */
-  snprintf(path, sizeof(path), "/sys/class/infiniband/%s/ports/%d/state", hca, port);
+  snprintf(path, sizeof(path), "/sys/class/infiniband/%s/ports/%i/state", hca, port);
   if (pscanf(path, "%d", &state) != 1) {
     ERROR("cannot read state of IB HCA `%s' port %d: %m\n", hca, port);
     goto out;
@@ -107,17 +112,12 @@ static void collect_hca_port(struct stats_type *type, const char *hca, int port)
 
   /* Get the lid. */
   snprintf(path, sizeof(path), "/sys/class/infiniband/%s/ports/%i/lid", hca, port);
-  if (pscanf(path, "%x", &lid) != 1) {
+  if (pscanf(path, "%s", &lid) != 1) {
     ERROR("cannot read lid of IB HCA `%s' port %d: %m\n", hca, port);
     goto out;
   }
 
-  TRACE("IB HCA %s, port %d, lid %x, state %d\n", hca, port, lid, state);
-
-  snprintf(dev, sizeof(dev), "%s/%d", hca, port);
-  stats = get_current_stats(type, dev);
-  if (stats == NULL)
-    goto out;
+  TRACE("IB HCA %s, port %d, lid %x\n", hca, port, lid);
 
   collect_lid_port(stats, lid, port);
 

@@ -52,11 +52,8 @@ static void collect_block(struct stats_type *type)
   while ((ent = readdir(dir)) != NULL) {
     if (ent->d_name[0] == '.')
       continue;
-    /* Ignore ram devices.  FIXME Make this a config. */
+    /* Ignore ram*.  FIXME Make this a config. */
     if (strncmp(ent->d_name, "ram", 3) == 0)
-      continue;
-    /* Ignore loop devices. ... */
-    if (strncmp(ent->d_name, "loop", 4) == 0)
       continue;
     collect_block_dev(type, ent->d_name);
   }

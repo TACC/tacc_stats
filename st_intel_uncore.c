@@ -65,7 +65,7 @@
   X(PERFEVTSEL6, "", ""), \
   X(PERFEVTSEL7, "", "")
 
-/* XXX Also defined in intel_pmc3. */
+/* XXX Also defined in perf_intel. */
 static int cpu_is_nehalem(char *cpu)
 {
   char cpuid_path[80];
@@ -103,18 +103,38 @@ static int cpu_is_nehalem(char *cpu)
   int perf_ver = buf[0] & 0xff;
   TRACE("cpu %s, perf_ver %d\n", cpu, perf_ver);
   switch (perf_ver) {
-  default:
-    ERROR("unknown perf monitoring version %d\n", perf_ver);
-    break;
   case 0:
+    /* ERROR("perf monitoring capability is not supported\n"); */
     break;
   case 1:
+    /* nr_ctrs = (buf[0] >> 8) & 0xff; */
+    /* The bit width of an IA32_PMCx MSR is reported using the
+       CPUID.0AH:EAX[23:16]. */
+    /* nr_fixed_ctrs = 0; */
     break;
   case 2:
+    /* nr_ctrs = (buf[0] >> 8) & 0xff */
+
+    /* Version 2 adds IA32_PERF_GLOBAL_CTRL, IA32_PERF_GLOBAL_STATUS,
+       IA32_PERF_GLOBAL_CTRL. */
+
+    /* Bits 0 through 4 of CPUID.0AH.EDX indicates the number
+       of fixed-function performance counters available per core.
+       It also says that there are 3. */
+
+    /* nr_fixed_ctrs = 3 */
+
+    /* Bits 5 through 12 of CPUID.0AH.EDX indicates the bit-width of
+       fixed-function performance counters. Bits beyond the width of
+       the fixed-function counter are reserved and must be written as
+       zeros. */
     break;
   case 3:
     /* Close enough. */
     rc = 1;
+    break;
+  default:
+    ERROR("unknown perf monitoring version %d\n", perf_ver);
     break;
   }
 
@@ -130,8 +150,6 @@ static void collect_uncore_cpu(struct stats_type *type, char *cpu)
   struct stats *stats = NULL;
   char msr_path[80];
   int msr_fd = -1;
-
-  /* FIXME Use cpu's physical package id at device name. */
 
   stats = get_current_stats(type, cpu);
   if (stats == NULL)
@@ -164,6 +182,15 @@ static void collect_uncore_cpu(struct stats_type *type, char *cpu)
 
 static void collect_uncore(struct stats_type *type)
 {
+  const char *path = "/dev/cpu";
+  DIR *dir = NULL;
+
+  dir = opendir(path);
+  if (dir == NULL) {
+    ERROR("cannot open `%s': %m\n", path);
+    goto out;
+  }
+
   // $ cd /sys/devices/system/cpu/cpu0/topology
   // $ for f in *; do echo $f $(cat $f); done
   // core_id 0
@@ -187,19 +214,20 @@ static void collect_uncore(struct stats_type *type)
   // cpu8            9               00000555        1               00000100
   // cpu9            9               00000aaa        0               00000200
 
-  int i;
-  for (i = 0; i < nr_cpus; i++) {
-    char cpu[80];
+  struct dirent *ent;
+  while ((ent = readdir(dir)) != NULL) {
     char core_id_path[80];
     int core_id = -1;
 
-    snprintf(cpu, sizeof(cpu), "%d", i);
-    if (!cpu_is_nehalem(cpu))
+    if (!isdigit(ent->d_name[0]))
+      continue;
+
+    if (!cpu_is_nehalem(ent->d_name))
       continue;
 
     /* Only collect uncore counters on core 0. */
 
-    snprintf(core_id_path, sizeof(core_id_path), "/sys/devices/system/cpu/cpu%d/topology/core_id", i);
+    snprintf(core_id_path, sizeof(core_id_path), "/sys/devices/system/cpu/cpu%s/topology/core_id", ent->d_name);
     if (pscanf(core_id_path, "%d", &core_id) != 1) {
       ERROR("cannot read core id file `%s': %m\n", core_id_path); /* errno */
       continue;
@@ -208,8 +236,12 @@ static void collect_uncore(struct stats_type *type)
     if (core_id != 0)
       continue;
 
-    collect_uncore_cpu(type, cpu);
+    collect_uncore_cpu(type, ent->d_name);
   }
+
+ out:
+  if (dir != NULL)
+    closedir(dir);
 }
 
 struct stats_type STATS_TYPE_INTEL_UNCORE = {

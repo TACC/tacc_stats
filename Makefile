@@ -1,6 +1,6 @@
 CC = gcc
 CFLAGS = -Wall -Werror # -pg
-CPPFLAGS = -D_GNU_SOURCE -I/opt/ofed/include -DDEBUG # -g
+CPPFLAGS = -D_GNU_SOURCE -I/opt/ofed/include # -DDEBUG -g
 LDFLAGS = -L/opt/ofed/lib64 -libmad # -pg
 
 ST_OBJS := st_amd64_pmc.o st_block.o st_cpu.o st_fs.o st_ib.o st_ib_ext.o \

@@ -8,9 +8,6 @@
 #include "trace.h"
 #include "dict.h"
 
-time_t current_time;
-int nr_cpus;
-
 #define X(t) extern struct stats_type STATS_TYPE_##t;
 #include "stats.x"
 #undef X
@@ -21,15 +18,14 @@ struct stats_type *type_table[] = {
 #undef X
 };
 
+time_t current_time;
+
 size_t nr_stats_types = sizeof(type_table) / sizeof(type_table[0]);
 
 static void init(void) __attribute__((constructor));
 static void init(void)
 {
   current_time = time(0);
-
-  nr_cpus = sysconf(_SC_NPROCESSORS_ONLN);
-  TRACE("nr_cpus %d\n", nr_cpus);
 
   /* Initialize types. */
   size_t i;

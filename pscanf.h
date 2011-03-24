@@ -3,8 +3,7 @@
 #include <stdio.h>
 #include <stdarg.h>
 
-__attribute__((format(scanf, 2, 3)))
-  static inline int pscanf(const char *path, const char *fmt, ...)
+static inline int pscanf(const char *path, const char *fmt, ...)
 {
   int rc = -1;
   FILE *file = NULL;

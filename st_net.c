@@ -104,7 +104,7 @@ static void collect_net(struct stats_type *type)
   X(IFF_DYNAMIC)
 
 #define X(F) ((flags & F) ? " " #F : "")
-    TRACE("dev %s, flags %u%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s\n",
+    TRACE("dev %s, flags %u%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s)\n",
           ent->d_name, flags, NET_FLAGS);
 #undef X
 
