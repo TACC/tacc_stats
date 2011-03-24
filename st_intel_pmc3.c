@@ -150,12 +150,12 @@ static int cpu_is_nehalem(char *cpu)
     EDX[4:0] Number of Fixed Counters
   */
 
-#ifdef DEBUG /* XXX */
+#ifdef DEBUG
   int nr_ctrs = (buf[0] >> 8) & 0xFF;
   int ctr_width = (buf[0] >> 16) & 0xFF;
 
   int nr_fixed_ctrs = buf[3] & 0x1F;
-  int fixed_ctr_width = (buf[3] >> 5) 0xFF;
+  int fixed_ctr_width = (buf[3] >> 5) & 0xFF;
 
   TRACE("nr_ctrs %d, ctr_width %d, nr_fixed_ctrs %d, fixed_ctr_width %d\n",
         nr_ctrs, ctr_width, nr_fixed_ctrs, fixed_ctr_width);
@@ -168,7 +168,7 @@ static int cpu_is_nehalem(char *cpu)
   return rc;
 }
 
-static int begin_pmc_cpu(char *cpu, uint64_t event[4])
+static int begin_pmc_cpu(char *cpu, uint64_t *events, size_t nr_events)
 {
   int rc = -1;
   char msr_path[80];
@@ -190,12 +190,12 @@ static int begin_pmc_cpu(char *cpu, uint64_t event[4])
   }
 
   int i;
-  for (i = 0; i < 4; i++) {
-    TRACE("MSR %08X, event %016llX\n", IA32_PERFEVTSEL0 + i, (unsigned long long) event[i]);
+  for (i = 0; i < nr_events; i++) {
+    TRACE("MSR %08X, event %016llX\n", IA32_PERFEVTSEL0 + i, (unsigned long long) events[i]);
 
-    if (pwrite(msr_fd, &event[i], sizeof(event[i]), IA32_PERFEVTSEL0 + i) < 0) {
+    if (pwrite(msr_fd, &events[i], sizeof(events[i]), IA32_PERFEVTSEL0 + i) < 0) {
       ERROR("cannot write event %016llX to MSR %08X through `%s': %m\n",
-            (unsigned long long) event[i],
+            (unsigned long long) events[i],
             (unsigned) IA32_PERFEVTSEL0 + i,
             msr_path);
       goto out;
@@ -235,7 +235,7 @@ static int begin_pmc_cpu(char *cpu, uint64_t event[4])
 #define MEM_LOAD_RETIRED_L1D_HIT       PERF_EVENT(0xCB, 0x01)
 #define MEM_LOAD_RETIRED_L2_HIT        PERF_EVENT(0xCB, 0x02)
 #define MEM_LOAD_RETIRED_L3_HIT        PERF_EVENT(0xCB, 0x0C)
-#define MEM_LOAD_RETIRED_L3_MISS       PERF_EVENT(0xCB, 0x10)
+#define MEM_LOAD_RETIRED_L3_MISS       PERF_EVENT(0xCB, 0x10) /* May be same as 0x0F/0x10 + 0x0F/0x20. */
 
 #define DTLB_LOAD_MISSES_WALK_CYCLES   PERF_EVENT(0x08, 0x04)
 #define FP_COMP_OPS_EXE_SSE_FP_PACKED  PERF_EVENT(0x10, 0x10)
@@ -243,32 +243,21 @@ static int begin_pmc_cpu(char *cpu, uint64_t event[4])
 
 static int begin_pmc(struct stats_type *type)
 {
-#define X(cpu, e0, e1, e2, e3) \
-  do { \
-    if (cpu_is_nehalem(cpu)) \
-      begin_pmc_cpu(cpu, (uint64_t []) { e0, e1, e2, e3 }); \
-  } while (0)
+  uint64_t events[] = {
+    MEM_UNCORE_RETIRED_REMOTE_DRAM,
+    MEM_UNCORE_RETIRED_LOCAL_DRAM,
+    FP_COMP_OPS_EXE_X87,
+    MEM_LOAD_RETIRED_L1D_HIT,
+  };
 
-  X("0", MEM_UNCORE_RETIRED_REMOTE_DRAM, MEM_UNCORE_RETIRED_LOCAL_DRAM,
-    FP_COMP_OPS_EXE_X87, MEM_LOAD_RETIRED_L1D_HIT);
+  int i;
+  for (i = 0; i < nr_cpus; i++) {
+    char cpu[80];
+    snprintf(cpu, sizeof(cpu), "%d", i);
 
-//   X("0", DRAMaccesses, UserCycles, DCacheSysFills, SSEFLOPS);
-//   X("1", HTlink0Use, UserCycles, DCacheSysFills, SSEFLOPS);
-//   X("2", HTlink1Use, UserCycles, DCacheSysFills, SSEFLOPS);
-//   X("3", HTlink2Use, UserCycles, DCacheSysFills, SSEFLOPS);
-//   X("4", DRAMaccesses, UserCycles, DCacheSysFills, SSEFLOPS);
-//   X("5", HTlink0Use, UserCycles, DCacheSysFills, SSEFLOPS);
-//   X("6", HTlink1Use, UserCycles, DCacheSysFills, SSEFLOPS);
-//   X("7", HTlink2Use, UserCycles, DCacheSysFills, SSEFLOPS);
-//   X("8", DRAMaccesses, UserCycles, DCacheSysFills, SSEFLOPS);
-//   X("9", HTlink0Use, UserCycles, DCacheSysFills, SSEFLOPS);
-//   X("10", HTlink1Use, UserCycles, DCacheSysFills, SSEFLOPS);
-//   X("11", HTlink2Use, UserCycles, DCacheSysFills, SSEFLOPS);
-//   X("12", DRAMaccesses, UserCycles, DCacheSysFills, SSEFLOPS);
-//   X("13", HTlink0Use, UserCycles, DCacheSysFills, SSEFLOPS);
-//   X("14", HTlink1Use, UserCycles, DCacheSysFills, SSEFLOPS);
-//   X("15", HTlink2Use, UserCycles, DCacheSysFills, SSEFLOPS);
-#undef X
+    if (cpu_is_nehalem(cpu))
+      begin_pmc_cpu(cpu, events, 4); /* HARD */
+  }
 
   return 0;
 }
@@ -310,27 +299,14 @@ static void collect_pmc_cpu(struct stats_type *type, char *cpu)
 
 static void collect_pmc(struct stats_type *type)
 {
-  const char *path = "/dev/cpu";
-  DIR *dir = NULL;
+  int i;
+  for (i = 0; i < nr_cpus; i++) {
+    char cpu[80];
+    snprintf(cpu, sizeof(cpu), "%d", i);
 
-  dir = opendir(path);
-  if (dir == NULL) {
-    ERROR("cannot open `%s': %m\n", path);
-    goto out;
+    if (cpu_is_nehalem(cpu))
+      collect_pmc_cpu(type, cpu);
   }
-
-  struct dirent *ent;
-  while ((ent = readdir(dir)) != NULL) {
-    if (!isdigit(ent->d_name[0]))
-      continue;
-    if (!cpu_is_nehalem(ent->d_name))
-      continue;
-    collect_pmc_cpu(type, ent->d_name);
-  }
-
- out:
-  if (dir != NULL)
-    closedir(dir);
 }
 
 struct stats_type STATS_TYPE_INTEL_PMC3 = {
