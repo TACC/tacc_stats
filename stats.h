@@ -26,6 +26,7 @@ struct stats {
 };
 
 extern time_t current_time;
+extern int nr_cpus;
 
 struct stats_type *name_to_type(const char *name);
 struct stats_type *stats_type_for_each(size_t *i);
