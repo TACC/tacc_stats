@@ -111,40 +111,55 @@ static int cpu_is_nehalem(char *cpu)
   int perf_ver = buf[0] & 0xff;
   TRACE("cpu %s, perf_ver %d\n", cpu, perf_ver);
   switch (perf_ver) {
+  default:
+    ERROR("unknown perf monitoring version %d\n", perf_ver);
+    goto out;
   case 0:
-    /* ERROR("perf monitoring capability is not supported\n"); */
-    break;
+    goto out;
   case 1:
-    /* nr_ctrs = (buf[0] >> 8) & 0xff; */
-    /* The bit width of an IA32_PMCx MSR is reported using the
-       CPUID.0AH:EAX[23:16]. */
-    /* nr_fixed_ctrs = 0; */
-    break;
+    goto out;
   case 2:
-    /* nr_ctrs = (buf[0] >> 8) & 0xff */
-
-    /* Version 2 adds IA32_PERF_GLOBAL_CTRL, IA32_PERF_GLOBAL_STATUS,
+    /* Adds IA32_PERF_GLOBAL_CTRL, IA32_PERF_GLOBAL_STATUS,
        IA32_PERF_GLOBAL_CTRL. */
-
-    /* Bits 0 through 4 of CPUID.0AH.EDX indicates the number
-       of fixed-function performance counters available per core.
-       It also says that there are 3. */
-
-    /* nr_fixed_ctrs = 3 */
-
-    /* Bits 5 through 12 of CPUID.0AH.EDX indicates the bit-width of
-       fixed-function performance counters. Bits beyond the width of
-       the fixed-function counter are reserved and must be written as
-       zeros. */
-    break;
+    goto out;
   case 3:
     /* Close enough. */
     rc = 1;
     break;
-  default:
-    ERROR("unknown perf monitoring version %d\n", perf_ver);
-    break;
   }
+
+  /*
+    EAX[31:24] Number of arch events supported per logical processor
+    EAX[23:16] Number of bits per programmable counter (width)
+    EAX[15:8] Number of counters per logical processor
+    EAX[7:0] Architectural PerfMon Version
+
+    EBX[31:7] Reserved
+    EBX[6] Branch Mispredicts Retired; 0 = supported
+    EBX[5] Branch Instructions Retired; 0 = supported
+    EBX[4] Last Level Cache Misses; 0 = supported
+    EBX[3] Last Level Cache References; 0 = supported
+    EBX[2] Reference Cycles; 0 = supported
+    EBX[1] Instructions Retired; 0 = supported
+    EBX[0] Core Cycles; 0 = supported
+
+    ECX[31:0] Reserved
+
+    EDX[31:13] Reserved
+    EDX[12:5] Number of Bits in the Fixed Counters (width)
+    EDX[4:0] Number of Fixed Counters
+  */
+
+#ifdef DEBUG /* XXX */
+  int nr_ctrs = (buf[0] >> 8) & 0xFF;
+  int ctr_width = (buf[0] >> 16) & 0xFF;
+
+  int nr_fixed_ctrs = buf[3] & 0x1F;
+  int fixed_ctr_width = (buf[3] >> 5) 0xFF;
+
+  TRACE("nr_ctrs %d, ctr_width %d, nr_fixed_ctrs %d, fixed_ctr_width %d\n",
+        nr_ctrs, ctr_width, nr_fixed_ctrs, fixed_ctr_width);
+#endif
 
  out:
   if (cpuid_fd >= 0)
@@ -158,8 +173,7 @@ static int begin_pmc_cpu(char *cpu, uint64_t event[4])
   int rc = -1;
   char msr_path[80];
   int msr_fd = -1;
-  uint64_t global_ctr_ctrl, global_ovf_ctrl, fixed_ctr_ctrl;
-
+  uint64_t global_ctr_ctrl, fixed_ctr_ctrl;
 
   snprintf(msr_path, sizeof(msr_path), "/dev/cpu/%s/msr", cpu);
   msr_fd = open(msr_path, O_RDWR);
@@ -170,7 +184,7 @@ static int begin_pmc_cpu(char *cpu, uint64_t event[4])
 
   /* Disable counters globally. */
   global_ctr_ctrl = 0;
-  if (pwrite(mds_fd, &global_ctr_ctrl, sizeof(global_ctr_ctrl), IA32_PERF_GLOBAL_CTRL) < 0) {
+  if (pwrite(msr_fd, &global_ctr_ctrl, sizeof(global_ctr_ctrl), IA32_PERF_GLOBAL_CTRL) < 0) {
     ERROR("cannot disable performance counters: %m\n");
     goto out;
   }
@@ -190,13 +204,13 @@ static int begin_pmc_cpu(char *cpu, uint64_t event[4])
   rc = 0;
 
   /* Enable fixed counters.  Three 4 bit blocks, enable OS, User, Any thread. */
-  uint64_t fixed_ctr_ctrl = 0x777;
-  if (pwrite(mds_fd, &fixed_ctr_ctrl, sizeof(fixed_ctr_ctrl), IA32_FIXED_CTR_CTRL) < 0)
+  fixed_ctr_ctrl = 0x777;
+  if (pwrite(msr_fd, &fixed_ctr_ctrl, sizeof(fixed_ctr_ctrl), IA32_FIXED_CTR_CTRL) < 0)
     ERROR("cannot enable fixed counters: %m\n");
 
   /* Enable counters globally, 4 PMC and 3 fixed. */
-  uint64_t global_ctr_ctrl = 0xF | (0x7ULL << 32);
-  if (pwrite(mds_fd, &global_ctr_ctrl, sizeof(global_ctr_ctrl), IA32_PERF_GLOBAL_CTRL) < 0)
+  global_ctr_ctrl = 0xF | (0x7ULL << 32);
+  if (pwrite(msr_fd, &global_ctr_ctrl, sizeof(global_ctr_ctrl), IA32_PERF_GLOBAL_CTRL) < 0)
     ERROR("cannot enable performance counters: %m\n");
 
  out:
@@ -215,13 +229,17 @@ static int begin_pmc_cpu(char *cpu, uint64_t event[4])
   | (1ULL << 22) /* Enable. */ \
   )
 
-// #define DRAMaccesses   PERF_EVENT(0xE0, 0x07) /* DCT0 only */
-// #define HTlink0Use     PERF_EVENT(0xF6, 0x37) /* Counts all except NOPs */
-// #define HTlink1Use     PERF_EVENT(0xF7, 0x37) /* Counts all except NOPs */
-// #define HTlink2Use     PERF_EVENT(0xF8, 0x37) /* Counts all except NOPs */
-// #define UserCycles    (PERF_EVENT(0x76, 0x00) & ~(1UL << 17))
-// #define DCacheSysFills PERF_EVENT(0x42, 0x01) /* Counts DCache fills from beyond the L2 cache. */
-// #define SSEFLOPS       PERF_EVENT(0x03, 0x7F) /* Counts single & double, add, multiply, divide & sqrt FLOPs. */
+#define MEM_UNCORE_RETIRED_REMOTE_DRAM PERF_EVENT(0x0F, 0x10) /* CHECKME */
+#define MEM_UNCORE_RETIRED_LOCAL_DRAM  PERF_EVENT(0x0F, 0x20) /* CHECKME */
+#define FP_COMP_OPS_EXE_X87            PERF_EVENT(0x10, 0x01)
+#define MEM_LOAD_RETIRED_L1D_HIT       PERF_EVENT(0xCB, 0x01)
+#define MEM_LOAD_RETIRED_L2_HIT        PERF_EVENT(0xCB, 0x02)
+#define MEM_LOAD_RETIRED_L3_HIT        PERF_EVENT(0xCB, 0x0C)
+#define MEM_LOAD_RETIRED_L3_MISS       PERF_EVENT(0xCB, 0x10)
+
+#define DTLB_LOAD_MISSES_WALK_CYCLES   PERF_EVENT(0x08, 0x04)
+#define FP_COMP_OPS_EXE_SSE_FP_PACKED  PERF_EVENT(0x10, 0x10)
+#define FP_COMP_OPS_EXE_SSE_FP_SCALAR  PERF_EVENT(0x10, 0x20)
 
 static int begin_pmc(struct stats_type *type)
 {
@@ -230,6 +248,9 @@ static int begin_pmc(struct stats_type *type)
     if (cpu_is_nehalem(cpu)) \
       begin_pmc_cpu(cpu, (uint64_t []) { e0, e1, e2, e3 }); \
   } while (0)
+
+  X("0", MEM_UNCORE_RETIRED_REMOTE_DRAM, MEM_UNCORE_RETIRED_LOCAL_DRAM,
+    FP_COMP_OPS_EXE_X87, MEM_LOAD_RETIRED_L1D_HIT);
 
 //   X("0", DRAMaccesses, UserCycles, DCacheSysFills, SSEFLOPS);
 //   X("1", HTlink0Use, UserCycles, DCacheSysFills, SSEFLOPS);
@@ -314,6 +335,7 @@ static void collect_pmc(struct stats_type *type)
 
 struct stats_type STATS_TYPE_INTEL_PMC3 = {
   .st_name = "intel_pmc3",
+  .st_begin = &begin_pmc,
   .st_collect = &collect_pmc,
 #define X(k,r...) #k
   .st_schema = (char *[]) { KEYS, NULL, },
