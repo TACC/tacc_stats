@@ -3,28 +3,38 @@
 #include <ctype.h>
 #include "split.h"
 
-char **split(const char *str)
+size_t strwc(const char *str)
 {
-  char **list = NULL;
-  const char *s, *t;
-  size_t len = 0, i;
+  size_t wc = 0;
+  const char *s;
 
   s = str;
   while (*s != 0) {
     while (isspace(*s))
       s++;
     if (*s != 0)
-      len++;
+      wc++;
     while (*s != 0 && !isspace(*s))
       s++;
   }
 
-  list = calloc(len + 1, sizeof(char*));
+  return wc;
+}
+
+char **split(const char *str)
+{
+  char **list = NULL;
+  const char *s, *t;
+  size_t wc, i;
+
+  wc = strwc(str);
+
+  list = calloc(wc + 1, sizeof(char*));
   if (list == NULL)
     goto err;
 
   s = str;
-  for (i = 0; i < len; i++) {
+  for (i = 0; i < wc; i++) {
     while (isspace(*s))
       s++;
     t = s;
@@ -40,7 +50,7 @@ char **split(const char *str)
   return list;
 
  err:
-  for (i = 0; i < len; i++)
+  for (i = 0; i < wc; i++)
     free(list[i]);
   free(list);
   return NULL;
