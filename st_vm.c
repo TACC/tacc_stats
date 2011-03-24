@@ -3,17 +3,6 @@
 #include "trace.h"
 #include "collect.h"
 
-static void collect_vmstat(struct stats_type *type)
-{
-  struct stats *vm_stats = NULL;
-
-  vm_stats = get_current_stats(type, NULL);
-  if (vm_stats == NULL)
-    return;
-
-  collect_key_value_file(vm_stats, "/proc/vmstat");
-}
-
 // $ cat /proc/vmstat
 // nr_anon_pages 398141
 // nr_mapped 12214
@@ -67,7 +56,7 @@ static void collect_vmstat(struct stats_type *type)
 // allocstall 18265
 // pgrotated 18
 
-#define VM_KEYS \
+#define KEYS \
   X(nr_dirty), \
   X(nr_writeback), \
   X(nr_unstable), \
@@ -106,10 +95,21 @@ static void collect_vmstat(struct stats_type *type)
   X(allocstall), \
   X(pgrotated)
 
-struct stats_type ST_VM_TYPE = {
+static void collect_vm(struct stats_type *type)
+{
+  struct stats *stats = NULL;
+
+  stats = get_current_stats(type, NULL);
+  if (stats == NULL)
+    return;
+
+  collect_key_value_file(stats, "/proc/vmstat");
+}
+
+struct stats_type STATS_TYPE_VM = {
   .st_name = "vm",
-  .st_collect = &collect_vmstat,
-#define X(K) #K
-  .st_schema = (char *[]) { VM_KEYS, NULL, },
+  .st_collect = &collect_vm,
+#define X(k,r...) #k
+  .st_schema = (char *[]) { KEYS, NULL, },
 #undef X
 };

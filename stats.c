@@ -8,12 +8,12 @@
 #include "trace.h"
 #include "dict.h"
 
-#define X(T) extern struct stats_type T##_TYPE;
+#define X(t) extern struct stats_type STATS_TYPE_##t;
 #include "stats.x"
 #undef X
 
 struct stats_type *type_table[] = {
-#define X(T) &T##_TYPE,
+#define X(t) &STATS_TYPE_##t,
 #include "stats.x"
 #undef X
 };

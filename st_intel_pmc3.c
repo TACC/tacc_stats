@@ -74,35 +74,6 @@
   X(PERF_GLOBAL_CTRL, "", ""), \
   X(PERF_GLOBAL_OVF_CTRL, "", "")
 
-/* B.4.1 Additional MSRs In the Intel Xeon Processors 5500 and 3400
-   Series.  These also apply to Core i7 and i5 processor family CPUID
-   signature of 06_1AH, 06_1EH and 06_1FH. */
-
-#define MSR_UNCORE_PERF_GLOBAL_CTRL     0x391
-#define MSR_UNCORE_PERF_GLOBAL_STATUS   0x392
-#define MSR_UNCORE_PERF_GLOBAL_OVF_CTRL 0x393
-#define MSR_UNCORE_FIXED_CTR0           0x394 /* Uncore clock. */
-#define MSR_UNCORE_FIXED_CTR_CTRL       0x395
-#define MSR_UNCORE_ADDR_OPCODE_MATCH    0x396
-
-#define MSR_UNCORE_PMC0 0x3B0 /* CHECKME */
-#define MSR_UNCORE_PMC1 0x3B1
-#define MSR_UNCORE_PMC2 0x3B2
-#define MSR_UNCORE_PMC3 0x3B3
-#define MSR_UNCORE_PMC4 0x3B4
-#define MSR_UNCORE_PMC5 0x3B5
-#define MSR_UNCORE_PMC6 0x3B6
-#define MSR_UNCORE_PMC7 0x3B7
-
-#define MSR_UNCORE_PERFEVTSEL0 0x3C0 /* CHECKME */
-#define MSR_UNCORE_PERFEVTSEL1 0x3C1
-#define MSR_UNCORE_PERFEVTSEL2 0x3C2
-#define MSR_UNCORE_PERFEVTSEL3 0x3C3
-#define MSR_UNCORE_PERFEVTSEL4 0x3C4
-#define MSR_UNCORE_PERFEVTSEL5 0x3C5
-#define MSR_UNCORE_PERFEVTSEL6 0x3C6
-#define MSR_UNCORE_PERFEVTSEL7 0x3C7
-
 static int cpu_is_nehalem(char *cpu)
 {
   char cpuid_path[80];
@@ -182,7 +153,106 @@ static int cpu_is_nehalem(char *cpu)
   return rc;
 }
 
-static void collect_perf_cpu(struct stats_type *type, char *cpu)
+static int begin_pmc_cpu(char *cpu, uint64_t event[4])
+{
+  int rc = -1;
+  char msr_path[80];
+  int msr_fd = -1;
+  uint64_t global_ctr_ctrl, global_ovf_ctrl, fixed_ctr_ctrl;
+
+
+  snprintf(msr_path, sizeof(msr_path), "/dev/cpu/%s/msr", cpu);
+  msr_fd = open(msr_path, O_RDWR);
+  if (msr_fd < 0) {
+    ERROR("cannot open `%s': %m\n", msr_path);
+    goto out;
+  }
+
+  /* Disable counters globally. */
+  global_ctr_ctrl = 0;
+  if (pwrite(mds_fd, &global_ctr_ctrl, sizeof(global_ctr_ctrl), IA32_PERF_GLOBAL_CTRL) < 0) {
+    ERROR("cannot disable performance counters: %m\n");
+    goto out;
+  }
+
+  int i;
+  for (i = 0; i < 4; i++) {
+    TRACE("MSR %08X, event %016llX\n", IA32_PERFEVTSEL0 + i, (unsigned long long) event[i]);
+
+    if (pwrite(msr_fd, &event[i], sizeof(event[i]), IA32_PERFEVTSEL0 + i) < 0) {
+      ERROR("cannot write event %016llX to MSR %08X through `%s': %m\n",
+            (unsigned long long) event[i],
+            (unsigned) IA32_PERFEVTSEL0 + i,
+            msr_path);
+      goto out;
+    }
+  }
+  rc = 0;
+
+  /* Enable fixed counters.  Three 4 bit blocks, enable OS, User, Any thread. */
+  uint64_t fixed_ctr_ctrl = 0x777;
+  if (pwrite(mds_fd, &fixed_ctr_ctrl, sizeof(fixed_ctr_ctrl), IA32_FIXED_CTR_CTRL) < 0)
+    ERROR("cannot enable fixed counters: %m\n");
+
+  /* Enable counters globally, 4 PMC and 3 fixed. */
+  uint64_t global_ctr_ctrl = 0xF | (0x7ULL << 32);
+  if (pwrite(mds_fd, &global_ctr_ctrl, sizeof(global_ctr_ctrl), IA32_PERF_GLOBAL_CTRL) < 0)
+    ERROR("cannot enable performance counters: %m\n");
+
+ out:
+  if (msr_fd >= 0)
+    close(msr_fd);
+
+  return rc;
+}
+
+#define PERF_EVENT(event, umask) \
+  ( (event) \
+  | (umask << 8) \
+  | (1ULL << 16) /* Count in user mode (CPL == 0). */ \
+  | (1ULL << 17) /* Count in OS mode (CPL > 0). */ \
+  | (1ULL << 21) /* Any thread. */ \
+  | (1ULL << 22) /* Enable. */ \
+  )
+
+// #define DRAMaccesses   PERF_EVENT(0xE0, 0x07) /* DCT0 only */
+// #define HTlink0Use     PERF_EVENT(0xF6, 0x37) /* Counts all except NOPs */
+// #define HTlink1Use     PERF_EVENT(0xF7, 0x37) /* Counts all except NOPs */
+// #define HTlink2Use     PERF_EVENT(0xF8, 0x37) /* Counts all except NOPs */
+// #define UserCycles    (PERF_EVENT(0x76, 0x00) & ~(1UL << 17))
+// #define DCacheSysFills PERF_EVENT(0x42, 0x01) /* Counts DCache fills from beyond the L2 cache. */
+// #define SSEFLOPS       PERF_EVENT(0x03, 0x7F) /* Counts single & double, add, multiply, divide & sqrt FLOPs. */
+
+static int begin_pmc(struct stats_type *type)
+{
+#define X(cpu, e0, e1, e2, e3) \
+  do { \
+    if (cpu_is_nehalem(cpu)) \
+      begin_pmc_cpu(cpu, (uint64_t []) { e0, e1, e2, e3 }); \
+  } while (0)
+
+//   X("0", DRAMaccesses, UserCycles, DCacheSysFills, SSEFLOPS);
+//   X("1", HTlink0Use, UserCycles, DCacheSysFills, SSEFLOPS);
+//   X("2", HTlink1Use, UserCycles, DCacheSysFills, SSEFLOPS);
+//   X("3", HTlink2Use, UserCycles, DCacheSysFills, SSEFLOPS);
+//   X("4", DRAMaccesses, UserCycles, DCacheSysFills, SSEFLOPS);
+//   X("5", HTlink0Use, UserCycles, DCacheSysFills, SSEFLOPS);
+//   X("6", HTlink1Use, UserCycles, DCacheSysFills, SSEFLOPS);
+//   X("7", HTlink2Use, UserCycles, DCacheSysFills, SSEFLOPS);
+//   X("8", DRAMaccesses, UserCycles, DCacheSysFills, SSEFLOPS);
+//   X("9", HTlink0Use, UserCycles, DCacheSysFills, SSEFLOPS);
+//   X("10", HTlink1Use, UserCycles, DCacheSysFills, SSEFLOPS);
+//   X("11", HTlink2Use, UserCycles, DCacheSysFills, SSEFLOPS);
+//   X("12", DRAMaccesses, UserCycles, DCacheSysFills, SSEFLOPS);
+//   X("13", HTlink0Use, UserCycles, DCacheSysFills, SSEFLOPS);
+//   X("14", HTlink1Use, UserCycles, DCacheSysFills, SSEFLOPS);
+//   X("15", HTlink2Use, UserCycles, DCacheSysFills, SSEFLOPS);
+#undef X
+
+  return 0;
+}
+
+static void collect_pmc_cpu(struct stats_type *type, char *cpu)
 {
   struct stats *stats = NULL;
   char msr_path[80];
@@ -217,7 +287,7 @@ static void collect_perf_cpu(struct stats_type *type, char *cpu)
     close(msr_fd);
 }
 
-static void collect_perf(struct stats_type *type)
+static void collect_pmc(struct stats_type *type)
 {
   const char *path = "/dev/cpu";
   DIR *dir = NULL;
@@ -234,7 +304,7 @@ static void collect_perf(struct stats_type *type)
       continue;
     if (!cpu_is_nehalem(ent->d_name))
       continue;
-    collect_perf_cpu(type, ent->d_name);
+    collect_pmc_cpu(type, ent->d_name);
   }
 
  out:
@@ -242,9 +312,9 @@ static void collect_perf(struct stats_type *type)
     closedir(dir);
 }
 
-struct stats_type ST_PERF_NEHALEM_TYPE = {
-  .st_name = "perf_nehalem",
-  .st_collect = &collect_perf,
+struct stats_type STATS_TYPE_INTEL_PMC3 = {
+  .st_name = "intel_pmc3",
+  .st_collect = &collect_pmc,
 #define X(k,r...) #k
   .st_schema = (char *[]) { KEYS, NULL, },
 #undef X

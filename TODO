@@ -1,3 +1,18 @@
+master.ls4:jhammond$ sudo perfquery -x
+ibwarn: [3918] dump_perfcounters: PerfMgt ClassPortInfo 0x400 extended counters not indicated
+
+# Port extended counters: Lid 1466 port 1
+PortSelect:......................1
+CounterSelect:...................0x0400
+PortXmitData:....................37880598370
+PortRcvData:.....................832555876
+PortXmitPkts:....................80434330
+PortRcvPkts:.....................44644020
+PortUnicastXmitPkts:.............0
+PortUnicastRcvPkts:..............0
+PortMulticastXmitPkts:...........0
+PortMulticastRcvPkts:............0
+
 stats.c
   Why is bsearch() broken?
 

@@ -49,7 +49,7 @@
 /* Dirty, Writeback, AnonPages, Mapped, Slab, PageTables,
    NFS_Unstable, Bounce. */
 
-#define MEM_KEYS \
+#define KEYS \
   X(MemTotal), \
   X(MemFree), \
   X(MemUsed), \
@@ -153,10 +153,10 @@ static void collect_mem(struct stats_type *type)
     closedir(dir);
 }
 
-struct stats_type ST_MEM_TYPE = {
+struct stats_type STATS_TYPE_MEM = {
   .st_name = "mem",
   .st_collect = &collect_mem,
 #define X(k,r...) #k
-  .st_schema = (char *[]) { MEM_KEYS, NULL, },
+  .st_schema = (char *[]) { KEYS, NULL, },
 #undef X
 };

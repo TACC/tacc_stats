@@ -10,7 +10,7 @@
    size of device). */
 /* All X_ticks members and time_in_queue are in ms. */
 
-#define BLOCK_KEYS \
+#define KEYS \
   X(rd_ios,        "event",           "read requests processed"), \
   X(rd_merges,     "event",           "read requests merged with in-queue requests"), \
   X(rd_sectors,    "event,unit=512B", "sectors read"), \
@@ -33,7 +33,7 @@ static void collect_block_dev(struct stats_type *type, const char *dev)
   snprintf(path, sizeof(path), "/sys/block/%s/stat", dev);
 
 #define X(k,r...) #k
-  collect_key_list(stats, path, BLOCK_KEYS, NULL);
+  collect_key_list(stats, path, KEYS, NULL);
 #undef X
 }
 
@@ -63,10 +63,10 @@ static void collect_block(struct stats_type *type)
     closedir(dir);
 }
 
-struct stats_type ST_BLOCK_TYPE = {
+struct stats_type STATS_TYPE_BLOCK = {
   .st_name = "block",
   .st_collect = &collect_block,
 #define X(k,r...) #k
-  .st_schema = (char *[]) { BLOCK_KEYS, NULL, },
+  .st_schema = (char *[]) { KEYS, NULL, },
 #undef X
 };

@@ -91,7 +91,7 @@ static void collect_lustre_stats(struct stats_type *type)
     closedir(base_dir);
 }
 
-struct stats_type ST_LUSTRE_TYPE = {
+struct stats_type STATS_TYPE_LUSTRE = {
   .st_name = "lustre",
   .st_collect = &collect_lustre_stats,
   .st_schema = (char *[]) { "read_bytes", "write_bytes", NULL, },

@@ -13,7 +13,7 @@
 #include "collect.h"
 #include "trace.h"
 
-#define NET_KEYS \
+#define KEYS \
   X(collisions, "event", ""), \
   X(multicast, "event", ""), \
   X(rx_bytes, "event,unit=B", ""), \
@@ -123,10 +123,10 @@ static void collect_net(struct stats_type *type)
     closedir(dir);
 }
 
-struct stats_type ST_NET_TYPE = {
+struct stats_type STATS_TYPE_NET = {
   .st_name = "net",
   .st_collect = &collect_net,
 #define X(k,r...) #k
-  .st_schema = (char *[]) { NET_KEYS, NULL, },
+  .st_schema = (char *[]) { KEYS, NULL, },
 #undef X
 };

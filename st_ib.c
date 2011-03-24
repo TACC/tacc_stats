@@ -8,7 +8,7 @@
 
 const char *perfquery = "/opt/ofed/bin/perfquery";
 
-#define IB_KEYS \
+#define KEYS \
   X(excessive_buffer_overrun_errors, "event", ""), \
   X(link_downed, "event", "failed link error recoveries"), \
   X(link_error_recovery, "event", "successful link error recoveries"), \
@@ -106,10 +106,10 @@ static void collect_ib(struct stats_type *type)
     closedir(dir);
 }
 
-struct stats_type ST_IB_TYPE = {
+struct stats_type STATS_TYPE_IB = {
   .st_name = "ib",
   .st_collect = &collect_ib,
 #define X(k,r...) #k
-  .st_schema = (char *[]) { IB_KEYS, NULL, },
+  .st_schema = (char *[]) { KEYS, NULL, },
 #undef X
 };

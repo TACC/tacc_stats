@@ -24,23 +24,22 @@
 #define MSR_PERF_CTL1 0xC0010001
 #define MSR_PERF_CTL2 0xC0010002
 #define MSR_PERF_CTL3 0xC0010003
-
 #define MSR_PERF_CTR0 0xC0010004
 #define MSR_PERF_CTR1 0xC0010005
 #define MSR_PERF_CTR2 0xC0010006
 #define MSR_PERF_CTR3 0xC0010007
 
-#define PERF_KEYS \
-  X(PERF_CTL0), \
-  X(PERF_CTL1), \
-  X(PERF_CTL2), \
-  X(PERF_CTL3), \
-  X(PERF_CTR0), \
-  X(PERF_CTR1), \
-  X(PERF_CTR2), \
-  X(PERF_CTR3)
+#define KEYS \
+  X(CTL0), \
+  X(CTL1), \
+  X(CTL2), \
+  X(CTL3), \
+  X(CTR0), \
+  X(CTR1), \
+  X(CTR2), \
+  X(CTR3)
 
-static int cpu_is_family_10h(char *cpu)
+static int cpu_is_amd64_10h(char *cpu)
 {
   char cpuid_path[80];
   int cpuid_fd = -1;
@@ -95,14 +94,11 @@ static int cpu_is_family_10h(char *cpu)
   return rc;
 }
 
-static int begin_perf_cpu(char *cpu, uint64_t event[4])
+static int begin_pmc_cpu(char *cpu, uint64_t event[4])
 {
   int rc = -1;
   char msr_path[80];
   int msr_fd = -1;
-
-  if (!cpu_is_family_10h(cpu))
-    goto out;
 
   snprintf(msr_path, sizeof(msr_path), "/dev/cpu/%s/msr", cpu);
   msr_fd = open(msr_path, O_RDWR);
@@ -149,10 +145,13 @@ static int begin_perf_cpu(char *cpu, uint64_t event[4])
 #define DCacheSysFills PERF_EVENT(0x42, 0x01) /* Counts DCache fills from beyond the L2 cache. */
 #define SSEFLOPS       PERF_EVENT(0x03, 0x7F) /* Counts single & double, add, multiply, divide & sqrt FLOPs. */
 
-static int begin_perf(struct stats_type *type)
+static int begin_pmc(struct stats_type *type)
 {
 #define X(cpu, e0, e1, e2, e3) \
-  begin_perf_cpu(cpu, (uint64_t []) { e0, e1, e2, e3 });
+  do { \
+    if (cpu_is_amd64_10h(cpu)) \
+      begin_pmc_cpu(cpu, (uint64_t []) { e0, e1, e2, e3 }); \
+  } while (0)
 
   X("0", DRAMaccesses, UserCycles, DCacheSysFills, SSEFLOPS);
   X("1", HTlink0Use, UserCycles, DCacheSysFills, SSEFLOPS);
@@ -175,14 +174,11 @@ static int begin_perf(struct stats_type *type)
   return 0;
 }
 
-static void collect_perf_cpu(struct stats_type *type, char *cpu)
+static void collect_pmc_cpu(struct stats_type *type, char *cpu)
 {
   char msr_path[80];
   int msr_fd = -1;
   struct stats *stats = NULL;
-
-  if (!cpu_is_family_10h(cpu))
-    goto out;
 
   stats = get_current_stats(type, cpu);
   if (stats == NULL)
@@ -196,15 +192,15 @@ static void collect_perf_cpu(struct stats_type *type, char *cpu)
     goto out;
   }
 
-#define X(K) \
+#define X(k,r...) \
   ({ \
     uint64_t val = 0; \
-    if (pread(msr_fd, &val, sizeof(val), MSR_##K) < 0) \
-      ERROR("cannot read `%s' (%08X) through `%s': %m\n", #K, MSR_##K, msr_path); \
+    if (pread(msr_fd, &val, sizeof(val), MSR_PERF_##k) < 0) \
+      ERROR("cannot read `%s' (%08X) through `%s': %m\n", #k, MSR_PERF_##k, msr_path); \
     else \
-      stats_set(stats, #K, val); \
+      stats_set(stats, #k, val); \
   })
-  PERF_KEYS;
+  KEYS;
 #undef X
 
  out:
@@ -212,7 +208,7 @@ static void collect_perf_cpu(struct stats_type *type, char *cpu)
     close(msr_fd);
 }
 
-static void collect_perf(struct stats_type *type)
+static void collect_pmc(struct stats_type *type)
 {
   const char *path = "/dev/cpu";
   DIR *dir = NULL;
@@ -227,7 +223,11 @@ static void collect_perf(struct stats_type *type)
   while ((ent = readdir(dir)) != NULL) {
     if (!isdigit(ent->d_name[0]))
       continue;
-    collect_perf_cpu(type, ent->d_name);
+
+    if (!cpu_is_amd64_10h(ent->d_name))
+      continue;
+
+    collect_pmc_cpu(type, ent->d_name);
   }
 
  out:
@@ -235,11 +235,11 @@ static void collect_perf(struct stats_type *type)
     closedir(dir);
 }
 
-struct stats_type ST_PERF_AMD64_TYPE = {
-  .st_name = "perf_amd64",
-  .st_begin = &begin_perf,
-  .st_collect = &collect_perf,
-#define X(K) #K
-  .st_schema = (char *[]) { PERF_KEYS, NULL, },
+struct stats_type STATS_TYPE_AMD64_PMC = {
+  .st_name = "amd64_pmc",
+  .st_begin = &begin_pmc,
+  .st_collect = &collect_pmc,
+#define X(k,r...) #k
+  .st_schema = (char *[]) { KEYS, NULL, },
 #undef X
 };

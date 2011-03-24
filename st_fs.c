@@ -6,7 +6,7 @@
 #include "collect.h"
 #include "trace.h"
 
-#define FS_KEYS \
+#define KEYS \
   X(dentry_use, "", "number of directory entries in use"), \
   X(file_use, "", "number of file handles in use"), \
   X(inode_use, "", "number of inodes in use")
@@ -15,7 +15,7 @@ static void collect_fs(struct stats_type *type)
 {
   struct stats *stats = NULL;
 #define X(k,r...) k = 0
-  unsigned long long FS_KEYS;
+  unsigned long long KEYS;
 #undef X
 
   stats = get_current_stats(type, NULL);
@@ -65,14 +65,14 @@ static void collect_fs(struct stats_type *type)
     inode_use = inode_alloc - inode_free;
 
 #define X(k,r...) stats_set(stats, #k, k)
-  FS_KEYS;
+  KEYS;
 #undef X
 }
 
-struct stats_type ST_FS_TYPE = {
+struct stats_type STATS_TYPE_FS = {
   .st_name = "fs",
   .st_collect = &collect_fs,
 #define X(k,r...) #k
-  .st_schema = (char *[]) { FS_KEYS, NULL, },
+  .st_schema = (char *[]) { KEYS, NULL, },
 #undef X
 };

@@ -244,7 +244,7 @@ static void collect_uncore(struct stats_type *type)
     closedir(dir);
 }
 
-struct stats_type ST_INTEL_UNCORE_TYPE = {
+struct stats_type STATS_TYPE_INTEL_UNCORE = {
   .st_name = "intel_uncore",
   .st_collect = &collect_uncore,
 #define X(k,r...) #k
