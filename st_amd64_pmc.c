@@ -30,14 +30,14 @@
 #define MSR_PERF_CTR3 0xC0010007
 
 #define KEYS \
-  X(CTL0), \
-  X(CTL1), \
-  X(CTL2), \
-  X(CTL3), \
-  X(CTR0), \
-  X(CTR1), \
-  X(CTR2), \
-  X(CTR3)
+  X(CTL0, "control", ""), \
+  X(CTL1, "control", ""), \
+  X(CTL2, "control", ""), \
+  X(CTL3, "control", ""), \
+  X(CTR0, "event,width=48", ""), \
+  X(CTR1, "event,wdith=48", ""), \
+  X(CTR2, "event,width=48", ""), \
+  X(CTR3, "event,width=48", "")
 
 static int cpu_is_amd64_10h(char *cpu)
 {
