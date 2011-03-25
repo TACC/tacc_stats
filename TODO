@@ -10,6 +10,7 @@ stats_file.c
   Allow space after directive character.
 
 stats.c
+  Add schema dict, key to index.
   Fix bsearch().
   Property lists.
   val_t.
