@@ -20,11 +20,17 @@ int stats_file_rd_hdr(FILE *file, const char *path)
   size_t size = 0;
 
   if (getline(&buf, &size, file) <= 0) {
-    ERROR("file `%s' is not in %s format\n", path, TACC_STATS_PROGRAM);
+    if (feof(file))
+      ERROR("empty stats file `%s'\n", path);
     goto err;
   }
 
   line = buf;
+  if (*(line++) != '#') {
+    ERROR("file `%s' is not in %s format\n", path, TACC_STATS_PROGRAM);
+    goto err;
+  }
+
   char *prog = strsep(&line, SPACE_CHARS);
   if (prog == NULL || strcmp(prog, TACC_STATS_PROGRAM) != 0) {
     ERROR("file `%s' is not in %s format\n", path, TACC_STATS_PROGRAM);
@@ -40,7 +46,7 @@ int stats_file_rd_hdr(FILE *file, const char *path)
   TRACE("prog %s, vers %s\n", prog, vers);
 
   /* TODO Jobid in header. */
-  /* Check for change of job. */
+  /* TODO Ignore whitespace. */
 
   int nr = 1;
   while (getline(&buf, &size, file) > 0) {
@@ -53,12 +59,6 @@ int stats_file_rd_hdr(FILE *file, const char *path)
 
     if (c == '#')
       continue; /* Comment. */
-
-    if (c == '$') {
-      /* TODO if (tacc_stats_config(line) < 0)
-         goto err; */
-      continue;
-    }
 
     /* Otherwise line is a directive to be processed by a type. */
     char *name = strsep(&line, SPACE_CHARS);
@@ -84,7 +84,11 @@ int stats_file_rd_hdr(FILE *file, const char *path)
       }
       type->st_enabled = 1;
       break;
-    case '@': /* TODO */
+    case '@': /* TODO Handle device list. */
+      break;
+    case '$': /* TODO */
+      break;
+    case '%': /* TODO */
       break;
     default:
       ERROR("%s:%d: bad directive `%c%s %s'\n", path, nr, c, name, line);
@@ -93,16 +97,19 @@ int stats_file_rd_hdr(FILE *file, const char *path)
   }
 
   if (ferror(file)) {
-    ERROR("error reading from `%s': %m\n", path);
   err:
     rc = -1;
     if (errno == 0)
       errno = EINVAL;
   }
 
+  if (ferror(file))
+    ERROR("error reading from `%s': %m\n", path);
+
   free(buf);
 
   return rc;
+
 }
 
 int stats_file_wr_hdr(FILE *file, const char *path)
@@ -110,10 +117,12 @@ int stats_file_wr_hdr(FILE *file, const char *path)
   struct utsname uts_buf;
   uname(&uts_buf);
 
-  fprintf(file, "%s %s\n", TACC_STATS_PROGRAM, TACC_STATS_VERSION);
+  fprintf(file, "#%s %s\n", TACC_STATS_PROGRAM, TACC_STATS_VERSION);
+  /* Make these global properties. */
   fprintf(file, "#hostname %s\n", uts_buf.nodename);
   fprintf(file, "#uname %s %s %s %s\n", uts_buf.sysname, uts_buf.machine,
           uts_buf.release, uts_buf.version);
+  /* TODO btime. */
 
   size_t i = 0;
   struct stats_type *type;
