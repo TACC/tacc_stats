@@ -1,48 +1,65 @@
-master.ls4:jhammond$ sudo perfquery -x
-ibwarn: [3918] dump_perfcounters: PerfMgt ClassPortInfo 0x400 extended counters not indicated
 
-# Port extended counters: Lid 1466 port 1
-PortSelect:......................1
-CounterSelect:...................0x0400
-PortXmitData:....................37880598370
-PortRcvData:.....................832555876
-PortXmitPkts:....................80434330
-PortRcvPkts:.....................44644020
-PortUnicastXmitPkts:.............0
-PortUnicastRcvPkts:..............0
-PortMulticastXmitPkts:...........0
-PortMulticastRcvPkts:............0
+stats_file.c
+  Make program version line a comment for easier parsing.
+  Put btime in header, remove from ps.
+  ! type schema
+  @ type devices
+  # comment
+  $ reserved
+  % type prop rest
+  Allow space after directive character.
 
 stats.c
-  Why is bsearch() broken?
-
-ST_PERF
-  AMD sanity check.
-  Uncore counters on Nehalem, Westmere, ...
-  /sys/devices/system/cpu/cpuN/topology/core_id == 0
+  Fix bsearch().
+  Property lists.
+  val_t.
 
 ib
-  Could replace perfquery with libibmad, preformance_reset_via().
-  Consider /sys/class/infiniband/mlx4_0/diag_counters/*.
-  Move active check to parent.
-  Use different FILE*s for different files.
+  Use "hca/port" for device name.
+
+  master.ls4:jhammond$ sudo perfquery -x
+  ibwarn: [3918] dump_perfcounters: PerfMgt ClassPortInfo 0x400 extended counters not indicated
+
+  # Port extended counters: Lid 1466 port 1
+  PortSelect:......................1
+  CounterSelect:...................0x0400
+  PortXmitData:....................37880598370
+  PortRcvData:.....................832555876
+  PortXmitPkts:....................80434330
+  PortRcvPkts:.....................44644020
+  PortUnicastXmitPkts:.............0
+  PortUnicastRcvPkts:..............0
+  PortMulticastXmitPkts:...........0
+  PortMulticastRcvPkts:............0
+
+mem
+  Separate meminfo and numastat.
+
+intel_uncore
+  Use physical package id as device.  Topology.
+
+vm
+  Remove, convert to swap.
 
 block
   Easy way to ignore inactive devices?
 
+TODO swap
+  Check /proc/swaps  
+
 lustre
-  MDS.
+  mdc
+  MDS/{mds,mds_readpage}.
+  OSS/{ost,ost_io,ost_create}.
   More keys.
 
-RRDtool.
+shmem
+  Check /proc/mounts 'tmpfs /dev/shm tmpfs ...'  On older kernels
+  first column is 'none.'
+  /proc/sysvipc/shm 'key shmid perms size ...'  Size units?
 
-Time format specifier.
 
-schema {
-  name
-  descr
-  rename
-}
+Trying to collect unknown type creates empty record.  NBD.
 
 More /sys, less /proc.
 
@@ -52,13 +69,9 @@ Track which stats/values were actually set.
 
 Replace asnprintf() with snprintf().
 
-Identifying which values are cumulative.
-
 Enabling, disabling types.
 
-Escaping of whitespace, other garbage, in ids.
-
-stats_put(), get_c, put_c.
+Checking for whitespace, other garbage, in ids.
 
 Torture test memory management.
 
@@ -66,35 +79,13 @@ Torture test dictionary.
 dict_resize()
 dict_allow_resize()
 
-Direct execution driven collection for start/end of job.  May require
-locking.
-
 Output file, directory naming.
 
-MAYBE ST_NFS
+MAYBE
   /proc/net/rpc/nfs
-
-MAYBE ST_NFS6
   /proc/net/rpc/nfsd
-
-MAYBE
-  /proc/sys/fs/dentry-state
-  $ cat /proc/sys/fs/dentry-state
-  1669793 1648474 45 0 0 0
-
-  This file contains six numbers, nr_dentry, nr_unused, age_limit (age
-  in seconds), want_pages (pages requested by system) and two dummy
-  values.  nr_dentry seems to be 0 all the time.  nr_unused seems to be
-  the number of unused dentries.  age_limit is the age in seconds after
-  which dcache entries can be reclaimed when memory is short and
-  want_pages is nonzero when the kernel has called shrink_dcache_pages()
-  and the dcache isn't pruned yet.
-
-MAYBE
-  /proc/sys/fs/{aio-nr,file-nr,inode-nr,inode-state}
   /proc/buddyinfo
   /proc/schedstat (Mostly unavailable.)
   /proc/slabinfo
   /proc/net/sockstat[6]
   /proc/net/snmp
-
