@@ -58,21 +58,21 @@
 #define IA32_PERF_GLOBAL_OVF_CTRL 0x390
 
 #define KEYS \
-  X(PMC0, "event", ""), \
-  X(PMC1, "event", ""), \
-  X(PMC2, "event", ""), \
-  X(PMC3, "event", ""), \
-  X(PERFEVTSEL0, "", ""), \
-  X(PERFEVTSEL1, "", ""), \
-  X(PERFEVTSEL2, "", ""), \
-  X(PERFEVTSEL3, "", ""), \
-  X(FIXED_CTR0, "event", ""), \
-  X(FIXED_CTR1, "event", ""), \
-  X(FIXED_CTR2, "event", ""), \
-  X(FIXED_CTR_CTRL, "", ""), \
-  X(PERF_GLOBAL_STATUS, "", ""), \
-  X(PERF_GLOBAL_CTRL, "", ""), \
-  X(PERF_GLOBAL_OVF_CTRL, "", "")
+  X(PMC0, "event,width=48", ""), \
+  X(PMC1, "event,width=48", ""), \
+  X(PMC2, "event,width=48", ""), \
+  X(PMC3, "event,width=48", ""), \
+  X(PERFEVTSEL0, "control", ""), \
+  X(PERFEVTSEL1, "control", ""), \
+  X(PERFEVTSEL2, "control", ""), \
+  X(PERFEVTSEL3, "control", ""), \
+  X(FIXED_CTR0, "event,width=48", ""), \
+  X(FIXED_CTR1, "event,width=48", ""), \
+  X(FIXED_CTR2, "event,width=48", ""), \
+  X(FIXED_CTR_CTRL, "control", ""), \
+  X(PERF_GLOBAL_STATUS, "status", ""), \
+  X(PERF_GLOBAL_CTRL, "control", ""), \
+  X(PERF_GLOBAL_OVF_CTRL, "control", "")
 
 static int cpu_is_nehalem(char *cpu)
 {
