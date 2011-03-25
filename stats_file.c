@@ -76,14 +76,6 @@ int stats_file_rd_hdr(FILE *file, const char *path)
 
     TRACE("%s:%d: c %c, name %s, rest %s\n", path, nr, c, name, line);
     switch (c) {
-    case '.':
-      if (type->st_rd_config == NULL) {
-        ERROR("type `%s' has no config method\n", type->st_name); /* XXX */
-        goto err;
-      }
-      if ((*type->st_rd_config)(type, line) < 0)
-        goto err;
-      break;
     case '!':
       type->st_schema = split(line);
       if (type->st_schema == NULL) {

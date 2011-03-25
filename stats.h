@@ -13,7 +13,6 @@ struct stats_type {
   unsigned int st_enabled:1, st_selected:1;
   char *st_name;
   int (*st_begin)(struct stats_type *type);
-  int (*st_rd_config)(struct stats_type *type, char *str);
   void (*st_collect)(struct stats_type *type);
   char **st_schema;
   struct dict st_current_dict;
