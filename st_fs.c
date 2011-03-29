@@ -72,7 +72,7 @@ static void collect_fs(struct stats_type *type)
 struct stats_type STATS_TYPE_FS = {
   .st_name = "fs",
   .st_collect = &collect_fs,
-#define X(k,r...) #k
-  .st_schema = (char *[]) { KEYS, NULL, },
+#define X(k,o,d,r...) #k "," o ",desc=" d "; "
+  .st_schema_def = STRJOIN(KEYS),
 #undef X
 };

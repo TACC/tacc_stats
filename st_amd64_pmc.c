@@ -30,10 +30,10 @@
 #define MSR_PERF_CTR3 0xC0010007
 
 #define KEYS \
-  X(CTL0, "control", ""), \
-  X(CTL1, "control", ""), \
-  X(CTL2, "control", ""), \
-  X(CTL3, "control", ""), \
+  X(CTL0, "bits", ""), \
+  X(CTL1, "bits", ""), \
+  X(CTL2, "bits", ""), \
+  X(CTL3, "bits", ""), \
   X(CTR0, "event,width=48", ""), \
   X(CTR1, "event,wdith=48", ""), \
   X(CTR2, "event,width=48", ""), \
@@ -216,7 +216,7 @@ struct stats_type STATS_TYPE_AMD64_PMC = {
   .st_name = "amd64_pmc",
   .st_begin = &begin_pmc,
   .st_collect = &collect_pmc,
-#define X(k,r...) #k
-  .st_schema = (char *[]) { KEYS, NULL, },
+#define X(k,o,d,r...) #k "," o ",desc=" d "; "
+  .st_schema_def = STRJOIN(KEYS),
 #undef X
 };

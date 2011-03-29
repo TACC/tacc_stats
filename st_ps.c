@@ -18,6 +18,14 @@
 // procs_running 17
 // procs_blocked 0
 
+#define KEYS \
+  X(ctxt, "event", "context switches"), \
+  X(processes, "event", "forks"), \
+  X(load_1, "", "1 minute load average"), \
+  X(load_5, "", "5 minute load average"), \
+  X(nr_running, "", ""), \
+  X(nr_threads, "", "")
+
 static void collect_proc_stat(struct stats *ps_stats)
 {
   const char *path = "/proc/stat";
@@ -107,7 +115,7 @@ static void collect_ps(struct stats_type *type)
 struct stats_type STATS_TYPE_PS = {
   .st_name = "ps",
   .st_collect = &collect_ps,
-  .st_schema = (char *[]) {
-    "btime", "ctxt", "processes", "load_1", "load_5", "load_15", "nr_running", "nr_threads", NULL,
-  },
+#define X(k,o,d,r...) #k "," o ",desc=" d "; "
+  .st_schema_def = STRJOIN(KEYS),
+#undef X
 };

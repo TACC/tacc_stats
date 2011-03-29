@@ -42,12 +42,12 @@
 #define MSR_UNCORE_PERFEVTSEL7 0x3C7
 
 #define KEYS \
-  X(PERF_GLOBAL_CTRL, "", ""), \
-  X(PERF_GLOBAL_STATUS, "", ""), \
-  X(PERF_GLOBAL_OVF_CTRL, "", ""), \
+  X(PERF_GLOBAL_CTRL, "bits", ""), \
+  X(PERF_GLOBAL_STATUS, "bits", ""), \
+  X(PERF_GLOBAL_OVF_CTRL, "bits", ""), \
   X(FIXED_CTR0, "event", ""), \
-  X(FIXED_CTR_CTRL, "", ""), \
-  X(ADDR_OPCODE_MATCH, "", ""), \
+  X(FIXED_CTR_CTRL, "bits", ""), \
+  X(ADDR_OPCODE_MATCH, "bits", ""), \
   X(PMC0, "event", ""), \
   X(PMC1, "event", ""), \
   X(PMC2, "event", ""), \
@@ -56,14 +56,14 @@
   X(PMC5, "event", ""), \
   X(PMC6, "event", ""), \
   X(PMC7, "event", ""), \
-  X(PERFEVTSEL0, "", ""), \
-  X(PERFEVTSEL1, "", ""), \
-  X(PERFEVTSEL2, "", ""), \
-  X(PERFEVTSEL3, "", ""), \
-  X(PERFEVTSEL4, "", ""), \
-  X(PERFEVTSEL5, "", ""), \
-  X(PERFEVTSEL6, "", ""), \
-  X(PERFEVTSEL7, "", "")
+  X(PERFEVTSEL0, "bits", ""), \
+  X(PERFEVTSEL1, "bits", ""), \
+  X(PERFEVTSEL2, "bits", ""), \
+  X(PERFEVTSEL3, "bits", ""), \
+  X(PERFEVTSEL4, "bits", ""), \
+  X(PERFEVTSEL5, "bits", ""), \
+  X(PERFEVTSEL6, "bits", ""), \
+  X(PERFEVTSEL7, "bits", "")
 
 /* XXX Also defined in intel_pmc3. */
 static int cpu_is_nehalem(char *cpu)
@@ -215,7 +215,7 @@ static void collect_uncore(struct stats_type *type)
 struct stats_type STATS_TYPE_INTEL_UNCORE = {
   .st_name = "intel_uncore",
   .st_collect = &collect_uncore,
-#define X(k,r...) #k
-  .st_schema = (char *[]) { KEYS, NULL, },
+#define X(k,o,d,r...) #k "," o ",desc=" d "; "
+  .st_schema_def = STRJOIN(KEYS),
 #undef X
 };

@@ -171,7 +171,7 @@ static void collect_ib_ext(struct stats_type *type)
 struct stats_type STATS_TYPE_IB_EXT = {
   .st_name = "ib_ext",
   .st_collect = &collect_ib_ext,
-#define X(k,r...) #k
-  .st_schema = (char *[]) { KEYS, NULL, },
+#define X(k,o,d,r...) #k "," o ",desc=" d "; "
+  .st_schema_def = STRJOIN(KEYS),
 #undef X
 };

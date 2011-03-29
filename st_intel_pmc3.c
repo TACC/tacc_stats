@@ -62,17 +62,17 @@
   X(PMC1, "event,width=48", ""), \
   X(PMC2, "event,width=48", ""), \
   X(PMC3, "event,width=48", ""), \
-  X(PERFEVTSEL0, "control", ""), \
-  X(PERFEVTSEL1, "control", ""), \
-  X(PERFEVTSEL2, "control", ""), \
-  X(PERFEVTSEL3, "control", ""), \
+  X(PERFEVTSEL0, "bits", ""), \
+  X(PERFEVTSEL1, "bits", ""), \
+  X(PERFEVTSEL2, "bits", ""), \
+  X(PERFEVTSEL3, "bits", ""), \
   X(FIXED_CTR0, "event,width=48", ""), \
   X(FIXED_CTR1, "event,width=48", ""), \
   X(FIXED_CTR2, "event,width=48", ""), \
-  X(FIXED_CTR_CTRL, "control", ""), \
-  X(PERF_GLOBAL_STATUS, "status", ""), \
-  X(PERF_GLOBAL_CTRL, "control", ""), \
-  X(PERF_GLOBAL_OVF_CTRL, "control", "")
+  X(FIXED_CTR_CTRL, "bits", ""), \
+  X(PERF_GLOBAL_STATUS, "bits", ""), \
+  X(PERF_GLOBAL_CTRL, "bits", ""), \
+  X(PERF_GLOBAL_OVF_CTRL, "bits", "")
 
 static int cpu_is_nehalem(char *cpu)
 {
@@ -313,7 +313,7 @@ struct stats_type STATS_TYPE_INTEL_PMC3 = {
   .st_name = "intel_pmc3",
   .st_begin = &begin_pmc,
   .st_collect = &collect_pmc,
-#define X(k,r...) #k
-  .st_schema = (char *[]) { KEYS, NULL, },
+#define X(k,o,d,r...) #k "," o ",desc=" d "; "
+  .st_schema_def = STRJOIN(KEYS),
 #undef X
 };
