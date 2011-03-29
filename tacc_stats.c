@@ -312,6 +312,8 @@ static void usage(int rc)
 
 int main(int argc, char *argv[])
 {
+  umask(022);
+
   struct option opts[] = {
     { "help", 0, 0, 'h' },
     { NULL, 0, 0, 0 },
