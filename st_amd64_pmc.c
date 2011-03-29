@@ -147,6 +147,8 @@ static int begin_pmc_cpu(char *cpu, uint64_t events[], size_t nr_events)
 
 static int begin_pmc(struct stats_type *type)
 {
+  int nr = 0;
+
   uint64_t events[4][4] = {
     { DRAMaccesses, UserCycles, DCacheSysFills, SSEFLOPS, },
     { HTlink0Use, UserCycles, DCacheSysFills, SSEFLOPS, },
@@ -160,10 +162,11 @@ static int begin_pmc(struct stats_type *type)
     snprintf(cpu, sizeof(cpu), "%d", i);
 
     if (cpu_is_amd64_10h(cpu))
-      begin_pmc_cpu(cpu, events[i % 4], 4); /* HARD */
+      if (begin_pmc_cpu(cpu, events[i % 4], 4) == 0) /* HARD */
+        nr++;
   }
 
-  return 0;
+  return nr > 0 ? 0 : -1;
 }
 
 static void collect_pmc_cpu(struct stats_type *type, char *cpu)

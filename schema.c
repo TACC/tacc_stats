@@ -33,13 +33,13 @@ struct schema_entry *parse_schema_entry(char *str)
 
     switch (toupper(*opt)) { /* XXX toupper() */
     default:
-      ERROR("unknown schema option `%s'\n", opt);
+      TRACE("unknown schema option `%s'\n", opt);
       break;
     case 'B':
       se->se_type = SE_BITS;
       break;
     case 'D':
-      if (opt_arg != NULL)
+      if (opt_arg != NULL && strlen(opt_arg) != 0) /* XXX */
         se->se_desc = strdup(opt_arg);
       break;
     case 'E':
@@ -56,19 +56,22 @@ struct schema_entry *parse_schema_entry(char *str)
     }
   }
 
-  TRACE("se_key %s, se_type %u, se_width %u, se_unit %s, se_desc %s\n",
+  TRACE("se_key `%s', se_type %u, se_width %u, se_unit %s, se_desc `%s'\n",
         se->se_key, se->se_type, se->se_width,
         se->se_unit ? : "NONE", se->se_desc ? : "NONE");
 
   return se;
 }
 
-/* Modifies str! */
-int stats_type_set_schema(struct stats_type *type, char *str)
+int stats_type_set_schema(struct stats_type *type, const char *def)
 {
   size_t nr_se = 0;
+  char *str = strdupa(def);
 
   while (str != NULL) {
+    while (isspace(*str))
+      str++;
+
     char *tok = strsep(&str, ";");
     if (*tok == 0)
       continue;
@@ -84,7 +87,7 @@ int stats_type_set_schema(struct stats_type *type, char *str)
 
   type->st_schema_len = nr_se;
   type->st_schema = calloc(type->st_schema_len, sizeof(*type->st_schema));
-  if (type->st_schema_len != 0 && type->st_schema == NULL) {
+  if (type->st_schema == NULL && type->st_schema_len != 0) {
     ERROR("cannot allocate schema entries: %m\n");
     goto err;
   }
@@ -92,8 +95,9 @@ int stats_type_set_schema(struct stats_type *type, char *str)
   size_t i = 0;
   struct dict_entry *de;
   while ((de = dict_for_each(&type->st_schema_dict, &i)) != NULL) {
-    struct schema_entry *se = (struct schema_entry *) de->d_key - 1;
+    struct schema_entry *se = key_to_schema_entry(de->d_key);
     type->st_schema[se->se_index] = se;
+    TRACE("i %zu, d_key `%s', se_key `%s', se_index %u\n", i, de->d_key, se->se_key, se->se_index);
   }
 
   return 0;

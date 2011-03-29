@@ -128,6 +128,8 @@ int stats_file_wr_hdr(FILE *file, const char *path)
     if (!type->st_enabled)
       continue;
 
+    TRACE("type %s, schema_len %zu\n", type->st_name, type->st_schema_len);
+
     /* Write schema. */
     fprintf(file, "!%s", type->st_name);
 

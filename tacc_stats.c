@@ -13,6 +13,7 @@
 #include "stats.h"
 #include "stats_file.h"
 #include "trace.h"
+#include "schema.h"
 #include "readstr.h"
 
 const char *stats_path = NULL;
@@ -292,11 +293,23 @@ static int tacc_stats_begin(char **arg_list, size_t arg_count)
       type->st_enabled = 1;
   }
 
-  /* Fire begin callbacks where defined. */
+  /* Set schemas and fire begin callbacks where defined. */
   i = 0;
-  while ((type = stats_type_for_each(&i)) != NULL)
-    if (type->st_enabled && type->st_begin != NULL)
-      (*type->st_begin)(type);
+  while ((type = stats_type_for_each(&i)) != NULL) {
+    if (!type->st_enabled)
+      continue;
+
+    TRACE("type %s, schema_def `%s'\n", type->st_name, type->st_schema_def);
+    if (stats_type_set_schema(type, type->st_schema_def) < 0) {
+      type->st_enabled = 0;
+      continue;
+    }
+
+    if (type->st_begin != NULL && (*type->st_begin)(type) < 0) {
+      type->st_enabled = 0;
+      continue;
+    }
+  }
 
   if (stats_file_wr_hdr(stats_file, stats_path) < 0) {
     ERROR("cannot write header to `%s'\n", stats_path);

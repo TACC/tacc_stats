@@ -111,7 +111,7 @@ void stats_aggr(struct stats_aggr *sa, time_t time, const val_t *rec)
   while (sa->sa_cur_time < sa->sa_end && sa->sa_cur_time <= time) {
     for (i = 0; i < sa->sa_rec_len; i++) {
       if (!sf_is_scalar(sa->sa_flags[i])) {
-        /* Don't interpolate control, status,... */
+        /* Don't interpolate bits,... */
         sa->sa_cur_rec[i] = sa->sa_prev_rec[i];
         continue;
       }

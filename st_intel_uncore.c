@@ -12,6 +12,8 @@
 #include "trace.h"
 #include "pscanf.h"
 
+/* TODO Implement begin(). */
+
 /* B.4.1 Additional MSRs In the Intel Xeon Processors 5500 and 3400
    Series.  These also apply to Core i7 and i5 processor family CPUID
    signature of 06_1AH, 06_1EH and 06_1FH. */

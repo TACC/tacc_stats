@@ -243,6 +243,8 @@ static int begin_pmc_cpu(char *cpu, uint64_t *events, size_t nr_events)
 
 static int begin_pmc(struct stats_type *type)
 {
+  int nr = 0;
+
   uint64_t events[] = {
     MEM_UNCORE_RETIRED_REMOTE_DRAM,
     MEM_UNCORE_RETIRED_LOCAL_DRAM,
@@ -256,10 +258,11 @@ static int begin_pmc(struct stats_type *type)
     snprintf(cpu, sizeof(cpu), "%d", i);
 
     if (cpu_is_nehalem(cpu))
-      begin_pmc_cpu(cpu, events, 4); /* HARD */
+      if (begin_pmc_cpu(cpu, events, 4) == 0)
+        nr++; /* HARD */
   }
 
-  return 0;
+  return nr > 0 ? 0 : -1;
 }
 
 static void collect_pmc_cpu(struct stats_type *type, char *cpu)
