@@ -116,7 +116,7 @@ struct stats *get_current_stats(struct stats_type *type, const char *dev)
   TRACE("get_current_stats %s %s\n", type->st_name, dev);
 
   hash = dict_strhash(dev);
-  ent = dict_ref(&type->st_current_dict, hash, dev);
+  ent = dict_entry_ref(&type->st_current_dict, hash, dev);
   if (ent->d_key != NULL)
     return (struct stats *) ent->d_key - 1;
 
@@ -126,8 +126,8 @@ struct stats *get_current_stats(struct stats_type *type, const char *dev)
     return NULL;
   }
 
-  if (dict_set(&type->st_current_dict, ent, hash, stats->s_dev) < 0) {
-    ERROR("dict_set: %m\n");
+  if (dict_entry_set(&type->st_current_dict, ent, hash, stats->s_dev) < 0) {
+    ERROR("dict_entry_set: %m\n");
     stats_free(stats);
     return NULL;
   }
@@ -147,7 +147,7 @@ struct st_pair *stats_ref(struct stats *stats, const char *key, int create)
   hash_t hash;
 
   hash = dict_strhash(key);
-  ent = dict_ref(&stats->s_dict, hash, key);
+  ent = dict_entry_ref(&stats->s_dict, hash, key);
   if (ent->d_key != NULL)
     return (struct st_pair *) (ent->d_key - sizeof(*pair));
 
@@ -163,8 +163,8 @@ struct st_pair *stats_ref(struct stats *stats, const char *key, int create)
   pair->p_val = 0;
   strcpy(pair->p_key, key);
 
-  if (dict_set(&stats->s_dict, ent, hash, pair->p_key) < 0) {
-    ERROR("dict_set: %m\n");
+  if (dict_entry_set(&stats->s_dict, ent, hash, pair->p_key) < 0) {
+    ERROR("dict_entry_set: %m\n");
     free(pair);
     return NULL;
   }

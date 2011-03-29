@@ -105,7 +105,7 @@ int dict_resize(struct dict *dict, size_t new_table_size)
   return 0;
 }
 
-struct dict_entry *dict_ref(struct dict *dict, hash_t hash, const char *key)
+struct dict_entry *dict_entry_ref(struct dict *dict, hash_t hash, const char *key)
 {
   size_t mask, i, perturb;
   struct dict_entry *table, *dummy, *ent;
@@ -143,7 +143,7 @@ struct dict_entry *dict_ref(struct dict *dict, hash_t hash, const char *key)
   }
 }
 
-int dict_set(struct dict *dict, struct dict_entry *ent, hash_t hash, char *key)
+int dict_entry_set(struct dict *dict, struct dict_entry *ent, hash_t hash, char *key)
 {
   if (ent->d_key == NULL) {
     if (!(ent->d_hash & DICT_HASH_DUMMY)) {
@@ -161,7 +161,7 @@ int dict_set(struct dict *dict, struct dict_entry *ent, hash_t hash, char *key)
         if (dict_resize(dict, table_size) < 0)
           return -1;
 
-        ent = dict_ref(dict, hash, key);
+        ent = dict_entry_ref(dict, hash, key);
       }
       dict->d_load++;
     }
@@ -189,10 +189,10 @@ char *dict_remv(struct dict *dict, struct dict_entry *ent, int may_resize)
   return key;
 }
 
-char *dict_lookup(struct dict *dict, const char *key)
+char *dict_ref(struct dict *dict, const char *key)
 {
   hash_t hash = dict_strhash(key);
-  struct dict_entry *ent = dict_ref(dict, hash, key);
+  struct dict_entry *ent = dict_entry_ref(dict, hash, key);
 
   if (ent->d_hash & DICT_HASH_DUMMY) /* Do we need this? */
     return NULL;
@@ -200,38 +200,20 @@ char *dict_lookup(struct dict *dict, const char *key)
   return ent->d_key;
 }
 
-char **dict_search(struct dict *dict, char *key)
+int dict_set(struct dict *dict, char *key)
 {
   hash_t hash = dict_strhash(key);
-  struct dict_entry *ent = dict_ref(dict, hash, key);
+  struct dict_entry *ent = dict_entry_ref(dict, hash, key);
 
-  if (ent->d_key == NULL) {
-    if (!(ent->d_hash & DICT_HASH_DUMMY)) {
-      size_t table_size = dict->d_mask + 1;
-      size_t load = dict->d_load + 1;
-
-      if (2 * table_size <= 3 * load) {
-        size_t count = dict->d_count + 1;
-        while (table_size < DICT_TABLE_SIZE_MAX && 2 * table_size <= 3 * count)
-          table_size *= 2;
-
-        if (count == table_size)
-          return NULL;
-
-        if (dict_resize(dict, table_size) < 0)
-          return NULL;
-
-        ent = dict_ref(dict, hash, key);
-      }
-      dict->d_load++;
-    }
-
-    ent->d_hash = hash;
+  if (ent->d_key != NULL) {
     ent->d_key = key;
-    dict->d_count++;
+    return 0;
   }
 
-  return &ent->d_key;
+  if (dict_entry_set(dict, ent, hash, key) < 0)
+    return -1;
+
+  return 0;
 }
 
 struct dict_entry *dict_for_each(struct dict *dict, size_t *i)
