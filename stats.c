@@ -37,7 +37,7 @@ static void init(void)
 
   for (i = 0; i < nr_stats_types; i++) {
     struct stats_type *type = type_table[i];
-    TRACE("type %s\n", type->st_name);
+    TRACE("init type %s\n", type->st_name);
 
     if (dict_init(&type->st_schema_dict, 0) < 0)
       /* XXX */;
@@ -173,12 +173,4 @@ void stats_inc(struct stats *stats, const char *key, unsigned long long val)
   se = key_to_schema_entry(sk);
 
   stats->s_val[se->se_index] = val;
-}
-
-void stats_type_collect(struct stats_type *type)
-{
-  void (*collect)(struct stats_type *) = type->st_collect;
-
-  if (collect != NULL)
-    (*collect)(type);
 }
