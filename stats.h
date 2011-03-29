@@ -5,17 +5,23 @@
 #include <time.h>
 #include "dict.h"
 #include "trace.h"
+#include "STRJOIN.h"
 
 #define TACC_STATS_PROGRAM "tacc_stats"
 #define TACC_STATS_VERSION "1.0.0"
 
+struct schema_entry;
+
 struct stats_type {
-  unsigned int st_enabled:1, st_selected:1;
   char *st_name;
   int (*st_begin)(struct stats_type *type);
   void (*st_collect)(struct stats_type *type);
-  char **st_schema;
+  char *st_schema_def;
+  size_t st_schema_len;
+  struct schema_entry *st_schema;
+  struct dict st_schema_dict;
   struct dict st_current_dict;
+  unsigned int st_enabled:1, st_selected:1;
 };
 
 struct stats {
