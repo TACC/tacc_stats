@@ -2,24 +2,7 @@
 #include <malloc.h>
 #include <ctype.h>
 #include "split.h"
-
-size_t strwc(const char *str)
-{
-  size_t wc = 0;
-  const char *s;
-
-  s = str;
-  while (*s != 0) {
-    while (isspace(*s))
-      s++;
-    if (*s != 0)
-      wc++;
-    while (*s != 0 && !isspace(*s))
-      s++;
-  }
-
-  return wc;
-}
+#include "strwc.h"
 
 char **split(const char *str)
 {

@@ -18,7 +18,7 @@ struct stats_type {
   void (*st_collect)(struct stats_type *type);
   char *st_schema_def;
   size_t st_schema_len;
-  struct schema_entry *st_schema;
+  struct schema_entry **st_schema;
   struct dict st_schema_dict;
   struct dict st_current_dict;
   unsigned int st_enabled:1, st_selected:1;
@@ -26,7 +26,7 @@ struct stats_type {
 
 struct stats {
   struct stats_type *s_type;
-  struct dict s_dict;
+  unsigned long long *s_val;
   char s_dev[];
 };
 
@@ -41,8 +41,6 @@ void stats_type_wr_stats(struct stats_type *type, FILE *file);
 
 struct stats *get_current_stats(struct stats_type *type, const char *dev);
 void stats_set(struct stats *s, const char *key, unsigned long long val);
-void stats_set_unit(struct stats *s, const char *key, unsigned long long val, const char *unit);
 void stats_inc(struct stats *s, const char *key, unsigned long long val);
-unsigned long long stats_get(struct stats *stats, const char *key);
 
 #endif

@@ -8,7 +8,7 @@
 #define OSC_BASE "/proc/fs/lustre/osc"
 
 #define KEYS \
-  X(read_bytes, "event", ""),
+  X(read_bytes, "event", ""), \
   X(write_bytes, "event", "")
 
 static void collect_osc_stats(struct stats *fs_stats, const char *osc)

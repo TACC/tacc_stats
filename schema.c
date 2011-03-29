@@ -1,5 +1,6 @@
 #include <malloc.h>
 #include <string.h>
+#include <ctype.h>
 #include "stats.h"
 #include "dict.h"
 #include "trace.h"
@@ -7,7 +8,7 @@
 
 /* key,opt1[=arg],opt2,...; */
 
-struct schema_entry *parse_schema_ent(char *str)
+struct schema_entry *parse_schema_entry(char *str)
 {
   struct schema_entry *se = NULL;
 

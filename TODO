@@ -1,6 +1,7 @@
 
 stats_file.c
   Make program version line a comment for easier parsing.
+  Put jobid in header.
   Put btime in header, remove from ps.
   ! type schema
   @ type devices
@@ -8,6 +9,10 @@ stats_file.c
   $ reserved
   % type prop rest
   Allow space after directive character.
+
+TODO
+  ^ Mark.
+  tacc_stats COMMAND -m 'Message ...'
 
 stats.c
   Add schema dict, key to index.

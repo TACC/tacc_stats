@@ -10,7 +10,7 @@
 #include "collect.h"
 #include "trace.h"
 
-/* TODO Units. */
+/* TODO Move numastat to its own file, or remove completely. */
 
 // i182-101# cat /sys/devices/system/node/node0/meminfo
 //
@@ -92,18 +92,17 @@ static void collect_meminfo_node(struct stats *stats, const char *node)
   }
 
   while (getline(&line, &line_size, file) >= 0) {
-    char key[81], unit[81];
+    char key[81];
     unsigned long long val = 0;
 
     key[0] = 0;
-    unit[0] = 0;
-    if (sscanf(line, "Node %*d %80[^:]: %llu %80s", key, &val, unit) < 2)
+    if (sscanf(line, "Node %*d %80[^:]: %llu %*s", key, &val) < 2)
       continue;
 
     if (key[0] == 0)
       continue;
 
-    stats_set_unit(stats, key, val, unit);
+    stats_set(stats, key, val);
   }
 
  out:

@@ -7,6 +7,7 @@
 #include "stats.h"
 #include "trace.h"
 #include "dict.h"
+#include "schema.h"
 
 time_t current_time;
 int nr_cpus;
@@ -76,32 +77,33 @@ struct stats_type *stats_type_for_each(size_t *i)
 
 static struct stats *stats_create(struct stats_type *type, const char *dev)
 {
-  struct stats *stats;
+  struct stats *stats = NULL;
+  unsigned long long *val = NULL;
 
   stats = malloc(sizeof(*stats) + strlen(dev) + 1);
   if (stats == NULL)
-    return NULL;
+    goto err;
+
+  val = calloc(type->st_schema_len, sizeof(*stats->s_val));
+  if (val == NULL && type->st_schema_len != 0)
+    goto err;
 
   memset(stats, 0, sizeof(*stats));
-
   stats->s_type = type;
-
-  if (dict_init(&stats->s_dict, 0) < 0) {
-    free(stats);
-    return NULL;
-  }
-
+  stats->s_val = val;
   strcpy(stats->s_dev, dev);
-
   return stats;
+
+ err:
+  free(stats);
+  free(val);
+  return NULL;
 }
 
 static void stats_free(struct stats *stats)
 {
-  if (stats != NULL) {
-    dict_destroy(&stats->s_dict);
-    free(stats);
-  }
+  free(stats->s_val);
+  free(stats);
 }
 
 struct stats *get_current_stats(struct stats_type *type, const char *dev)
@@ -135,94 +137,38 @@ struct stats *get_current_stats(struct stats_type *type, const char *dev)
   return stats;
 }
 
-struct st_pair {
-  unsigned long long p_val;
-  char p_key[];
-};
-
-struct st_pair *stats_ref(struct stats *stats, const char *key, int create)
-{
-  struct st_pair *pair = NULL;
-  struct dict_entry *ent;
-  hash_t hash;
-
-  hash = dict_strhash(key);
-  ent = dict_entry_ref(&stats->s_dict, hash, key);
-  if (ent->d_key != NULL)
-    return (struct st_pair *) (ent->d_key - sizeof(*pair));
-
-  if (!create)
-    return NULL;
-
-  pair = malloc(sizeof(*pair) + strlen(key) + 1);
-  if (pair == NULL) {
-    ERROR("cannot create st_pair: %m\n");
-    return NULL;
-  }
-
-  pair->p_val = 0;
-  strcpy(pair->p_key, key);
-
-  if (dict_entry_set(&stats->s_dict, ent, hash, pair->p_key) < 0) {
-    ERROR("dict_entry_set: %m\n");
-    free(pair);
-    return NULL;
-  }
-
-  return pair;
-}
-
 void stats_set(struct stats *stats, const char *key, unsigned long long val)
 {
-  struct st_pair *pair;
+  char *sk;
+  struct schema_entry *se;
 
   TRACE("%s %s %s %llu\n",
         stats->s_type->st_name, stats->s_dev, key, val);
 
-  pair = stats_ref(stats, key, 1);
-  if (pair != NULL)
-    pair->p_val = val;
-}
+  sk = dict_ref(&stats->s_type->st_schema_dict, key);
+  if (sk == NULL)
+    return;
 
-unsigned long long stats_get(struct stats *stats, const char *key)
-{
-  struct st_pair *pair = stats_ref(stats, key, 0);
-  if (pair == NULL)
-    return 0;
-  return pair->p_val;
+  se = (struct schema_entry *) sk - 1;
+
+  stats->s_val[se->se_index] = val;
 }
 
 void stats_inc(struct stats *stats, const char *key, unsigned long long val)
 {
-  struct st_pair *pair;
+  char *sk;
+  struct schema_entry *se;
 
   TRACE("%s %s %s %llu\n",
         stats->s_type->st_name, stats->s_dev, key, val);
 
-  pair = stats_ref(stats, key, 1);
-  if (pair != NULL)
-    pair->p_val += val;
-}
+  sk = dict_ref(&stats->s_type->st_schema_dict, key);
+  if (sk == NULL)
+    return;
 
-void stats_set_unit(struct stats *stats, const char *key, unsigned long long val, const char *unit)
-{
-  unsigned long long mult = 1;
+  se = (struct schema_entry *) sk - 1;
 
-  if (strcasecmp(unit, "KB") == 0)
-    mult = 1ULL << 10;
-  else if (strcasecmp(unit, "MB") == 0)
-    mult = 1ULL << 20;
-  else if (strcasecmp(unit, "GB") == 0)
-    mult = 1ULL << 30;
-  else if (strcasecmp(unit, "TB") == 0)
-    mult = 1ULL << 40;
-  else if (strlen(unit) != 0)
-    ERROR("unknown unit `%s'\n", unit);
-
-  TRACE("%s %s %s %llu %s %llu\n",
-       stats->s_type->st_name, stats->s_dev, key, val, unit, mult);
-
-  stats_set(stats, key, val * mult);
+  stats->s_val[se->se_index] = val;
 }
 
 void stats_type_collect(struct stats_type *type)

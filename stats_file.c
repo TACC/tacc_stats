@@ -8,8 +8,8 @@
 #include <sys/utsname.h>
 #include "stats.h"
 #include "stats_file.h"
+#include "schema.h"
 #include "trace.h"
-#include "split.h"
 
 #define SPACE_CHARS " \t\n\v\f\r"
 
@@ -77,8 +77,7 @@ int stats_file_rd_hdr(FILE *file, const char *path)
     TRACE("%s:%d: c %c, name %s, rest %s\n", path, nr, c, name, line);
     switch (c) {
     case '!':
-      type->st_schema = split(line);
-      if (type->st_schema == NULL) {
+      if (stats_type_set_schema(type, line) < 0) {
         ERROR("cannot parse schema: %m\n");
         goto err;
       }
@@ -109,7 +108,6 @@ int stats_file_rd_hdr(FILE *file, const char *path)
   free(buf);
 
   return rc;
-
 }
 
 int stats_file_wr_hdr(FILE *file, const char *path)
@@ -133,10 +131,21 @@ int stats_file_wr_hdr(FILE *file, const char *path)
     /* Write schema. */
     fprintf(file, "!%s", type->st_name);
 
-    char **key;
-    for (key = type->st_schema; *key != NULL; key++)
-      fprintf(file, " %s", *key);
-
+    /* MOVEME */
+    int j;
+    for (j = 0; j < type->st_schema_len; j++) {
+      struct schema_entry *se = type->st_schema[j];
+      fprintf(file, " %s%s%s", se->se_key,
+              se->se_type == SE_EVENT ? ",E" : "",
+              se->se_type == SE_BITS ? ",B" : "");
+      if (se->se_width != 0)
+        fprintf(file, ",W=%u", se->se_width);
+      if (se->se_unit != NULL)
+        fprintf(file, ",U=%s", se->se_unit);
+      if (se->se_desc != NULL)
+        fprintf(file, ",D=%s", se->se_desc);
+      fprintf(file, ";");
+    }
     fprintf(file, "\n");
   }
 
@@ -146,15 +155,15 @@ int stats_file_wr_hdr(FILE *file, const char *path)
 void stats_type_wr_stats(struct stats_type *type, FILE *file)
 {
   size_t i = 0;
-  struct dict_entry *ent;
-  while ((ent = dict_for_each(&type->st_current_dict, &i)) != NULL) {
-    struct stats *stats = (struct stats *) ent->d_key - 1;
+  struct dict_entry *de;
+  while ((de = dict_for_each(&type->st_current_dict, &i)) != NULL) {
+    struct stats *stats = (struct stats *) de->d_key - 1;
 
     fprintf(file, "%s %s", type->st_name, stats->s_dev);
 
-    char **key;
-    for (key = type->st_schema; *key != NULL; key++)
-      fprintf(file, " %llu", stats_get(stats, *key));
+    int j;
+    for (j = 0; j < type->st_schema_len; j++)
+      fprintf(file, " %llu", stats->s_val[j]);
 
     fprintf(file, "\n");
   }
