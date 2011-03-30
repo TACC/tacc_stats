@@ -24,7 +24,4 @@ struct stats_type;
 
 int stats_type_set_schema(struct stats_type *type, const char *str);
 
-
-
-
 #endif
