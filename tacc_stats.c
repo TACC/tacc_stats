@@ -269,6 +269,11 @@ static int tacc_stats_end(char **arg_list, size_t arg_count)
 {
   tacc_stats_collect(arg_list, arg_count);
 
+  if (stats_file != NULL) {
+    fclose(stats_file);
+    stats_file = NULL;
+  }
+
   char *const argv[] = { "tacc_stats_helper", "end", NULL };
   if (helper(helper_path, argv, helper_envp) != 0)
     return -1;

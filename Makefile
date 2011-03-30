@@ -24,7 +24,7 @@ stats_aggr_test: stats_aggr_test.o stats_aggr.o
 	$(CC) -MM $(CFLAGS) $(CPPFLAGS) $*.c > .$*.d
 
 stats.x: stats.all
-	sort stats.all | awk '{ printf "#ifdef CONFIG_ST_%s\nX(%s)\n#endif\n", $1, $1; }'
+	sort stats.all | awk '{ printf "#ifdef CONFIG_ST_%s\nX(%s)\n#endif\n", $1, $1; }' > stats.x
 
 .PHONY: clean
 clean:

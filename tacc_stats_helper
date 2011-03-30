@@ -32,17 +32,17 @@ case "$1" in
         fi
         mkdir --parents $stats_dir
         touch $stats_file
-        ln --symbolic $stats_file $current
+        ln --force --symbolic $stats_file $current
         rm --force /etc/cron.d/tacc_stats
         echo "*/$interval * * * * root $TACC_STATS_PROGRAM collect" > /etc/cron.d/tacc_stats
         exit 0
         ;;
     end)
+        rm --force $current
+        rm --force /etc/cron.d/tacc_stats
         if [ ! -f "$stats_file" ]; then
             exit 1
         fi
-        rm --force /etc/cron.d/tacc_stats
-        rm --force $current
         if [ -n "$project_dir" ]; then
             mkdir --parents $project_dir/$jobid
             mv $stats_file $project_dir/$jobid/$HOSTNAME
