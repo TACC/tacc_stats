@@ -8,6 +8,7 @@
 #include <errno.h>
 #include <ctype.h>
 #include <malloc.h>
+#include <sys/file.h>
 #include <sys/types.h>
 #include <sys/stat.h>
 #include "stats.h"
@@ -15,11 +16,17 @@
 #include "trace.h"
 #include "schema.h"
 
+/* MOVEME */
+#ifndef EPREFIX
+#define EPREFIX "/usr/local"
+#endif
+
 const char *lock_path = "/var/run/tacc_stats_lock";
 const char *stats_path = "/var/run/tacc_stats_current";
-const char *helper_path = "/usr/local/bin/tacc_stats_helper";
+const char *helper_path = EPREFIX"/bin/tacc_stats_helper";
+char *const helper_envp[] = { "TACC_STATS_PROGRAM="EPREFIX"/bin/tacc_stats", NULL };
 
-int helper(const char *path, const char *arg);
+int helper(const char *path, char *const argv[], char *const envp[]);
 
 int lock_timeout = 30;
 int lock_fd = -1;
@@ -34,11 +41,6 @@ static int lock(void)
   int rc = 0;
   void (*prev_alrm_handler)(int) = SIG_ERR;
 
-  struct flock flock = {
-    .l_type = F_WRLCK,
-    .l_start = SEEK_SET,
-  };
-
   if (lock_fd < 0)
     lock_fd = open(lock_path, O_WRONLY|O_CREAT, 0600);
 
@@ -51,7 +53,7 @@ static int lock(void)
   prev_alrm_handler = signal(SIGALRM, &lock_alrm_handler);
   alarm(lock_timeout);
 
-  if (fcntl(lock_fd, F_SETLK, &flock) < 0) {
+  if (flock(lock_fd, LOCK_EX) < 0) {
     if (errno == EINTR)
       errno = ETIMEDOUT;
     ERROR("cannot lock `%s': %m\n", lock_path);
@@ -69,12 +71,7 @@ static int lock(void)
 
 static void unlock(void)
 {
-  struct flock flock = {
-    .l_type = F_UNLCK,
-    .l_start = SEEK_SET,
-  };
-
-  if (fcntl(lock_fd, F_SETLK, &flock) < 0)
+  if (flock(lock_fd, LOCK_UN) < 0)
     ERROR("cannot unlock `%s': %m\n", lock_path);
 }
 
@@ -85,7 +82,7 @@ static int tacc_stats_collect(char **arg_list, size_t arg_count)
   struct stats_type *type;
 
   if (stats_file == NULL) {
-    stats_file = fopen(stats_path, "a+");
+    stats_file = fopen(stats_path, "r+");
     if (stats_file == NULL) {
       if (errno == ENOENT)
         rc = 0; /* OK just exit. */
@@ -118,8 +115,6 @@ static int tacc_stats_collect(char **arg_list, size_t arg_count)
   }
 
   fseek(stats_file, 0, SEEK_END);
-
-  /* TODO Check size of stat_file. */
 
   i = 0;
   while ((type = stats_type_for_each(&i)) != NULL) {
@@ -210,11 +205,11 @@ static int tacc_stats_mark(char **arg_list, size_t arg_count)
 static int tacc_stats_begin(char **arg_list, size_t arg_count)
 {
   int rc = -1;
-
-  if (helper(helper_path, "begin") != 0)
+  char *const argv[] = { "tacc_stats_helper", "begin", NULL };
+  if (helper(helper_path, argv, helper_envp) != 0)
     return -1;
 
-  stats_file = fopen(stats_path, "a+");
+  stats_file = fopen(stats_path, "r+");
   if (stats_file == NULL) {
     ERROR("cannot open `%s': %m\n", stats_path);
     goto out;
@@ -274,7 +269,8 @@ static int tacc_stats_end(char **arg_list, size_t arg_count)
 {
   tacc_stats_collect(arg_list, arg_count);
 
-  if (helper(helper_path, "end") != 0)
+  char *const argv[] = { "tacc_stats_helper", "end", NULL };
+  if (helper(helper_path, argv, helper_envp) != 0)
     return -1;
 
   return 0;
@@ -345,11 +341,12 @@ int main(int argc, char *argv[])
     FATAL("cannot acquire lock\n");
 
   int cmd_rc = (*cmd_handler)(cmd_arg_list, cmd_arg_count);
+  TRACE("command `%s' returned %d\n", cmd, cmd_rc);
 
   if (stats_file != NULL && fclose(stats_file) < 0)
     ERROR("error closing `%s': %m\n", stats_path);
 
   unlock();
 
-  return cmd_rc < 0 ? 1 : 0;
+  return 0; /* XXX */
 }
