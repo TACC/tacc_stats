@@ -6,7 +6,7 @@
 #ifdef DEBUG
 #define TRACE ERROR
 #else
-#define TRACE(fmt,arg...) ((void) 0)
+static inline void TRACE(const char *fmt, ...) { }
 #endif
 
 #ifdef DEBUG
