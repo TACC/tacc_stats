@@ -101,7 +101,7 @@ int stats_file_rd(FILE *file, const char *path, struct stats_file_rd_ops *ops)
       continue;
     case '$':
       op = ops->o_set_variable;
-      continue;
+      goto do_op;
     case '%':
       op = ops->o_set_property;
       goto do_op;
