@@ -7,8 +7,8 @@ ST_OBJS := st_amd64_pmc.o st_block.o st_cpu.o st_fs.o st_ib.o st_ib_ext.o \
  st_intel_pmc3.o st_intel_uncore.o st_lustre.o st_mem.o st_net.o \
  st_ps.o st_vm.o
 
-OBJS :=  $(ST_OBJS) stats.o dict.o collect.o split.o readstr.o stats_file.o \
- tacc_stats.o stats_aggr.o schema.o helper.o
+OBJS :=  $(ST_OBJS) stats.o dict.o collect.o schema.o \
+ tacc_stats.o helper.o stats_file.o stats_aggr.o
 
 all: tacc_stats
 
