@@ -3,14 +3,18 @@
 set -eu
 
 PATH=/bin
+
+project_dir=/home1/01114/jhammond/projects/tacc_stats # FIXME
 jobid_file=/var/run/TACC_jobid
 stats_dir=/var/log/tacc_stats
-project_dir=/NONE
 current=/var/run/tacc_stats_current
-program=/usr/local/bin/tacc_stats
 interval=10 # Minutes.
 
 umask 0022
+
+if [ ! -x "$TACC_STATS_PROGRAM" ]; then
+    exit 1
+fi
 
 jobid=$(cat $jobid_file)
 if [[ ! "$jobid" =~ ^[[:alnum:]]+$ ]]; then
@@ -19,29 +23,29 @@ fi
 
 stats_file=$stats_dir/$jobid
 
-# XXX Check if jobid is 0. 
+# XXX Check that jobid is nonzero.
 
 case "$1" in
     begin)
-        if [ -f $stats_file ]; then
+        if [ -f "$stats_file" ]; then
             exit 1 # Fail if it already exists.
         fi
         mkdir --parents $stats_dir
         touch $stats_file
         ln --symbolic $stats_file $current
         rm --force /etc/cron.d/tacc_stats
-        echo "*/$interval * * * * root $program collect" > /etc/cron.d/tacc_stats
+        echo "*/$interval * * * * root $TACC_STATS_PROGRAM collect" > /etc/cron.d/tacc_stats
         exit 0
         ;;
     end)
-        if [ ! -f $stats_file ]; then
+        if [ ! -f "$stats_file" ]; then
             exit 1
         fi
         rm --force /etc/cron.d/tacc_stats
         rm --force $current
-        if [ -d $project_dir ]; then
-            mkdir --parents $project_dir/$jobid/raw
-            mv $stats_file $project_dir/$jobid/raw/$HOSTNAME
+        if [ -n "$project_dir" ]; then
+            mkdir --parents $project_dir/$jobid
+            mv $stats_file $project_dir/$jobid/$HOSTNAME
         fi
         exit 0
         ;;
