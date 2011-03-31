@@ -3,6 +3,8 @@ CFLAGS = -Wall -Werror # -pg
 CPPFLAGS = -D_GNU_SOURCE -I/opt/ofed/include -DEPREFIX='"/sge_common/default/tacc/tacc_stats_test"' # -DDEBUG # -g
 LDFLAGS = -L/opt/ofed/lib64 -libmad # -pg
 
+# Horrible.
+
 -include config
 -include rules
 
@@ -23,8 +25,8 @@ stats_aggr_test: stats_aggr_test.o stats_aggr.o
 	$(CC) -c $(CFLAGS) $(CPPFLAGS) $*.c -o $*.o
 	$(CC) -MM $(CFLAGS) $(CPPFLAGS) $*.c > .$*.d
 
-stats.x: stats.all
-	sort stats.all | awk '{ printf "#ifdef CONFIG_ST_%s\nX(%s)\n#endif\n", $1, $1; }' > stats.x
+# stats.x: STATS
+#	sort STATS | awk '{ printf "#ifdef CONFIG_ST_%s\nX(%s)\n#endif\n", $1, $1; }' > stats.x
 
 .PHONY: clean
 clean:

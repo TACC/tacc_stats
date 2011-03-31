@@ -22,6 +22,9 @@ X(INTEL_PMC3)
 #ifdef CONFIG_ST_INTEL_UNCORE
 X(INTEL_UNCORE)
 #endif
+#ifdef CONFIG_ST_LLITE
+X(LLITE)
+#endif
 #ifdef CONFIG_ST_LUSTRE
 X(LUSTRE)
 #endif
