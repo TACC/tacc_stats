@@ -241,7 +241,7 @@ static int tacc_stats_begin(char **arg_list, size_t arg_count)
       continue;
 
     TRACE("type %s, schema_def `%s'\n", type->st_name, type->st_schema_def);
-    if (stats_type_set_schema(type, type->st_schema_def) < 0) {
+    if (schema_init(&type->st_schema, type->st_schema_def) < 0) {
       type->st_enabled = 0;
       continue;
     }

@@ -39,7 +39,7 @@ static void init(void)
     struct stats_type *type = type_table[i];
     TRACE("init type %s\n", type->st_name);
 
-    if (dict_init(&type->st_schema_dict, 0) < 0)
+    if (dict_init(&type->st_schema.sc_dict, 0) < 0)
       /* XXX */;
     if (dict_init(&type->st_current_dict, 0) < 0)
       /* XXX */;
@@ -88,8 +88,8 @@ static struct stats *stats_create(struct stats_type *type, const char *dev)
   if (stats == NULL)
     goto err;
 
-  val = calloc(type->st_schema_len, sizeof(*stats->s_val));
-  if (val == NULL && type->st_schema_len != 0)
+  val = calloc(type->st_schema.sc_len, sizeof(*stats->s_val));
+  if (val == NULL && type->st_schema.sc_len != 0)
     goto err;
 
   memset(stats, 0, sizeof(*stats));
@@ -143,34 +143,21 @@ struct stats *get_current_stats(struct stats_type *type, const char *dev)
 
 void stats_set(struct stats *stats, const char *key, unsigned long long val)
 {
-  char *sk;
-  struct schema_entry *se;
+  int i = schema_ref(&stats->s_type->st_schema, key);
 
-  TRACE("%s %s %s %llu\n",
-        stats->s_type->st_name, stats->s_dev, key, val);
+  TRACE("%s %s %s %llu %d\n",
+        stats->s_type->st_name, stats->s_dev, key, val, i);
 
-  sk = dict_ref(&stats->s_type->st_schema_dict, key);
-  if (sk == NULL)
-    return;
-
-  se = key_to_schema_entry(sk);
-
-  stats->s_val[se->se_index] = val;
+  if (i >= 0)
+    stats->s_val[i] = val;
 }
 
 void stats_inc(struct stats *stats, const char *key, unsigned long long val)
 {
-  char *sk;
-  struct schema_entry *se;
+  int i = schema_ref(&stats->s_type->st_schema, key);
 
-  TRACE("%s %s %s %llu\n",
-        stats->s_type->st_name, stats->s_dev, key, val);
+  TRACE("%s %s %s %llu %d\n",
+        stats->s_type->st_name, stats->s_dev, key, val, i);
 
-  sk = dict_ref(&stats->s_type->st_schema_dict, key);
-  if (sk == NULL)
-    return;
-
-  se = key_to_schema_entry(sk);
-
-  stats->s_val[se->se_index] = val;
+  stats->s_val[i] = val;
 }

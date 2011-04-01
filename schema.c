@@ -63,16 +63,17 @@ struct schema_entry *parse_schema_entry(char *str)
   return se;
 }
 
-int stats_type_set_schema(struct stats_type *type, const char *def)
+int schema_init(struct schema *sc, const char *def)
 {
+  int rc = -1;
   size_t nr_se = 0;
-  char *str = strdupa(def);
+  char *cpy = strdup(def);
 
-  while (str != NULL) {
-    while (isspace(*str))
-      str++;
+  while (cpy != NULL) {
+    while (isspace(*cpy))
+      cpy++;
 
-    char *tok = strsep(&str, ";");
+    char *tok = strsep(&cpy, ";");
     if (*tok == 0)
       continue;
 
@@ -81,28 +82,27 @@ int stats_type_set_schema(struct stats_type *type, const char *def)
       goto err;
 
     se->se_index = nr_se++;
-    if (dict_set(&type->st_schema_dict, se->se_key) < 0)
+    if (dict_set(&sc->sc_dict, se->se_key) < 0)
       goto err;
   }
 
-  type->st_schema_len = nr_se;
-  type->st_schema = calloc(type->st_schema_len, sizeof(*type->st_schema));
-  if (type->st_schema == NULL && type->st_schema_len != 0) {
+  sc->sc_len = nr_se;
+  sc->sc_ent = calloc(sc->sc_len, sizeof(*sc->sc_ent));
+  if (sc->sc_ent == NULL && sc->sc_len != 0) {
     ERROR("cannot allocate schema entries: %m\n");
     goto err;
   }
 
   size_t i = 0;
   struct dict_entry *de;
-  while ((de = dict_for_each(&type->st_schema_dict, &i)) != NULL) {
+  while ((de = dict_for_each(&sc->sc_dict, &i)) != NULL) {
     struct schema_entry *se = key_to_schema_entry(de->d_key);
-    type->st_schema[se->se_index] = se;
+    sc->sc_ent[se->se_index] = se;
     TRACE("i %zu, d_key `%s', se_key `%s', se_index %u\n", i, de->d_key, se->se_key, se->se_index);
   }
 
-  return 0;
-
+  rc = 0;
  err:
-  /* TODO Clear dict and free entries. */
-  return -1;
+  free(cpy);
+  return rc;
 }

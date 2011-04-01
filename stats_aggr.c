@@ -35,7 +35,7 @@ int stats_aggr_init(struct stats_aggr *sa, struct stats_type *type, time_t begin
   sa->sa_prev_rec = calloc(rec_len, sizeof(*sa->sa_prev_rec));
   if (sa->sa_prev_rec == NULL)
     goto err;
- sa->sa_flags = calloc(rec_len, sizeof(*sa->sa_flags));
+  sa->sa_flags = calloc(rec_len, sizeof(*sa->sa_flags));
   if (sa->sa_flags == NULL)
     goto err;
 

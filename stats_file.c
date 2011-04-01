@@ -77,7 +77,7 @@ int stats_file_rd_hdr(FILE *file, const char *path)
     TRACE("%s:%d: c %c, name %s, rest %s\n", path, nr, c, name, line);
     switch (c) {
     case '!':
-      if (stats_type_set_schema(type, line) < 0) {
+      if (schema_init(&type->st_schema, line) < 0) {
         ERROR("cannot parse schema: %m\n");
         goto err;
       }
@@ -128,15 +128,15 @@ int stats_file_wr_hdr(FILE *file, const char *path)
     if (!type->st_enabled)
       continue;
 
-    TRACE("type %s, schema_len %zu\n", type->st_name, type->st_schema_len);
+    TRACE("type %s, schema_len %zu\n", type->st_name, type->st_schema.sc_len);
 
     /* Write schema. */
     fprintf(file, "!%s", type->st_name);
 
     /* MOVEME */
-    int j;
-    for (j = 0; j < type->st_schema_len; j++) {
-      struct schema_entry *se = type->st_schema[j];
+    size_t j;
+    for (j = 0; j < type->st_schema.sc_len; j++) {
+      struct schema_entry *se = type->st_schema.sc_ent[j];
       fprintf(file, " %s%s%s", se->se_key,
               se->se_type == SE_EVENT ? ",E" : "",
               se->se_type == SE_BITS ? ",B" : "");
@@ -159,12 +159,12 @@ void stats_type_wr_stats(struct stats_type *type, FILE *file)
   size_t i = 0;
   struct dict_entry *de;
   while ((de = dict_for_each(&type->st_current_dict, &i)) != NULL) {
-    struct stats *stats = (struct stats *) de->d_key - 1;
+    struct stats *stats = (struct stats *) de->d_key - 1; /* XXX */
 
     fprintf(file, "%s %s", type->st_name, stats->s_dev);
 
     int j;
-    for (j = 0; j < type->st_schema_len; j++)
+    for (j = 0; j < type->st_schema.sc_len; j++)
       fprintf(file, " %llu", stats->s_val[j]);
 
     fprintf(file, "\n");
