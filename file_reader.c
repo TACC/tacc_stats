@@ -1,11 +1,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <unistd.h>
+#include <malloc.h>
 #include <ctype.h>
-#include <limits.h>
-#include "stats.h"
-#include "stats_file.h"
 #include "trace.h"
 
 typedef unsigned long long val_t;
@@ -22,15 +19,14 @@ struct stats_file_rd_ops {
 
 /* TODO Check white space skipping. */
 
-static int parse_rec(val_t **p_buf, size_t *p_len, char *str)
+static int parse_rec(val_t **p_buf, size_t *p_buf_len, char *str)
 {
-  int i;
   val_t *buf = *p_buf;
-  size_t len = *p_len;
+  size_t i = 0, buf_len = *p_buf_len;
 
-  if (buf == NULL || len == 0) {
-    len = 512;
-    buf = malloc(len * sizeof(*buf));
+  if (buf == NULL || buf_len == 0) {
+    buf_len = 512;
+    buf = malloc(buf_len * sizeof(*buf));
     if (buf == NULL) {
       ERROR("cannot allocate record buffer: %m\n");
       return -1;
@@ -44,14 +40,14 @@ static int parse_rec(val_t **p_buf, size_t *p_len, char *str)
     if (eov == str) /* No digits. */
       goto out;
 
-    if (i >= len) {
-      size_t new_len = 2 * len;
-      val_t *new_buf = realloc(buf, new_len * sizeof(*buf));
+    if (i >= buf_len) {
+      size_t new_buf_len = 2 * buf_len;
+      val_t *new_buf = realloc(buf, new_buf_len * sizeof(*buf));
       if (new_buf == NULL) {
         ERROR("cannot allocate record buffer: %m\n");
         goto out;
       }
-      len = new_len;
+      buf_len = new_buf_len;
       buf = new_buf;
     }
 
@@ -61,7 +57,7 @@ static int parse_rec(val_t **p_buf, size_t *p_len, char *str)
 
  out:
   *p_buf = buf;
-  *p_len = len;
+  *p_buf_len = buf_len;
   return i;
 }
 
@@ -127,8 +123,6 @@ int stats_file_rd(FILE *file, const char *path, struct stats_file_rd_ops *ops)
 
   time_t time = 0;
   while (getline(&line_buf, &line_buf_size, file) > 0) {
-    const char *name, *dev;
-
     nr++;
     line = line_buf;
 
@@ -140,11 +134,11 @@ int stats_file_rd(FILE *file, const char *path, struct stats_file_rd_ops *ops)
       continue;
     }
 
-    name = strsep(&line, SPACE_CHARS);
+    const char *name = strsep(&line, SPACE_CHARS);
     if (*name == 0 || line == NULL)
       continue;
 
-    dev = strsep(&line, SPACE_CHARS);
+    const char *dev = strsep(&line, SPACE_CHARS);
     if (*dev == 0 || line == NULL)
       continue;
 
