@@ -9,6 +9,7 @@
 #include "dict.h"
 #include "schema.h"
 
+struct dict global_dict;
 time_t current_time;
 int nr_cpus;
 
@@ -32,9 +33,11 @@ static void init(void)
   nr_cpus = sysconf(_SC_NPROCESSORS_ONLN);
   TRACE("nr_cpus %d\n", nr_cpus);
 
+  if (dict_init(&global_dict, 0) < 0)
+    /* XXX */;
+
   /* Initialize types. */
   size_t i;
-
   for (i = 0; i < nr_stats_types; i++) {
     struct stats_type *type = type_table[i];
     TRACE("init type %s\n", type->st_name);
@@ -113,7 +116,7 @@ static void stats_free(struct stats *stats)
 struct stats *get_current_stats(struct stats_type *type, const char *dev)
 {
   struct stats *stats = NULL;
-  struct dict_entry *ent;
+  struct dict_entry *de;
   hash_t hash;
 
   if (dev == NULL)
@@ -122,9 +125,9 @@ struct stats *get_current_stats(struct stats_type *type, const char *dev)
   TRACE("get_current_stats %s %s\n", type->st_name, dev);
 
   hash = dict_strhash(dev);
-  ent = dict_entry_ref(&type->st_current_dict, hash, dev);
-  if (ent->d_key != NULL)
-    return (struct stats *) ent->d_key - 1;
+  de = dict_entry_ref(&type->st_current_dict, hash, dev);
+  if (de->d_key != NULL)
+    return key_to_stats(de->d_key);
 
   stats = stats_create(type, dev);
   if (stats == NULL) {
@@ -132,7 +135,7 @@ struct stats *get_current_stats(struct stats_type *type, const char *dev)
     return NULL;
   }
 
-  if (dict_entry_set(&type->st_current_dict, ent, hash, stats->s_dev) < 0) {
+  if (dict_entry_set(&type->st_current_dict, de, hash, stats->s_dev) < 0) {
     ERROR("dict_entry_set: %m\n");
     stats_free(stats);
     return NULL;

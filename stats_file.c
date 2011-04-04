@@ -10,6 +10,7 @@
 #include "stats_file.h"
 #include "schema.h"
 #include "trace.h"
+#include "pscanf.h"
 
 #define SPACE_CHARS " \t\n\v\f\r"
 
@@ -113,14 +114,17 @@ int stats_file_rd_hdr(FILE *file, const char *path)
 int stats_file_wr_hdr(FILE *file, const char *path)
 {
   struct utsname uts_buf;
+  unsigned long long uptime = 0;
+
   uname(&uts_buf);
+  pscanf("/proc/uptime", "%llu", &uptime);
 
   fprintf(file, "#%s %s\n", TACC_STATS_PROGRAM, TACC_STATS_VERSION);
   /* Make these global properties. */
-  fprintf(file, "#hostname %s\n", uts_buf.nodename);
-  fprintf(file, "#uname %s %s %s %s\n", uts_buf.sysname, uts_buf.machine,
+  fprintf(file, "$hostname %s\n", uts_buf.nodename);
+  fprintf(file, "$uname %s %s %s %s\n", uts_buf.sysname, uts_buf.machine,
           uts_buf.release, uts_buf.version);
-  /* TODO btime. */
+  fprintf(file, "$uptime %llu\n", uptime);
 
   size_t i = 0;
   struct stats_type *type;
@@ -159,7 +163,7 @@ void stats_type_wr_stats(struct stats_type *type, FILE *file)
   size_t i = 0;
   struct dict_entry *de;
   while ((de = dict_for_each(&type->st_current_dict, &i)) != NULL) {
-    struct stats *stats = (struct stats *) de->d_key - 1; /* XXX */
+    struct stats *stats = key_to_stats(de->d_key);
 
     fprintf(file, "%s %s", type->st_name, stats->s_dev);
 

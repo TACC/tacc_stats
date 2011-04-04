@@ -27,6 +27,13 @@ struct stats {
   char s_dev[];
 };
 
+static inline struct stats *key_to_stats(const char *key)
+{
+  size_t s_dev_offset = ((struct stats *) NULL)->s_dev - (char *) NULL;
+  return (struct stats *) (key - s_dev_offset);
+}
+
+extern struct dict global_dict;
 extern time_t current_time;
 extern int nr_cpus;
 
