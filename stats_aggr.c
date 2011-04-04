@@ -7,6 +7,8 @@
 #include "stats_aggr.h"
 #include "trace.h"
 
+typedef unsigned long long val_t;
+
 /* Consider including back pointer to type or dev. */
 
 #define sa_rec_size(sa) ((sa)->sa_rec_len * sizeof(val_t))

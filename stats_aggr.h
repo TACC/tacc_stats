@@ -13,13 +13,12 @@
 #define sf_width(f) ((f) & SF_WIDTH)
 
 struct stats_type;
-typedef unsigned long long val_t;
 
 struct stats_aggr {
-  val_t *sa_buf;
-  val_t *sa_base_rec;
-  val_t *sa_prev_rec;
-  val_t *sa_cur_rec; /* Initialized to sa_buf. */
+  unsigned long long *sa_buf;
+  unsigned long long *sa_base_rec;
+  unsigned long long *sa_prev_rec;
+  unsigned long long *sa_cur_rec; /* Initialized to sa_buf. */
   unsigned int *sa_flags;
   time_t sa_begin, sa_end, sa_step;
   time_t sa_prev_time; /* Initialized to -1 */
@@ -28,7 +27,7 @@ struct stats_aggr {
 };
 
 int stats_aggr_init(struct stats_aggr *sa, struct stats_type *type, time_t begin, time_t end, time_t step);
-void stats_aggr(struct stats_aggr *sa, time_t time, const val_t *rec);
+void stats_aggr(struct stats_aggr *sa, time_t time, const unsigned long long *rec);
 void stats_aggr_rewind(struct stats_aggr *sa);
 void stats_aggr_sum(struct stats_aggr *r, const struct stats_aggr *s);
 int stats_aggr_print(FILE *file, struct stats_aggr *sa, const char *time_fmt, const char *dev, const char *fs, const char *rs);
