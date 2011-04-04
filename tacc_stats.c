@@ -193,7 +193,7 @@ static int tacc_stats_mark(char **arg_list, size_t arg_count)
 
   iter = str;
   while ((line = strsep(&str, "\n")) != NULL)
-    if (stats_file_printf(stats_file, stats_path, "#%s\n", line) < 0)
+    if (stats_file_printf(stats_file, stats_path, "\n#%s\n", line) < 0)
       goto out;
 
   rc = 0;
