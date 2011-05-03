@@ -33,8 +33,10 @@ char *dict_entry_remv(struct dict *dict, struct dict_entry *ent, int may_resize)
 
 char *dict_ref(struct dict *dict, const char *key);
 int dict_set(struct dict *dict, char *key);
+char *dict_remv(struct dict *dict, const char *key);
 
-/* Returns only entries with non-NULL keys. */
-struct dict_entry *dict_for_each(struct dict *dict, size_t *i);
+/* Returns only non-NULL keys. */
+char *dict_for_each(struct dict *dict, size_t *i);
+struct dict_entry *dict_for_each_ref(struct dict *dict, size_t *i);
 
 #endif

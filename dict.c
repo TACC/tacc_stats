@@ -2,6 +2,7 @@
 #include <string.h>
 #include <malloc.h>
 #include <errno.h>
+#include "trace.h"
 #include "dict.h"
 
 #define DICT_HASH_DUMMY (((hash_t) 1) << (8 * sizeof(hash_t) - 1))
@@ -71,6 +72,9 @@ void dict_destroy(struct dict *dict)
 /* new_table_len must be a power of two. */
 static int dict_resize(struct dict *dict, size_t new_table_len)
 {
+  TRACE("table_len %zu, load %zu, count %zu, new_table_len %zu\n",
+        dict->d_table_len, dict->d_load, dict->d_count, new_table_len);
+
   struct dict_entry *table, *old_table;
   size_t mask, old_table_len;
 
@@ -180,7 +184,7 @@ int dict_entry_set(struct dict *dict, struct dict_entry *ent, hash_t hash, char 
       new_table_len *= 2;
 
     if (new_count >= new_table_len) {
-      /* We've reached the maximum possible dict size. */
+      TRACE("new_count %zu >= new_table_len %zu\n", new_count, new_table_len);
       errno = ENOMEM;
       return -1;
     }
@@ -216,6 +220,14 @@ char *dict_entry_remv(struct dict *dict, struct dict_entry *ent, int may_resize)
   return key;
 }
 
+char *dict_remv(struct dict *dict, const char *key)
+{
+  hash_t hash = dict_strhash(key);
+  struct dict_entry *ent = dict_entry_ref(dict, hash, key);
+
+  return dict_entry_remv(dict, ent, 1);
+}
+
 char *dict_ref(struct dict *dict, const char *key)
 {
   hash_t hash = dict_strhash(key);
@@ -233,6 +245,8 @@ int dict_set(struct dict *dict, char *key)
   struct dict_entry *ent = dict_entry_ref(dict, hash, key);
 
   if (ent->d_key != NULL) {
+    TRACE("overwriting old key `%s', hash %zu, with new key `%s' hash %zu\n",
+          ent->d_key, ent->d_hash, key, hash);
     ent->d_key = key;
     return 0;
   }
@@ -243,7 +257,7 @@ int dict_set(struct dict *dict, char *key)
   return 0;
 }
 
-struct dict_entry *dict_for_each(struct dict *dict, size_t *i)
+struct dict_entry *dict_for_each_ref(struct dict *dict, size_t *i)
 {
   while (*i < dict->d_table_len) {
     struct dict_entry *ent = dict->d_table + (*i)++;
@@ -251,5 +265,13 @@ struct dict_entry *dict_for_each(struct dict *dict, size_t *i)
       return ent;
   }
 
+  return NULL;
+}
+
+char *dict_for_each(struct dict *dict, size_t *i)
+{
+  struct dict_entry *ent = dict_for_each_ref(dict, i);
+  if (ent != NULL)
+    return ent->d_key;
   return NULL;
 }
