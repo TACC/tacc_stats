@@ -100,17 +100,17 @@ int main(int argc, char *argv[])
   TRACE("d_count %zu\n", sb_dict.d_count);
 
   size_t i = 0;
-  struct dict_entry *de;
-  while ((de = dict_for_each(&sb_dict, &i)) != 0) {
-    char *sb = de->d_key;
+  char *sb;
+  while ((sb = dict_for_each(&sb_dict, &i)) != NULL) {
     ERROR("sb `%s', dir `%s'\n", sb, sb + strlen(sb) + 1);
+    free(sb);
   }
 
  out:
+  dict_destroy(&sb_dict);
+
   if (mnt_file != NULL)
     endmntent(mnt_file);
-
-  dict_destroy(&sb_dict);
 
   return 0;
 }
