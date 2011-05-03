@@ -34,7 +34,7 @@ void test1(void)
 {
   DEFINE_DICT(d);
   print_dict(d);
-  dict_destroy(&d);
+  dict_destroy(&d, &free);
 }
 
 void test2(void)
@@ -43,7 +43,7 @@ void test2(void)
   dict_init(&d, 16);
   dict_set(&d, "foo");
   print_dict(d);
-  dict_destroy(&d);
+  dict_destroy(&d, &free);
 }
 
 void test3(void)
@@ -54,7 +54,7 @@ void test3(void)
   for (i = 0; i < 100; i++)
     dict_set(&d, "foo");
   print_dict(d);
-  dict_destroy(&d);
+  dict_destroy(&d, &free);
 }
 
 void test4(void)
@@ -73,7 +73,7 @@ void test4(void)
       ERROR("dict_set(&d, \"%s\") failed: %m\n", key);
   }
   print_dict(d);
-  dict_destroy(&d);
+  dict_destroy(&d, &free);
 }
 
 void test5(void)
@@ -113,7 +113,7 @@ void test5(void)
   if (key != NULL)
     ERROR("dict should be empty but contains key `%s'\n", key);
 
-  dict_destroy(&d);
+  dict_destroy(&d, &free);
 }
 
 int main(int argc, char *argv[])

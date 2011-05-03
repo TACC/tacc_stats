@@ -63,8 +63,14 @@ int dict_init(struct dict *dict, size_t count)
   return 0;
 }
 
-void dict_destroy(struct dict *dict)
+void dict_destroy(struct dict *dict, void (*key_dtor)(void*))
 {
+  if (key_dtor != NULL) {
+    size_t i;
+    for (i = 0; i < dict->d_table_len; i++)
+      if (dict->d_table[i].d_key != NULL)
+        (*key_dtor)(dict->d_table[i].d_key);
+  }
   free(dict->d_table);
   memset(dict, 0, sizeof(struct dict));
 }
