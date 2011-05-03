@@ -94,11 +94,11 @@ int schema_init(struct schema *sc, const char *def)
   }
 
   size_t i = 0;
-  struct dict_entry *de;
-  while ((de = dict_for_each(&sc->sc_dict, &i)) != NULL) {
-    struct schema_entry *se = key_to_schema_entry(de->d_key);
+  char *key;
+  while ((key = dict_for_each(&sc->sc_dict, &i)) != NULL) {
+    struct schema_entry *se = key_to_schema_entry(key);
     sc->sc_ent[se->se_index] = se;
-    TRACE("i %zu, d_key `%s', se_key `%s', se_index %u\n", i, de->d_key, se->se_key, se->se_index);
+    TRACE("i %zu, d_key `%s', se_key `%s', se_index %u\n", i, key, se->se_key, se->se_index);
   }
 
   rc = 0;

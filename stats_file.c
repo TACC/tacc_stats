@@ -165,9 +165,9 @@ int stats_file_wr_hdr(struct stats_file *sf)
 static void stats_type_wr_stats(struct stats_file *sf, struct stats_type *type)
 {
   size_t i = 0;
-  struct dict_entry *de;
-  while ((de = dict_for_each(&type->st_current_dict, &i)) != NULL) {
-    struct stats *stats = key_to_stats(de->d_key);
+  char *key;
+  while ((key = dict_for_each(&type->st_current_dict, &i)) != NULL) {
+    struct stats *stats = key_to_stats(key);
 
     sf_printf(sf, "%s %s", type->st_name, stats->s_dev);
 
