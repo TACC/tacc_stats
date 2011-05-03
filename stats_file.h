@@ -1,9 +1,15 @@
 #ifndef _STATS_FILE_H_
 #define _STATS_FILE_H_
+#include <stdio.h>
 
-int stats_file_wr_hdr(FILE *file, const char *path);
-int stats_file_rd_hdr(FILE *file, const char *path);
-int stats_file_wr_rec(FILE *file, const char *path);
-int stats_file_printf(FILE *file, const char *path, const char *fmt, ...);
+struct stats_file {
+  char *sf_path;
+  FILE *sf_file;
+};
+
+int stats_file_rd_hdr(struct stats_file *sf);
+int stats_file_wr_hdr(struct stats_file *sf);
+int stats_file_wr_rec(struct stats_file *sf);
+int stats_file_wr_mark(struct stats_file *sf, const char *str);
 
 #endif
