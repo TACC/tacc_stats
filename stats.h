@@ -8,9 +8,6 @@
 #include "schema.h"
 #include "STRJOIN.h"
 
-#define TACC_STATS_PROGRAM "tacc_stats"
-#define TACC_STATS_VERSION "1.0.0"
-
 struct stats_type {
   char *st_name;
   int (*st_begin)(struct stats_type *type);
