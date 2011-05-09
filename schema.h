@@ -4,7 +4,7 @@
 #include "dict.h"
 
 #define SE_EVENT 1
-#define SE_BITS 2
+#define SE_CONTROL 2
 
 struct schema_entry {
   char *se_unit;

@@ -145,13 +145,15 @@ static int sf_wr_hdr(struct stats_file *sf)
     size_t j;
     for (j = 0; j < type->st_schema.sc_len; j++) {
       struct schema_entry *se = type->st_schema.sc_ent[j];
-      sf_printf(sf, " %s%s%s", se->se_key,
-              se->se_type == SE_EVENT ? ",E" : "",
-              se->se_type == SE_BITS ? ",B" : "");
-      if (se->se_width != 0)
-        sf_printf(sf, ",W=%u", se->se_width);
+      sf_printf(sf, " %s", se->se_key);
+      if (se->se_type == SE_CONTROL)
+        sf_printf(sf, ",C");
+      if (se->se_type == SE_EVENT)
+        sf_printf(sf, ",E");
       if (se->se_unit != NULL)
         sf_printf(sf, ",U=%s", se->se_unit);
+      if (se->se_width != 0)
+        sf_printf(sf, ",W=%u", se->se_width);
     }
     sf_printf(sf, "\n");
   }

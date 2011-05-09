@@ -35,12 +35,8 @@ struct schema_entry *parse_schema_entry(char *str)
     default:
       TRACE("unknown schema option `%s'\n", opt);
       break;
-    case 'B':
-      se->se_type = SE_BITS;
-      break;
-    case 'D':
-      if (opt_arg != NULL && strlen(opt_arg) != 0) /* XXX */
-        se->se_desc = strdup(opt_arg);
+    case 'C':
+      se->se_type = SE_CONTROL;
       break;
     case 'E':
       se->se_type = SE_EVENT;
