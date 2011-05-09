@@ -9,7 +9,6 @@
 #include "dict.h"
 #include "schema.h"
 
-struct dict global_dict;
 time_t current_time;
 int nr_cpus;
 
@@ -32,9 +31,6 @@ static void init(void)
 
   nr_cpus = sysconf(_SC_NPROCESSORS_ONLN);
   TRACE("nr_cpus %d\n", nr_cpus);
-
-  if (dict_init(&global_dict, 0) < 0)
-    /* XXX */;
 
   /* Initialize types. */
   size_t i;
