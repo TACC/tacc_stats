@@ -147,6 +147,6 @@ struct stats_type STATS_TYPE_LLITE = {
   .st_name = "llite",
   .st_collect = &collect_llite,
 #define X(k,o,d,r...) #k "," o
-  .st_schema_def = STRJOIN(SCHEMA),
+  .st_schema_def = JOIN(SCHEMA),
 #undef X
 };

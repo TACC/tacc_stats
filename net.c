@@ -127,6 +127,6 @@ struct stats_type STATS_TYPE_NET = {
   .st_name = "net",
   .st_collect = &collect_net,
 #define X(k,o,d,r...) #k "," o
-  .st_schema_def = STRJOIN(KEYS),
+  .st_schema_def = JOIN(KEYS),
 #undef X
 };

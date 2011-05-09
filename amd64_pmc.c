@@ -220,6 +220,6 @@ struct stats_type STATS_TYPE_AMD64_PMC = {
   .st_begin = &begin_pmc,
   .st_collect = &collect_pmc,
 #define X(k,o,d,r...) #k "," o
-  .st_schema_def = STRJOIN(KEYS),
+  .st_schema_def = JOIN(KEYS),
 #undef X
 };

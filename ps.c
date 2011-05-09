@@ -117,6 +117,6 @@ struct stats_type STATS_TYPE_PS = {
   .st_name = "ps",
   .st_collect = &collect_ps,
 #define X(k,o,d,r...) #k "," o
-  .st_schema_def = STRJOIN(KEYS),
+  .st_schema_def = JOIN(KEYS),
 #undef X
 };

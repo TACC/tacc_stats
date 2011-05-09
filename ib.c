@@ -110,6 +110,6 @@ struct stats_type STATS_TYPE_IB = {
   .st_name = "ib",
   .st_collect = &collect_ib,
 #define X(k,o,d,r...) #k "," o
-  .st_schema_def = STRJOIN(KEYS),
+  .st_schema_def = JOIN(KEYS),
 #undef X
 };

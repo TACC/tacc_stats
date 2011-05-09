@@ -218,6 +218,6 @@ struct stats_type STATS_TYPE_INTEL_UNCORE = {
   .st_name = "intel_uncore",
   .st_collect = &collect_uncore,
 #define X(k,o,d,r...) #k "," o
-  .st_schema_def = STRJOIN(KEYS),
+  .st_schema_def = JOIN(KEYS),
 #undef X
 };

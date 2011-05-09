@@ -208,7 +208,7 @@ int stats_file_close(struct stats_file *sf)
 
   fseek(sf->sf_file, 0, SEEK_END);
 
-  sf_printf(sf, "\n%ld\n", (long) current_time);
+  sf_printf(sf, "\n%ld %s\n", (long) current_time, current_jobid);
 
   /* Write mark. */
   if (sf->sf_mark != NULL) {
