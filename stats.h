@@ -6,7 +6,7 @@
 #include "dict.h"
 #include "trace.h"
 #include "schema.h"
-#include "STRJOIN.h"
+#include "JOIN.h"
 
 extern time_t current_time;
 extern char current_jobid[80];
