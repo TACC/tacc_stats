@@ -33,8 +33,9 @@ static inline struct stats *key_to_stats(const char *key)
 extern time_t current_time;
 extern int nr_cpus;
 
-struct stats_type *name_to_type(const char *name);
+int stats_type_init(struct stats_type *type);
 struct stats_type *stats_type_for_each(size_t *i);
+struct stats_type *name_to_type(const char *name);
 
 struct stats *get_current_stats(struct stats_type *type, const char *dev);
 void stats_set(struct stats *s, const char *key, unsigned long long val);

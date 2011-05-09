@@ -22,27 +22,26 @@ struct stats_type *type_table[] = {
 #undef X
 };
 
-size_t nr_stats_types = sizeof(type_table) / sizeof(type_table[0]);
+static size_t nr_stats_types = sizeof(type_table) / sizeof(type_table[0]);
 
 static void init(void) __attribute__((constructor));
 static void init(void)
 {
   current_time = time(0);
-
   nr_cpus = sysconf(_SC_NPROCESSORS_ONLN);
-  TRACE("nr_cpus %d\n", nr_cpus);
+}
 
-  /* Initialize types. */
-  size_t i;
-  for (i = 0; i < nr_stats_types; i++) {
-    struct stats_type *type = type_table[i];
-    TRACE("init type %s\n", type->st_name);
+int stats_type_init(struct stats_type *st)
+{
+  TRACE("type %s, schema_def `%s'\n", st->st_name, st->st_schema_def);
 
-    if (dict_init(&type->st_schema.sc_dict, 0) < 0)
-      /* XXX */;
-    if (dict_init(&type->st_current_dict, 0) < 0)
-      /* XXX */;
-  }
+  if (schema_init(&st->st_schema, st->st_schema_def) < 0)
+    return -1;
+
+  if (dict_init(&st->st_current_dict, 0) < 0)
+    return -1;
+
+  return 0;
 }
 
 // static int name_to_type_cmp(const void *name, const void *memb)

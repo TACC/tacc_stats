@@ -65,6 +65,11 @@ int schema_init(struct schema *sc, const char *def)
   size_t nr_se = 0;
   char *cpy = strdup(def);
 
+  if (dict_init(&sc->sc_dict, 0) < 0) {
+    ERROR("cannot initialize schema: %m\n");
+    goto err;
+  }
+
   while (cpy != NULL) {
     while (isspace(*cpy))
       cpy++;

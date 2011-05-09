@@ -198,8 +198,7 @@ int main(int argc, char *argv[])
     if (!type->st_enabled)
       continue;
 
-    TRACE("type %s, schema_def `%s'\n", type->st_name, type->st_schema_def);
-    if (schema_init(&type->st_schema, type->st_schema_def) < 0) {
+    if (stats_type_init(type) < 0) {
       type->st_enabled = 0;
       continue;
     }

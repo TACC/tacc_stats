@@ -86,10 +86,7 @@ static int sf_rd_hdr(struct stats_file *sf)
     TRACE("%s:%d: c %c, name %s, rest %s\n", sf->sf_path, nr, c, name, line);
     switch (c) {
     case SF_SCHEMA_CHAR:
-      if (schema_init(&type->st_schema, line) < 0) {
-        ERROR("cannot parse schema: %m\n");
-        goto err;
-      }
+      type->st_schema_def = strdup(line);
       type->st_enabled = 1;
       break;
     case SF_DEVICES_CHAR: /* TODO. */
