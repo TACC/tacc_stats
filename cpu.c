@@ -85,7 +85,7 @@ static void collect_proc_stat(struct stats_type *type)
 struct stats_type STATS_TYPE_CPU = {
   .st_name = "cpu",
   .st_collect = &collect_proc_stat,
-#define X(k,o,d,r...) #k "," o
+#define X SCHEMA_DEF
   .st_schema_def = JOIN(KEYS),
 #undef X
 };

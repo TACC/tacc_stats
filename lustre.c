@@ -98,7 +98,7 @@ static void collect_lustre_stats(struct stats_type *type)
 struct stats_type STATS_TYPE_LUSTRE = {
   .st_name = "lustre",
   .st_collect = &collect_lustre_stats,
-#define X(k,o,d,r...) #k "," o
+#define X SCHEMA_DEF
   .st_schema_def = JOIN(KEYS),
 #undef X
 };

@@ -217,7 +217,7 @@ static void collect_uncore(struct stats_type *type)
 struct stats_type STATS_TYPE_INTEL_UNCORE = {
   .st_name = "intel_uncore",
   .st_collect = &collect_uncore,
-#define X(k,o,d,r...) #k "," o
+#define X SCHEMA_DEF
   .st_schema_def = JOIN(KEYS),
 #undef X
 };

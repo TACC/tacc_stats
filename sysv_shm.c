@@ -76,7 +76,7 @@ static void collect_sysv_shm(struct stats_type *type)
 struct stats_type STATS_TYPE_SYSV_SHM = {
   .st_name = "sysv_shm",
   .st_collect = &collect_sysv_shm,
-#define X(k,o,d,r...) #k "," o
+#define X SCHEMA_DEF
   .st_schema_def = JOIN(KEYS),
 #undef X
 };

@@ -52,7 +52,7 @@ static void collect_vm(struct stats_type *type)
 struct stats_type STATS_TYPE_VM = {
   .st_name = "vm",
   .st_collect = &collect_vm,
-#define X(k,o,d,r...) #k "," o
+#define X SCHEMA_DEF
   .st_schema_def = JOIN(KEYS),
 #undef X
 };

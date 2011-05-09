@@ -171,7 +171,7 @@ int stats_file_open(struct stats_file *sf, const char *path)
     goto err;
   }
 
-  sf->sf_file = fopen(sf->sf_path, "r+");
+  sf->sf_file = fopen(sf->sf_path, "a+");
   if (sf->sf_file == NULL) {
     ERROR("cannot open `%s': %m\n", path);
     goto err;

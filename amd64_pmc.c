@@ -219,7 +219,7 @@ struct stats_type STATS_TYPE_AMD64_PMC = {
   .st_name = "amd64_pmc",
   .st_begin = &begin_pmc,
   .st_collect = &collect_pmc,
-#define X(k,o,d,r...) #k "," o
+#define X SCHEMA_DEF
   .st_schema_def = JOIN(KEYS),
 #undef X
 };

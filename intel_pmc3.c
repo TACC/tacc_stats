@@ -316,7 +316,7 @@ struct stats_type STATS_TYPE_INTEL_PMC3 = {
   .st_name = "intel_pmc3",
   .st_begin = &begin_pmc,
   .st_collect = &collect_pmc,
-#define X(k,o,d,r...) #k "," o
+#define X SCHEMA_DEF
   .st_schema_def = JOIN(KEYS),
 #undef X
 };
