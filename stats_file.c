@@ -12,56 +12,62 @@
 #include "trace.h"
 #include "pscanf.h"
 
-#define sf_printf(sf, fmt, args...) fprintf(sf->sf_file, fmt, ##args)
+#define SF_COMMENT_CHAR '#'
+#define SF_SCHEMA_CHAR '!'
+#define SF_MARK_CHAR '^'
+#define SF_DEVICES_CHAR '@'
+/*#define SF_PROPERTY_CHAR '$' */
 
+/* TODO Check whitespace handling. */
 #define SPACE_CHARS " \t\n\v\f\r"
 
-int stats_file_rd_hdr(struct stats_file *sf)
+#define sf_printf(sf, fmt, args...) fprintf(sf->sf_file, fmt, ##args)
+
+static int sf_rd_hdr(struct stats_file *sf)
 {
   int rc = 0;
-  char *buf = NULL, *line;
-  size_t size = 0;
+  char *line_buf = NULL, *line;
+  size_t line_buf_size = 0;
 
-  if (getline(&buf, &size, sf->sf_file) <= 0) {
-    if (feof(sf->sf_file))
-      ERROR("empty stats file `%s'\n", sf->sf_path);
+  if (getline(&line_buf, &line_buf_size, sf->sf_file) <= 0) {
+    if (feof(sf->sf_file)) {
+      sf->sf_empty = 1;
+      goto out;
+    }
     goto err;
   }
 
-  line = buf;
-  if (*(line++) != '#') {
-    ERROR("file `%s' is not in %s format\n", sf->sf_path, TACC_STATS_PROGRAM);
+  line = line_buf;
+  if (*(line++) != SF_COMMENT_CHAR) {
+    ERROR("file `%s' is not in %s format\n", sf->sf_path, STATS_PROGRAM);
     goto err;
   }
 
   char *prog = strsep(&line, SPACE_CHARS);
-  if (prog == NULL || strcmp(prog, TACC_STATS_PROGRAM) != 0) {
-    ERROR("file `%s' is not in %s format\n", sf->sf_path, TACC_STATS_PROGRAM);
+  if (prog == NULL || strcmp(prog, STATS_PROGRAM) != 0) {
+    ERROR("file `%s' is not in %s format\n", sf->sf_path, STATS_PROGRAM);
     goto err;
   }
 
   char *vers = strsep(&line, SPACE_CHARS);
-  if (vers == NULL || strverscmp(vers, TACC_STATS_VERSION) > 0) {
+  if (vers == NULL || strverscmp(vers, STATS_VERSION) > 0) {
     ERROR("file `%s' is has unsupported version `%s'\n", sf->sf_path, vers != NULL ? vers : "NULL");
     goto err;
   }
 
   TRACE("prog %s, vers %s\n", prog, vers);
 
-  /* TODO Jobid in header. */
-  /* TODO Ignore whitespace. */
-
   int nr = 1;
-  while (getline(&buf, &size, sf->sf_file) > 0) {
+  while (getline(&line_buf, &line_buf_size, sf->sf_file) > 0) {
     nr++;
-    line = buf;
+    line = line_buf;
 
     int c = *(line++);
     if (c == '\n')
       break; /* End of header. */
 
-    if (c == '#')
-      continue; /* Comment. */
+    if (c == SF_COMMENT_CHAR)
+      continue;
 
     /* Otherwise line is a directive to be processed by a type. */
     char *name = strsep(&line, SPACE_CHARS);
@@ -79,18 +85,14 @@ int stats_file_rd_hdr(struct stats_file *sf)
 
     TRACE("%s:%d: c %c, name %s, rest %s\n", sf->sf_path, nr, c, name, line);
     switch (c) {
-    case '!':
+    case SF_SCHEMA_CHAR:
       if (schema_init(&type->st_schema, line) < 0) {
         ERROR("cannot parse schema: %m\n");
         goto err;
       }
       type->st_enabled = 1;
       break;
-    case '@': /* TODO Handle device list. */
-      break;
-    case '$': /* TODO */
-      break;
-    case '%': /* TODO */
+    case SF_DEVICES_CHAR: /* TODO. */
       break;
     default:
       ERROR("%s:%d: bad directive `%c%s %s'\n", sf->sf_path, nr, c, name, line);
@@ -98,6 +100,7 @@ int stats_file_rd_hdr(struct stats_file *sf)
     }
   }
 
+ out:
   if (ferror(sf->sf_file)) {
   err:
     rc = -1;
@@ -108,12 +111,11 @@ int stats_file_rd_hdr(struct stats_file *sf)
   if (ferror(sf->sf_file))
     ERROR("error reading from `%s': %m\n", sf->sf_path);
 
-  free(buf);
-
+  free(line_buf);
   return rc;
 }
 
-int stats_file_wr_hdr(struct stats_file *sf)
+static int sf_wr_hdr(struct stats_file *sf)
 {
   struct utsname uts_buf;
   unsigned long long uptime = 0;
@@ -121,12 +123,12 @@ int stats_file_wr_hdr(struct stats_file *sf)
   uname(&uts_buf);
   pscanf("/proc/uptime", "%llu", &uptime);
 
-  sf_printf(sf, "#%s %s\n", TACC_STATS_PROGRAM, TACC_STATS_VERSION);
-  /* Make these global properties. */
-  sf_printf(sf, "$hostname %s\n", uts_buf.nodename);
-  sf_printf(sf, "$uname %s %s %s %s\n", uts_buf.sysname, uts_buf.machine,
-          uts_buf.release, uts_buf.version);
-  sf_printf(sf, "$uptime %llu\n", uptime);
+  sf_printf(sf, "%c%s %s\n", SF_COMMENT_CHAR, STATS_PROGRAM, STATS_VERSION);
+
+  sf_printf(sf, "%chostname %s\n", SF_COMMENT_CHAR, uts_buf.nodename);
+  sf_printf(sf, "%cuname %s %s %s %s\n", SF_COMMENT_CHAR, uts_buf.sysname,
+            uts_buf.machine, uts_buf.release, uts_buf.version);
+  sf_printf(sf, "%cuptime %llu\n", SF_COMMENT_CHAR, uptime);
 
   size_t i = 0;
   struct stats_type *type;
@@ -137,7 +139,7 @@ int stats_file_wr_hdr(struct stats_file *sf)
     TRACE("type %s, schema_len %zu\n", type->st_name, type->st_schema.sc_len);
 
     /* Write schema. */
-    sf_printf(sf, "!%s", type->st_name);
+    sf_printf(sf, "%c%s", SF_SCHEMA_CHAR, type->st_name);
 
     /* MOVEME */
     size_t j;
@@ -150,9 +152,6 @@ int stats_file_wr_hdr(struct stats_file *sf)
         sf_printf(sf, ",W=%u", se->se_width);
       if (se->se_unit != NULL)
         sf_printf(sf, ",U=%s", se->se_unit);
-      if (se->se_desc != NULL)
-        sf_printf(sf, ",D=%s", se->se_desc);
-      sf_printf(sf, ";");
     }
     sf_printf(sf, "\n");
   }
@@ -162,53 +161,99 @@ int stats_file_wr_hdr(struct stats_file *sf)
   return 0;
 }
 
-static void stats_type_wr_stats(struct stats_file *sf, struct stats_type *type)
+int stats_file_open(struct stats_file *sf, const char *path)
 {
-  size_t i = 0;
-  char *key;
-  while ((key = dict_for_each(&type->st_current_dict, &i)) != NULL) {
-    struct stats *stats = key_to_stats(key);
+  int rc = 0;
+  memset(sf, 0, sizeof(*sf));
 
-    sf_printf(sf, "%s %s", type->st_name, stats->s_dev);
-
-    int j;
-    for (j = 0; j < type->st_schema.sc_len; j++)
-      sf_printf(sf, " %llu", stats->s_val[j]);
-
-    sf_printf(sf, "\n");
+  sf->sf_path = strdup(path);
+  if (sf->sf_path == NULL) {
+    ERROR("cannot create path: %m\n");
+    goto err;
   }
+
+  sf->sf_file = fopen(sf->sf_path, "r+");
+  if (sf->sf_file == NULL) {
+    ERROR("cannot open `%s': %m\n", path);
+    goto err;
+  }
+
+  if (sf_rd_hdr(sf) < 0) {
+ err:
+    rc = -1;
+  }
+
+  return rc;
 }
 
-int stats_file_wr_rec(struct stats_file *sf)
+int stats_file_mark(struct stats_file *sf, const char *fmt, ...)
 {
+  /* TODO Concatenate new mark with old. */
+  va_list args;
+  va_start(args, fmt);
+
+  if (vasprintf(&sf->sf_mark, fmt, args) < 0)
+    sf->sf_mark = NULL;
+
+  va_end(args);
+
+  return 0;
+}
+
+int stats_file_close(struct stats_file *sf)
+{
+  int rc = 0;
+
+  if (sf->sf_empty)
+    sf_wr_hdr(sf);
+
   fseek(sf->sf_file, 0, SEEK_END);
 
   sf_printf(sf, "\n%ld\n", (long) current_time);
 
-  size_t i = 0;
-  struct stats_type *type;
-  while ((type = stats_type_for_each(&i)) != NULL)
-    if (type->st_enabled && type->st_selected)
-      stats_type_wr_stats(sf, type);
-
-  fflush(sf->sf_file);
-
-  return 0;
-}
-
-int stats_file_wr_mark(struct stats_file *sf, const char *str)
-{
-  fseek(sf->sf_file, 0, SEEK_END);
-
-  while (*str != 0) {
-    const char *eol = strchrnul(str, '\n');
-    sf_printf(sf, "^%*s\n", (int) (eol - str), str);
-    str = eol;
-    if (*str == '\n')
-      str++;
+  /* Write mark. */
+  if (sf->sf_mark != NULL) {
+    const char *str = sf->sf_mark;
+    while (*str != 0) {
+      const char *eol = strchrnul(str, '\n');
+      sf_printf(sf, "%c%*s\n", SF_MARK_CHAR, (int) (eol - str), str);
+      str = eol;
+      if (*str == '\n')
+        str++;
+    }
   }
 
-  fflush(sf->sf_file);
+  /* Write stats. */
+  size_t i = 0;
+  struct stats_type *type;
+  while ((type = stats_type_for_each(&i)) != NULL) {
+    if (!(type->st_enabled && type->st_selected))
+      continue;
 
-  return 0;
+    size_t j = 0;
+    char *dev;
+    while ((dev = dict_for_each(&type->st_current_dict, &j)) != NULL) {
+      struct stats *stats = key_to_stats(dev);
+
+      sf_printf(sf, "%s %s", type->st_name, stats->s_dev);
+
+      size_t k;
+      for (k = 0; k < type->st_schema.sc_len; k++)
+        sf_printf(sf, " %llu", stats->s_val[k]);
+
+      sf_printf(sf, "\n");
+    }
+  }
+
+  if (ferror(sf->sf_file)) {
+    ERROR("error writing to `%s': %m\n", sf->sf_path);
+    rc = -1;
+  }
+
+  if (fclose(sf->sf_file) < 0) {
+    ERROR("error closing `%s': %m\n", sf->sf_path);
+    rc = -1;
+  }
+
+  return rc;
 }

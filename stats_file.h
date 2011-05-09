@@ -5,11 +5,12 @@
 struct stats_file {
   char *sf_path;
   FILE *sf_file;
+  char *sf_mark;
+  unsigned int sf_empty:1;
 };
 
-int stats_file_rd_hdr(struct stats_file *sf);
-int stats_file_wr_hdr(struct stats_file *sf);
-int stats_file_wr_rec(struct stats_file *sf);
-int stats_file_wr_mark(struct stats_file *sf, const char *str);
+int stats_file_open(struct stats_file *sf, const char *path);
+int stats_file_mark(struct stats_file *sf, const char *fmt, ...) __attribute__((format(printf, 2, 3)));
+int stats_file_close(struct stats_file *sf);
 
 #endif
