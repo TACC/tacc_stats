@@ -17,6 +17,7 @@
 #include "stats_file.h"
 #include "trace.h"
 #include "schema.h"
+#include "pscanf.h"
 
 const char *stats_dir_path = "/var/log/tacc_stats"; /* XXX */
 static const char *stats_sem_path = "/tacc_stats_sem";
@@ -24,6 +25,7 @@ static sem_t *stats_sem = NULL;
 static int stats_sem_timeout = 30;
 
 time_t current_time;
+char current_jobid[80] = "0";
 int nr_cpus;
 
 static void alarm_handler(int sig)
@@ -92,9 +94,6 @@ int main(int argc, char *argv[])
   const char *mark = NULL;
   char *stats_file_path = NULL; /* <stats_dir_path>/current */
 
-  current_time = time(0);
-  nr_cpus = sysconf(_SC_NPROCESSORS_ONLN);
-
   struct option opts[] = {
     { "help", 0, 0, 'h' },
     { "mark", 0, 0, 'm' },
@@ -157,6 +156,10 @@ int main(int argc, char *argv[])
     }
     goto out;
   }
+
+  current_time = time(0);
+  pscanf(JOBID_PATH, "%79s", current_jobid);
+  nr_cpus = sysconf(_SC_NPROCESSORS_ONLN);
 
   struct stats_file sf;
   if (stats_file_open(&sf, stats_file_path) < 0) {

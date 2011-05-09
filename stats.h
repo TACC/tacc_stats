@@ -8,6 +8,10 @@
 #include "schema.h"
 #include "STRJOIN.h"
 
+extern time_t current_time;
+extern char current_jobid[80];
+extern int nr_cpus;
+
 struct stats_type {
   char *st_name;
   int (*st_begin)(struct stats_type *type);
@@ -29,9 +33,6 @@ static inline struct stats *key_to_stats(const char *key)
   size_t s_dev_offset = ((struct stats *) NULL)->s_dev - (char *) NULL;
   return (struct stats *) (key - s_dev_offset);
 }
-
-extern time_t current_time;
-extern int nr_cpus;
 
 int stats_type_init(struct stats_type *type);
 struct stats_type *stats_type_for_each(size_t *i);
