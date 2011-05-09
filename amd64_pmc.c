@@ -30,14 +30,14 @@
 #define MSR_PERF_CTR3 0xC0010007
 
 #define KEYS \
-  X(CTL0, "bits", ""), \
-  X(CTL1, "bits", ""), \
-  X(CTL2, "bits", ""), \
-  X(CTL3, "bits", ""), \
-  X(CTR0, "event,width=48", ""), \
-  X(CTR1, "event,wdith=48", ""), \
-  X(CTR2, "event,width=48", ""), \
-  X(CTR3, "event,width=48", "")
+  X(CTL0, "C", ""), \
+  X(CTL1, "C", ""), \
+  X(CTL2, "C", ""), \
+  X(CTL3, "C", ""), \
+  X(CTR0, "E,W=48", ""), \
+  X(CTR1, "E,W=48", ""), \
+  X(CTR2, "E,W=48", ""), \
+  X(CTR3, "E,W=48", "")
 
 static int cpu_is_amd64_10h(char *cpu)
 {
@@ -219,7 +219,7 @@ struct stats_type STATS_TYPE_AMD64_PMC = {
   .st_name = "amd64_pmc",
   .st_begin = &begin_pmc,
   .st_collect = &collect_pmc,
-#define X(k,o,d,r...) #k "," o ",desc=" d "; "
+#define X(k,o,d,r...) #k "," o
   .st_schema_def = STRJOIN(KEYS),
 #undef X
 };

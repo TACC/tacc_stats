@@ -146,7 +146,7 @@ static void collect_llite(struct stats_type *type)
 struct stats_type STATS_TYPE_LLITE = {
   .st_name = "llite",
   .st_collect = &collect_llite,
-#define X(k,o,d,r...) #k "," o ",D=" d "; "
+#define X(k,o,d,r...) #k "," o
   .st_schema_def = STRJOIN(SCHEMA),
 #undef X
 };

@@ -11,17 +11,17 @@
 /* All X_ticks members and time_in_queue are in ms. */
 
 #define KEYS \
-  X(rd_ios,        "event",           "read requests processed"), \
-  X(rd_merges,     "event",           "read requests merged with in-queue requests"), \
-  X(rd_sectors,    "event,unit=512B", "sectors read"), \
-  X(rd_ticks,      "event,unit=ms",   "wait time for read requests"), \
-  X(wr_ios,        "event",           "write requests processed"), \
-  X(wr_merges,     "event",           "write requests merged with in-queue requests"), \
-  X(wr_sectors,    "event,unit=512B", "sectors written"), \
-  X(wr_ticks,      "event,unit=ms",   "wait time for write requests"), \
-  X(in_flight,     "",                "requests in flight"), \
-  X(io_ticks,      "event,unit=ms",   "time active"), \
-  X(time_in_queue, "event,unit=ms",   "wait time for all requests")
+  X(rd_ios,        "E",        "read requests processed"), \
+  X(rd_merges,     "E",        "read requests merged with in-queue requests"), \
+  X(rd_sectors,    "E,U=512B", "sectors read"), \
+  X(rd_ticks,      "E,U=ms",   "wait time for read requests"), \
+  X(wr_ios,        "E",        "write requests processed"), \
+  X(wr_merges,     "E",        "write requests merged with in-queue requests"), \
+  X(wr_sectors,    "E,U=512B", "sectors written"), \
+  X(wr_ticks,      "E,U=ms",   "wait time for write requests"), \
+  X(in_flight,     "",         "requests in flight"), \
+  X(io_ticks,      "E,U=ms",   "time active"), \
+  X(time_in_queue, "E,U=ms",   "wait time for all requests")
 
 static void collect_block_dev(struct stats_type *type, const char *dev)
 {
@@ -69,7 +69,7 @@ static void collect_block(struct stats_type *type)
 struct stats_type STATS_TYPE_BLOCK = {
   .st_name = "block",
   .st_collect = &collect_block,
-#define X(k,o,d,r...) #k "," o ",desc=" d "; "
+#define X(k,o,d,r...) #k "," o
   .st_schema_def = STRJOIN(KEYS),
 #undef X
 };

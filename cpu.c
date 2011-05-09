@@ -14,13 +14,13 @@
 /* We ignore steal and guest. */
 
 #define KEYS \
-  X(user, "event,unit=cs", "time in user mode"), \
-  X(nice, "event,unit=cs", "time in user mode with low priority"), \
-  X(system, "event,unit=cs", "time in system mode"), \
-  X(idle, "event,unit=cs", "time in idle task"), \
-  X(iowait, "event,unit=cs", "time in I/O wait"), \
-  X(irq, "event,unit=cs", "time in IRQ"), \
-  X(softirq, "event,unit=cs", "time in softIRQ")
+  X(user, "E,U=cs", "time in user mode"), \
+  X(nice, "E,U=cs", "time in user mode with low priority"), \
+  X(system, "E,U=cs", "time in system mode"), \
+  X(idle, "E,U=cs", "time in idle task"), \
+  X(iowait, "E,U=cs", "time in I/O wait"), \
+  X(irq, "E,U=cs", "time in IRQ"), \
+  X(softirq, "E,U=cs", "time in softIRQ")
 
 static void collect_proc_stat_cpu(struct stats_type *type, char *cpu, char *rest)
 {
@@ -85,7 +85,7 @@ static void collect_proc_stat(struct stats_type *type)
 struct stats_type STATS_TYPE_CPU = {
   .st_name = "cpu",
   .st_collect = &collect_proc_stat,
-#define X(k,o,d,r...) #k "," o ",desc=" d "; "
+#define X(k,o,d,r...) #k "," o
   .st_schema_def = STRJOIN(KEYS),
 #undef X
 };

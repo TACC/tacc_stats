@@ -8,8 +8,8 @@
 #define OSC_BASE "/proc/fs/lustre/osc"
 
 #define KEYS \
-  X(read_bytes, "event", ""), \
-  X(write_bytes, "event", "")
+  X(read_bytes, "E,U=B", ""), \
+  X(write_bytes, "E,U=B", "")
 
 static void collect_osc_stats(struct stats *fs_stats, const char *osc)
 {
@@ -98,7 +98,7 @@ static void collect_lustre_stats(struct stats_type *type)
 struct stats_type STATS_TYPE_LUSTRE = {
   .st_name = "lustre",
   .st_collect = &collect_lustre_stats,
-#define X(k,o,d,r...) #k "," o ",desc=" d "; "
+#define X(k,o,d,r...) #k "," o
   .st_schema_def = STRJOIN(KEYS),
 #undef X
 };

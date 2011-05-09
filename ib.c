@@ -9,23 +9,23 @@
 const char *perfquery = "/opt/ofed/bin/perfquery";
 
 #define KEYS \
-  X(excessive_buffer_overrun_errors, "event", ""), \
-  X(link_downed, "event", "failed link error recoveries"), \
-  X(link_error_recovery, "event", "successful link error recoveries"), \
-  X(local_link_integrity_errors, "event", ""), \
-  X(port_rcv_constraint_errors, "event", "packets discarded due to constraint"), \
-  X(port_rcv_data, "event,unit=4B", "data received"), \
-  X(port_rcv_errors, "event", "bad packets received"), \
-  X(port_rcv_packets, "event", "packets received"), \
-  X(port_rcv_remote_physical_errors, "event", "EBP packets received"), \
-  X(port_rcv_switch_relay_errors, "event", ""), \
-  X(port_xmit_constraint_errors, "event", "packets not transmitted due to constraint"), \
-  X(port_xmit_data, "event,unit=4B", "data transmitted"), \
-  X(port_xmit_discards, "event", "packets discarded due to down or congested port"), \
-  X(port_xmit_packets, "event", "packets transmitted"), \
-  X(port_xmit_wait, "event,unit=ms", "wait time for credits or arbitration"), \
-  X(symbol_error, "event", "minor link errors"), \
-  X(VL15_dropped, "event", "")
+  X(excessive_buffer_overrun_errors, "E", ""), \
+  X(link_downed, "E", "failed link error recoveries"), \
+  X(link_error_recovery, "E", "successful link error recoveries"), \
+  X(local_link_integrity_errors, "E", ""), \
+  X(port_rcv_constraint_errors, "E", "packets discarded due to constraint"), \
+  X(port_rcv_data, "E,U=4B", "data received"), \
+  X(port_rcv_errors, "E", "bad packets received"), \
+  X(port_rcv_packets, "E", "packets received"), \
+  X(port_rcv_remote_physical_errors, "E", "EBP packets received"), \
+  X(port_rcv_switch_relay_errors, "E", ""), \
+  X(port_xmit_constraint_errors, "E", "packets not transmitted due to constraint"), \
+  X(port_xmit_data, "E,U=4B", "data transmitted"), \
+  X(port_xmit_discards, "E", "packets discarded due to down or congested port"), \
+  X(port_xmit_packets, "E", "packets transmitted"), \
+  X(port_xmit_wait, "E,U=ms", "wait time for credits or arbitration"), \
+  X(symbol_error, "E", "minor link errors"), \
+  X(VL15_dropped, "E", "")
 
 static void collect_ib_dev(struct stats_type *type, const char *dev)
 {
@@ -109,7 +109,7 @@ static void collect_ib(struct stats_type *type)
 struct stats_type STATS_TYPE_IB = {
   .st_name = "ib",
   .st_collect = &collect_ib,
-#define X(k,o,d,r...) #k "," o ",desc=" d "; "
+#define X(k,o,d,r...) #k "," o
   .st_schema_def = STRJOIN(KEYS),
 #undef X
 };

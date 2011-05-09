@@ -58,21 +58,21 @@
 #define IA32_PERF_GLOBAL_OVF_CTRL 0x390
 
 #define KEYS \
-  X(PMC0, "event,width=48", ""), \
-  X(PMC1, "event,width=48", ""), \
-  X(PMC2, "event,width=48", ""), \
-  X(PMC3, "event,width=48", ""), \
-  X(PERFEVTSEL0, "bits", ""), \
-  X(PERFEVTSEL1, "bits", ""), \
-  X(PERFEVTSEL2, "bits", ""), \
-  X(PERFEVTSEL3, "bits", ""), \
-  X(FIXED_CTR0, "event,width=48", ""), \
-  X(FIXED_CTR1, "event,width=48", ""), \
-  X(FIXED_CTR2, "event,width=48", ""), \
-  X(FIXED_CTR_CTRL, "bits", ""), \
-  X(PERF_GLOBAL_STATUS, "bits", ""), \
-  X(PERF_GLOBAL_CTRL, "bits", ""), \
-  X(PERF_GLOBAL_OVF_CTRL, "bits", "")
+  X(PMC0, "E,W=48", ""), \
+  X(PMC1, "E,W=48", ""), \
+  X(PMC2, "E,W=48", ""), \
+  X(PMC3, "E,W=48", ""), \
+  X(PERFEVTSEL0, "C", ""), \
+  X(PERFEVTSEL1, "C", ""), \
+  X(PERFEVTSEL2, "C", ""), \
+  X(PERFEVTSEL3, "C", ""), \
+  X(FIXED_CTR0, "E,W=48", ""), \
+  X(FIXED_CTR1, "E,W=48", ""), \
+  X(FIXED_CTR2, "E,W=48", ""), \
+  X(FIXED_CTR_CTRL, "C", ""), \
+  X(PERF_GLOBAL_STATUS, "C", ""), \
+  X(PERF_GLOBAL_CTRL, "C", ""), \
+  X(PERF_GLOBAL_OVF_CTRL, "C", "")
 
 static int cpu_is_nehalem(char *cpu)
 {
@@ -316,7 +316,7 @@ struct stats_type STATS_TYPE_INTEL_PMC3 = {
   .st_name = "intel_pmc3",
   .st_begin = &begin_pmc,
   .st_collect = &collect_pmc,
-#define X(k,o,d,r...) #k "," o ",desc=" d "; "
+#define X(k,o,d,r...) #k "," o
   .st_schema_def = STRJOIN(KEYS),
 #undef X
 };

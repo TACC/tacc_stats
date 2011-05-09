@@ -12,16 +12,16 @@
 /* CHECKME Is unit 4B for extended counters as well? */
 
 #define KEYS \
-  X(port_select, "", ""), \
-  X(counter_select, "", ""), \
-  X(port_xmit_data, "event,unit=4B", ""), \
-  X(port_rcv_data, "event,unit=4B", ""), \
-  X(port_xmit_pkts, "event", ""), \
-  X(port_rcv_pkts, "event", ""), \
-  X(port_unicast_xmit_pkts, "event", ""), \
-  X(port_unicast_rcv_pkts, "event", ""), \
-  X(port_multicast_xmit_pkts, "event", ""), \
-  X(port_multicast_rcv_pkts, "event", "")
+  X(port_select, "C", ""), \
+  X(counter_select, "C", ""), \
+  X(port_xmit_data, "E,U=4B", ""), \
+  X(port_rcv_data, "E,U=4B", ""), \
+  X(port_xmit_pkts, "E", ""), \
+  X(port_rcv_pkts, "E", ""), \
+  X(port_unicast_xmit_pkts, "E", ""), \
+  X(port_unicast_rcv_pkts, "E", ""), \
+  X(port_multicast_xmit_pkts, "E", ""), \
+  X(port_multicast_rcv_pkts, "E", "")
 
 #define IB_PC_EXT_F \
   X(uint32_t, port_select, IB_PC_EXT_PORT_SELECT_F) \
@@ -171,7 +171,7 @@ static void collect_ib_ext(struct stats_type *type)
 struct stats_type STATS_TYPE_IB_EXT = {
   .st_name = "ib_ext",
   .st_collect = &collect_ib_ext,
-#define X(k,o,d,r...) #k "," o ",desc=" d "; "
+#define X(k,o,d,r...) #k "," o
   .st_schema_def = STRJOIN(KEYS),
 #undef X
 };

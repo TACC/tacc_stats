@@ -50,32 +50,32 @@
    NFS_Unstable, Bounce. */
 
 #define KEYS \
-  X(MemTotal, "unit=KB", ""), \
-  X(MemFree, "unit=KB", ""), \
-  X(MemUsed, "unit=KB", ""), \
-  X(Active, "unit=KB", ""), \
-  X(Inactive, "unit=KB", ""), \
-  X(HighTotal, "unit=KB", ""), \
-  X(HighFree, "unit=KB", ""), \
-  X(LowTotal, "unit=KB", ""), \
-  X(LowFree, "unit=KB", ""), \
-  X(Dirty, "unit=KB", ""), \
-  X(Writeback, "unit=KB", ""), \
-  X(FilePages, "unit=KB", ""), \
-  X(Mapped, "unit=KB", ""), \
-  X(AnonPages, "unit=KB", ""), \
-  X(PageTables, "unit=KB", ""), \
-  X(NFS_Unstable, "unit=KB", ""), \
-  X(Bounce, "unit=KB", ""), \
-  X(Slab, "unit=KB", ""), \
+  X(MemTotal, "U=KB", ""), \
+  X(MemFree, "U=KB", ""), \
+  X(MemUsed, "U=KB", ""), \
+  X(Active, "U=KB", ""), \
+  X(Inactive, "U=KB", ""), \
+  X(HighTotal, "U=KB", ""), \
+  X(HighFree, "U=KB", ""), \
+  X(LowTotal, "U=KB", ""), \
+  X(LowFree, "U=KB", ""), \
+  X(Dirty, "U=KB", ""), \
+  X(Writeback, "U=KB", ""), \
+  X(FilePages, "U=KB", ""), \
+  X(Mapped, "U=KB", ""), \
+  X(AnonPages, "U=KB", ""), \
+  X(PageTables, "U=KB", ""), \
+  X(NFS_Unstable, "U=KB", ""), \
+  X(Bounce, "U=KB", ""), \
+  X(Slab, "U=KB", ""), \
   X(HugePages_Total, "", ""), \
   X(HugePages_Free, "", ""), \
-  X(numa_hit, "event", ""), \
-  X(numa_miss, "event", ""), \
-  X(numa_foreign, "event", ""), \
-  X(interleave_hit, "event", ""), \
-  X(local_node, "event", ""), \
-  X(other_node, "event", "")
+  X(numa_hit, "E", ""), \
+  X(numa_miss, "E", ""), \
+  X(numa_foreign, "E", ""), \
+  X(interleave_hit, "E", ""), \
+  X(local_node, "E", ""), \
+  X(other_node, "E", "")
 
 static void collect_meminfo_node(struct stats *stats, const char *node)
 {
@@ -155,7 +155,7 @@ static void collect_mem(struct stats_type *type)
 struct stats_type STATS_TYPE_MEM = {
   .st_name = "mem",
   .st_collect = &collect_mem,
-#define X(k,o,d,r...) #k "," o ",desc=" d "; "
+#define X(k,o,d,r...) #k "," o
   .st_schema_def = STRJOIN(KEYS),
 #undef X
 };
