@@ -8,6 +8,7 @@
 #include <errno.h>
 #include <ctype.h>
 #include <malloc.h>
+#include <time.h>
 #include <sys/file.h>
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -21,6 +22,9 @@ const char *stats_dir_path = "/var/log/tacc_stats"; /* XXX */
 static const char *stats_sem_path = "/tacc_stats_sem";
 static sem_t *stats_sem = NULL;
 static int stats_sem_timeout = 30;
+
+time_t current_time;
+int nr_cpus;
 
 static void alarm_handler(int sig)
 {
@@ -87,6 +91,9 @@ int main(int argc, char *argv[])
   int rc = 0;
   const char *mark = NULL;
   char *stats_file_path = NULL; /* <stats_dir_path>/current */
+
+  current_time = time(0);
+  nr_cpus = sysconf(_SC_NPROCESSORS_ONLN);
 
   struct option opts[] = {
     { "help", 0, 0, 'h' },

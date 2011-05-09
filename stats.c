@@ -1,16 +1,11 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <time.h>
-#include <unistd.h>
 #include <limits.h>
 #include "stats.h"
 #include "trace.h"
 #include "dict.h"
 #include "schema.h"
-
-time_t current_time;
-int nr_cpus;
 
 #define X(t) extern struct stats_type STATS_TYPE_##t;
 #include "stats.x"
@@ -23,13 +18,6 @@ struct stats_type *type_table[] = {
 };
 
 static size_t nr_stats_types = sizeof(type_table) / sizeof(type_table[0]);
-
-static void init(void) __attribute__((constructor));
-static void init(void)
-{
-  current_time = time(0);
-  nr_cpus = sysconf(_SC_NPROCESSORS_ONLN);
-}
 
 int stats_type_init(struct stats_type *st)
 {
