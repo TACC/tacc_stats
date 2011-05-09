@@ -69,8 +69,8 @@ static void collect_fs(struct stats_type *type)
 #undef X
 }
 
-struct stats_type STATS_TYPE_FS = {
-  .st_name = "fs",
+struct stats_type STATS_TYPE_VFS = {
+  .st_name = "vfs",
   .st_collect = &collect_fs,
 #define X(k,o,d,r...) #k "," o
   .st_schema_def = STRJOIN(KEYS),

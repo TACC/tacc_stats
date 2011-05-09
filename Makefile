@@ -27,7 +27,6 @@ edit = sed \
 OBJS_$(CONFIG_AMD64_PMC) += amd64_pmc.o
 OBJS_$(CONFIG_BLOCK) += block.o
 OBJS_$(CONFIG_CPU) += cpu.o
-OBJS_$(CONFIG_FS) += fs.o
 OBJS_$(CONFIG_IB) += ib.o
 OBJS_$(CONFIG_IB_EXT) += ib_ext.o
 OBJS_$(CONFIG_INTEL_PMC3) += intel_pmc3.o
@@ -38,6 +37,7 @@ OBJS_$(CONFIG_MEM) += mem.o
 OBJS_$(CONFIG_NET) += net.o
 OBJS_$(CONFIG_PS) += ps.o
 OBJS_$(CONFIG_VM) += vm.o
+OBJS_$(CONFIG_VFS) += vfs.o
 
 OBJS := main.o stats.o dict.o collect.o schema.o stats_file.o $(OBJS_y)
 
