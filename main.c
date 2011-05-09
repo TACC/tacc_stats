@@ -17,7 +17,7 @@
 #include "trace.h"
 #include "schema.h"
 
-const char *stats_file_path = "/var/log/tacc_stats/current"; /* XXX */
+const char *stats_dir_path = "/var/log/tacc_stats"; /* XXX */
 static const char *stats_sem_path = "/tacc_stats_sem";
 static sem_t *stats_sem = NULL;
 static int stats_sem_timeout = 30;
@@ -84,8 +84,9 @@ static void usage(void)
 
 int main(int argc, char *argv[])
 {
-  const char *mark = NULL;
   int rc = 0;
+  const char *mark = NULL;
+  char *stats_file_path = NULL; /* <stats_dir_path>/current */
 
   struct option opts[] = {
     { "help", 0, 0, 'h' },
@@ -97,7 +98,7 @@ int main(int argc, char *argv[])
   while ((c = getopt_long(argc, argv, "hm:", opts, 0)) != -1) {
     switch (c) {
     case 'h':
-      usage(0);
+      usage();
       exit(0);
     case 'm':
       mark = optarg;
@@ -112,6 +113,10 @@ int main(int argc, char *argv[])
 
   if (!(optind < argc))
     FATAL("must specify a command\n");
+
+  asprintf(&stats_file_path, "%s/current", stats_dir_path);
+  if (stats_file_path == NULL)
+    FATAL("cannot create path: %m\n");
 
   const char *cmd_str = argv[optind];
   char **arg_list = argv + optind + 1;
@@ -146,13 +151,30 @@ int main(int argc, char *argv[])
     goto out;
   }
 
-  struct stats_file file;
-  if (stats_file_open(&file, stats_file_path) < 0) {
+  struct stats_file sf;
+  if (stats_file_open(&sf, stats_file_path) < 0) {
     rc = 1;
     goto out;
   }
 
-  int select_all = file.sf_empty || cmd != cmd_collect || arg_count == 0;
+  int enable_all = 0;
+  int select_all = cmd != cmd_collect || arg_count == 0;
+
+  if (sf.sf_empty) {
+    time_t epoch = time(NULL);
+    char *link_path = NULL;
+    asprintf(&link_path, "%s/%ld", stats_dir_path, epoch);
+    if (link_path == NULL) {
+      ERROR("cannot create path: %m\n");
+    } else if (link(stats_file_path, link_path) < 0) {
+      ERROR("cannot link `%s' to `%s': %m\n", stats_file_path, link_path);
+    }
+    free(link_path);
+
+    enable_all = 1;
+    select_all = 1;
+  }
+
   size_t i;
   struct stats_type *type;
 
@@ -170,36 +192,38 @@ int main(int argc, char *argv[])
 
   i = 0;
   while ((type = stats_type_for_each(&i)) != NULL) {
+    if (enable_all)
+      type->st_enabled = 1;
+
     if (!type->st_enabled)
       continue;
 
-    if (cmd == cmd_begin) {
-      if (type->st_begin != NULL && (*type->st_begin)(type) < 0) {
-        type->st_enabled = 0;
-        continue;
-      }
+    TRACE("type %s, schema_def `%s'\n", type->st_name, type->st_schema_def);
+    if (schema_init(&type->st_schema, type->st_schema_def) < 0) {
+      type->st_enabled = 0;
+      continue;
     }
-
-//     TRACE("type %s, schema_def `%s'\n", type->st_name, type->st_schema_def);
-//     if (schema_init(&type->st_schema, type->st_schema_def) < 0) {
-//       type->st_enabled = 0;
-//       continue;
-//     }
 
     if (select_all)
       type->st_selected = 1;
+
+    if (cmd == cmd_begin && type->st_begin != NULL)
+      (*type->st_begin)(type);
 
     if (type->st_enabled && type->st_selected)
       (*type->st_collect)(type);
   }
 
-  /* TODO Handle mark. */
-  if (stats_file_close(stats_file) < 0) {
+  if (mark != NULL)
+    stats_file_mark(&sf, "%s", mark);
+  else if (cmd == cmd_begin || cmd == cmd_end)
+    /* On begin set mark to "begin JOBID", and similar for end. */
+    stats_file_mark(&sf, "%s %s", cmd_str, arg_count > 0 ? arg_list[0] : "-");
+
+  if (stats_file_close(&sf) < 0)
     rc = 1;
-    goto out;
-  }
 
  out:
-  sem_unlock();
+  stats_unlock();
   return rc;
 }
