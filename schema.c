@@ -6,7 +6,7 @@
 #include "trace.h"
 #include "schema.h"
 
-/* key,opt1[=arg],opt2,...; */
+/* key,opt1[=arg],opt2,... */
 
 struct schema_entry *parse_schema_entry(char *str)
 {
@@ -73,7 +73,7 @@ int schema_init(struct schema *sc, const char *def)
     while (isspace(*cpy))
       cpy++;
 
-    char *tok = strsep(&cpy, ";");
+    char *tok = strsep(&cpy, " ");
     if (*tok == 0)
       continue;
 
