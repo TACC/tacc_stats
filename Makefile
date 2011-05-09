@@ -5,7 +5,7 @@ stats_version = 1.0.0
 jobid_path = /var/run/TACC_jobid
 
 CC = gcc
-CFLAGS = -Wall -Werror
+CFLAGS = -Wall -Werror -DDEBUG # XXX
 CPPFLAGS = -D_GNU_SOURCE \
  -DSTATS_PROGRAM=\"$(stats_program)\" \
  -DSTATS_VERSION=\"$(stats_version)\" \

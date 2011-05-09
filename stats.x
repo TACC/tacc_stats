@@ -34,6 +34,9 @@ X(NET)
 #ifdef CONFIG_PS
 X(PS)
 #endif
+#ifdef CONFIG_SYSV_SHM
+X(SYSV_SHM)
+#endif
 #ifdef CONFIG_VFS
 X(VFS)
 #endif

@@ -8,6 +8,8 @@
 #include "schema.h"
 #include "JOIN.h"
 
+#define SCHEMA_DEF(k,o,d,r...) " " #k "," o
+
 extern time_t current_time;
 extern char current_jobid[80];
 extern int nr_cpus;

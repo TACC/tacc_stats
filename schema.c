@@ -28,6 +28,9 @@ struct schema_entry *parse_schema_entry(char *str)
 
   while (str != NULL) {
     char *opt = strsep(&str, ",");
+    if (*opt == 0)
+      continue;
+
     char *opt_arg = opt;
     strsep(&opt_arg, "=");
 
