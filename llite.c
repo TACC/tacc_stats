@@ -1,6 +1,5 @@
 #include <stdio.h>
 #include <stdlib.h>
-#include <string.h>
 #include <fcntl.h>
 #include <dirent.h>
 #include <mntent.h>
@@ -9,6 +8,8 @@
 #include "stats.h"
 #include "trace.h"
 #include "dict.h"
+#include "string1.h"
+
 #define OBD_IOC_GETNAME 0xC0086683
 #define LLITE_DIR_PATH "/proc/fs/lustre/llite"
 
@@ -165,8 +166,8 @@ static void collect_llite_fs(struct stats *stats, const char *d_name)
 
   while (getline(&line_buf, &line_buf_size, file) >= 0) {
     char *line = line_buf;
-    char *key = strsep(&line, " ");
-    if (*key == 0 || line == NULL)
+    char *key = wsep(&line);
+    if (key == NULL || line == NULL)
       continue;
 
     unsigned long long count = 0, sum = 0;
