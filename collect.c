@@ -1,11 +1,11 @@
 #include <stdio.h>
 #include <stdlib.h>
-#include <string.h>
 #include <dirent.h>
 #include <stdarg.h>
 #include "stats.h"
 #include "trace.h"
 #include "collect.h"
+#include "string1.h"
 
 int collect_single(const char *path, unsigned long long *dest)
 {
@@ -116,10 +116,8 @@ int collect_key_value_file(struct stats *stats, const char *path)
     char *key, *rest = line;
     unsigned long long val;
 
-    key = strsep(&rest, " \t\n");
-    if (key[0] == 0)
-      continue;
-    if (rest == NULL)
+    key = wsep(&rest);
+    if (key == NULL || rest == NULL)
       continue;
 
     errno = 0;
