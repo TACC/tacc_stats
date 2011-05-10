@@ -40,7 +40,8 @@ static void collect_lnet(struct stats_type *type)
 
   collect_key_list(stats, path, "msgs_alloc", "msgs_alloc_max", "errors",
                    "tx_msgs", "rx_msgs", "route_msgs", "rx_msgs_dropped",
-                   "tx_bytes", "rx_bytes", "route_bytes", "rx_bytes_dropped");
+                   "tx_bytes", "rx_bytes", "route_bytes", "rx_bytes_dropped",
+                   NULL);
 }
 
 struct stats_type lnet_stats_type = {
