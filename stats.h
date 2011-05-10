@@ -15,13 +15,13 @@ extern char current_jobid[80];
 extern int nr_cpus;
 
 struct stats_type {
-  char *st_name;
   int (*st_begin)(struct stats_type *type);
   void (*st_collect)(struct stats_type *type);
   char *st_schema_def;
   struct schema st_schema;
   struct dict st_current_dict;
   unsigned int st_enabled:1, st_selected:1;
+  char st_name[];
 };
 
 struct stats {
