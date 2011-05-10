@@ -6,16 +6,10 @@
 #include <getopt.h>
 #include <signal.h>
 #include <errno.h>
-#include <ctype.h>
-#include <malloc.h>
 #include <time.h>
-#include <sys/file.h>
-#include <sys/types.h>
-#include <sys/stat.h>
 #include "stats.h"
 #include "stats_file.h"
 #include "trace.h"
-#include "schema.h"
 #include "pscanf.h"
 
 static const char *stats_dir_path = "/var/log/tacc_stats"; /* XXX */
