@@ -1,12 +1,12 @@
 #include <stddef.h>
 #include <stdlib.h>
 #include <stdio.h>
-#include <string.h>
 #include <errno.h>
 #include <malloc.h>
 #include <ctype.h>
 #include "stats.h"
 #include "trace.h"
+#include "string1.h"
 
 // $ cat /proc/stat
 // cpu ...
@@ -42,8 +42,8 @@ static void collect_proc_stat(struct stats *ps_stats)
 
   while (getline(&line, &line_size, file) >= 0) {
     char *key, *rest = line;
-    key = strsep(&rest, " ");
-    if (*key == 0 || rest == NULL)
+    key = wsep(&rest);
+    if (key == NULL || rest == NULL)
       continue;
 
     if (strncmp(key, "cpu", 3) == 0)
