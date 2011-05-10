@@ -1,9 +1,9 @@
 #include <stdio.h>
 #include <stdlib.h>
-#include <string.h>
 #include <dirent.h>
 #include "stats.h"
 #include "trace.h"
+#include "string1.h"
 
 #define OSC_BASE "/proc/fs/lustre/osc"
 
@@ -39,8 +39,8 @@ static void collect_osc_stats(struct stats *fs_stats, const char *osc)
     char *key, *rest = line;
     unsigned long long val = 0;
 
-    key = strsep(&rest, " \t");
-    if (*key == 0 || rest == NULL)
+    key = wsep(&rest);
+    if (key == NULL || rest == NULL)
       continue;
 
     if (sscanf(rest, "%*u samples %*s %*u %*u %llu", &val) == 1)
