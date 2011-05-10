@@ -12,17 +12,16 @@
 #include <sys/file.h>
 #include <sys/types.h>
 #include <sys/stat.h>
-#include <semaphore.h>
 #include "stats.h"
 #include "stats_file.h"
 #include "trace.h"
 #include "schema.h"
 #include "pscanf.h"
 
-const char *stats_dir_path = "/var/log/tacc_stats"; /* XXX */
-static const char *stats_sem_path = "/tacc_stats_sem";
-static sem_t *stats_sem = NULL;
-static int stats_sem_timeout = 30;
+static const char *stats_dir_path = "/var/log/tacc_stats"; /* XXX */
+static const char *stats_lock_path = "/var/lock/tacc_stats";
+static int stats_lock_fd = -1;
+static int stats_lock_timeout = 30;
 
 time_t current_time;
 char current_jobid[80] = "0";
@@ -34,44 +33,36 @@ static void alarm_handler(int sig)
 
 static int stats_lock(void)
 {
-  int rc = 0;
-  void (*prev_alarm_handler)(int) = SIG_ERR;
+  int rc = -1;
+  struct sigaction alarm_action = {
+    .sa_handler = &alarm_handler,
+  };
+  struct flock lock = {
+    .l_type = F_WRLCK,
+    .l_whence = SEEK_SET,
+  };
 
-  if (stats_sem == NULL)
-    stats_sem = sem_open(stats_sem_path, O_CREAT, 0600, 1);
-
-  if (stats_sem == SEM_FAILED) {
-    ERROR("cannot open `%s': %m\n", stats_sem_path);
-    rc = -1;
+  stats_lock_fd = open(stats_lock_path, O_CREAT|O_RDWR, 0600);
+  if (stats_lock_fd < 0) {
+    ERROR("cannot open `%s': %m\n", stats_lock_path);
     goto out;
   }
 
-  prev_alarm_handler = signal(SIGALRM, &alarm_handler);
-  alarm(stats_sem_timeout);
-
-  if (sem_wait(stats_sem) < 0) {
-    if (errno == EINTR)
-      errno = ETIMEDOUT;
-    ERROR("cannot lock `%s': %m\n", stats_sem_path);
-    rc = -1;
+  if (sigaction(SIGALRM, &alarm_action, NULL) < 0) {
+    ERROR("cannot set alarm handler: %m\n");
     goto out;
   }
 
+  alarm(stats_lock_timeout);
+
+  if (fcntl(stats_lock_fd, F_SETLKW, &lock) < 0) {
+    ERROR("cannot lock `%s': %m\n", stats_lock_path);
+    goto out;
+  }
+  rc = 0;
  out:
   alarm(0);
-  if (prev_alarm_handler != SIG_ERR)
-    signal(SIGALRM, prev_alarm_handler);
-
   return rc;
-}
-
-static void stats_unlock(void)
-{
-  if (stats_sem == NULL || stats_sem == SEM_FAILED)
-    return;
-
-  if (sem_post(stats_sem) < 0)
-    ERROR("cannot unlock `%s': %m\n", stats_sem_path);
 }
 
 static void usage(void)
@@ -233,6 +224,5 @@ int main(int argc, char *argv[])
     rc = 1;
 
  out:
-  stats_unlock();
   return rc;
 }
