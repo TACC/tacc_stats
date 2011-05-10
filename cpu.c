@@ -1,12 +1,12 @@
 #include <stddef.h>
 #include <stdlib.h>
 #include <stdio.h>
-#include <string.h>
 #include <errno.h>
 #include <malloc.h>
 #include <ctype.h>
 #include "stats.h"
 #include "trace.h"
+#include "string1.h"
 
 /* The /proc manpage says units are units of 1/sysconf(_SC_CLK_TCK)
    second.  sysconf(_SC_CLK_TCK) seems to always be 100. */
@@ -66,8 +66,8 @@ static void collect_proc_stat(struct stats_type *type)
 
   while (getline(&line, &line_size, file) >= 0) {
     char *key, *rest = line;
-    key = strsep(&rest, " ");
-    if (*key == 0 || rest == NULL)
+    key = wsep(&rest);
+    if (key == NULL || rest == NULL)
       continue;
 
     if (strncmp(key, "cpu", 3) != 0)
