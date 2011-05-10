@@ -38,7 +38,7 @@ X(PS)
 X(SYSV_SHM)
 #endif
 #ifdef CONFIG_TMPFS
-X(SYSV_SHM)
+X(TMPFS)
 #endif
 #ifdef CONFIG_VFS
 X(VFS)
