@@ -152,7 +152,7 @@ static void collect_mem(struct stats_type *type)
     closedir(dir);
 }
 
-struct stats_type STATS_TYPE_MEM = {
+struct stats_type mem_stats_type = {
   .st_name = "mem",
   .st_collect = &collect_mem,
 #define X SCHEMA_DEF

@@ -113,7 +113,7 @@ static void collect_ps(struct stats_type *type)
   collect_loadavg(ps_stats);
 }
 
-struct stats_type STATS_TYPE_PS = {
+struct stats_type ps_stats_type = {
   .st_name = "ps",
   .st_collect = &collect_ps,
 #define X SCHEMA_DEF

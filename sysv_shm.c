@@ -73,7 +73,7 @@ static void collect_sysv_shm(struct stats_type *type)
     fclose(shm_file);
 }
 
-struct stats_type STATS_TYPE_SYSV_SHM = {
+struct stats_type sysv_shm_stats_type = {
   .st_name = "sysv_shm",
   .st_collect = &collect_sysv_shm,
 #define X SCHEMA_DEF

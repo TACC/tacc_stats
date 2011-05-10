@@ -53,7 +53,7 @@ static void collect_tmpfs(struct stats_type *type)
     endmntent(me_file);
 }
 
-struct stats_type STATS_TYPE_TMPFS = {
+struct stats_type tmpfs_stats_type = {
   .st_name = "tmpfs",
   .st_collect = &collect_tmpfs,
 #define X SCHEMA_DEF

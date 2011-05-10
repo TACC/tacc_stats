@@ -82,7 +82,7 @@ static void collect_proc_stat(struct stats_type *type)
     fclose(file);
 }
 
-struct stats_type STATS_TYPE_CPU = {
+struct stats_type cpu_stats_type = {
   .st_name = "cpu",
   .st_collect = &collect_proc_stat,
 #define X SCHEMA_DEF

@@ -106,7 +106,7 @@ static void collect_ib(struct stats_type *type)
     closedir(dir);
 }
 
-struct stats_type STATS_TYPE_IB = {
+struct stats_type ib_stats_type = {
   .st_name = "ib",
   .st_collect = &collect_ib,
 #define X SCHEMA_DEF

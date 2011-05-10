@@ -95,7 +95,7 @@ static void collect_lustre_stats(struct stats_type *type)
     closedir(base_dir);
 }
 
-struct stats_type STATS_TYPE_LUSTRE = {
+struct stats_type lustre_stats_type = {
   .st_name = "lustre",
   .st_collect = &collect_lustre_stats,
 #define X SCHEMA_DEF

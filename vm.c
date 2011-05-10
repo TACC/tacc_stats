@@ -49,7 +49,7 @@ static void collect_vm(struct stats_type *type)
   collect_key_value_file(stats, "/proc/vmstat");
 }
 
-struct stats_type STATS_TYPE_VM = {
+struct stats_type vm_stats_type = {
   .st_name = "vm",
   .st_collect = &collect_vm,
 #define X SCHEMA_DEF

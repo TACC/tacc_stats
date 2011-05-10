@@ -312,7 +312,7 @@ static void collect_pmc(struct stats_type *type)
   }
 }
 
-struct stats_type STATS_TYPE_INTEL_PMC3 = {
+struct stats_type intel_pmc3_stats_type = {
   .st_name = "intel_pmc3",
   .st_begin = &begin_pmc,
   .st_collect = &collect_pmc,

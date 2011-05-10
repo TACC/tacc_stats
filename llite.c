@@ -246,7 +246,7 @@ static void collect_llite(struct stats_type *type)
     closedir(llite_dir);
 }
 
-struct stats_type STATS_TYPE_LLITE = {
+struct stats_type llite_stats_type = {
   .st_name = "llite",
   .st_collect = &collect_llite,
 #define X SCHEMA_DEF

@@ -1,16 +1,16 @@
-CONFIG_AMD64_PMC=y
-CONFIG_BLOCK=y
-CONFIG_CPU=y
-# CONFIG_IB
-# CONFIG_IB_EXT=y
-CONFIG_INTEL_PMC3=y
-CONFIG_INTEL_UNCORE=y
-CONFIG_LLITE=y
-# CONFIG_LUSTRE
-CONFIG_MEM=y
-CONFIG_NET=y
-CONFIG_PS=y
-CONFIG_SYSV_SHM=y
-CONFIG_TMPFS=y
-CONFIG_VFS=y
-CONFIG_VM=y
+amd64_pmc=y
+block=y
+cpu=y
+# ib
+# ib_ext
+# intel_pmc3
+# intel_uncore
+llite=y
+# lustre
+mem=y
+net=y
+ps=y
+sysv_shm=y
+tmpfs=y
+vfs=y
+vm=y

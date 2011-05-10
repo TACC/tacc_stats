@@ -123,7 +123,7 @@ static void collect_net(struct stats_type *type)
     closedir(dir);
 }
 
-struct stats_type STATS_TYPE_NET = {
+struct stats_type net_stats_type = {
   .st_name = "net",
   .st_collect = &collect_net,
 #define X SCHEMA_DEF

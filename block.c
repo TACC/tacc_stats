@@ -66,7 +66,7 @@ static void collect_block(struct stats_type *type)
     closedir(dir);
 }
 
-struct stats_type STATS_TYPE_BLOCK = {
+struct stats_type block_stats_type = {
   .st_name = "block",
   .st_collect = &collect_block,
 #define X SCHEMA_DEF

@@ -7,12 +7,12 @@
 #include "dict.h"
 #include "schema.h"
 
-#define X(t) extern struct stats_type STATS_TYPE_##t;
+#define X(t) extern struct stats_type t##_stats_type;
 #include "stats.x"
 #undef X
 
 struct stats_type *type_table[] = {
-#define X(t) &STATS_TYPE_##t,
+#define X(t) &t##_stats_type,
 #include "stats.x"
 #undef X
 };

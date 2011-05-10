@@ -69,7 +69,7 @@ static void collect_fs(struct stats_type *type)
 #undef X
 }
 
-struct stats_type STATS_TYPE_VFS = {
+struct stats_type vfs_stats_type = {
   .st_name = "vfs",
   .st_collect = &collect_fs,
 #define X SCHEMA_DEF

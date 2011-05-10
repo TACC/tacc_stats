@@ -215,7 +215,7 @@ static void collect_pmc(struct stats_type *type)
   }
 }
 
-struct stats_type STATS_TYPE_AMD64_PMC = {
+struct stats_type amd64_pmc_stats_type = {
   .st_name = "amd64_pmc",
   .st_begin = &begin_pmc,
   .st_collect = &collect_pmc,
