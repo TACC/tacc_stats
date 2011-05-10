@@ -30,7 +30,7 @@
 
 #define KEYS \
   X(mem_used, "U=B", "System V shared memory used"), \
-  X(nr_segs, "", "number of System V shared segments used")
+  X(segs_used, "", "number of System V shared segments used")
 
 static void collect_sysv_shm(struct stats_type *type)
 {
@@ -53,19 +53,19 @@ static void collect_sysv_shm(struct stats_type *type)
   /* Skip header. */
   getline(&line_buf, &line_buf_size, shm_file);
 
-  unsigned long long mem_used = 0, nr_segs = 0;
+  unsigned long long mem_used = 0, segs_used = 0;
 
   while (getline(&line_buf, &line_buf_size, shm_file) >= 0) {
     unsigned long long seg_size = 0;
-    if (sscanf(line_buf, "%*d %*d %*o %llu", &seg_size) < 0)
+    if (sscanf(line_buf, "%*d %*d %*o %llu", &seg_size) < 1)
       continue;
 
     mem_used += seg_size;
-    nr_segs++;
+    segs_used++;
   }
 
   stats_set(stats, "mem_used", mem_used);
-  stats_set(stats, "nr_segs", nr_segs);
+  stats_set(stats, "segs_used", segs_used);
 
  out:
   free(line_buf);
