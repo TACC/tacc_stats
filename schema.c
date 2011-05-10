@@ -5,6 +5,7 @@
 #include "dict.h"
 #include "trace.h"
 #include "schema.h"
+#define SPACE_CHARS " \t\n\v\f\r"
 
 /* key,opt1[=arg],opt2,... */
 
@@ -77,7 +78,7 @@ int schema_init(struct schema *sc, const char *def)
     while (isspace(*cpy))
       cpy++;
 
-    char *tok = strsep(&cpy, " ");
+    char *tok = strsep(&cpy, SPACE_CHARS);
     if (*tok == 0)
       continue;
 
