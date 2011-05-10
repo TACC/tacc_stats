@@ -1,13 +1,17 @@
 TYPES += amd64_pmc
 TYPES += block
 TYPES += cpu
-# ib
-# ib_ext
-# intel_pmc3
-# intel_uncore
+# TYPES += ib
+# CPPFLAGS += -I/opt/ofed/include
+# LDFLAGS += -L/opt/ofed/lib64 -libmad
+# TYPES += ib_ext
+# CPPFLAGS += -I/opt/ofed/include
+# LDFLAGS += -L/opt/ofed/lib64 -libmad
+# TYPES += intel_pmc3
+# TYPES += intel_uncore
 TYPES += llite
 TYPES += lnet
-# lustre
+# TYPES += lustre
 TYPES += mem
 TYPES += net
 TYPES += ps

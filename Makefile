@@ -5,7 +5,7 @@ stats_version = 1.0.0
 jobid_path = /var/run/TACC_jobid
 
 CC = gcc
-CFLAGS = -Wall -Werror -DDEBUG # XXX
+CFLAGS = -Wall -Werror # -DDEBUG
 CPPFLAGS = -D_GNU_SOURCE \
  -DSTATS_PROGRAM=\"$(stats_program)\" \
  -DSTATS_VERSION=\"$(stats_version)\" \
@@ -13,7 +13,7 @@ CPPFLAGS = -D_GNU_SOURCE \
 LDFLAGS = -lrt
 OBJS = main.o stats.o dict.o collect.o schema.o stats_file.o
 
-edit = sed \
+EDIT = sed \
  -e 's|@bindir[@]|$(bindir)|g' \
  -e 's|@prefix[@]|$(prefix)|g'
 # logdir
@@ -23,24 +23,16 @@ edit = sed \
 
 all: tacc_stats
 
-# The road to Hell is paved with elaborate Makefile constructs.
-
 stats.x: config
-	@echo "$(foreach t,$(TYPES),X($(t)))" > stats.x
+	echo '$(patsubst %,X(%),$(sort $(TYPES)))' > stats.x
 
-OBJS += $(foreach t,$(TYPES),$(t).o)
-
-ib_x = $(or $(ib),$(ib_ext))
-ifdef ib_x
-CPPFLAGS += -I/opt/ofed/include
-LDFLAGS += -L/opt/ofed/lib64 -libmad
-endif
+OBJS += $(patsubst %,%.o,$(TYPES))
 
 tacc_stats: $(OBJS)
 	$(CC) $(LDFLAGS) $(OBJS) -o $@
 
 init.d/tacc_stats: init.d/tacc_stats.in
-	$(edit) init.d/tacc_stats.in > init.d/tacc_stats
+	$(EDIT) init.d/tacc_stats.in > init.d/tacc_stats
 
 -include $(OBJS:%.o=.%.d)
 
