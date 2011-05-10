@@ -1,6 +1,5 @@
 #include <stdio.h>
 #include <stdlib.h>
-#include <string.h>
 #include <unistd.h>
 #include <ctype.h>
 #include <limits.h>
@@ -11,15 +10,13 @@
 #include "schema.h"
 #include "trace.h"
 #include "pscanf.h"
+#include "string1.h"
 
 #define SF_COMMENT_CHAR '#'
 #define SF_SCHEMA_CHAR '!'
 #define SF_MARK_CHAR '^'
 #define SF_DEVICES_CHAR '@'
 /*#define SF_PROPERTY_CHAR '$' */
-
-/* TODO Check whitespace handling. */
-#define SPACE_CHARS " \t\n\v\f\r"
 
 #define sf_printf(sf, fmt, args...) fprintf(sf->sf_file, fmt, ##args)
 
@@ -43,13 +40,13 @@ static int sf_rd_hdr(struct stats_file *sf)
     goto err;
   }
 
-  char *prog = strsep(&line, SPACE_CHARS);
+  char *prog = wsep(&line);
   if (prog == NULL || strcmp(prog, STATS_PROGRAM) != 0) {
     ERROR("file `%s' is not in %s format\n", sf->sf_path, STATS_PROGRAM);
     goto err;
   }
 
-  char *vers = strsep(&line, SPACE_CHARS);
+  char *vers = wsep(&line);
   if (vers == NULL || strverscmp(vers, STATS_VERSION) > 0) {
     ERROR("file `%s' is has unsupported version `%s'\n", sf->sf_path, vers != NULL ? vers : "NULL");
     goto err;
@@ -70,8 +67,8 @@ static int sf_rd_hdr(struct stats_file *sf)
       continue;
 
     /* Otherwise line is a directive to be processed by a type. */
-    char *name = strsep(&line, SPACE_CHARS);
-    if (*name == 0 || line == NULL) {
+    char *name = wsep(&line);
+    if (name == NULL || line == NULL) {
       line = "";
       ERROR("%s:%d: bad directive `%c%s %s'\n", sf->sf_path, nr, c, name, line);
       goto err;
