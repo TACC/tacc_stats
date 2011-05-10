@@ -1,11 +1,10 @@
 #include <malloc.h>
-#include <string.h>
 #include <ctype.h>
 #include "stats.h"
 #include "dict.h"
 #include "trace.h"
 #include "schema.h"
-#define SPACE_CHARS " \t\n\v\f\r"
+#include "string1.h"
 
 /* key,opt1[=arg],opt2,... */
 
@@ -67,21 +66,14 @@ int schema_init(struct schema *sc, const char *def)
 {
   int rc = -1;
   size_t nr_se = 0;
-  char *cpy = strdup(def);
+  char *cpy = strdup(def), *str = cpy, *tok;
 
   if (dict_init(&sc->sc_dict, 0) < 0) {
     ERROR("cannot initialize schema: %m\n");
     goto err;
   }
 
-  while (cpy != NULL) {
-    while (isspace(*cpy))
-      cpy++;
-
-    char *tok = strsep(&cpy, SPACE_CHARS);
-    if (*tok == 0)
-      continue;
-
+  while ((tok = wsep(&str)) != NULL) {
     struct schema_entry *se = parse_schema_entry(tok);
     if (se == NULL)
       goto err;
