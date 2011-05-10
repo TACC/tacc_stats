@@ -1,16 +1,17 @@
-amd64_pmc=y
-block=y
-cpu=y
+TYPES += amd64_pmc
+TYPES += block
+TYPES += cpu
 # ib
 # ib_ext
 # intel_pmc3
 # intel_uncore
-llite=y
+TYPES += llite
+TYPES += lnet
 # lustre
-mem=y
-net=y
-ps=y
-sysv_shm=y
-tmpfs=y
-vfs=y
-vm=y
+TYPES += mem
+TYPES += net
+TYPES += ps
+TYPES += sysv_shm
+TYPES += tmpfs
+TYPES += vfs
+TYPES += vm

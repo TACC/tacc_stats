@@ -12,7 +12,6 @@ CPPFLAGS = -D_GNU_SOURCE \
  -DJOBID_PATH=\"$(jobid_path)\"
 LDFLAGS = -lrt
 OBJS = main.o stats.o dict.o collect.o schema.o stats_file.o
-TYPES = amd64_pmc block cpu ib ib_ext intel_pmc3 intel_uncore llite lustre mem net ps sysv_shm tmpfs vfs vm
 
 edit = sed \
  -e 's|@bindir[@]|$(bindir)|g' \
@@ -27,9 +26,9 @@ all: tacc_stats
 # The road to Hell is paved with elaborate Makefile constructs.
 
 stats.x: config
-	@echo "$(foreach t,$(TYPES), $(if $($(t)),X($(t)),))" > stats.x
+	@echo "$(foreach t,$(TYPES),X($(t)))" > stats.x
 
-OBJS += $(foreach t,$(TYPES), $(if $($(t)),$(t).o,))
+OBJS += $(foreach t,$(TYPES),$(t).o)
 
 ib_x = $(or $(ib),$(ib_ext))
 ifdef ib_x
