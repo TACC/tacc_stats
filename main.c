@@ -78,12 +78,9 @@ static void usage(void)
 
 int main(int argc, char *argv[])
 {
-  const char *lock_path = STATS_LOCK_PATH;
   int lock_fd = -1;
   int lock_timeout = 30;
-  const char *stats_dir_path = STATS_DIR_PATH;
-  char *stats_current_path = NULL; /* <stats_dir_path>/current */
-  char *stats_epoch_path = NULL; /* <stats_dir_path>/<EPOCH> */
+  char *current_path = NULL; /* STATS_DIR_PATH"/current" */
   const char *mark = NULL;
   int rc = 0;
 
@@ -113,8 +110,8 @@ int main(int argc, char *argv[])
   if (!(optind < argc))
     FATAL("must specify a command\n");
 
-  stats_current_path = strf("%s/current", stats_dir_path);
-  if (stats_current_path == NULL)
+  current_path = strf("%s/current", STATS_DIR_PATH);
+  if (current_path == NULL)
     FATAL("cannot create path: %m\n");
 
   const char *cmd_str = argv[optind];
@@ -139,29 +136,29 @@ int main(int argc, char *argv[])
   else
     FATAL("invalid command `%s'\n", cmd_str);
 
-  lock_fd = open_lock_timeout(lock_path, lock_timeout);
+  lock_fd = open_lock_timeout(STATS_LOCK_PATH, lock_timeout);
   if (lock_fd < 0)
     FATAL("cannot acquire lock\n");
 
   if (cmd == cmd_rotate) {
-    if (unlink(stats_current_path) < 0 && errno != ENOENT) {
-        ERROR("cannot unlink `%s': %m\n", stats_current_path);
+    if (unlink(current_path) < 0 && errno != ENOENT) {
+        ERROR("cannot unlink `%s': %m\n", current_path);
         rc = 1;
     }
     goto out;
   }
 
   current_time = time(NULL);
-  pscanf(JOBID_PATH, "%79s", current_jobid);
+  pscanf(JOBID_FILE_PATH, "%79s", current_jobid);
   nr_cpus = sysconf(_SC_NPROCESSORS_ONLN);
 
-  if (mkdir(stats_dir_path, 0777) < 0) {
+  if (mkdir(STATS_DIR_PATH, 0777) < 0) {
     if (errno != EEXIST)
-      FATAL("cannot create directory `%s': %m\n", stats_dir_path);
+      FATAL("cannot create directory `%s': %m\n", STATS_DIR_PATH);
   }
 
   struct stats_file sf;
-  if (stats_file_open(&sf, stats_current_path) < 0) {
+  if (stats_file_open(&sf, current_path) < 0) {
     rc = 1;
     goto out;
   }
@@ -170,11 +167,11 @@ int main(int argc, char *argv[])
   int select_all = cmd != cmd_collect || arg_count == 0;
 
   if (sf.sf_empty) {
-    stats_epoch_path = strf("%s/%ld", stats_dir_path, current_time);
-    if (stats_epoch_path == NULL)
+    char *link_path = strf("%s/%ld", STATS_DIR_PATH, current_time);
+    if (link_path == NULL)
       ERROR("cannot create path: %m\n");
-    else if (link(stats_current_path, stats_epoch_path) < 0)
-      ERROR("cannot link `%s' to `%s': %m\n", stats_current_path, stats_epoch_path);
+    else if (link(current_path, link_path) < 0)
+      ERROR("cannot link `%s' to `%s': %m\n", current_path, link_path);
 
     enable_all = 1;
     select_all = 1;

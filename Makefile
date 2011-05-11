@@ -1,39 +1,30 @@
-bindir = /usr/local/bin
-stats_program = tacc_stats
-stats_version = 1.0.0
-stats_dir_path = /var/log/tacc_stats
-stats_lock_path = /var/lock/tacc_stats
-jobid_path = /var/run/TACC_jobid
-# stats_cron_interval = 10 # minutes
+name = tacc_stats
+version = 1.0.0
+stats_dir = /var/log/tacc_stats
+stats_lock = /var/lock/tacc_stats
+jobid_file = /var/run/TACC_jobid
+config = ./config
+-include config
 
 CC = gcc
 CFLAGS = -Wall -Werror -O3 # -DDEBUG
 CPPFLAGS = -D_GNU_SOURCE \
- -DSTATS_PROGRAM=\"$(stats_program)\" \
- -DSTATS_VERSION=\"$(stats_version)\" \
- -DSTATS_DIR_PATH=\"$(stats_dir_path)\" \
- -DSTATS_LOCK_PATH=\"$(stats_lock_path)\" \
- -DJOBID_PATH=\"$(jobid_path)\" \
+ -DSTATS_PROGRAM=\"$(name)\" \
+ -DSTATS_VERSION=\"$(version)\" \
+ -DSTATS_DIR_PATH=\"$(stats_dir)\" \
+ -DSTATS_LOCK_PATH=\"$(stats_lock)\" \
+ -DJOBID_FILE_PATH=\"$(jobid_file)\"
 
 OBJS = main.o stats.o dict.o collect.o schema.o stats_file.o
+OBJS += $(patsubst %,%.o,$(TYPES))
 
-EDIT = sed \
- -e 's|@bindir[@]|$(bindir)|g' \
- -e 's|@prefix[@]|$(prefix)|g'
-# logdir
-# @stats_cron_path@
+$(name): $(OBJS)
+	$(CC) $(LDFLAGS) $(OBJS) -o $@
 
--include config
-
-all: tacc_stats
+stats.o: stats.x
 
 stats.x: config
 	echo '$(patsubst %,X(%),$(sort $(TYPES)))' > stats.x
-
-OBJS += $(patsubst %,%.o,$(TYPES))
-
-tacc_stats: $(OBJS)
-	$(CC) $(LDFLAGS) $(OBJS) -o $@
 
 -include $(OBJS:%.o=.%.d)
 
@@ -43,4 +34,4 @@ tacc_stats: $(OBJS)
 
 .PHONY: clean
 clean:
-	rm -f tacc_stats $(OBJS)
+	rm -f tacc_stats $(OBJS) $(OBJS:%.o=.%.d)
