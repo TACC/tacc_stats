@@ -1,15 +1,20 @@
+bindir = /usr/local/bin
 stats_program = tacc_stats
 stats_version = 1.0.0
-# stats_dir = /var/log/tacc_stats
-# stats_cron_interval = 10 # minutes
+stats_dir_path = /var/log/tacc_stats
+stats_lock_path = /var/lock/tacc_stats
 jobid_path = /var/run/TACC_jobid
+# stats_cron_interval = 10 # minutes
 
 CC = gcc
 CFLAGS = -Wall -Werror -O3 # -DDEBUG
 CPPFLAGS = -D_GNU_SOURCE \
  -DSTATS_PROGRAM=\"$(stats_program)\" \
  -DSTATS_VERSION=\"$(stats_version)\" \
- -DJOBID_PATH=\"$(jobid_path)\"
+ -DSTATS_DIR_PATH=\"$(stats_dir_path)\" \
+ -DSTATS_LOCK_PATH=\"$(stats_lock_path)\" \
+ -DJOBID_PATH=\"$(jobid_path)\" \
+
 OBJS = main.o stats.o dict.o collect.o schema.o stats_file.o
 
 EDIT = sed \
@@ -29,9 +34,6 @@ OBJS += $(patsubst %,%.o,$(TYPES))
 
 tacc_stats: $(OBJS)
 	$(CC) $(LDFLAGS) $(OBJS) -o $@
-
-init.d/tacc_stats: init.d/tacc_stats.in
-	$(EDIT) init.d/tacc_stats.in > init.d/tacc_stats
 
 -include $(OBJS:%.o=.%.d)
 

@@ -1,21 +1,19 @@
 #include <stdio.h>
 #include <stdlib.h>
-#include <string.h>
 #include <unistd.h>
 #include <fcntl.h>
 #include <getopt.h>
 #include <signal.h>
+#include <malloc.h>
 #include <errno.h>
 #include <time.h>
+#include <sys/stat.h>
+#include <sys/types.h>
+#include "string1.h"
 #include "stats.h"
 #include "stats_file.h"
 #include "trace.h"
 #include "pscanf.h"
-
-static const char *stats_dir_path = "/var/log/tacc_stats"; /* XXX */
-static const char *stats_lock_path = "/var/lock/tacc_stats";
-static int stats_lock_fd = -1;
-static int stats_lock_timeout = 30;
 
 time_t current_time;
 char current_jobid[80] = "0";
@@ -25,9 +23,9 @@ static void alarm_handler(int sig)
 {
 }
 
-static int stats_lock(void)
+static int open_lock_timeout(const char *path, int timeout)
 {
-  int rc = -1;
+  int fd = -1;
   struct sigaction alarm_action = {
     .sa_handler = &alarm_handler,
   };
@@ -36,27 +34,32 @@ static int stats_lock(void)
     .l_whence = SEEK_SET,
   };
 
-  stats_lock_fd = open(stats_lock_path, O_CREAT|O_RDWR, 0600);
-  if (stats_lock_fd < 0) {
-    ERROR("cannot open `%s': %m\n", stats_lock_path);
-    goto out;
+  fd = open(path, O_CREAT|O_RDWR, 0600);
+  if (fd < 0) {
+    ERROR("cannot open `%s': %m\n", path);
+    goto err;
   }
 
   if (sigaction(SIGALRM, &alarm_action, NULL) < 0) {
     ERROR("cannot set alarm handler: %m\n");
-    goto out;
+    goto err;
   }
 
-  alarm(stats_lock_timeout);
+  alarm(timeout);
 
-  if (fcntl(stats_lock_fd, F_SETLKW, &lock) < 0) {
-    ERROR("cannot lock `%s': %m\n", stats_lock_path);
-    goto out;
+  if (fcntl(fd, F_SETLKW, &lock) < 0) {
+    ERROR("cannot lock `%s': %m\n", path);
+    goto err;
   }
-  rc = 0;
- out:
+
+  if (0) {
+  err:
+    if (fd >= 0)
+      close(fd);
+    fd = -1;
+  }
   alarm(0);
-  return rc;
+  return fd;
 }
 
 static void usage(void)
@@ -75,9 +78,14 @@ static void usage(void)
 
 int main(int argc, char *argv[])
 {
-  int rc = 0;
+  const char *lock_path = STATS_LOCK_PATH;
+  int lock_fd = -1;
+  int lock_timeout = 30;
+  const char *stats_dir_path = STATS_DIR_PATH;
+  char *stats_current_path = NULL; /* <stats_dir_path>/current */
+  char *stats_epoch_path = NULL; /* <stats_dir_path>/<EPOCH> */
   const char *mark = NULL;
-  char *stats_file_path = NULL; /* <stats_dir_path>/current */
+  int rc = 0;
 
   struct option opts[] = {
     { "help", 0, 0, 'h' },
@@ -105,8 +113,8 @@ int main(int argc, char *argv[])
   if (!(optind < argc))
     FATAL("must specify a command\n");
 
-  asprintf(&stats_file_path, "%s/current", stats_dir_path);
-  if (stats_file_path == NULL)
+  stats_current_path = strf("%s/current", stats_dir_path);
+  if (stats_current_path == NULL)
     FATAL("cannot create path: %m\n");
 
   const char *cmd_str = argv[optind];
@@ -131,23 +139,29 @@ int main(int argc, char *argv[])
   else
     FATAL("invalid command `%s'\n", cmd_str);
 
-  if (stats_lock() < 0)
+  lock_fd = open_lock_timeout(lock_path, lock_timeout);
+  if (lock_fd < 0)
     FATAL("cannot acquire lock\n");
 
   if (cmd == cmd_rotate) {
-    if (unlink(stats_file_path) < 0 && errno != ENOENT) {
-        ERROR("cannot unlink `%s': %m\n", stats_file_path);
+    if (unlink(stats_current_path) < 0 && errno != ENOENT) {
+        ERROR("cannot unlink `%s': %m\n", stats_current_path);
         rc = 1;
     }
     goto out;
   }
 
-  current_time = time(0);
+  current_time = time(NULL);
   pscanf(JOBID_PATH, "%79s", current_jobid);
   nr_cpus = sysconf(_SC_NPROCESSORS_ONLN);
 
+  if (mkdir(stats_dir_path, 0777) < 0) {
+    if (errno != EEXIST)
+      FATAL("cannot create directory `%s': %m\n", stats_dir_path);
+  }
+
   struct stats_file sf;
-  if (stats_file_open(&sf, stats_file_path) < 0) {
+  if (stats_file_open(&sf, stats_current_path) < 0) {
     rc = 1;
     goto out;
   }
@@ -156,15 +170,11 @@ int main(int argc, char *argv[])
   int select_all = cmd != cmd_collect || arg_count == 0;
 
   if (sf.sf_empty) {
-    time_t epoch = time(NULL);
-    char *link_path = NULL;
-    asprintf(&link_path, "%s/%ld", stats_dir_path, epoch);
-    if (link_path == NULL) {
+    stats_epoch_path = strf("%s/%ld", stats_dir_path, current_time);
+    if (stats_epoch_path == NULL)
       ERROR("cannot create path: %m\n");
-    } else if (link(stats_file_path, link_path) < 0) {
-      ERROR("cannot link `%s' to `%s': %m\n", stats_file_path, link_path);
-    }
-    free(link_path);
+    else if (link(stats_current_path, stats_epoch_path) < 0)
+      ERROR("cannot link `%s' to `%s': %m\n", stats_current_path, stats_epoch_path);
 
     enable_all = 1;
     select_all = 1;
