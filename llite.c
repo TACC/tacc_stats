@@ -74,7 +74,7 @@ static int sb_dict_init(struct dict *sb_dict)
   char me_buf[4096];
   while (getmntent_r(me_file, &me, me_buf, sizeof(me_buf)) != NULL) {
     int me_dir_fd = -1;
-    char me_lov_uuid[40];
+    char me_lov_uuid[40] = "";
 
     if (strcmp(me.mnt_type, "lustre") != 0)
       goto next;
