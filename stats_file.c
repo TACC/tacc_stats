@@ -250,6 +250,9 @@ int stats_file_close(struct stats_file *sf)
     ERROR("error closing `%s': %m\n", sf->sf_path);
     rc = -1;
   }
+  free(sf->sf_path);
+  free(sf->sf_mark);
+  memset(sf, 0, sizeof(struct stats_file));
 
   return rc;
 }
