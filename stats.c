@@ -1,7 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <limits.h>
 #include "stats.h"
 #include "trace.h"
 #include "dict.h"
@@ -51,22 +50,21 @@ void stats_type_destroy(struct stats_type *st)
   dict_destroy(&st->st_current_dict, &key_stats_destroy);
 }
 
-// static int name_to_type_cmp(const void *name, const void *memb)
-// {
-//   struct stats_type **type = (struct stats_type **) memb;
-
-//   return strcmp(name, (*type)->st_name);
-// }
-
 struct stats_type *name_to_type(const char *name)
 {
-//   return bsearch(name, type_table,
-//                  nr_stats_types, sizeof(type_table[0]),
-//                  &name_to_type_cmp);
-  int i;
-  for (i = 0; i < nr_stats_types; i++) {
-    if (strcmp(name, type_table[i]->st_name) == 0)
-      return type_table[i];
+  size_t begin = 0, end = nr_stats_types;
+
+  while (begin < end) {
+    size_t mid = begin + (end - begin) / 2;
+    struct stats_type *type = type_table[mid];
+
+    int cmp = strcmp(name, type->st_name);
+    if (cmp < 0)
+      end = mid;
+    else if (cmp > 0)
+      begin = mid + 1;
+    else
+      return type;
   }
 
   return NULL;
