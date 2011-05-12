@@ -35,8 +35,8 @@ install -m 0755 archive.sh %{buildroot}/%{_bindir}/%{name}_archive
   archive_hour=$(( (RANDOM %% 2) + 2 ))
 
   echo "MAILTO="
-  echo "55 11 * * * root %{_bindir}/%{name} rotate"
   echo "*/10 * * * * root %{_bindir}/%{name} collect"
+  echo "55 23 * * * root %{_bindir}/%{name} rotate"
   echo "${archive_min} ${archive_hour} * * * root %{_bindir}/%{name}_archive %{stats_dir} %{archive_dir}"
 ) > %{crontab_file}
 
