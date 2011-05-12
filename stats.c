@@ -19,6 +19,8 @@ struct stats_type *type_table[] = {
 
 static size_t nr_stats_types = sizeof(type_table) / sizeof(type_table[0]);
 
+static void stats_destroy(struct stats *stats);
+
 int stats_type_init(struct stats_type *st)
 {
   TRACE("type %s, schema_def `%s'\n", st->st_name, st->st_schema_def);
@@ -30,6 +32,23 @@ int stats_type_init(struct stats_type *st)
     return -1;
 
   return 0;
+}
+
+void key_stats_destroy(void *key)
+{
+  stats_destroy(key_to_stats(key));
+}
+
+void stats_type_destroy(struct stats_type *st)
+{
+  extern char _edata; /* XXX */
+  if (st->st_schema_def >= &_edata) {
+    free(st->st_schema_def);
+    st->st_schema_def = NULL;
+  }
+
+  schema_destroy(&st->st_schema);
+  dict_destroy(&st->st_current_dict, &key_stats_destroy);
 }
 
 // static int name_to_type_cmp(const void *name, const void *memb)
@@ -90,7 +109,7 @@ static struct stats *stats_create(struct stats_type *type, const char *dev)
   return NULL;
 }
 
-static void stats_free(struct stats *stats)
+static void stats_destroy(struct stats *stats)
 {
   free(stats->s_val);
   free(stats);
@@ -120,7 +139,7 @@ struct stats *get_current_stats(struct stats_type *type, const char *dev)
 
   if (dict_entry_set(&type->st_current_dict, de, hash, stats->s_dev) < 0) {
     ERROR("dict_entry_set: %m\n");
-    stats_free(stats);
+    stats_destroy(stats);
     return NULL;
   }
 
