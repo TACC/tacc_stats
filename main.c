@@ -80,7 +80,7 @@ int main(int argc, char *argv[])
 {
   int lock_fd = -1;
   int lock_timeout = 30;
-  char *current_path = NULL; /* STATS_DIR_PATH"/current" */
+  const char *current_path = STATS_DIR_PATH"/current";
   const char *mark = NULL;
   int rc = 0;
 
@@ -109,10 +109,6 @@ int main(int argc, char *argv[])
 
   if (!(optind < argc))
     FATAL("must specify a command\n");
-
-  current_path = strf("%s/current", STATS_DIR_PATH);
-  if (current_path == NULL)
-    FATAL("cannot create path: %m\n");
 
   const char *cmd_str = argv[optind];
   char **arg_list = argv + optind + 1;
@@ -223,6 +219,11 @@ int main(int argc, char *argv[])
 
   if (stats_file_close(&sf) < 0)
     rc = 1;
+
+  /* Cleanup. */
+  i = 0;
+  while ((type = stats_type_for_each(&i)) != NULL)
+    stats_type_destroy(type);
 
  out:
   return rc;
