@@ -179,7 +179,7 @@ int main(int argc, char *argv[])
   if (cmd == cmd_collect) {
     /* If arg_count is zero then we select all below. */
     for (i = 0; i < arg_count; i++) {
-      type = name_to_type(arg_list[i]);
+      type = stats_type_get(arg_list[i]);
       if (type == NULL) {
         ERROR("unknown type `%s'\n", arg_list[i]);
         continue;

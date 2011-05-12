@@ -50,7 +50,7 @@ void stats_type_destroy(struct stats_type *st)
   dict_destroy(&st->st_current_dict, &key_stats_destroy);
 }
 
-struct stats_type *name_to_type(const char *name)
+struct stats_type *stats_type_get(const char *name)
 {
   size_t begin = 0, end = nr_stats_types;
 

@@ -74,7 +74,7 @@ static int sf_rd_hdr(struct stats_file *sf)
       goto err;
     }
 
-    struct stats_type *type = name_to_type(name);
+    struct stats_type *type = stats_type_get(name);
     if (type == NULL) {
       ERROR("%s:%d: unknown type `%s'\n", sf->sf_path, nr, name);
       goto err;
