@@ -29,6 +29,7 @@ static inline struct schema_entry *key_to_schema_entry(const char *key)
 }
 
 int schema_init(struct schema *sc, const char *def);
+void schema_destroy(struct schema *sc);
 
 static inline int schema_ref(struct schema *sc, const char *key)
 {

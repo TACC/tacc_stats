@@ -103,3 +103,17 @@ int schema_init(struct schema *sc, const char *def)
   free(cpy);
   return rc;
 }
+
+void schema_destroy(struct schema *sc)
+{
+  size_t i;
+  for (i = 0; i < sc->sc_len; i++) {
+    struct schema_entry *se = sc->sc_ent[i];
+    free(se->se_unit);
+    free(se->se_desc);
+    free(se);
+  }
+  free(sc->sc_ent);
+  dict_destroy(&sc->sc_dict, NULL);
+  memset(sc, 0, sizeof(struct schema));
+}
