@@ -3,8 +3,8 @@ version = 1.0.0
 stats_dir = /var/log/tacc_stats
 stats_lock = /var/lock/tacc_stats
 jobid_file = /var/run/TACC_jobid
-config = ./config
--include config
+config = config
+-include $(config)
 
 CC = gcc
 CFLAGS = -Wall -Werror -O3 # -DDEBUG
@@ -23,7 +23,7 @@ $(name): $(OBJS)
 
 stats.o: stats.x
 
-stats.x: config
+stats.x: $(config)
 	echo '$(patsubst %,X(%),$(sort $(TYPES)))' > stats.x
 
 -include $(OBJS:%.o=.%.d)
