@@ -20,7 +20,7 @@ static inline char *wsep(char **ref)
 
 static inline char *strf(const char *fmt, ...)
 {
-  char *str;
+  char *str = NULL;
   va_list args;
 
   va_start(args, fmt);
