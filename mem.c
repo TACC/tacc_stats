@@ -10,8 +10,6 @@
 #include "collect.h"
 #include "trace.h"
 
-/* TODO Move numastat to its own file, or remove completely. */
-
 // i182-101# cat /sys/devices/system/node/node0/meminfo
 //
 // Node 0 MemTotal:      8220940 kB
@@ -34,14 +32,6 @@
 // Node 0 Slab:           294400 kB
 // Node 0 HugePages_Total:     0
 // Node 0 HugePages_Free:      0
-
-// # cat /sys/devices/system/node/node0/numastat
-// numa_hit 24972369
-// numa_miss 41182663
-// numa_foreign 12112910
-// interleave_hit 49948
-// local_node 24910136
-// other_node 41244896
 
 /* On 2.6.18-194.32.1 files in /dev/shm show up as FilePages in
    nodeN/meminfo and as Cached in /proc/meminfo. */
@@ -69,13 +59,7 @@
   X(Bounce, "U=KB", ""), \
   X(Slab, "U=KB", ""), \
   X(HugePages_Total, "", ""), \
-  X(HugePages_Free, "", ""), \
-  X(numa_hit, "E", ""), \
-  X(numa_miss, "E", ""), \
-  X(numa_foreign, "E", ""), \
-  X(interleave_hit, "E", ""), \
-  X(local_node, "E", ""), \
-  X(other_node, "E", "")
+  X(HugePages_Free, "", "")
 
 static void collect_meminfo_node(struct stats *stats, const char *node)
 {
@@ -111,14 +95,6 @@ static void collect_meminfo_node(struct stats *stats, const char *node)
     fclose(file);
 }
 
-static void collect_numastat_node(struct stats *stats, const char *node)
-{
-  char path[80];
-
-  snprintf(path, sizeof(path), "/sys/devices/system/node/node%s/numastat", node);
-  collect_key_value_file(stats, path);
-}
-
 static void collect_mem(struct stats_type *type)
 {
   const char *dir_path = "/sys/devices/system/node";
@@ -144,7 +120,6 @@ static void collect_mem(struct stats_type *type)
       continue;
 
     collect_meminfo_node(stats, node);
-    collect_numastat_node(stats, node);
   }
 
  out:
