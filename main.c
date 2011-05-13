@@ -168,7 +168,7 @@ int main(int argc, char *argv[])
       ERROR("cannot create path: %m\n");
     else if (link(current_path, link_path) < 0)
       ERROR("cannot link `%s' to `%s': %m\n", current_path, link_path);
-
+    free(link_path);
     enable_all = 1;
     select_all = 1;
   }
