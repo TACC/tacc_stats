@@ -50,7 +50,7 @@ struct schema_entry *parse_schema_entry(char *str)
       break;
     case 'W':
       if (opt_arg != NULL)
-        se->se_width = strtoul(opt + 1, NULL, 0);
+        se->se_width = strtoul(opt_arg, NULL, 0);
       break;
     }
   }
