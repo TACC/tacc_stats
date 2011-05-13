@@ -3,33 +3,21 @@
 #include "trace.h"
 #include "collect.h"
 
-/* TODO Trim this down. */
-
 #define KEYS \
   X(pgpgin, "E", ""), \
   X(pgpgout, "E", ""), \
   X(pswpin, "E", ""), \
   X(pswpout, "E", ""), \
-  X(pgalloc_high, "E", ""), \
   X(pgalloc_normal, "E", ""), \
-  X(pgalloc_dma, "E", ""), \
   X(pgfree, "E", ""), \
   X(pgactivate, "E", ""), \
   X(pgdeactivate, "E", ""), \
   X(pgfault, "E", ""), \
   X(pgmajfault, "E", ""), \
-  X(pgrefill_high, "E", ""), \
   X(pgrefill_normal, "E", ""), \
-  X(pgrefill_dma, "E", ""), \
-  X(pgsteal_high, "E", ""), \
   X(pgsteal_normal, "E", ""), \
-  X(pgsteal_dma, "E", ""), \
-  X(pgscan_kswapd_high, "E", ""), \
   X(pgscan_kswapd_normal, "E", ""), \
-  X(pgscan_kswapd_dma, "E", ""), \
-  X(pgscan_direct_high, "E", ""), \
   X(pgscan_direct_normal, "E", ""), \
-  X(pgscan_direct_dma, "E", ""), \
   X(pginodesteal, "E", ""), \
   X(slabs_scanned, "E", ""), \
   X(kswapd_steal, "E", ""), \
