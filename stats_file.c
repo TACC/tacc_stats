@@ -16,7 +16,7 @@
 #define SF_SCHEMA_CHAR '!'
 #define SF_MARK_CHAR '^'
 #define SF_DEVICES_CHAR '@'
-/*#define SF_PROPERTY_CHAR '$' */
+#define SF_PROPERTY_CHAR '$'
 
 #define sf_printf(sf, fmt, args...) fprintf(sf->sf_file, fmt, ##args)
 
@@ -119,10 +119,10 @@ static int sf_wr_hdr(struct stats_file *sf)
 
   sf_printf(sf, "%c%s %s\n", SF_COMMENT_CHAR, STATS_PROGRAM, STATS_VERSION);
 
-  sf_printf(sf, "%chostname %s\n", SF_COMMENT_CHAR, uts_buf.nodename);
-  sf_printf(sf, "%cuname %s %s %s %s\n", SF_COMMENT_CHAR, uts_buf.sysname,
+  sf_printf(sf, "%chostname %s\n", SF_PROPERTY_CHAR, uts_buf.nodename);
+  sf_printf(sf, "%cuname %s %s %s %s\n", SF_PROPERTY_CHAR, uts_buf.sysname,
             uts_buf.machine, uts_buf.release, uts_buf.version);
-  sf_printf(sf, "%cuptime %llu\n", SF_COMMENT_CHAR, uptime);
+  sf_printf(sf, "%cuptime %llu\n", SF_PROPERTY_CHAR, uptime);
 
   size_t i = 0;
   struct stats_type *type;
