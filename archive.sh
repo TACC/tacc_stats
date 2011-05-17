@@ -19,7 +19,7 @@ if ! [ -d $stats_dir ]; then
     exit 1
 fi
 
-if ! [ -d $host_dir ]; then
+if ! [ -d $host_dir ] && ! mkdir $host_dir; then
     exit 1
 fi
 
