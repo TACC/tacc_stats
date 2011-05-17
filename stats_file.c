@@ -12,11 +12,11 @@
 #include "pscanf.h"
 #include "string1.h"
 
-#define SF_COMMENT_CHAR '#'
 #define SF_SCHEMA_CHAR '!'
-#define SF_MARK_CHAR '^'
 #define SF_DEVICES_CHAR '@'
+#define SF_COMMENT_CHAR '#'
 #define SF_PROPERTY_CHAR '$'
+#define SF_MARK_CHAR '%'
 
 #define sf_printf(sf, fmt, args...) fprintf(sf->sf_file, fmt, ##args)
 
@@ -59,37 +59,32 @@ static int sf_rd_hdr(struct stats_file *sf)
     nr++;
     line = line_buf;
 
-    int c = *(line++);
-    if (c == '\n')
+    char *first = wsep(&line);
+    if (first == NULL)
       break; /* End of header. */
 
-    if (c == SF_COMMENT_CHAR)
-      continue;
-
-    /* Otherwise line is a directive to be processed by a type. */
-    char *name = wsep(&line);
-    if (name == NULL || line == NULL) {
-      line = "";
-      ERROR("%s:%d: bad directive `%c%s %s'\n", sf->sf_path, nr, c, name, line);
-      goto err;
-    }
-
-    struct stats_type *type = stats_type_get(name);
-    if (type == NULL) {
-      ERROR("%s:%d: unknown type `%s'\n", sf->sf_path, nr, name);
-      goto err;
-    }
-
-    TRACE("%s:%d: c %c, name %s, rest %s\n", sf->sf_path, nr, c, name, line);
-    switch (c) {
+    struct stats_type *type;
+    TRACE("%s:%d: first `%s', rest `%s'\n", sf->sf_path, nr, first, line);
+    switch (*first) {
     case SF_SCHEMA_CHAR:
+      type = stats_type_get(first + 1);
+      if (type == NULL) {
+        ERROR("%s:%d: unknown type `%s'\n", sf->sf_path, nr, first + 1);
+        goto err;
+      }
       type->st_schema_def = strdup(line);
       type->st_enabled = 1;
       break;
     case SF_DEVICES_CHAR: /* TODO. */
       break;
+    case SF_COMMENT_CHAR:
+      break;
+    case SF_PROPERTY_CHAR:
+      break;
+    case SF_MARK_CHAR:
+      break;
     default:
-      ERROR("%s:%d: bad directive `%c%s %s'\n", sf->sf_path, nr, c, name, line);
+      ERROR("%s:%d: bad directive `%s %s'\n", sf->sf_path, nr, first, line);
       goto err;
     }
   }
