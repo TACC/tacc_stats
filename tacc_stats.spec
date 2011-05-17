@@ -8,10 +8,10 @@ Group: System Environment/Base
 Packager: TACC - jhammond@tacc.utexas.edu
 Source: %{name}-%{version}.tar.gz
 BuildRoot: %{_tmppath}/%{name}-%{version}-%{release}-root
-%define _bindir /opt/%{name}/%{version}
+%define _bindir /opt/%{name}
 %define crontab_file /etc/cron.d/%{name}
 %define stats_dir /var/log/tacc_stats
-%define archive_dir /scratch/projects/%{name}/%{version}
+%define archive_dir /scratch/projects/%{name}/archive
 
 %description
 This package provides the tacc_stats command, along with a cron file
@@ -53,5 +53,6 @@ fi
 rm -rf %{buildroot}
 
 %files
+%attr(0755,root,root) %{_bindir}
 %attr(6755,root,root) %{_bindir}/%{name}
 %attr(0755,root,root) %{_bindir}/%{name}_archive
