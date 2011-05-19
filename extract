@@ -1,25 +1,36 @@
 #!/usr/bin/python
 #tacc_stats_extract
-import sys, string, time
+import sys, signal, string, time
+signal.signal(signal.SIGPIPE, signal.SIG_DFL)
 
 prog = sys.argv[0]
 stats_file = sys.stdin
-time_fmt = "%b %d %H:%M"
+# time_fmt = "%b %d %H:%M"
+time_fmt = "%s"
+opt_format_size = False
+opt_print_mark = False
+hostname = "-"
+opt_short_hostname = True
+header_props = {}
 
-SF_COMMENT_CHAR = '#'
 SF_SCHEMA_CHAR = '!'
-SF_MARK_CHAR = '^'
 SF_DEVICES_CHAR = '@'
+SF_COMMENT_CHAR = '#'
 SF_PROPERTY_CHAR = '$'
+SF_MARK_CHAR = '%'
 
 def trace(fmt, *args):
-    sys.stderr.write(("%s: " + fmt) % ((prog,) + args))
+    # msg = fmt % args
+    # sys.stderr.write(prog + ": " + msg)
+    pass
 
 def error(fmt, *args):
-    sys.stderr.write(("%s: " + fmt) % ((prog,) + args))
+    msg = fmt % args
+    sys.stderr.write(prog + ": " + msg)
     
 def fatal(fmt, *args):
-    error(fmt, args)
+    msg = fmt % args
+    sys.stderr.write(prog + ": " + msg)
     sys.exit(1)
 
 if len(sys.argv) < 2:
@@ -38,9 +49,9 @@ def skip_type(type):
 def skip_dev(type, dev):
     return type != TYPE_ARG or (dev_dict and dev not in dev_dict)
 
-key_list = None
+KEY_LIST = None
 if len(sys.argv) > 3:
-    key_list = sys.argv[3:]
+    KEY_LIST = sys.argv[3:]
 
 # Read header.
 schema_def = None
@@ -52,11 +63,19 @@ for line in stats_file:
         break # Invalid.
     elif rec[0] == SF_SCHEMA_CHAR + TYPE_ARG:
         schema_def = rec[1:]
+    elif rec[0][0] == SF_PROPERTY_CHAR:
+        header_props[rec[0][1:]] = string.join(rec[1:])
+
+hostname = header_props.get("hostname", "-")
+if opt_short_hostname:
+    hostname = hostname.split(".")[0]
 
 if not schema_def:
     fatal("unknown type `%s'\n", TYPE_ARG)
 
 def format_size(v, u):
+    if not opt_format_size:
+        return (v, "")
     m = ""
     if abs(v) >= 1L << 30:
         v /= 1L << 30 
@@ -142,30 +161,41 @@ for ent_def in schema_def:
     schema_dict[ent.key] = schema_len
     schema_len += 1
 
-if key_list:
+if KEY_LIST:
     index_list = []
-    for key in key_list:
-        if not key in schema_dict:
-            fatal("unrecognized key `%s'\n", key)
-        index_list.append(schema_dict[key])
+    for key in KEY_LIST:
+        i = schema_dict.get(key, None)
+        if not i:
+            # Try to get a good partial match.
+            match_list = []
+            for (s_key, s_index) in schema_dict.iteritems():
+                if s_key[0:len(key)] == key:
+                    i = s_index
+                    match_list.append(s_key)
+            if len(match_list) == 0:
+                fatal("unrecognized key `%s'\n", key)
+            elif len(match_list) > 1:
+                fatal("ambiguous key specification `%s': possible completions are `%s'\n",
+                      key, string.join(match_list, ", "))
+        index_list.append(i)
 else:
     index_list = range(0, schema_len)
 
 trace("type: `%s'\n", TYPE_ARG)
 trace("dev_dict: %s\n", dev_dict)
-trace("key_list: %s\n", key_list)
+trace("key_list: %s\n", KEY_LIST)
 trace("schema_ent: %s\n", schema_ent)
 trace("schema_dict: %s\n", schema_dict)
 trace("index_list: %s\n", index_list)
 
 curr_time = 0L
 curr_time_str = time.strftime(time_fmt, time.localtime(curr_time))
-curr_jobid = None
+curr_jobid = "-"
 prev_time_dict = {}
 prev_vals_dict = {}
 
 def emit_prefix(type, dev):
-    print "%s %-10s" % (curr_time_str, dev),
+    print "%s\t%s\t%s\t%s" % (curr_time_str, curr_jobid, hostname, dev),
 
 def handle_stats(stype, rest):
     if skip_type(stype):
@@ -187,12 +217,12 @@ def handle_stats(stype, rest):
         emit_prefix(stype, dev)
         for i in index_list:
             (v, u) = schema_ent[i].format(prev_vals[i], curr_vals[i], t0, t1)
-            print "%8.3f %-2s" % (v, u),
+            # print "%10.3f %-2s" % (v, u),
+            print "\t%d" % (long(v),),
         print
     prev_time_dict[dev] = curr_time
     prev_vals_dict[dev] = curr_vals
 
-opt_print_mark = False
 def handle_mark(str, rest):
     if opt_print_mark:
         print "%s MARK %s %s" % (curr_time_str, str, string.join(rest))
@@ -209,6 +239,8 @@ for line in stats_file:
         curr_time = long(rec[0])
         curr_time_str = time.strftime(time_fmt, time.localtime(curr_time))
         # TODO jobid.
+        if len(rec) > 1:
+            curr_jobid = rec[1]
     elif c.isalpha():
         handle_stats(rec[0], rec[1:])
     elif c == SF_COMMENT_CHAR:
