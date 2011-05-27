@@ -59,4 +59,4 @@ if [ -z "$job_host_file" ]; then
 fi
 trace "job_host_file '$job_host_file'"
 
-echo "$job_begin $job_end $job_host_file"
+echo $job_begin $job_end $(cat $job_host_file)
