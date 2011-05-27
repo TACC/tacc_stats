@@ -1,0 +1,62 @@
+#!/bin/bash
+
+prog="$(basename $0)"
+accounting_file=/share/sge6.2/default/common/accounting
+hostfile_dir=/share/sge6.2/default/tacc/hostfile_logs
+
+trace() {
+    if [ -n "$DEBUG" ]; then
+        echo "$1" >&2
+    fi
+}
+
+fatal() {
+    echo "$1" >&2
+    exit 1
+}
+
+jobid=$1
+if [ -z "$jobid" ]; then
+    fatal "$prog: must specify a jobid"
+fi
+
+# Some interesting accounting file fields.
+# $1 queue
+# $4 owner
+# $5 job_name
+# $6 jobid
+# $10 start_time
+# $11 end_time
+# $34 granted_pe
+# $35 slots
+
+set -- $(awk -F : -v jobid=$jobid '
+$6 == jobid {
+  print $10, strftime("%Y/%m/%d", $10), $11;
+  exit 0;
+}' $accounting_file)
+job_begin="$1" yyyy_mm_dd="$2" job_end="$3"
+
+if [ -z "$job_begin" ]; then
+     fatal "$prog: cannot find accounting data for job $jobid"
+fi
+trace "job_begin '$job_begin', yyyy_mm_dd '$yyyy_mm_dd', job_end '$job_end'"
+
+# Find the hostfile written during the prolog.  For example:
+# /share/sge6.2/default/tacc/hostfile_logs/2011/05/19/prolog_hostfile.1957000.IV32627
+# TODO May need to try day before or after on failure.
+
+job_host_file=""
+for host_file in $hostfile_dir/$yyyy_mm_dd/prolog_hostfile.$jobid.*; do
+    if [ -e "$host_file" ]; then
+        job_host_file="$host_file"
+        break
+    fi
+done
+
+if [ -z "$job_host_file" ]; then
+    fatal "$prog: cannot find host file for job $jobid"
+fi
+trace "job_host_file '$job_host_file'"
+
+echo "$job_begin $job_end $job_host_file"
