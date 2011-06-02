@@ -1,7 +1,11 @@
 # Based on coreutils human_readable()
 
 def human_readable(amt):
-    amt = int(amt)
+    amt = long(amt)
+    sign = ""
+    if amt < 0:
+        sign = "-"
+        amt = - amt
     fraction = ""
     prefix_letters = "KMGTPEZY"
     exponent_max = len(prefix_letters)
@@ -48,4 +52,4 @@ def human_readable(amt):
     prefix = ""
     if exponent > 0:
         prefix = prefix_letters[exponent - 1]
-    return str(amt) + fraction + prefix
+    return sign + str(amt) + fraction + prefix
