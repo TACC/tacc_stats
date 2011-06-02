@@ -137,10 +137,23 @@ static int begin_pmc_cpu(char *cpu, uint64_t events[], size_t nr_events)
   | ((event_select & 0xF00) << 24) \
   )
 
+/* From the 10h BKDG, p. 403, "The performance counter registers can
+   be used to track events in the Northbridge. Northbridge events
+   include all memory controller events, crossbar events, and
+   HyperTransportTM interface events as documented in 3.14.7, 3.14.8,
+   and 3.14.9. Monitoring of Northbridge events should only be
+   performed by one core.  If a Northbridge event is selected using
+   one of the Performance Event-Select registers in any core of a
+   multi-core processor, then a Northbridge performance event cannot
+   be selected in the same Performance Event Select register of any
+   other core. */
+
+/* Northbridge events. */
 #define DRAMaccesses   PERF_EVENT(0xE0, 0x07) /* DCT0 only */
 #define HTlink0Use     PERF_EVENT(0xF6, 0x37) /* Counts all except NOPs */
 #define HTlink1Use     PERF_EVENT(0xF7, 0x37) /* Counts all except NOPs */
 #define HTlink2Use     PERF_EVENT(0xF8, 0x37) /* Counts all except NOPs */
+/* Core events. */
 #define UserCycles    (PERF_EVENT(0x76, 0x00) & ~(1UL << 17))
 #define DCacheSysFills PERF_EVENT(0x42, 0x01) /* Counts DCache fills from beyond the L2 cache. */
 #define SSEFLOPS       PERF_EVENT(0x03, 0x7F) /* Counts single & double, add, multiply, divide & sqrt FLOPs. */
@@ -150,10 +163,10 @@ static int begin_pmc(struct stats_type *type)
   int nr = 0;
 
   uint64_t events[4][4] = {
-    { DRAMaccesses, UserCycles, DCacheSysFills, SSEFLOPS, },
-    { HTlink0Use, UserCycles, DCacheSysFills, SSEFLOPS, },
-    { HTlink1Use, UserCycles, DCacheSysFills, SSEFLOPS, },
-    { HTlink2Use, UserCycles, DCacheSysFills, SSEFLOPS, },
+    { DRAMaccesses, UserCycles,     DCacheSysFills, SSEFLOPS, },
+    { UserCycles,   HTlink0Use,     DCacheSysFills, SSEFLOPS, },
+    { UserCycles,   DCacheSysFills, HTlink1Use,     SSEFLOPS, },
+    { UserCycles,   DCacheSysFills, SSEFLOPS,       HTlink2Use, },
   };
 
   int i;
