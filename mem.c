@@ -45,10 +45,6 @@
   X(MemUsed, "U=KB", ""), \
   X(Active, "U=KB", ""), \
   X(Inactive, "U=KB", ""), \
-  X(HighTotal, "U=KB", ""), \
-  X(HighFree, "U=KB", ""), \
-  X(LowTotal, "U=KB", ""), \
-  X(LowFree, "U=KB", ""), \
   X(Dirty, "U=KB", ""), \
   X(Writeback, "U=KB", ""), \
   X(FilePages, "U=KB", ""), \
