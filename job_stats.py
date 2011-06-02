@@ -61,6 +61,7 @@ user_cycles = amd64_perf_event(0x76, 0x00) & ~(1L << 17)
 dcache_sys_fills = amd64_perf_event(0x42, 0x01)
 sse_flops = amd64_perf_event(0x03, 0x7F)
 
+# TODO Use setdefault
 # TODO se_'ify members.
 class SchemaEnt:
     def __init__(self, index, ent_spec):
@@ -129,9 +130,7 @@ class RecordGroup(object):
     def add_record(self, name, dev, va):
         sc = self.host.sc_dict[name]
         # Check that len(vals) == len(schema)
-        st = self.st_dict.get(name)
-        if not st:
-            self.st_dict[name] = st = {}
+        st = self.st_dict.setdefault(name, {})
         st[dev] = rec = Record()
         dh = self.host.dev_hist.get((name, dev))
         if not dh:
@@ -243,6 +242,7 @@ class JobHost(object):
                 pass
             elif c == SF_MARK_CHAR:
                 mark = line[1:].strip()
+                # TODO Move check for end mark to __init__.
                 if mark == "end %s" % self.job.id:
                     self.end_mark = True
                 group.add_mark(mark)
@@ -262,12 +262,14 @@ class JobStats(object):
         self.begin = None
         self.end = None
         self.hosts = []
-        self.summary_cache = None
+        self.bad_hosts = []
+        self.summary = {}
         # Get job begin, end, and hosts.
-        info_proc = subprocess.Popen([job_info_cmd, self.id], stdout=subprocess.PIPE)
+        info_proc = subprocess.Popen([job_info_cmd, self.id], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         info_proc_out, info_proc_err = info_proc.communicate()
         info = info_proc_out.split()
         if len(info) < 2 or not info[0].isdigit() or not info[1].isdigit():
+            # FIXME Prints "cannot get info for job `1971376': tacc_job_info: cannot find accounting data for job 1971376".
             error("cannot get info for job `%s': %s\n", self.id, info_proc_err.strip())
             return
         if len(info) == 2:
@@ -276,26 +278,30 @@ class JobStats(object):
         self.begin = long(info[0])
         self.end = long(info[1])
         trace("jobid `%s', begin %d, end %d\n", self.id, self.begin, self.end)
-        for host in info[2:]:
-            self.hosts.append(JobHost(self, host))
-    def summary(self):
+        for host_name in info[2:]:
+            host = JobHost(self, host_name)
+            if host.end_mark:
+                self.hosts.append(host)
+            else:
+                self.bad_hosts.append(host)
+        # Create job summary.
         def sum_event(type, key):
             return sum(v.__dict__[key] for h in self.hosts for v in h.record_groups[-1].st_dict[type].values())
-        if not self.summary_cache:
-            sc = self.summary_cache = {}
-            sc["nr_collects"] = sum(len(h.record_groups) for h in self.hosts)
-            sc["user_cycles"] = sum_event("amd64_pmc", "CTR1")
-            sc["dcache_sys_fills"] = sum_event("amd64_pmc", "CTR2")
-            sc["sse_flops"] = sum_event("amd64_pmc", "CTR3")
-            sc["user_ticks"] = sum_event("cpu", "user")
-            sc["system_ticks"] = sum_event("cpu", "system")
-            sc["idle_ticks"] = sum_event("cpu", "idle")
-            sc["nr_forks"] = sum_event("ps", "processes")
-            sc["nr_ctxt_sw"] = sum_event("ps", "ctxt")
-            for key in "tx_bytes", "rx_bytes":
-                sc["lnet:" + key] = sum_event("lnet", key)
-            for key in "open", "close", "read_bytes", "write_bytes":
-                sc["llite:" + key] = sum_event("llite", key)
+        self.summary["nr_collects"] = sum(len(h.record_groups) for h in self.hosts)
+        self.summary["user_cycles"] = sum_event("amd64_pmc", "CTR1")
+        self.summary["dcache_sys_fills"] = sum_event("amd64_pmc", "CTR2")
+        self.summary["sse_flops"] = sum_event("amd64_pmc", "CTR3")
+        self.summary["user_ticks"] = sum_event("cpu", "user")
+        self.summary["system_ticks"] = sum_event("cpu", "system")
+        self.summary["idle_ticks"] = sum_event("cpu", "idle")
+        self.summary["nr_forks"] = sum_event("ps", "processes")
+        self.summary["nr_ctxt_sw"] = sum_event("ps", "ctxt")
+        for key in "tx_bytes", "rx_bytes":
+            self.summary["lnet:" + key] = sum_event("lnet", key)
+        for key in "open", "close", "read_bytes", "write_bytes":
+            self.summary["llite:" + key] = sum_event("llite", key)
+    #
+    def print_summary(self):
         def pr(key, val):
             print key.ljust(40, '.'), val
         pr("jobid", self.id)
@@ -305,8 +311,9 @@ class JobStats(object):
         d1 = datetime.datetime.fromtimestamp(self.end)
         pr("run_time", str(d1 - d0))
         pr("nr_hosts", len(self.hosts))
+        # slots, pe_way
         # "nr_cores"
-        for key, val in self.summary_cache.iteritems():
+        for key, val in self.summary.iteritems():
             pr(key, val)
 
 # if __name__ == "main":
