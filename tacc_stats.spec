@@ -1,6 +1,6 @@
 Summary: TACC system statistics collector
 Name: tacc_stats
-Version: 1.0.1
+Version: 1.0.2
 Release: 0
 Copyright: University of Texas at Austin
 Vendor: TACC/Ranger

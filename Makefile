@@ -1,5 +1,5 @@
 name = tacc_stats
-version = 1.0.1
+version = 1.0.2
 stats_dir = /var/log/tacc_stats
 stats_lock = /var/lock/tacc_stats
 jobid_file = /var/run/TACC_jobid
