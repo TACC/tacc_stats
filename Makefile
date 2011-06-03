@@ -4,7 +4,6 @@ stats_dir = /var/log/tacc_stats
 stats_lock = /var/lock/tacc_stats
 jobid_file = /var/run/TACC_jobid
 config = config
--include $(config)
 
 CC = gcc
 CFLAGS = -Wall -Werror -O3 # -DDEBUG
@@ -14,6 +13,8 @@ CPPFLAGS = -D_GNU_SOURCE \
  -DSTATS_DIR_PATH=\"$(stats_dir)\" \
  -DSTATS_LOCK_PATH=\"$(stats_lock)\" \
  -DJOBID_FILE_PATH=\"$(jobid_file)\"
+
+-include $(config)
 
 OBJS = main.o stats.o dict.o collect.o schema.o stats_file.o
 OBJS += $(patsubst %,%.o,$(TYPES))
