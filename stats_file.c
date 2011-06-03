@@ -35,7 +35,7 @@ static int sf_rd_hdr(struct stats_file *sf)
   }
 
   line = line_buf;
-  if (*(line++) != SF_COMMENT_CHAR) {
+  if (*(line++) != SF_PROPERTY_CHAR) {
     ERROR("file `%s' is not in %s format\n", sf->sf_path, STATS_PROGRAM);
     goto err;
   }
@@ -112,7 +112,7 @@ static int sf_wr_hdr(struct stats_file *sf)
   uname(&uts_buf);
   pscanf("/proc/uptime", "%llu", &uptime);
 
-  sf_printf(sf, "%c%s %s\n", SF_COMMENT_CHAR, STATS_PROGRAM, STATS_VERSION);
+  sf_printf(sf, "%c%s %s\n", SF_PROPERTY_CHAR, STATS_PROGRAM, STATS_VERSION);
 
   sf_printf(sf, "%chostname %s\n", SF_PROPERTY_CHAR, uts_buf.nodename);
   sf_printf(sf, "%cuname %s %s %s %s\n", SF_PROPERTY_CHAR, uts_buf.sysname,
