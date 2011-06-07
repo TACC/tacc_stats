@@ -1,17 +1,7 @@
-#!/usr/bin/python
+#!/opt/apps/python/2.7.1/bin/python
 #tacc_stats_extract
-import sys, signal, string, time
+import argparse, os, signal, string, sys, time
 signal.signal(signal.SIGPIPE, signal.SIG_DFL)
-
-prog = sys.argv[0]
-stats_file = sys.stdin
-# time_fmt = "%b %d %H:%M"
-time_fmt = "%s"
-opt_format_size = False
-opt_print_mark = False
-hostname = "-"
-opt_short_hostname = True
-header_props = {}
 
 SF_SCHEMA_CHAR = '!'
 SF_DEVICES_CHAR = '@'
@@ -19,10 +9,30 @@ SF_COMMENT_CHAR = '#'
 SF_PROPERTY_CHAR = '$'
 SF_MARK_CHAR = '%'
 
+prog = os.path.basename(sys.argv[0])
+
+opt_parser = argparse.ArgumentParser(description="Extract data from stats file(s).", prog=prog)
+# epilog=""
+opt_parser.add_argument("-j", "--jobid", dest="jobid")
+opt_parser.add_argument("-f", "--fqdn", "--full-hostname", action="store_true", dest="fqdn")
+opt_parser.add_argument("-m", "--marks", action="store_true", dest="marks")
+opt_parser.add_argument("-t", "--time-fmt", metavar="FMT", dest="time_fmt", default="%b %d %H:%M:%S")
+opt_parser.add_argument("-v", "--verbose", action="store_true", dest="verbose")
+# prefix time,host,jobid,type,dev
+# fs, rs
+# size_format
+
+(opt, args) = opt_parser.parse_known_args()
+spec_args = args
+path_list = []
+if "--" in args:
+    spec_args = args[:args.index("--")]
+    path_list = args[args.index("--") + 1:]
+
 def trace(fmt, *args):
-    # msg = fmt % args
-    # sys.stderr.write(prog + ": " + msg)
-    pass
+    if opt.verbose:
+        msg = fmt % args
+        sys.stderr.write(prog + ": " + msg)
 
 def error(fmt, *args):
     msg = fmt % args
@@ -33,220 +43,94 @@ def fatal(fmt, *args):
     sys.stderr.write(prog + ": " + msg)
     sys.exit(1)
 
-if len(sys.argv) < 2:
+trace("args: `%s'\n", args)
+trace("opt: `%s'\n", opt)
+trace("spec_args: `%s'\n", spec_args)
+trace("path_list: `%s'\n", path_list)
+
+if len(spec_args) == 0:
     fatal("must specify a type\n")
-TYPE_ARG = sys.argv[1]
 
-dev_dict = None
-if len(sys.argv) > 2 and sys.argv[2] != '-':
-    dev_dict = {}
-    for dev in sys.argv[2].split(','):
-        dev_dict[dev] = True
+extract_type = spec_args[0]
+extract_devs = None
+extract_keys = None
 
-def skip_type(type):
-    return type != TYPE_ARG
+if len(spec_args) >= 2 and spec_args[1] != '-':
+    extract_devs = {}
+    for dev in spec_args[1].split(','):
+        extrace_devs[dev] = True
 
-def skip_dev(type, dev):
-    return type != TYPE_ARG or (dev_dict and dev not in dev_dict)
+if len(spec_args) > 2:
+    extract_keys = spec_args[2:]
 
-KEY_LIST = None
-if len(sys.argv) > 3:
-    KEY_LIST = sys.argv[3:]
+class StatsType:
+    def __init__(name):
+        self.name = name
+    def schema_init(spec):
+        pass
+    def handle(host, time, jobid, dev, vals):
+        pass
 
-# Read header.
-schema_def = None
-for line in stats_file:
-    rec = line.split()
-    if len(rec) == 0:
-        break # end_header()
-    elif rec[0][0].isalnum():
-        break # Invalid.
-    elif rec[0] == SF_SCHEMA_CHAR + TYPE_ARG:
-        schema_def = rec[1:]
-    elif rec[0][0] == SF_PROPERTY_CHAR:
-        header_props[rec[0][1:]] = string.join(rec[1:])
+def handle_mark(host, time, jobid, str):
+    pass # TODO
 
-hostname = header_props.get("hostname", "-")
-if opt_short_hostname:
-    hostname = hostname.split(".")[0]
-
-if not schema_def:
-    fatal("unknown type `%s'\n", TYPE_ARG)
-
-def format_size(v, u):
-    if not opt_format_size:
-        return (v, "")
-    m = ""
-    if abs(v) >= 1L << 30:
-        v /= 1L << 30 
-        m = 'G'
-    elif abs(v) >= 1L << 20:
-        v /= 1L << 20
-        m = 'M'
-    elif abs(v) >= 1L << 10:
-        v /= 1L << 10
-        m = 'K'
-    return (v, m + u)
-
-def parse_size(str):
-    v = 1.0
-    i = 0
-    while str[i].isdigit() or str[i] == '.':
-        i = i + 1
-    if i > 0:
-        v = float(str[0:i])
-    if str[i] == 'G':
-        v *= 1L << 30
-        i += 1
-    elif str[i] == 'M':
-        v *= 1L << 20
-        i += 1
-    elif str[i] == 'K':
-        v *= 1L << 10
-        i += 1
-    elif str[i] == 'c':
-        v /= 100.0
-        i += 1
-    elif str[i] == 'm':
-        v /= 1000.0
-        i += 1
-    return (v, str[i:])
-
-class SchemaEnt:
-    def __init__(self, ent_def):
-        lis = ent_def.split(',')
-        self.key = lis[0]
-        self.event = False
-        self.control = False
-        self.width = None
-        self.mult = 1.0
-        self.unit = ""
-        for opt in lis[1:]:
-            if len(opt) == 0:
-                continue
-            elif opt[0] == 'C':
-                self.control = True
-            elif opt[0] == 'E':
-                self.event = True
-            elif opt[0:2] == 'W=':
-                self.width = int(opt[2:])
-            elif opt[0:2] == 'U=':
-                (self.mult, self.unit) = parse_size(opt[2:])
+def stats_file_read(sf):
+    sf_type_dict = {}
+    sf_prop_dict = {}
+    # Read header.
+    for line in sf:
+        c = line[0]
+        if c == SF_SCHEMA_CHAR:
+            (name, spec) = line[1:].split(" ", 1)
+            if name in sf_type_dict:
+                st = sf_type_dict[name]
+                st.schema_init(spec)
             else:
-                error("unrecognized option `%s'\n", opt)
-    def format(self, v0, v1, t0, t1):
-        if self.control:
-            return (v1, "")
-        elif self.event:
-            ve = 0.0
-            if t0 != 0L:
-                # Check for rollover.
-                if v1 < v0:
-                    if self.width:
-                        v0 -= 1L << self.width
-                    else:
-                        error("full width rollover at time %s, key `%s', v0 %u, v1 %u\n",
-                              curr_time_str, self.key, v0, v1)
-                ve = self.mult * float(v1 - v0) / (t1 - t0)
-            return format_size(ve, self.unit)
+                st = StatsType(name)
+                st.schema_init(spec)
+                sf_type_dict[name] = st
+        elif c == SF_DEVICES_CHAR:
+            pass # Not implemented.
+        elif c == SF_COMMENT_CHAR:
+            pass
+        elif c == SF_PROPERTY_CHAR:
+            (key, val) = line[1:].split(" ", 1)
+            sf_prop_dict[key] = val
         else:
-            return format_size(v1 * self.mult, self.unit)
+            break
+    # End of header.
+    sf_host = sf_prop_dict.get("hostname")
+    if not sf_host:
+        error("no hostname found in `%s'\n", sf.name)
+    # Read record groups.
+    rg_time = 0
+    rg_jobid = 0
+    for line in sf:
+        if line.isspace(): # End group.
+            continue
+        c = line[0]
+        if c.isdigit(): # Begin group.
+            r = line.split()
+            rg_time = long(r[0])
+            if len(r) > 1:
+                rg_jobid = r[1]
+        elif c.isalpha():
+            r = line.split()
+            st = sf_type_dict.get(r[0])
+            if not st:
+                error("unknown type `%s'\n", type)
+                continue
+            st.handle(sf_host, rg_time, rg_jobid, r[1], map(long, r[2:]))
+        elif c == SF_COMMENT_CHAR:
+            pass
+        elif c == SF_MARK_CHAR:
+            handle_mark(sf_host, rg_time, rg_jobid, line[1:])
+        else:
+            error("invalid record `%s'\n", line)
+    # End record groups.
 
-schema_len = 0
-schema_ent = []
-schema_dict = {}
-for ent_def in schema_def:
-    ent = SchemaEnt(ent_def)
-    schema_ent.insert(schema_len, ent)
-    schema_dict[ent.key] = schema_len
-    schema_len += 1
-
-if KEY_LIST:
-    index_list = []
-    for key in KEY_LIST:
-        i = schema_dict.get(key, None)
-        if not i:
-            # Try to get a good partial match.
-            match_list = []
-            for (s_key, s_index) in schema_dict.iteritems():
-                if s_key[0:len(key)] == key:
-                    i = s_index
-                    match_list.append(s_key)
-            if len(match_list) == 0:
-                fatal("unrecognized key `%s'\n", key)
-            elif len(match_list) > 1:
-                fatal("ambiguous key specification `%s': possible completions are `%s'\n",
-                      key, string.join(match_list, ", "))
-        index_list.append(i)
+if len(path_list) == 0:
+    stats_file_read(sys.stdin)
 else:
-    index_list = range(0, schema_len)
-
-trace("type: `%s'\n", TYPE_ARG)
-trace("dev_dict: %s\n", dev_dict)
-trace("key_list: %s\n", KEY_LIST)
-trace("schema_ent: %s\n", schema_ent)
-trace("schema_dict: %s\n", schema_dict)
-trace("index_list: %s\n", index_list)
-
-curr_time = 0L
-curr_time_str = time.strftime(time_fmt, time.localtime(curr_time))
-curr_jobid = "-"
-prev_time_dict = {}
-prev_vals_dict = {}
-
-def emit_prefix(type, dev):
-    print "%s\t%s\t%s\t%s" % (curr_time_str, curr_jobid, hostname, dev),
-
-def handle_stats(stype, rest):
-    if skip_type(stype):
-        return
-    if len(rest) != schema_len + 1:
-        error("short record `%s' %s\n", stype, rest)
-        return
-    if curr_time == 0L:
-        error("no timestamp for record `%s' %s\n", stype, rest)
-        return
-    dev = rest[0]
-    if skip_dev(stype, dev):
-        return
-    t0 = prev_time_dict.get(dev, 0L)
-    t1 = curr_time
-    prev_vals = prev_vals_dict.get(dev, schema_len * [ 0L ])
-    curr_vals = map(long, rest[1:])
-    if t0 < t1:
-        emit_prefix(stype, dev)
-        for i in index_list:
-            (v, u) = schema_ent[i].format(prev_vals[i], curr_vals[i], t0, t1)
-            # print "%10.3f %-2s" % (v, u),
-            print "\t%d" % (long(v),),
-        print
-    prev_time_dict[dev] = curr_time
-    prev_vals_dict[dev] = curr_vals
-
-def handle_mark(str, rest):
-    if opt_print_mark:
-        print "%s MARK %s %s" % (curr_time_str, str, string.join(rest))
-
-# Read data.
-for line in stats_file:
-    if line.isspace():
-        # End group.
-        continue
-    rec = line.split()
-    c = rec[0][0]
-    if c.isdigit():
-        # Begin group.
-        curr_time = long(rec[0])
-        curr_time_str = time.strftime(time_fmt, time.localtime(curr_time))
-        # TODO jobid.
-        if len(rec) > 1:
-            curr_jobid = rec[1]
-    elif c.isalpha():
-        handle_stats(rec[0], rec[1:])
-    elif c == SF_COMMENT_CHAR:
-        pass
-    elif c == SF_MARK_CHAR:
-        handle_mark(rec[0][1:], rec[1:])
-    else:
-        # Invalid record.
-        pass
+    for path in path_list:
+        stats_file_read(open(path, mode="r"))
