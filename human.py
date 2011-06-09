@@ -1,6 +1,14 @@
-# Based on coreutils human_readable()
+def fhms(t):
+    t = int(t)
+    s = ""
+    if t < 0:
+        t = -t
+        s = "-"
+    return "%s%02d:%02d:%02d" % (s, t / 3600, (t % 3600) / 60, t % 60)
 
-def human_readable(amt):
+# Based on coreutils human_readable()
+# TODO Handle small values.
+def fsize(amt):
     amt = long(amt)
     sign = ""
     if amt < 0:
