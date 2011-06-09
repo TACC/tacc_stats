@@ -1,5 +1,5 @@
 #!/opt/apps/python/2.7.1/bin/python
-import argparse, datetime, gzip, os, signal, string, subprocess, sys, time
+import gzip, os, numpy, signal, string, subprocess, sys, time
 # signal.signal(signal.SIGPIPE, signal.SIG_DFL)
 
 # TODO Handle changes in schema.
@@ -28,6 +28,7 @@ def fatal(fmt, *args):
 archive_dir = "/scratch/projects/tacc_stats/archive"
 STATS_PROGRAM = "tacc_stats" # XXX
 STATS_VERSION = "1.0.1" # XXX
+JOB_TIME_PAD = 600
 FILE_TIME_MAX = 86400 + 3600 # XXX
 SF_SCHEMA_CHAR = '!'
 SF_DEVICES_CHAR = '@'
@@ -108,12 +109,12 @@ class Job(object):
             error("empty host list for job `%s'\n", id)
         for host in host_list:
             entry = HostEntry(self, host)
-            if len(entry.records) < 2: # BLECH.
+            if len(entry.times) < 2: # BLECH.
                 self.bad_hosts[host] = entry
                 continue
             self.hosts[host] = entry
             for type_name, type_data in entry.types.iteritems():
-                for dev in type_data.devs:
+                for dev in type_data.devs():
                     self.types[type_name].devs.add(dev)
         # TODO Warn about bad hosts.
     def get_schema(self, type_name, schema_desc):
@@ -148,7 +149,7 @@ def get_stats_paths(job, host_name):
         # Prune to files that might overlap with job.
         file_begin = long(base)
         file_end_max = file_begin + FILE_TIME_MAX
-        if max(job.begin, file_begin) <= min(job.end, file_end_max):
+        if max(job.begin - JOB_TIME_PAD, file_begin) <= min(job.end + JOB_TIME_PAD, file_end_max):
             files.append((file_begin, os.path.join(host_dir, dent)))
     files.sort(key=lambda tup: tup[0])
     # trace("host_name `%s', files `%s'\n", host_name, files)
@@ -160,7 +161,7 @@ class HostEntry(object):
         self.job = job
         self.name = name
         self.types = {}
-        self.records = []
+        self.times = []
         self.marks = {}
         end_mark = "end %s" % job.id
         self.stats_file_paths = get_stats_paths(job, self.name)
@@ -171,22 +172,25 @@ class HostEntry(object):
             if end_mark in self.marks:
                 break
         # TODO Check for begin, end mark.
+        for type_data in self.types.itervalues():
+            type_data.process_stats()
     def read_stats_file(self, file):
         job_id = self.job.id
-        rec = None
+        rec_time = 0
         rec_job_id = ""
         for line in file:
             c = line[0]
             if c.isalpha():
                 if rec_job_id == job_id:
                     tdv = line.split()
-                    self.add_stats(rec, tdv[0], tdv[1], map(long, tdv[2:]))
-                elif len(self.records) != 0:
+                    self.add_stats(rec_time, tdv[0], tdv[1], map(long, tdv[2:]))
+                elif len(self.times) != 0:
                     return # We're done.
             elif c.isdigit():
                 str_time, rec_job_id = line.split()
                 if rec_job_id == job_id:
-                    rec = self.new_record(long(str_time))
+                    rec_time = long(str_time)
+                    self.times.append(rec_time)
             elif c.isspace():
                 pass
             elif c == SF_SCHEMA_CHAR:
@@ -200,42 +204,70 @@ class HostEntry(object):
                 pass # TODO
             elif c == SF_MARK_CHAR:
                 if rec_job_id == job_id:
-                    self.add_mark(rec, line[1:].strip())
+                    self.add_mark(rec_time, line[1:].strip())
             else:
                 error("%s: unrecognized directive `%s'\n", file.name, line.strip())
     def add_type(self, type_name, schema_desc):
         type_data = self.types.get(type_name)
         if not type_data:
             schema = self.job.get_schema(type_name, schema_desc)
-            type_data = HostTypeData(schema)
+            type_data = HostTypeData(type_name, schema)
             self.types[type_name] = type_data
         if type_data.schema.desc != schema_desc: # BLECH.
             error("schema changed for type `%s', host `%s'\n", type_name, self.name)
-    def add_stats(self, rec, type_name, dev, vals):
+        return type_data
+    def add_stats(self, rec_time, type_name, dev, vals):
         type_data = self.types.get(type_name)
         if not type_data:
             error("no data for type `%s', host `%s', dev `%s'\n", type_name, self.name, dev)
             return
-        type_ent = rec.types.setdefault(type_name, {})
-        type_ent[dev] = type_data.schema.process(type_data, dev, vals)
-    def new_record(self, time):
-        rec = Record(time - self.job.begin)
-        self.records.append(rec)
-        return rec
-    def add_mark(self, rec, mark):
-        self.marks.setdefault(mark, []).append(rec)
-
-
-class Record(object):
-    def __init__(self, time):
-        self.time = time
-        self.types = {}
+        type_data.add_stats(rec_time, dev, vals)
+    def add_mark(self, rec_time, mark):
+        self.marks.setdefault(mark, []).append(rec_time)
 
 
 class HostTypeData(object):
-    def __init__(self, schema):
+    def __init__(self, type_name, schema):
+        self.name = type_name
         self.schema = schema
-        self.devs = {}
+        self.times = {}
+        self.stats = {}
+    def devs(self):
+        return self.times.keys()
+    def add_stats(self, time, dev, vals):
+        self.times.setdefault(dev, []).append(time)
+        self.stats.setdefault(dev, []).append(vals)
+    def process_stats(self):
+        for dev in self.times.keys():
+            self.times[dev] = numpy.array(self.times[dev], numpy.uint64)
+            nr_rows = len(self.times[dev])
+            nr_cols = len(self.schema.entries)
+            old_stats = self.stats[dev]
+            new_stats = self.stats[dev] = numpy.zeros((nr_rows, nr_cols), numpy.uint64)
+            base_vals = list(old_stats[0])
+            prev_vals = old_stats[0]
+            for row in range(0, nr_rows):
+                for new_col, entry in enumerate(self.schema.entries):
+                    old_col = entry.index
+                    val = old_stats[row][old_col]
+                    if entry.event:
+                        prev_val = prev_vals[old_col]
+                        if val < prev_val:
+                            width = entry.width or 64 # XXX
+                            if abs(val - prev_val) < 0.25 * (2.0 ** width): #XXX
+                                trace("spurious rollover on type `%s', dev `%s', counter `%s', val %d, prev, %d\n",
+                                      self.name, dev, entry.key, val, prev_val)
+                                val = prev_val
+                            else:
+                                if self.name != "amd64_pmc": # XXX
+                                    trace("rollover on type `%s', dev `%s', counter `%s', val %d, prev, %d\n",
+                                          self.name, dev, entry.key, val, prev_val)
+                                base_vals[old_col] -= 1L << width
+                        val -= base_vals[old_col]
+                    if entry.mult:
+                        val *= entry.mult
+                    new_stats[row][new_col] = val
+                prev_vals = old_stats[row]
 
 
 class Schema(object):
@@ -248,33 +280,6 @@ class Schema(object):
             entry = SchemaEntry(index, entry_desc)
             self.keys[entry.key] = entry
             self.entries.append(entry)
-    def process(self, data, dev, vals):
-        res = []
-        tup = data.devs.get(dev)
-        if not tup:
-            tup = data.devs[dev] = (list(vals), list(vals))
-        base, prev = tup
-        for entry in self.entries:
-            i = entry.index
-            val = vals[i]
-            if entry.event:
-                if val < prev[i]:
-                    width = entry.width or 64 # XXX
-                    if abs(val - prev[i]) < 0.25 * (2.0 ** width): #XXX
-                        trace("spurious rollover on type `%s', dev `%s', counter `%s', val %d, prev, %d\n",
-                              self.name, dev, entry.key, val, prev[i])
-                        val = prev[i]
-                    else:
-                        if self.name != "amd64_pmc": # XXX
-                            trace("rollover on type `%s', dev `%s', counter `%s', val %d, prev, %d\n",
-                                  self.name, dev, entry.key, val, prev[i])
-                        base[i] -= 1L << width
-                val -= base[i]
-            prev[i] = vals[i]
-            if entry.mult:
-                val *= entry.mult
-            res.append(val)
-        return res
 
 
 class SchemaEntry(object):
