@@ -1,3 +1,8 @@
+import time
+
+def ftime(epoch, fmt="%b %d %H:%M:%S"):
+    return time.strftime(fmt, time.localtime(epoch))
+
 def fhms(t):
     t = int(t)
     s = ""
@@ -8,6 +13,7 @@ def fhms(t):
 
 # Based on coreutils human_readable()
 # TODO Handle small values.
+# TODO Add unit=""
 def fsize(amt):
     amt = long(amt)
     sign = ""
