@@ -15,39 +15,30 @@ fatal() {
     exit 1
 }
 
-jobid=$1
-if [ -z "$jobid" ]; then
-    fatal "$prog: must specify a jobid"
+job_id=$1
+if [ -z "$job_id" ]; then
+    fatal "$prog: must specify a job ID"
 fi
 
-# Some interesting accounting file fields.
-# $1 queue
-# $4 owner
-# $5 job_name
-# $6 jobid
-# $10 start_time
-# $11 end_time
-# $34 granted_pe
-# $35 slots
-
-set -- $(awk -F : -v jobid=$jobid '
-$6 == jobid {
-  print $10, strftime("%Y/%m/%d", $10), $11;
-  exit 0;
-}' $accounting_file)
-job_begin="$1" yyyy_mm_dd="$2" job_end="$3"
-
-if [ -z "$job_begin" ]; then
-     fatal "$prog: cannot find accounting data for job $jobid"
+job_record="$(awk -F: -v job_id=$job_id '$6 == job_id' $accounting_file)"
+if [ -z "$job_record" ]; then
+     fatal "$prog: cannot find accounting data for job $job_id"
 fi
-trace "job_begin '$job_begin', yyyy_mm_dd '$yyyy_mm_dd', job_end '$job_end'"
+
+OLD_IFS=$IFS
+IFS=:
+job_info=( ${job_record} )
+IFS=$OLD_IFS
+
+begin=${job_info[9]}
+yyyy_mm_dd=$(date --date="Jan 1 00:00:00 UTC 1970 + $begin seconds" +"%Y/%m/%d")
 
 # Find the hostfile written during the prolog.  For example:
 # /share/sge6.2/default/tacc/hostfile_logs/2011/05/19/prolog_hostfile.1957000.IV32627
 # TODO May need to try day before or after on failure.
 
 job_host_file=""
-for host_file in $hostfile_dir/$yyyy_mm_dd/prolog_hostfile.$jobid.*; do
+for host_file in $hostfile_dir/$yyyy_mm_dd/prolog_hostfile.$job_id.*; do
     if [ -e "$host_file" ]; then
         job_host_file="$host_file"
         break
@@ -55,8 +46,17 @@ for host_file in $hostfile_dir/$yyyy_mm_dd/prolog_hostfile.$jobid.*; do
 done
 
 if [ -z "$job_host_file" ]; then
-    fatal "$prog: cannot find host file for job $jobid"
+    fatal "$prog: cannot find host file for job $job_id"
 fi
 trace "job_host_file '$job_host_file'"
 
-echo $job_begin $job_end $(cat $job_host_file)
+echo queue ${job_info[0]}
+echo owner ${job_info[3]}
+echo name ${job_info[4]}
+echo id ${job_info[5]}
+echo account ${job_info[6]}
+echo begin ${job_info[9]}
+echo end ${job_info[10]}
+echo granted_pe ${job_info[33]}
+echo slots ${job_info[34]}
+echo hosts $(cat $job_host_file)
