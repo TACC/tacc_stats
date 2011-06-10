@@ -1,4 +1,4 @@
-import human, job, numpy
+import human, job, numpy, string
 
 # MOVEME Convert to method of Job().
 # TODO Safety.
