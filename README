@@ -63,9 +63,9 @@ type, followed by a space separated list of elements.  Each element
 consists of a key name, followed by a comma-separated list of options;
 the options currently used are:
   E meaning that the counter is an event counter,
-  W=<BItacc_stats> meaning that the counter is <BItacc_stats> wide (as opposed to 64),
+  W=<BITS> meaning that the counter is <BITS> wide (as opposed to 64),
   C meaning that the value is a control register, not a counter,
-  U=<STR> meaning that the value is in units specificed by <STR>.
+  U=<STR> meaning that the value is in units specified by <STR>.
 
 Note especially the event and width options.  Certain counters, such
 as the performance counters are subject to rollover, and as such their
@@ -89,13 +89,13 @@ time of the record and the current jobid, zero of more lines of marks
   cpu 11 429720418 0 1685980 43516346 447875 155 3443
   cpu 10 429988676 0 1675476 43150935 559410 8 283
   ...
-  net ib0 0 0 55915434547 0 0 0 0 0 0 0 0 0 159301288 0 46963995550 0 0 97 0 0 0 31404022 0
+  net rib0 0 0 55915434547 0 0 0 0 0 0 0 0 0 159301288 0 46963995550 0 0 97 0 0 0 31404022 0
   ...
   ps - 4059349377 507410 1600 1600 1600 18 373
   ...
 
 Each line of statistics contains the type (amd64_pmc, cpu, net,
-ps,...), the device (11,10,13,12,...,ib0,-...), followed by the
+ps,...), the device (11,10,13,12,...,rib0,-...), followed by the
 counter values in the order given by the schema.  Note that when we
 cannot meaningfully attach statistics to a device, we use '-' as the
 device name.
@@ -107,8 +107,8 @@ The types currently collected on Ranger are:
   amd64_pmc  AMD Opteron performance counters (per core),
   block      block device statistics (per device),
   cpu        scheduler accounting (per CPU),
-  ib_sw      InfiniBand usage,
-  llite      Lustre filesystem usage (per mount),
+  rib_sw      InfiniBand usage,
+  llite      Lisette filesystem usage (per mount),
   lnet       Lustre network usage,
   mem        memory usage (per socket)
   net        network device usage (per device)
