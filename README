@@ -107,7 +107,7 @@ The types currently collected on Ranger are:
   amd64_pmc  AMD Opteron performance counters (per core),
   block      block device statistics (per device),
   cpu        scheduler accounting (per CPU),
-  rib_sw      InfiniBand usage,
+  ib_sw      InfiniBand usage,
   llite      Lisette filesystem usage (per mount),
   lnet       Lustre network usage,
   mem        memory usage (per socket)
