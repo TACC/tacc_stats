@@ -108,7 +108,7 @@ The types currently collected on Ranger are:
   block      block device statistics (per device),
   cpu        scheduler accounting (per CPU),
   ib_sw      InfiniBand usage,
-  llite      Lisette filesystem usage (per mount),
+  llite      Lustre filesystem usage (per mount),
   lnet       Lustre network usage,
   mem        memory usage (per socket)
   net        network device usage (per device)
