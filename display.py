@@ -1,4 +1,4 @@
-import human, job, numpy, string
+import human, job_stats, numpy, string
 
 # MOVEME Convert to method of Job().
 # TODO Safety.
@@ -22,10 +22,17 @@ def get_record_times(job): # XXX
 # d_time = opts.get("d_time", True)
 
 def display(job, type_name, **opts):
+    opt_delta = opts.get("delta", True)
+    opt_out = opts.get("out")
     use_human = opts.get("human", True)
-    hosts = opts.get("hosts") or job.hosts.keys()
+    hosts = opts.get("host") or opts.get("hosts") or job.hosts.keys()
+    if type(hosts) == str:
+        hosts = [hosts]
     # Should use host/type/devs.
-    devs = opts.get("devs") or job.types[type_name].devs
+    devs = opts.get("dev") or opts.get("devs") or job.types[type_name].devs
+    if type(devs) == str or type(devs) == int:
+        devs = [devs]
+    devs = map(str, devs)
     schema = list(job.types[type_name].schemas.values())[0]
     if hosts:
         times = job.hosts[hosts[0]].times
@@ -40,19 +47,22 @@ def display(job, type_name, **opts):
     for host in hosts:
         for dev in devs:
             stats += job.hosts[host].types[type_name].stats[dev]
-    for i in range(0, nr_rows):
-        for j, entry in enumerate(schema.entries):
-            if entry.event:
-                if i < nr_rows - 1:
-                    v0 = stats[i][j]
-                    v1 = stats[i + 1][j]
-                    stats[i][j] = (v1 - v0) / (times[i + 1] - times[i])
-                else:
-                    stats[i][j] = 0
-    display1(schema.entries, times, stats, human=use_human)
+    if opt_delta:
+        for i in range(0, nr_rows):
+            for j, entry in enumerate(schema.entries):
+                if entry.event:
+                    if i < nr_rows - 1:
+                        v0 = stats[i][j]
+                        v1 = stats[i + 1][j]
+                        stats[i][j] = (v1 - v0) / (times[i + 1] - times[i])
+                    else:
+                        stats[i][j] = 0
+    display1(schema.entries, times, stats, delta=opt_delta, human=use_human, out=opt_out)
 
 
 def display1(schema_entries, times, stats, **opts):
+    opt_delta = opts.get("delta", True)
+    opt_out = opts.get("out")
     use_human = opts.get("human", True)
     if use_human:
         time_width = len(human.fhms(0))
@@ -61,17 +71,17 @@ def display1(schema_entries, times, stats, **opts):
         time_width = len(str(2 * 86400))
         val_width = 15
     def pr(time_str, val_strs):
-        print time_str.ljust(time_width), string.join(str.rjust(val_width) for str in val_strs)
+        print>>opt_out, time_str.rjust(time_width), string.join(str.rjust(val_width) for str in val_strs)
     def fmt(ent, val):
         str = human.fsize(val)
         if ent.unit:
             str += ent.unit
-        if ent.event:
+        if opt_delta and ent.event:
             str += "/s"
         return str
     row = 0
     for time, vals in zip(times, stats):
-        if row % 20 == 0:
+        if use_human and row % 20 == 0:
             pr('TIME', [entry.key for entry in schema_entries])
         row += 1
         if use_human:

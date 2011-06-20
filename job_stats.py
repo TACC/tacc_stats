@@ -36,35 +36,6 @@ SF_COMMENT_CHAR = '#'
 SF_PROPERTY_CHAR = '$'
 SF_MARK_CHAR = '%'
 
-# amd64
-# define PERF_EVENT(event_select, unit_mask) \
-#  ( (event_select & 0xFF) \
-#  | (unit_mask << 8) \
-#  | (1UL << 16) /* Count in user mode (CPL == 0). */ \
-#  | (1UL << 17) /* Count in OS mode (CPL > 0). */ \
-#  | (1UL << 22) /* Enable. */ \
-#  | ((event_select & 0xF00) << 24) \
-#  )
-
-def amd64_perf_event(event_select, unit_mask):
-    return (event_select & 0xFF) | (unit_mask << 8) | (1L << 16) | (1L << 17) | (1L << 22) | ((event_select & 0xF00) << 24)
-
-#define DRAMaccesses   PERF_EVENT(0xE0, 0x07) /* DCT0 only */
-#define HTlink0Use     PERF_EVENT(0xF6, 0x37) /* Counts all except NOPs */
-#define HTlink1Use     PERF_EVENT(0xF7, 0x37) /* Counts all except NOPs */
-#define HTlink2Use     PERF_EVENT(0xF8, 0x37) /* Counts all except NOPs */
-#define UserCycles    (PERF_EVENT(0x76, 0x00) & ~(1UL << 17))
-#define DCacheSysFills PERF_EVENT(0x42, 0x01) /* Counts DCache fills from beyond the L2 cache. */
-#define SSEFLOPS       PERF_EVENT(0x03, 0x7F) /* Counts single & double, add, multiply, divide & sqrt FLOPs. */
-
-dram_accesses = amd64_perf_event(0xE0, 0x07)
-ht_link_0_use = amd64_perf_event(0xF6, 0x37)
-ht_link_1_use = amd64_perf_event(0xF7, 0x37)
-ht_link_2_use = amd64_perf_event(0xF8, 0x37)
-user_cycles = amd64_perf_event(0x76, 0x00) & ~(1L << 17)
-dcache_sys_fills = amd64_perf_event(0x42, 0x01)
-sse_flops = amd64_perf_event(0x03, 0x7F)
-
 job_info_cmd = "./tacc_job_info" # XXX
 def get_job_info(id):
     id = str(id)
@@ -102,8 +73,8 @@ class Job(object):
         if not self.info:
             return
         self.id = self.info["id"]
-        self.begin = long(self.info["begin"])
-        self.end = long(self.info["end"])
+        self.begin = long(self.info["start_time"])
+        self.end = long(self.info["end_time"])
         host_list = self.info["hosts"].split()
         if len(host_list) == 0:
             error("empty host list for job `%s'\n", id)
