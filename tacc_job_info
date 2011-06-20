@@ -55,8 +55,9 @@ echo owner ${job_info[3]}
 echo name ${job_info[4]}
 echo id ${job_info[5]}
 echo account ${job_info[6]}
-echo begin ${job_info[9]}
-echo end ${job_info[10]}
+echo submission_time ${job_info[8]}
+echo start_time ${job_info[9]}
+echo end_time ${job_info[10]}
 echo granted_pe ${job_info[33]}
 echo slots ${job_info[34]}
 echo hosts $(cat $job_host_file)
