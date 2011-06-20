@@ -112,7 +112,7 @@ The types currently collected on Ranger are:
   lnet       Lustre network usage,
   mem        memory usage (per socket)
   net        network device usage (per device)
-  numa       weird NUAM statistics (per socket),
+  numa       weird NUMA statistics (per socket),
   ps         process statistics,
   sysv_shm   SysV shared memory segment usage,
   tmpfs      ram-backed filesystem usage (per mount),
