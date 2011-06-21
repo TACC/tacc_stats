@@ -1,5 +1,5 @@
 #!/opt/apps/python/2.7.1/bin/python
-import job_stats, numpy, signal, string, sys
+import human, job_stats, numpy, signal, string, sys
 
 signal.signal(signal.SIGPIPE, signal.SIG_DFL)
 
@@ -15,9 +15,13 @@ class Report(object):
         self.dict = {}
         self.add_info('id', job.id)
         self.add_info('owner', job.info['owner'])
-        self.add_info('queue_time', job.begin - long(job.info['submission_time']))
+        self.add_info('queue', job.info['queue_name'])
+        self.add_info('queue_wait_time', job.begin - long(job.info['submission_time']))
         self.add_info('run_time', job.end - job.begin)
+        self.add_info('failed', job.info['failed'])
+        self.add_info('exit_status', job.info['exit_status'])
         self.add_info('nr_hosts', len(job.hosts))
+        self.add_info('nr_bad_hosts', len(job.bad_hosts))
         self.add_info('nr_slots', long(job.info['slots']))
         self.add_info('pe', job.info['granted_pe'])
         self.add_events(job, 'amd64_core', keys=['USER', 'DCSF', 'SSE_FLOPS'])
@@ -30,7 +34,7 @@ class Report(object):
         self.add_events(job, 'ib_sw', keys=['rx_bytes', 'tx_bytes'])
         self.add_events(job, 'net', keys=['rx_bytes', 'tx_bytes'])
         self.add_gauges(job, 'mem', keys=['MemTotal', 'MemUsed', 'FilePages', 'Mapped', 'AnonPages', 'Slab'])
-        self.add_events(job, 'vm', keys=['pgactivate', 'pgdeactivate'])
+        # self.add_events(job, 'vm', keys=['pgactivate', 'pgdeactivate'])
     def add_info(self, col, val):
         self.cols.append(col)
         self.dict[col] = val
@@ -45,7 +49,7 @@ class Report(object):
         schema = job.get_schema(type_name)
         if not schema:
             for key in keys:
-                self.add_key_val(type_name, dev, key, '-')
+                self.cols.append(key)
             return
         vals = numpy.zeros(len(schema.entries), numpy.uint64)
         for host in job.hosts.itervalues():
@@ -58,10 +62,10 @@ class Report(object):
         for key in keys:
             self.add_key_val(type_name, dev, key, vals[schema.keys[key].index])
     def add_gauges(self, job, type_name, dev=None, keys=None):
-        schema = job.get_schema('mem')
+        schema = job.get_schema(type_name)
         if not schema:
             for key in keys:
-                self.add_key_val(type_name, dev, key, '-')
+                self.cols.append(key)
             return
         vals = numpy.zeros(len(schema.entries), numpy.uint64)
         for host in job.hosts.itervalues():
@@ -87,10 +91,23 @@ class Report(object):
     def print_values(self):
         print '\t'.join([str(self.dict[col]) for col in self.cols])
     def display(self):
-        col_width = 32 # max(len(col) for col in self.cols) + 1
-        val_width = 32 # max(len(str(val)) for val in self.dict.itervalues()) + 1
+        col_width = 28 # max(len(col) for col in self.cols) + 1
+        val_width = 28 # max(len(str(val)) for val in self.dict.itervalues()) + 1
+        cpu_total = sum(self.dict.get(key, 0) for key in ['user', 'nice', 'system', 'idle', 'iowait', 'irq', 'softirq'])
         for col in self.cols:
-            print (col + ' ').ljust(col_width, '.') + (' ' + str(self.dict[col])).rjust(val_width, '.')
+            val = self.dict.get(col, '-')
+            extra = ""
+            if col.startswith("llite:"):
+                col = col[6:]
+            if (col == "amd64_sock" or col.endswith("_bytes")) and val != '-':
+                extra = ' ' + human.fsize(long(val)) + 'B'
+            elif col == "amd64_core" and val != '-':
+                extra = ' ' + human.fsize(long(val))
+            elif col.endswith("_time") and val != '-':
+                extra = ' ' + human.ftime(long(val))
+            elif col.startswith("cpu:") and val != '-':
+                extra = " %.2f%%" % 100.0 * float(val) / float(cpu_total)
+            print (col + ' ').ljust(col_width, '.') + (' ' + str(val).rjust(val_width, '.') + extra
 
 
 def display_job_report(info):
