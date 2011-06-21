@@ -203,19 +203,22 @@ def get_stats_paths(job, host_name):
     files = []
     host_dir = os.path.join(archive_dir, host_name)
     trace("host_name `%s', host_dir `%s'\n", host_name, host_dir)
-    for dent in os.listdir(host_dir):
-        base, dot, ext = dent.partition(".")
-        if not base.isdigit():
-            continue
-        # TODO Pad end.
-        # Prune to files that might overlap with job.
-        file_begin = long(base)
-        file_end_max = file_begin + FILE_TIME_MAX
-        if max(job.begin - JOB_TIME_PAD, file_begin) <= min(job.end + JOB_TIME_PAD, file_end_max):
-            files.append((file_begin, os.path.join(host_dir, dent)))
-    files.sort(key=lambda tup: tup[0])
-    # trace("host_name `%s', files `%s'\n", host_name, files)
-    return [tup[1] for tup in files]
+    try:
+        for dent in os.listdir(host_dir):
+            base, dot, ext = dent.partition(".")
+            if not base.isdigit():
+                continue
+            # TODO Pad end.
+            # Prune to files that might overlap with job.
+            file_begin = long(base)
+            file_end_max = file_begin + FILE_TIME_MAX
+            if max(job.begin - JOB_TIME_PAD, file_begin) <= min(job.end + JOB_TIME_PAD, file_end_max):
+                files.append((file_begin, os.path.join(host_dir, dent)))
+        files.sort(key=lambda tup: tup[0])
+        # trace("host_name `%s', files `%s'\n", host_name, files)
+        return [tup[1] for tup in files]
+    except:
+        return []
 
 
 class HostEntry(object):
