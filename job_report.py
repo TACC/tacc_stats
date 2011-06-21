@@ -30,6 +30,7 @@ class Report(object):
         self.add_events(job, 'ib_sw', keys=['rx_bytes', 'tx_bytes'])
         self.add_events(job, 'net', keys=['rx_bytes', 'tx_bytes'])
         self.add_gauges(job, 'mem', keys=['MemTotal', 'MemUsed', 'FilePages', 'Mapped', 'AnonPages', 'Slab'])
+        self.add_events(job, 'vm', keys=['pgactivate', 'pgdeactivate'])
     def add_info(self, col, val):
         self.cols.append(col)
         self.dict[col] = val
@@ -86,22 +87,27 @@ class Report(object):
     def print_values(self):
         print '\t'.join([str(self.dict[col]) for col in self.cols])
     def display(self):
-        col_width = max(len(col) for col in self.cols) + 1
-        val_width = max(len(str(val)) for val in self.dict.itervalues()) + 1
+        col_width = 32 # max(len(col) for col in self.cols) + 1
+        val_width = 32 # max(len(str(val)) for val in self.dict.itervalues()) + 1
         for col in self.cols:
-            print col.ljust(col_width, ' ') + str(self.dict[col]).rjust(val_width, ' ')
+            print (col + ' ').ljust(col_width, '.') + (' ' + str(self.dict[col])).rjust(val_width, '.')
+
 
 def display_job_report(info):
-    id = info.get("id")
-    if not id:
-        job_stats.error("no id in job info\n")
-        return
-    job = job_stats.Job(id, info=info)
-    if len(job.hosts) == 0:
-        job_stats.error("job `%s' has no good hosts, skipping\n", job.id)
-        return
-    report = Report(job)
-    report.display()
+    try:
+        id = info.get("id")
+        if not id:
+            job_stats.error("no id in job info\n")
+            return
+        job = job_stats.Job(id, info=info)
+        if len(job.hosts) == 0:
+            job_stats.error("job `%s' has no good hosts, skipping\n", job.id)
+            return
+        report = Report(job)
+        report.display()
+        print
+    except:
+        pass
 
 
 if __name__ == '__main__':
