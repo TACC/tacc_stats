@@ -75,7 +75,7 @@ awk -F: -v r0=$report_begin -v r1=$report_end 'r0 <= $11 && $11 < r1' $accountin
     fi
     trace "job_host_file '$job_host_file'"
 
-    echo queue ${job_info[0]}
+    echo queue_name ${job_info[0]}
     echo owner ${job_info[3]}
     echo name ${job_info[4]}
     echo id ${job_info[5]}
@@ -83,6 +83,8 @@ awk -F: -v r0=$report_begin -v r1=$report_end 'r0 <= $11 && $11 < r1' $accountin
     echo submission_time ${job_info[8]}
     echo start_time ${job_info[9]}
     echo end_time ${job_info[10]}
+    echo failed ${job_info[11]}
+    echo exit_status ${job_info[12]}
     echo granted_pe ${job_info[33]}
     echo slots ${job_info[34]}
     echo hosts $(cat $job_host_file)
