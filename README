@@ -89,13 +89,13 @@ time of the record and the current jobid, zero of more lines of marks
   cpu 11 429720418 0 1685980 43516346 447875 155 3443
   cpu 10 429988676 0 1675476 43150935 559410 8 283
   ...
-  net rib0 0 0 55915434547 0 0 0 0 0 0 0 0 0 159301288 0 46963995550 0 0 97 0 0 0 31404022 0
+  net ib0 0 0 55915434547 0 0 0 0 0 0 0 0 0 159301288 0 46963995550 0 0 97 0 0 0 31404022 0
   ...
   ps - 4059349377 507410 1600 1600 1600 18 373
   ...
 
 Each line of statistics contains the type (amd64_pmc, cpu, net,
-ps,...), the device (11,10,13,12,...,rib0,-...), followed by the
+ps,...), the device (11,10,13,12,...,ib0,-...), followed by the
 counter values in the order given by the schema.  Note that when we
 cannot meaningfully attach statistics to a device, we use '-' as the
 device name.
