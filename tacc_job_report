@@ -57,11 +57,15 @@ awk -F: -v r0=$report_begin -v r1=$report_end 'r0 <= $11 && $11 < r1' $accountin
     job_id=${job_info[5]}
     job_begin=${job_info[9]}
 
-    queue=${job_info[0]}
-    if [ "$queue" == "vis" ]; then
+    # Skip vis jobs, for now.
+    queue_name=${job_info[0]}
+    if [ "$queue_name" == "vis" ]; then
         trace "$prog: skipping vis job '$job_id'"
         continue
     fi
+
+    # We assume that for each job there exists a unique record in
+    # accounting with pe_taskid equal to NONE.
     pe_taskid=${job_info[41]}
     if [ "$pe_taskid" != NONE ]; then
         trace "$prog: skipping record for job '$job_id' with pe_taskid '$pe_taskid'"
