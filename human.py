@@ -14,7 +14,8 @@ def fhms(t):
 # Based on coreutils human_readable()
 # TODO Handle small values.
 # TODO Add unit=""
-def fsize(amt):
+# Way too complicated, no need to avoid use of floating point.
+def fsize_and_unit(amt):
     amt = long(amt)
     sign = ""
     if amt < 0:
@@ -66,4 +67,11 @@ def fsize(amt):
     prefix = ""
     if exponent > 0:
         prefix = prefix_letters[exponent - 1]
-    return sign + str(amt) + fraction + prefix
+    return (sign + str(amt) + fraction, prefix)
+
+def fsize(amt, align=False, space=""):
+    size_str, unit_str = fsize_and_unit(amt)
+    if align:
+        return size_str.rjust(4) + space + unit_str.rjust(1)
+    else:
+        return size_str + space + unit_str
