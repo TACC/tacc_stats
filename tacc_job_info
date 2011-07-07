@@ -30,27 +30,31 @@ IFS=:
 job_info=( ${job_record} )
 IFS=$OLD_IFS
 
-begin=${job_info[9]}
-yyyy_mm_dd=$(date --date="Jan 1 00:00:00 UTC 1970 + $begin seconds" +"%Y/%m/%d")
+job_begin=${job_info[9]}
 
-# Find the hostfile written during the prolog.  For example:
-# /share/sge6.2/default/tacc/hostfile_logs/2011/05/19/prolog_hostfile.1957000.IV32627
-# TODO May need to try day before or after on failure.
+get_host_file() {
+    id=$1
+    begin=$2
+    for delta in 0 -3600 3600; do
+        epoch=$((begin + delta))
+        yyyy_mm_dd=$(date --date="@$epoch" +"%Y/%m/%d")
+        trace "checking $hostfile_dir/$yyyy_mm_dd/prolog_hostfile.$id.*"
+        for host_file in $hostfile_dir/$yyyy_mm_dd/prolog_hostfile.$id.*; do
+            if [ -e "$host_file" ]; then
+                echo $host_file
+                return
+            fi
+        done
+    done
+}
 
-job_host_file=""
-for host_file in $hostfile_dir/$yyyy_mm_dd/prolog_hostfile.$job_id.*; do
-    if [ -e "$host_file" ]; then
-        job_host_file="$host_file"
-        break
-    fi
-done
-
+job_host_file=$(get_host_file $job_id $job_begin)
 if [ -z "$job_host_file" ]; then
-    fatal "$prog: cannot find host file for job $job_id"
+    fatal "$prog: cannot find host file for job '$job_id'"
 fi
 trace "job_host_file '$job_host_file'"
 
-echo queue ${job_info[0]}
+echo queue_name ${job_info[0]}
 echo owner ${job_info[3]}
 echo name ${job_info[4]}
 echo id ${job_info[5]}
@@ -58,6 +62,9 @@ echo account ${job_info[6]}
 echo submission_time ${job_info[8]}
 echo start_time ${job_info[9]}
 echo end_time ${job_info[10]}
+echo failed ${job_info[11]}
+echo exit_status ${job_info[12]}
 echo granted_pe ${job_info[33]}
 echo slots ${job_info[34]}
 echo hosts $(cat $job_host_file)
+echo

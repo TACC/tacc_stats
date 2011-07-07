@@ -24,8 +24,14 @@ report_end=$2
 if [ -z "$report_begin" ]; then
     fatal "$prog: must specify a start time"
 fi
+if ! report_begin=$(date --date="$report_begin" +%s); then
+    fatal "$prog: invalid start time"
+fi
+
 if [ -z "$report_end" ]; then
-    fatal "$prog: must specify and end time"
+    report_end=$((report_begin + 86400))
+elif ! report_end=$(date --date="$report_end" +%s); then
+    fatal "$prog: invalid end time"
 fi
 
 # Find the hostfile written during the prolog.  For example:
@@ -36,7 +42,7 @@ get_host_file() {
     begin_epoch=$2
     for delta in 0 -3600 3600; do
         epoch=$((begin_epoch + delta))
-        yyyy_mm_dd=$(date --date="Jan 1 00:00:00 UTC 1970 + $epoch seconds" +"%Y/%m/%d")
+        yyyy_mm_dd=$(date --date="@$epoch" +"%Y/%m/%d")
         trace "$hostfile_dir/$yyyy_mm_dd/prolog_hostfile.$id.*"
         for host_file in $hostfile_dir/$yyyy_mm_dd/prolog_hostfile.$id.*; do
             if [ -e "$host_file" ]; then
