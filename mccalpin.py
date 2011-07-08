@@ -3,7 +3,7 @@ import human, job_stats, numpy, os, signal, string, sys
 
 sock_schema_desc = 'DRAM,E HT0,E HT1,E HT2,E'
 sock_stats_cols = [(str(sock), key) for sock in range(0, 4) for key in ['DRAM', 'HT0', 'HT1', 'HT2']]
-sock_stats_hdr = " ".join(sock + ":" + key for sock, col in sock_stats_cols)
+sock_stats_hdr = " ".join(sock + ":" + key for sock, key in sock_stats_cols)
 
 core_schema_desc = 'USER,E DCSF,E SSE_FLOPS,E'
 core_stats_cols = [(str(core), key) for core in range(0, 16) for key in ['USER', 'DCSF', 'SSE_FLOPS']]
