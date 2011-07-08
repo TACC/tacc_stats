@@ -27,8 +27,6 @@ def fatal(fmt, *args):
 
 
 archive_dir = "/scratch/projects/tacc_stats/archive"
-STATS_PROGRAM = "tacc_stats" # XXX
-STATS_VERSION = "1.0.1" # XXX
 JOB_TIME_PAD = 600
 FILE_TIME_MAX = 86400 + 3600 # XXX
 SF_SCHEMA_CHAR = '!'
@@ -37,7 +35,7 @@ SF_COMMENT_CHAR = '#'
 SF_PROPERTY_CHAR = '$'
 SF_MARK_CHAR = '%'
 
-job_info_cmd = "./tacc_job_info" # XXX
+job_info_cmd = "/share/home/01114/jhammond/tacc_stats/tacc_job_info" # XXX
 def get_job_info(id):
     id = str(id)
     info = {}
@@ -102,6 +100,16 @@ amd64_sock_ctls = {
     ht_link_2_use: 3,
     }
 
+amd64_mults = {
+    user_cycles: 1,
+    dcache_sys_fills: 64, # DCSFs are 64B.
+    sse_flops: 1,
+    dram_accesses: 64, # DRAM accesses are 64B.
+    ht_link_0_use: 4, # Each HT event counter increment represents 4B.
+    ht_link_1_use: 4,
+    ht_link_2_use: 4,
+    }
+
 class Job(object):
     def __init__(self, id, info=None):
         self.id = str(id)
@@ -134,6 +142,10 @@ class Job(object):
         if 'amd64_pmc' in self.types:
             self.process_amd64()
     def process_amd64(self):
+        self.get_schema('amd64_core', 'USER,E DCSF,E SSE_FLOPS,E')
+        self.types['amd64_core'].devs = set(map(str, range(0, 16))) # BLECH.
+        self.get_schema('amd64_sock', 'DRAM,E HT0,E HT1,E HT2,E')
+        self.types['amd64_sock'].devs = set(map(str, range(0, 4))) # BLECH.
         for host_entry in self.hosts.itervalues():
             orig_data = host_entry.types['amd64_pmc']
             core_data = host_entry.add_type('amd64_core', 'USER,E DCSF,E SSE_FLOPS,E')
@@ -157,21 +169,16 @@ class Job(object):
                             val = orig_stats[row][ctl_nr + 4]
                             if ctl in amd64_sock_ctls:
                                 col = amd64_sock_ctls[ctl]
-                                if col == 0: # This is horrible.
-                                    val *= 64 # DRAM accesses are 64B.
-                                else:
-                                    val *= 4 # Each HT event counter increment represents 4B.
-                                sock_stats[row][col] += val
+                                sock_stats[row][col] += val * amd64_mults[ctl]
                             elif ctl in amd64_core_ctls:
-                                core_stats[row][amd64_core_ctls[ctl]] += val
+                                col = amd64_core_ctls[ctl]
+                                core_stats[row][col] += val * amd64_mults[ctl]
                             else:
                                 # TODO Improve error detection.
                                 error("unknown PMC control value %d\n", ctl)
                                 del self.types['amd64_core']
                                 del self.types['amd64_sock']
                                 return
-        self.types['amd64_core'].devs = set(map(str, range(0, 16)))
-        self.types['amd64_sock'].devs = set(map(str, range(0, 4)))
     def get_schema(self, type_name, desc=None):
         if desc:
             # TODO Warn about schema changes.
@@ -185,10 +192,13 @@ class Job(object):
                 data.schemas[desc] = schema
             return schema
         else:
-            if len(self.types[type_name].schemas) != 1:
-                # error
+            type_data = self.types.get(type_name)
+            if not type_data:
                 return None
-            for schema in self.types[type_name].schemas.itervalues():
+            if len(type_data.schemas) != 1:
+                error("multiple schemas for type `%s'\n", type_name)
+                return None
+            for schema in type_data.schemas.itervalues():
                 return schema
 
 
@@ -320,12 +330,12 @@ class HostTypeData(object):
                         if val < prev_val:
                             width = entry.width or 64 # XXX
                             if abs(val - prev_val) < 0.25 * (2.0 ** width): #XXX
-                                trace("spurious rollover on type `%s', dev `%s', counter `%s', val %d, prev, %d\n",
+                                trace("spurious rollover on type `%s', dev `%s', counter `%s', val %d, prev %d\n",
                                       self.name, dev, entry.key, val, prev_val)
                                 val = prev_val
                             else:
                                 if self.name != "amd64_pmc": # XXX
-                                    trace("rollover on type `%s', dev `%s', counter `%s', val %d, prev, %d\n",
+                                    trace("rollover on type `%s', dev `%s', counter `%s', val %d, prev %d\n",
                                           self.name, dev, entry.key, val, prev_val)
                                 base_vals[old_col] -= 1L << width
                         val -= base_vals[old_col]
