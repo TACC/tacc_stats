@@ -63,6 +63,11 @@ awk -F: -v r0=$report_begin -v r1=$report_end 'r0 <= $11 && $11 < r1' $accountin
     job_id=${job_info[5]}
     job_begin=${job_info[9]}
 
+    job_owner=${job_info[3]}
+    if [ -n "$owner" -a "$owner" != "$job_owner" ]; then
+        continue
+    fi
+
     # Skip vis jobs, for now.
     queue_name=${job_info[0]}
     if [ "$queue_name" == "vis" ]; then
