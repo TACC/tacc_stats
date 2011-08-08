@@ -24,6 +24,7 @@ job_record="$(awk -F: -v job_id=$job_id '$6 == job_id' $accounting_file)"
 if [ -z "$job_record" ]; then
      fatal "$prog: cannot find accounting data for job $job_id"
 fi
+trace "job_record $job_record"
 
 OLD_IFS=$IFS
 IFS=:
@@ -31,6 +32,7 @@ job_info=( ${job_record} )
 IFS=$OLD_IFS
 
 job_begin=${job_info[9]}
+trace "job_begin $job_begin"
 
 get_host_file() {
     id=$1

@@ -257,8 +257,9 @@ class HostEntry(object):
             c = line[0]
             if c.isalpha():
                 if rec_job_id == job_id:
-                    tdv = line.split()
-                    self.add_stats(rec_time, tdv[0], tdv[1], map(long, tdv[2:]))
+                    type_name, sep, rest = line.partition(' ')
+                    dev, sep, val_str = rest.partition(' ')
+                    self.add_stats(rec_time, type_name, dev, val_str)
                 elif len(self.times) != 0:
                     return # We're done.
             elif c.isdigit():
@@ -291,12 +292,12 @@ class HostEntry(object):
         if type_data.schema.desc != schema_desc: # BLECH.
             error("schema changed for type `%s', host `%s'\n", type_name, self.name)
         return type_data
-    def add_stats(self, rec_time, type_name, dev, vals):
+    def add_stats(self, rec_time, type_name, dev, val_str):
         type_data = self.types.get(type_name)
         if not type_data:
             error("no data for type `%s', host `%s', dev `%s'\n", type_name, self.name, dev)
             return
-        type_data.add_stats(rec_time, dev, vals)
+        type_data.add_stats(rec_time, dev, val_str)
     def add_mark(self, rec_time, mark):
         self.marks.setdefault(mark, []).append(rec_time)
 
@@ -309,7 +310,14 @@ class HostTypeData(object):
         self.stats = {}
     def devs(self):
         return self.times.keys()
-    def add_stats(self, time, dev, vals):
+    def add_stats(self, time, dev, val_str):
+        nr_cols = len(self.schema.entries)
+        vals = numpy.zeros(nr_cols, numpy.uint64)
+        for i, s in enumerate(val_str.split()):
+            if i < nr_cols:
+                vals[i] = s
+            else:
+                error("type `%s', dev `%s': too many values\n", self.name, dev)
         self.times.setdefault(dev, []).append(time)
         self.stats.setdefault(dev, []).append(vals)
     def process_stats(self):
@@ -319,7 +327,7 @@ class HostTypeData(object):
             nr_cols = len(self.schema.entries)
             old_stats = self.stats[dev]
             new_stats = self.stats[dev] = numpy.zeros((nr_rows, nr_cols), numpy.uint64)
-            base_vals = list(old_stats[0])
+            base_vals = numpy.array(old_stats[0], numpy.uint64)
             prev_vals = old_stats[0]
             for row in range(0, nr_rows):
                 for new_col, entry in enumerate(self.schema.entries):
@@ -329,15 +337,15 @@ class HostTypeData(object):
                         prev_val = prev_vals[old_col]
                         if val < prev_val:
                             width = entry.width or 64 # XXX
-                            if abs(val - prev_val) < 0.25 * (2.0 ** width): #XXX
+                            if prev_val - val < 0.25 * (2.0 ** width): #XXX
                                 trace("spurious rollover on type `%s', dev `%s', counter `%s', val %d, prev %d\n",
                                       self.name, dev, entry.key, val, prev_val)
                                 val = prev_val
                             else:
                                 if self.name != "amd64_pmc": # XXX
-                                    trace("rollover on type `%s', dev `%s', counter `%s', val %d, prev %d\n",
+                                    error("rollover on type `%s', dev `%s', counter `%s', val %d, prev %d\n",
                                           self.name, dev, entry.key, val, prev_val)
-                                base_vals[old_col] -= 1L << width
+                                base_vals[old_col] -= numpy.uint64(1L << width)
                         val -= base_vals[old_col]
                     if entry.mult:
                         val *= entry.mult
@@ -382,11 +390,11 @@ class SchemaEntry(object):
                 while i < len(opt) and opt[i].isdigit():
                     i += 1
                 if i > 2:
-                    self.mult = int(opt[2:i])
+                    self.mult = numpy.uint64((opt[2:i]))
                 if i < len(opt):
                     self.unit = opt[i:]
                 if self.unit == "KB":
-                    self.mult = 1024
+                    self.mult = numpy.uint64(1024)
                     self.unit = "B"
             else:
                 error("unrecognized option `%s' in schema entry spec `%s'\n", opt, desc)
