@@ -168,7 +168,7 @@ static void collect_ib_ext(struct stats_type *type)
     closedir(sys_dir);
 }
 
-struct stats_type ib_stats_type_EXT = {
+struct stats_type ib_ext_stats_type = {
   .st_name = "ib_ext",
   .st_collect = &collect_ib_ext,
 #define X SCHEMA_DEF
