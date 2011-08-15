@@ -55,6 +55,7 @@ static void collect_proc_stat(struct stats_type *type)
 {
   const char *path = "/proc/stat";
   FILE *file = NULL;
+  char file_buf[4096];
   char *line = NULL;
   size_t line_size = 0;
 
@@ -63,6 +64,7 @@ static void collect_proc_stat(struct stats_type *type)
     ERROR("cannot open `%s': %m\n", path);
     goto out;
   }
+  setvbuf(file, file_buf, _IOFBF, sizeof(file_buf));
 
   while (getline(&line, &line_size, file) >= 0) {
     char *key, *rest = line;

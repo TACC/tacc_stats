@@ -138,6 +138,7 @@ static void collect_llite_fs(struct stats *stats, const char *d_name)
 {
   char *path = NULL;
   FILE *file = NULL;
+  char file_buf[4096];
   char *line_buf = NULL;
   size_t line_buf_size = 0;
 
@@ -151,6 +152,7 @@ static void collect_llite_fs(struct stats *stats, const char *d_name)
     ERROR("cannot open `%s': %m\n", path);
     goto out;
   }
+  setvbuf(file, file_buf, _IOFBF, sizeof(file_buf));
 
   // $ cat /proc/fs/lustre/llite/scratch-ffff81019a4eb000/stats
   // snapshot_time             1301585789.189183 secs.usecs

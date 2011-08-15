@@ -7,6 +7,7 @@
 #include "stats.h"
 #include "trace.h"
 #include "string1.h"
+#include "pscanf.h"
 
 // $ cat /proc/stat
 // cpu ...
@@ -31,6 +32,7 @@ static void collect_proc_stat(struct stats *ps_stats)
 {
   const char *path = "/proc/stat";
   FILE *file = NULL;
+  char file_buf[4096];
   char *line = NULL;
   size_t line_size = 0;
 
@@ -39,6 +41,7 @@ static void collect_proc_stat(struct stats *ps_stats)
     ERROR("cannot open `%s': %m\n", path);
     goto out;
   }
+  setvbuf(file, file_buf, _IOFBF, sizeof(file_buf));
 
   while (getline(&line, &line_size, file) >= 0) {
     char *key, *rest = line;
@@ -67,27 +70,19 @@ static void collect_proc_stat(struct stats *ps_stats)
 static void collect_loadavg(struct stats *ps_stats)
 {
   const char *path = "/proc/loadavg";
-  FILE *file = NULL;
-
-  file = fopen(path, "r");
-  if (file == NULL) {
-    ERROR("cannot open `%s': %m\n", path);
-    goto out;
-  }
-
   unsigned long long load[3][2];
   unsigned long long nr_running = 0, nr_threads = 0;
 
   memset(load, 0, sizeof(load));
 
   /* Ignore last_pid (sixth field). */
-  if (fscanf(file, "%llu.%llu %llu.%llu %llu.%llu %llu/%llu",
+  if (pscanf(path, "%llu.%llu %llu.%llu %llu.%llu %llu/%llu",
              &load[0][0], &load[0][1],
              &load[1][0], &load[1][1],
              &load[2][0], &load[2][1],
-             &nr_running, &nr_threads) <= 0) {
+             &nr_running, &nr_threads) != 8) {
     /* XXX */
-    goto out;
+    return;
   }
 
   stats_set(ps_stats, "load_1",  load[0][0] * 100 + load[0][1]);
@@ -95,10 +90,6 @@ static void collect_loadavg(struct stats *ps_stats)
   stats_set(ps_stats, "load_15", load[2][0] * 100 + load[2][1]);
   stats_set(ps_stats, "nr_running", nr_running);
   stats_set(ps_stats, "nr_threads", nr_threads);
-
- out:
-  if (file != NULL)
-    fclose(file);
 }
 
 static void collect_ps(struct stats_type *type)

@@ -35,8 +35,9 @@
 static void collect_sysv_shm(struct stats_type *type)
 {
   struct stats *stats = NULL;
-  const char *shm_path = "/proc/sysvipc/shm";
-  FILE *shm_file = NULL;
+  const char *path = "/proc/sysvipc/shm";
+  FILE *file = NULL;
+  char file_buf[4096];
   char *line_buf = NULL;
   size_t line_buf_size = 0;
 
@@ -44,18 +45,19 @@ static void collect_sysv_shm(struct stats_type *type)
   if (stats == NULL)
     goto out;
 
-  shm_file = fopen(shm_path, "r");
-  if (shm_file == NULL) {
-    ERROR("cannot open `%s': %m\n", shm_path);
+  file = fopen(path, "r");
+  if (file == NULL) {
+    ERROR("cannot open `%s': %m\n", path);
     goto out;
   }
+  setvbuf(file, file_buf, _IOFBF, sizeof(file_buf));
 
   /* Skip header. */
-  getline(&line_buf, &line_buf_size, shm_file);
+  getline(&line_buf, &line_buf_size, file);
 
   unsigned long long mem_used = 0, segs_used = 0;
 
-  while (getline(&line_buf, &line_buf_size, shm_file) >= 0) {
+  while (getline(&line_buf, &line_buf_size, file) >= 0) {
     unsigned long long seg_size = 0;
     if (sscanf(line_buf, "%*d %*d %*o %llu", &seg_size) < 1)
       continue;
@@ -69,8 +71,8 @@ static void collect_sysv_shm(struct stats_type *type)
 
  out:
   free(line_buf);
-  if (shm_file != NULL)
-    fclose(shm_file);
+  if (file != NULL)
+    fclose(file);
 }
 
 struct stats_type sysv_shm_stats_type = {
