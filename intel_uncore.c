@@ -41,37 +41,6 @@
 #define MSR_UNCORE_PERFEVTSEL6 0x3C6
 #define MSR_UNCORE_PERFEVTSEL7 0x3C7
 
-#define UNC_EVENT(sel, mask) ((sel) | ((mask) << 8) | (1 << 22))
-
-/* Volume 3B: Non-architectural Performance monitoring events of the
-   uncore sub-system for Processors with CPUID signature of
-   DisplayFamily_DisplayModel 06_25H, 06_2CH, and 06_1FH support
-   performance events listed in Table A-7. */
-
-#define CPU_IS_WESTMERE(family, model) \
-  ((family) == 6 && (((model) == 0x25) || ((model) == 0x2c) || ((model) == 0x1f)))
-
-#define UNC_L3_HITS_READ UNC_EVENT(0x08, 0x01)
-  /* Number of code read, data read and RFO requests that hit in the L3. */
-#define UNC_L3_HITS_WRITE UNC_EVENT(0x08, 0x02)
-  /* Number of writeback requests that hit in the L3. Writebacks from
-     the cores will always result in L3 hits due to the inclusive
-     property of the L3. */
-#define UNC_L3_HITS_PROBE UNC_EVENT(0x08, 0x04)
-  /* Number of snoops from IOH or remote sockets that hit in the L3. */
-#define UNC_L3_MISS_READ UNC_EVENT(0x09, 0x01)
-  /* Number of code read, data read and RFO requests that miss the L3. */
-#define UNC_L3_MISS_WRITE UNC_EVENT(0x09, 0x02) /* XXX 0? */
-  /* Number of writeback requests that miss the L3. Should always be
-     zero as writebacks from the cores will always result in L3 hits
-     due to the inclusive property of the L3. */
-#define UNC_L3_MISS_PROBE UNC_EVENT(0x09, 0x04)
-  /* Number of snoops from IOH or remote sockets that miss the L3. */
-#define UNC_L3_LINES_IN_ANY UNC_EVENT(0x0a, 0x0f)
-  /* Counts the number of L3 lines allocated in any state. */
-#define UNC_L3_LINES_OUT_ANY UNC_EVENT(0x0b, 0x1f)
-  /* Counts the number of L3 lines victimized in any state. */
-
 #define KEYS \
   X(PERF_GLOBAL_CTRL, "C", ""), \
   X(PERF_GLOBAL_STATUS, "C", ""), \
@@ -95,6 +64,37 @@
   X(PERFEVTSEL5, "C", ""), \
   X(PERFEVTSEL6, "C", ""), \
   X(PERFEVTSEL7, "C", "")
+
+/* Volume 3B: Non-architectural Performance monitoring events of the
+   uncore sub-system for Processors with CPUID signature of
+   DisplayFamily_DisplayModel 06_25H, 06_2CH, and 06_1FH support
+   performance events listed in Table A-7. */
+
+#define CPU_IS_WESTMERE(family, model) \
+  ((family) == 6 && (((model) == 0x25) || ((model) == 0x2c) || ((model) == 0x1f)))
+
+#define UNC_EVENT(sel, mask) ((sel) | ((mask) << 8) | (1 << 22))
+
+#define UNC_L3_HITS_READ UNC_EVENT(0x08, 0x01)
+  /* Number of code read, data read and RFO requests that hit in the L3. */
+#define UNC_L3_HITS_WRITE UNC_EVENT(0x08, 0x02)
+  /* Number of writeback requests that hit in the L3. Writebacks from
+     the cores will always result in L3 hits due to the inclusive
+     property of the L3. */
+#define UNC_L3_HITS_PROBE UNC_EVENT(0x08, 0x04)
+  /* Number of snoops from IOH or remote sockets that hit in the L3. */
+#define UNC_L3_MISS_READ UNC_EVENT(0x09, 0x01)
+  /* Number of code read, data read and RFO requests that miss the L3. */
+#define UNC_L3_MISS_WRITE UNC_EVENT(0x09, 0x02)
+  /* Number of writeback requests that miss the L3. Should always be
+     zero as writebacks from the cores will always result in L3 hits
+     due to the inclusive property of the L3. */
+#define UNC_L3_MISS_PROBE UNC_EVENT(0x09, 0x04)
+  /* Number of snoops from IOH or remote sockets that miss the L3. */
+#define UNC_L3_LINES_IN_ANY UNC_EVENT(0x0a, 0x0f)
+  /* Counts the number of L3 lines allocated in any state. */
+#define UNC_L3_LINES_OUT_ANY UNC_EVENT(0x0b, 0x1f)
+  /* Counts the number of L3 lines victimized in any state. */
 
 static int cpu_is_westmere(char *cpu)
 {
@@ -134,10 +134,9 @@ static int cpu_is_westmere(char *cpu)
   unsigned int model = ((buf[0] & 0xf0) >> 4) | ((buf[0] & 0xf0000) >> 12);
   unsigned int family = (buf[0] & 0xf00) >> 8;
 
-  TRACE("cpu %s, family %x, model %x, stepping %x\n", cpu, family, model, stepping);
+  rc = CPU_IS_WESTMERE(family, model); 
 
-  if (CPU_IS_WESTMERE(family, model))
-    rc = 1;
+  TRACE("cpu %s, family %x, model %x, stepping %x, rc %d\n", cpu, family, model, stepping, rc);
 
  out:
   if (cpuid_fd >= 0)
@@ -214,10 +213,6 @@ static int begin_uncore(struct stats_type *type)
     char core_id_path[80];
     int core_id = -1;
 
-    snprintf(cpu, sizeof(cpu), "%d", i);
-    if (!cpu_is_westmere(cpu))
-      continue;
-
     /* Only program uncore counters on core 0 of a socket. */
 
     snprintf(core_id_path, sizeof(core_id_path), "/sys/devices/system/cpu/cpu%d/topology/core_id", i);
@@ -227,6 +222,10 @@ static int begin_uncore(struct stats_type *type)
     }
 
     if (core_id != 0)
+      continue;
+
+    snprintf(cpu, sizeof(cpu), "%d", i);
+    if (!cpu_is_westmere(cpu))
       continue;
 
     if (begin_uncore_cpu(type, cpu) == 0)
@@ -304,10 +303,6 @@ static void collect_uncore(struct stats_type *type)
     char core_id_path[80];
     int core_id = -1;
 
-    snprintf(cpu, sizeof(cpu), "%d", i);
-    if (!cpu_is_westmere(cpu))
-      continue;
-
     /* Only collect uncore counters on core 0 of a socket. */
     snprintf(core_id_path, sizeof(core_id_path), "/sys/devices/system/cpu/cpu%d/topology/core_id", i);
     if (pscanf(core_id_path, "%d", &core_id) != 1) {
@@ -316,6 +311,10 @@ static void collect_uncore(struct stats_type *type)
     }
 
     if (core_id != 0)
+      continue;
+
+    snprintf(cpu, sizeof(cpu), "%d", i);
+    if (!cpu_is_westmere(cpu))
       continue;
 
     collect_uncore_cpu(type, cpu);
