@@ -1,11 +1,8 @@
 #include <stdio.h>
 #include <stdlib.h>
-#include <fcntl.h>
 #include <dirent.h>
-#include <unistd.h>
 #include "stats.h"
 #include "trace.h"
-#include "dict.h"
 #include "string1.h"
 #include "lustre_obd_to_mnt.h"
 
