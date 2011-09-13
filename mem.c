@@ -61,6 +61,7 @@ static void collect_meminfo_node(struct stats *stats, const char *node)
 {
   char path[80];
   FILE *file = NULL;
+  char file_buf[4096];
   char *line = NULL;
   size_t line_size = 0;
 
@@ -70,6 +71,7 @@ static void collect_meminfo_node(struct stats *stats, const char *node)
     ERROR("cannot open `%s': %m\n", path);
     goto out;
   }
+  setvbuf(file, file_buf, _IOFBF, sizeof(file_buf));
 
   while (getline(&line, &line_size, file) >= 0) {
     char key[81];

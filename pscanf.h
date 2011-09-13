@@ -8,12 +8,14 @@ __attribute__((format(scanf, 2, 3)))
 {
   int rc = -1;
   FILE *file = NULL;
+  char file_buf[4096];
   va_list arg_list;
   va_start(arg_list, fmt);
 
   file = fopen(path, "r");
   if (file == NULL)
     goto out;
+  setvbuf(file, file_buf, _IOFBF, sizeof(file_buf));
 
   rc = vfscanf(file, fmt, arg_list);
 

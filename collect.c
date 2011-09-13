@@ -11,6 +11,7 @@ int collect_single(const char *path, unsigned long long *dest)
 {
   int rc = 0;
   FILE *file = NULL;
+  char file_buf[4096];
   unsigned long long val;
 
   file = fopen(path, "r");
@@ -19,6 +20,7 @@ int collect_single(const char *path, unsigned long long *dest)
     rc = -1;
     goto out;
   }
+  setvbuf(file, file_buf, _IOFBF, sizeof(file_buf));
 
   if (fscanf(file, "%llu", &val) == 1) {
     *dest = val;
@@ -36,6 +38,7 @@ int collect_list(const char *path, ...)
 {
   int rc = 0;
   FILE *file = NULL;
+  char file_buf[4096];
   va_list dest_list;
   va_start(dest_list, path);
 
@@ -45,6 +48,7 @@ int collect_list(const char *path, ...)
     rc = -1;
     goto out;
   }
+  setvbuf(file, file_buf, _IOFBF, sizeof(file_buf));
 
   unsigned long long *dest;
   while ((dest = va_arg(dest_list, unsigned long long *)) != NULL) {
@@ -68,6 +72,7 @@ int collect_key_list(struct stats *stats, const char *path, ...)
 {
   int rc = 0;
   FILE *file = NULL;
+  char file_buf[4096];
   va_list key_list;
   va_start(key_list, path);
 
@@ -77,6 +82,7 @@ int collect_key_list(struct stats *stats, const char *path, ...)
     rc = -1;
     goto out;
   }
+  setvbuf(file, file_buf, _IOFBF, sizeof(file_buf));
 
   const char *key;
   while ((key = va_arg(key_list, const char *)) != NULL) {
@@ -102,6 +108,7 @@ int collect_key_value_file(struct stats *stats, const char *path)
 {
   int rc = 0;
   FILE *file = NULL;
+  char file_buf[4096];
   char *line = NULL;
   size_t line_size = 0;
 
@@ -111,6 +118,7 @@ int collect_key_value_file(struct stats *stats, const char *path)
     rc = -1;
     goto out;
   }
+  setvbuf(file, file_buf, _IOFBF, sizeof(file_buf));
 
   while (getline(&line, &line_size, file) >= 0) {
     char *key, *rest = line;

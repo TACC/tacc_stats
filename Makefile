@@ -16,7 +16,7 @@ CPPFLAGS = -D_GNU_SOURCE \
 
 -include $(config)
 
-OBJS = main.o stats.o dict.o collect.o schema.o stats_file.o
+OBJS = main.o stats.o dict.o collect.o schema.o stats_file.o lustre_obd_to_mnt.o
 OBJS += $(patsubst %,%.o,$(TYPES))
 
 $(name): $(OBJS)

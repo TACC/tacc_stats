@@ -33,6 +33,7 @@ static void collect_ib_dev(struct stats_type *type, const char *dev)
   for (port = 1; port <= 2; port++) {
     char path[80], id[80], cmd[160];
     FILE *file = NULL;
+    char file_buf[4096];
     unsigned int lid;
     struct stats *stats = NULL;
 
@@ -40,6 +41,7 @@ static void collect_ib_dev(struct stats_type *type, const char *dev)
     file = fopen(path, "r");
     if (file == NULL)
       goto next; /* ERROR("cannot open `%s': %m\n", path); */
+    setvbuf(file, file_buf, _IOFBF, sizeof(file_buf));
 
     char buf[80] = { 0 };
     if (fgets(buf, sizeof(buf), file) == NULL)
@@ -64,6 +66,10 @@ static void collect_ib_dev(struct stats_type *type, const char *dev)
     /* Get the LID for perfquery. */
     snprintf(path, sizeof(path), "/sys/class/infiniband/%s/ports/%i/lid", dev, port);
     file = fopen(path, "r");
+    if (file == NULL)
+      goto next;
+    setvbuf(file, file_buf, _IOFBF, sizeof(file_buf));
+
     if (fscanf(file, "%x", &lid) != 1)
       goto next;
 

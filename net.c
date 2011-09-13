@@ -11,6 +11,7 @@
 #include <linux/if.h>
 #include "stats.h"
 #include "collect.h"
+#include "pscanf.h"
 #include "trace.h"
 
 #define KEYS \
@@ -66,22 +67,15 @@ static void collect_net(struct stats_type *type)
   while ((ent = readdir(dir)) != NULL) {
     unsigned int flags;
     char flags_path[80];
-    FILE *flags_file = NULL;
 
     if (ent->d_name[0] == '.')
-      goto next;
+      continue;
 
     /* Only collect if dev is up. */
     snprintf(flags_path, sizeof(flags_path), "/sys/class/net/%s/flags", ent->d_name);
-    flags_file = fopen(flags_path, "r");
-    if (flags_file == NULL) {
-      ERROR("cannot open `%s'; %m\n", flags_path);
-      goto next;
-    }
-
-    if (fscanf(flags_file, "%x", &flags) != 1) {
+    if (pscanf(flags_path, "%x", &flags) != 1) {
       ERROR("cannot read flags for device `%s'\n", ent->d_name);
-      goto next;
+      continue;
     }
 
 #define NET_FLAGS \
@@ -108,14 +102,8 @@ static void collect_net(struct stats_type *type)
           ent->d_name, flags, NET_FLAGS);
 #undef X
 
-    if ((flags & IFF_UP) == 0)
-      goto next;
-
-    collect_net_dev(type, ent->d_name);
-
-  next:
-    if (flags_file != NULL)
-      fclose(flags_file);
+    if (flags & IFF_UP)
+      collect_net_dev(type, ent->d_name);
   }
 
  out:
