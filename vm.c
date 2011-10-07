@@ -4,8 +4,8 @@
 #include "collect.h"
 
 #define KEYS \
-  X(pgpgin, "E", ""), \
-  X(pgpgout, "E", ""), \
+  X(pgpgin, "E,U=KB", ""), \
+  X(pgpgout, "E,U=KB", ""), \
   X(pswpin, "E", ""), \
   X(pswpout, "E", ""), \
   X(pgalloc_normal, "E", ""), \
