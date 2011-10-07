@@ -46,7 +46,17 @@
   X(getxattr, "E", ""), \
   X(listxattr, "E", ""), \
   X(removexattr, "E", ""), \
-  X(inode_permission, "E", "")
+  X(inode_permission, "E", ""), \
+  X(readdir, "E", ""), \
+  X(create, "E", ""), \
+  X(lookup, "E", ""), \
+  X(link, "E", ""), \
+  X(unlink, "E", ""), \
+  X(symlink, "E", ""), \
+  X(mkdir, "E", ""), \
+  X(rmdir, "E", ""), \
+  X(mknod, "E", ""), \
+  X(rename, "E", "")
 
 static void collect_llite_fs(struct stats *stats, const char *d_name)
 {
