@@ -162,5 +162,6 @@ void stats_inc(struct stats *stats, const char *key, unsigned long long val)
   TRACE("%s %s %s %llu %d\n",
         stats->s_type->st_name, stats->s_dev, key, val, i);
 
-  stats->s_val[i] = val;
+  if (i >= 0)
+    stats->s_val[i] = val;
 }

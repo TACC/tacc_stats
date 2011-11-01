@@ -21,7 +21,7 @@ to trigger collection and archiving.
 %setup -q
 
 %build
-make name=%{name} version=%{version} config=%{!?config: config} stats_dir=%{stats_dir}
+make name=%{name} version=%{version} %{?config: config=%{config}} stats_dir=%{stats_dir}
 
 %install
 rm -rf %{buildroot}
@@ -53,6 +53,7 @@ fi
 rm -rf %{buildroot}
 
 %files
-%attr(0755,root,root) %{_bindir}
+%defattr(-,root,root,-)
+%dir %{_bindir}/
 %attr(6755,root,root) %{_bindir}/%{name}
 %attr(0755,root,root) %{_bindir}/%{name}_archive
