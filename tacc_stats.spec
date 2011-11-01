@@ -1,6 +1,6 @@
 Summary: TACC system statistics collector
 Name: tacc_stats
-Version: 1.0.2
+Version: 1.0.3
 Release: 1
 Copyright: University of Texas at Austin
 Vendor: TACC/Ranger
@@ -21,7 +21,7 @@ to trigger collection and archiving.
 %setup -q
 
 %build
-make name=%{name} version=%{version} stats_dir=%{stats_dir}
+make name=%{name} version=%{version} config=%{!?config: config} stats_dir=%{stats_dir}
 
 %install
 rm -rf %{buildroot}
