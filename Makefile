@@ -6,7 +6,7 @@ jobid_file = /var/run/TACC_jobid
 config = config
 
 CC = gcc
-CFLAGS = -Wall -Werror -O3 # -DDEBUG
+CFLAGS = -g -Wall -Werror -O3 # -DDEBUG
 CPPFLAGS = -D_GNU_SOURCE \
  -DSTATS_PROGRAM=\"$(name)\" \
  -DSTATS_VERSION=\"$(version)\" \
