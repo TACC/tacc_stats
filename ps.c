@@ -28,7 +28,7 @@
   X(nr_running, "", ""), \
   X(nr_threads, "", "")
 
-static void collect_proc_stat(struct stats *ps_stats)
+static void ps_collect_proc_stat(struct stats *stats)
 {
   const char *path = "/proc/stat";
   FILE *file = NULL;
@@ -58,7 +58,7 @@ static void collect_proc_stat(struct stats *ps_stats)
     errno = 0;
     unsigned long long val = strtoull(rest, NULL, 0);
     if (errno == 0)
-      stats_set(ps_stats, key, val);
+      stats_set(stats, key, val);
   }
 
  out:
@@ -67,7 +67,7 @@ static void collect_proc_stat(struct stats *ps_stats)
     fclose(file);
 }
 
-static void collect_loadavg(struct stats *ps_stats)
+static void ps_collect_loadavg(struct stats *stats)
 {
   const char *path = "/proc/loadavg";
   unsigned long long load[3][2];
@@ -85,28 +85,28 @@ static void collect_loadavg(struct stats *ps_stats)
     return;
   }
 
-  stats_set(ps_stats, "load_1",  load[0][0] * 100 + load[0][1]);
-  stats_set(ps_stats, "load_5",  load[1][0] * 100 + load[1][1]);
-  stats_set(ps_stats, "load_15", load[2][0] * 100 + load[2][1]);
-  stats_set(ps_stats, "nr_running", nr_running);
-  stats_set(ps_stats, "nr_threads", nr_threads);
+  stats_set(stats, "load_1",  load[0][0] * 100 + load[0][1]);
+  stats_set(stats, "load_5",  load[1][0] * 100 + load[1][1]);
+  stats_set(stats, "load_15", load[2][0] * 100 + load[2][1]);
+  stats_set(stats, "nr_running", nr_running);
+  stats_set(stats, "nr_threads", nr_threads);
 }
 
-static void collect_ps(struct stats_type *type)
+static void ps_collect(struct stats_type *type)
 {
-  struct stats *ps_stats = NULL;
+  struct stats *stats = NULL;
 
-  ps_stats = get_current_stats(type, NULL);
-  if (ps_stats == NULL)
+  stats = get_current_stats(type, NULL);
+  if (stats == NULL)
     return;
 
-  collect_proc_stat(ps_stats);
-  collect_loadavg(ps_stats);
+  ps_collect_proc_stat(stats);
+  ps_collect_loadavg(stats);
 }
 
 struct stats_type ps_stats_type = {
   .st_name = "ps",
-  .st_collect = &collect_ps,
+  .st_collect = &ps_collect,
 #define X SCHEMA_DEF
   .st_schema_def = JOIN(KEYS),
 #undef X
