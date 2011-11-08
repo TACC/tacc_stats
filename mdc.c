@@ -20,7 +20,7 @@
   X(reqs, "E", ""), \
   X(wait, "E,U=us", "")
 
-static void collect_mdc_fs(struct stats *stats, const char *d_name)
+static void mdc_collect_fs(struct stats *stats, const char *d_name)
 {
   char *path = NULL;
   FILE *file = NULL;
@@ -55,9 +55,6 @@ static void collect_mdc_fs(struct stats *stats, const char *d_name)
   // ldlm_cancel               169832 samples [usec] 32 8257 25752413 4873947759
   // obd_ping                  112820 samples [usec] 40 1543848 548167082 592878039802964
 
-  /* Skip snapshot. */
-  getline(&line_buf, &line_buf_size, file);
-
   while (getline(&line_buf, &line_buf_size, file) >= 0) {
     char *line = line_buf;
     char *key = wsep(&line);
@@ -83,7 +80,7 @@ static void collect_mdc_fs(struct stats *stats, const char *d_name)
   free(path);
 }
 
-static void collect_mdc(struct stats_type *type)
+static void mdc_collect(struct stats_type *type)
 {
   const char *mdc_dir_path = MDC_DIR_PATH;
   DIR *mdc_dir = NULL;
@@ -112,7 +109,7 @@ static void collect_mdc(struct stats_type *type)
     if (stats == NULL)
       continue;
 
-    collect_mdc_fs(stats, de->d_name);
+    mdc_collect_fs(stats, de->d_name);
   }
 
  out:
@@ -122,7 +119,7 @@ static void collect_mdc(struct stats_type *type)
 
 struct stats_type mdc_stats_type = {
   .st_name = "mdc",
-  .st_collect = &collect_mdc,
+  .st_collect = &mdc_collect,
 #define X SCHEMA_DEF
   .st_schema_def = JOIN(KEYS),
 #undef X

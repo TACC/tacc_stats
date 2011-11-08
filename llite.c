@@ -58,7 +58,7 @@
   X(mknod, "E", ""), \
   X(rename, "E", "")
 
-static void collect_llite_fs(struct stats *stats, const char *d_name)
+static void llite_collect_fs(struct stats *stats, const char *d_name)
 {
   char *path = NULL;
   FILE *file = NULL;
@@ -87,9 +87,6 @@ static void collect_llite_fs(struct stats *stats, const char *d_name)
   // brw_read                  13 samples [pages] 4096 4096 53248
   // ioctl                     8050 samples [regs]
 
-  /* Skip snapshot. */
-  getline(&line_buf, &line_buf_size, file);
-
   while (getline(&line_buf, &line_buf_size, file) >= 0) {
     char *line = line_buf;
     char *key = wsep(&line);
@@ -111,7 +108,7 @@ static void collect_llite_fs(struct stats *stats, const char *d_name)
   free(path);
 }
 
-static void collect_llite(struct stats_type *type)
+static void llite_collect(struct stats_type *type)
 {
   const char *llite_dir_path = LLITE_DIR_PATH;
   DIR *llite_dir = NULL;
@@ -140,7 +137,7 @@ static void collect_llite(struct stats_type *type)
     if (stats == NULL)
       continue;
 
-    collect_llite_fs(stats, de->d_name);
+    llite_collect_fs(stats, de->d_name);
   }
 
  out:
@@ -150,7 +147,7 @@ static void collect_llite(struct stats_type *type)
 
 struct stats_type llite_stats_type = {
   .st_name = "llite",
-  .st_collect = &collect_llite,
+  .st_collect = &llite_collect,
 #define X SCHEMA_DEF
   .st_schema_def = JOIN(KEYS),
 #undef X

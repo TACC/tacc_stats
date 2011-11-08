@@ -20,7 +20,7 @@
   X(reqs, "E", ""), \
   X(wait, "E,U=us", "")
 
-static void collect_osc_fs(struct stats *stats, const char *d_name)
+static void osc_collect_fs(struct stats *stats, const char *d_name)
 {
   char *path = NULL;
   FILE *file = NULL;
@@ -56,9 +56,6 @@ static void collect_osc_fs(struct stats *stats, const char *d_name)
   // ldlm_cancel               266738 samples [usec] 31 215570 57640045 563159939987
   // obd_ping                  114215 samples [usec] 43 63021 130531843 219411737307
 
-  /* Skip snapshot. */
-  getline(&line_buf, &line_buf_size, file);
-
   while (getline(&line_buf, &line_buf_size, file) >= 0) {
     char *line = line_buf;
     char *key = wsep(&line);
@@ -86,7 +83,7 @@ static void collect_osc_fs(struct stats *stats, const char *d_name)
   free(path);
 }
 
-static void collect_osc(struct stats_type *type)
+static void osc_collect(struct stats_type *type)
 {
   const char *osc_dir_path = OSC_DIR_PATH;
   DIR *osc_dir = NULL;
@@ -115,7 +112,7 @@ static void collect_osc(struct stats_type *type)
     if (stats == NULL)
       continue;
 
-    collect_osc_fs(stats, de->d_name);
+    osc_collect_fs(stats, de->d_name);
   }
 
  out:
@@ -125,7 +122,7 @@ static void collect_osc(struct stats_type *type)
 
 struct stats_type osc_stats_type = {
   .st_name = "osc",
-  .st_collect = &collect_osc,
+  .st_collect = &osc_collect,
 #define X SCHEMA_DEF
   .st_schema_def = JOIN(KEYS),
 #undef X

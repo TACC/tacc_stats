@@ -32,7 +32,7 @@
   X(mem_used, "U=B", "System V shared memory used"), \
   X(segs_used, "", "number of System V shared segments used")
 
-static void collect_sysv_shm(struct stats_type *type)
+static void sysv_shm_collect(struct stats_type *type)
 {
   struct stats *stats = NULL;
   const char *path = "/proc/sysvipc/shm";
@@ -53,7 +53,8 @@ static void collect_sysv_shm(struct stats_type *type)
   setvbuf(file, file_buf, _IOFBF, sizeof(file_buf));
 
   /* Skip header. */
-  getline(&line_buf, &line_buf_size, file);
+  if (getline(&line_buf, &line_buf_size, file) < 0)
+    goto out;
 
   unsigned long long mem_used = 0, segs_used = 0;
 
@@ -77,7 +78,7 @@ static void collect_sysv_shm(struct stats_type *type)
 
 struct stats_type sysv_shm_stats_type = {
   .st_name = "sysv_shm",
-  .st_collect = &collect_sysv_shm,
+  .st_collect = &sysv_shm_collect,
 #define X SCHEMA_DEF
   .st_schema_def = JOIN(KEYS),
 #undef X
