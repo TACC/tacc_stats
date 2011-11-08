@@ -12,7 +12,7 @@
   X(bytes_used, "U=B", "bytes used"), \
   X(files_used, "", "files used")
 
-static void collect_tmpfs(struct stats_type *type)
+static void tmpfs_collect(struct stats_type *type)
 {
   const char *me_path = "/proc/mounts";
   FILE *me_file = NULL;
@@ -55,7 +55,7 @@ static void collect_tmpfs(struct stats_type *type)
 
 struct stats_type tmpfs_stats_type = {
   .st_name = "tmpfs",
-  .st_collect = &collect_tmpfs,
+  .st_collect = &tmpfs_collect,
 #define X SCHEMA_DEF
   .st_schema_def = JOIN(KEYS),
 #undef X
