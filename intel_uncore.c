@@ -145,7 +145,7 @@ static int cpu_is_westmere(char *cpu)
   return rc;
 }
 
-static int begin_uncore_cpu(struct stats_type *type, const char *cpu)
+static int intel_uncore_begin_cpu(struct stats_type *type, const char *cpu)
 {
   int rc = -1;
   char msr_path[80];
@@ -205,7 +205,7 @@ static int begin_uncore_cpu(struct stats_type *type, const char *cpu)
   return rc;
 }
 
-static int begin_uncore(struct stats_type *type)
+static int intel_uncore_begin(struct stats_type *type)
 {
   int i, nr = 0;
   for (i = 0; i < nr_cpus; i++) {
@@ -228,14 +228,14 @@ static int begin_uncore(struct stats_type *type)
     if (!cpu_is_westmere(cpu))
       continue;
 
-    if (begin_uncore_cpu(type, cpu) == 0)
+    if (intel_uncore_begin_cpu(type, cpu) == 0)
       nr++;
   }
 
   return nr > 0 ? 0 : -1;
 }
 
-static void collect_uncore_cpu(struct stats_type *type, char *cpu)
+static void intel_uncore_collect_cpu(struct stats_type *type, char *cpu)
 {
   struct stats *stats = NULL;
   char msr_path[80];
@@ -272,7 +272,7 @@ static void collect_uncore_cpu(struct stats_type *type, char *cpu)
     close(msr_fd);
 }
 
-static void collect_uncore(struct stats_type *type)
+static void intel_uncore_collect(struct stats_type *type)
 {
   // $ cd /sys/devices/system/cpu/cpu0/topology
   // $ for f in *; do echo $f $(cat $f); done
@@ -317,14 +317,14 @@ static void collect_uncore(struct stats_type *type)
     if (!cpu_is_westmere(cpu))
       continue;
 
-    collect_uncore_cpu(type, cpu);
+    intel_uncore_collect_cpu(type, cpu);
   }
 }
 
 struct stats_type intel_uncore_stats_type = {
   .st_name = "intel_uncore",
-  .st_begin = &begin_uncore,
-  .st_collect = &collect_uncore,
+  .st_begin = &intel_uncore_begin,
+  .st_collect = &intel_uncore_collect,
 #define X SCHEMA_DEF
   .st_schema_def = JOIN(KEYS),
 #undef X
