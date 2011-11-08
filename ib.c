@@ -27,7 +27,7 @@ const char *perfquery = "/opt/ofed/bin/perfquery";
   X(symbol_error, "E", "minor link errors"), \
   X(VL15_dropped, "E", "")
 
-static void collect_ib_dev(struct stats_type *type, const char *dev)
+static void ib_collect_dev(struct stats_type *type, const char *dev)
 {
   int port;
   for (port = 1; port <= 2; port++) {
@@ -89,7 +89,7 @@ static void collect_ib_dev(struct stats_type *type, const char *dev)
   }
 }
 
-static void collect_ib(struct stats_type *type)
+static void ib_collect(struct stats_type *type)
 {
   const char *path = "/sys/class/infiniband";
   DIR *dir = NULL;
@@ -104,7 +104,7 @@ static void collect_ib(struct stats_type *type)
   while ((ent = readdir(dir)) != NULL) {
     if (ent->d_name[0] == '.')
       continue;
-    collect_ib_dev(type, ent->d_name);
+    ib_collect_dev(type, ent->d_name);
   }
 
  out:
@@ -114,7 +114,7 @@ static void collect_ib(struct stats_type *type)
 
 struct stats_type ib_stats_type = {
   .st_name = "ib",
-  .st_collect = &collect_ib,
+  .st_collect = &ib_collect,
 #define X SCHEMA_DEF
   .st_schema_def = JOIN(KEYS),
 #undef X
