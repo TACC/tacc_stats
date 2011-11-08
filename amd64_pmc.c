@@ -94,7 +94,7 @@ static int cpu_is_amd64_10h(char *cpu)
   return rc;
 }
 
-static int begin_pmc_cpu(char *cpu, uint64_t events[], size_t nr_events)
+static int amd64_pmc_begin_cpu(char *cpu, uint64_t events[], size_t nr_events)
 {
   int rc = -1;
   char msr_path[80];
@@ -158,7 +158,7 @@ static int begin_pmc_cpu(char *cpu, uint64_t events[], size_t nr_events)
 #define DCacheSysFills PERF_EVENT(0x42, 0x01) /* Counts DCache fills from beyond the L2 cache. */
 #define SSEFLOPS       PERF_EVENT(0x03, 0x7F) /* Counts single & double, add, multiply, divide & sqrt FLOPs. */
 
-static int begin_pmc(struct stats_type *type)
+static int amd64_pmc_begin(struct stats_type *type)
 {
   int nr = 0;
 
@@ -175,14 +175,14 @@ static int begin_pmc(struct stats_type *type)
     snprintf(cpu, sizeof(cpu), "%d", i);
 
     if (cpu_is_amd64_10h(cpu))
-      if (begin_pmc_cpu(cpu, events[i % 4], 4) == 0) /* HARD */
+      if (amd64_pmc_begin_cpu(cpu, events[i % 4], 4) == 0) /* HARD */
         nr++;
   }
 
   return nr > 0 ? 0 : -1;
 }
 
-static void collect_pmc_cpu(struct stats_type *type, char *cpu)
+static void amd64_pmc_collect_cpu(struct stats_type *type, char *cpu)
 {
   char msr_path[80];
   int msr_fd = -1;
@@ -216,7 +216,7 @@ static void collect_pmc_cpu(struct stats_type *type, char *cpu)
     close(msr_fd);
 }
 
-static void collect_pmc(struct stats_type *type)
+static void amd64_pmc_collect(struct stats_type *type)
 {
   int i;
   for (i = 0; i < nr_cpus; i++) {
@@ -224,14 +224,14 @@ static void collect_pmc(struct stats_type *type)
     snprintf(cpu, sizeof(cpu), "%d", i);
 
     if (cpu_is_amd64_10h(cpu))
-      collect_pmc_cpu(type, cpu);
+      amd64_pmc_collect_cpu(type, cpu);
   }
 }
 
 struct stats_type amd64_pmc_stats_type = {
   .st_name = "amd64_pmc",
-  .st_begin = &begin_pmc,
-  .st_collect = &collect_pmc,
+  .st_begin = &amd64_pmc_begin,
+  .st_collect = &amd64_pmc_collect,
 #define X SCHEMA_DEF
   .st_schema_def = JOIN(KEYS),
 #undef X
