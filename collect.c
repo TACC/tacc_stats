@@ -105,6 +105,60 @@ int str_collect_key_list(const char *str, struct stats *stats, ...)
   return rc;
 }
 
+int str_collect_prefix_key_list(const char *str, struct stats *stats,
+				const char *pre, ...)
+{
+  int rc = 0;
+  int errno_saved = errno;
+  size_t pre_len = strlen(pre);
+  char *key = NULL;
+  va_list suf_list;
+  va_start(suf_list, pre);
+
+  const char *suf;
+  while ((suf = va_arg(suf_list, const char *)) != NULL) {
+    size_t suf_len = strlen(suf);
+    char *tmp = realloc(key, pre_len + suf_len + 1);
+    if (tmp == NULL) {
+      ERROR("cannot allocate key string: %m\n");
+      goto out;
+    }
+    key = tmp;
+
+    memcpy(key, pre, pre_len);
+    memcpy(key + pre_len, suf, suf_len);
+    key[pre_len + suf_len] = 0;
+
+    TRACE("pre `%s', suf `%s', key `%s'\n", pre, suf, key);
+
+    char *end = NULL;
+    unsigned long long val;
+
+    errno = 0;
+    val = strtoull(str, &end, 0);
+    if (errno != 0) {
+      ERROR("cannot convert str `%s' for key `%s': %m\n", str, key);
+      goto out;
+    }
+
+    if (str == end) {
+      ERROR("no value in str `%s' for key `%s'\n", str, key);
+      goto out;
+    }
+
+    stats_set(stats, key, val);
+    str = end;
+    rc++;
+  }
+
+ out:
+  free(key);
+  if (errno == 0)
+    errno = errno_saved;
+
+  return rc;
+}
+
 int path_collect_key_list(const char *path, struct stats *stats, ...)
 {
   int rc = 0;
