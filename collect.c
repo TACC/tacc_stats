@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <dirent.h>
 #include <stdarg.h>
+#include <errno.h>
 #include "stats.h"
 #include "trace.h"
 #include "collect.h"
@@ -64,6 +65,42 @@ int path_collect_list(const char *path, ...)
   if (file != NULL)
     fclose(file);
   va_end(dest_list);
+
+  return rc;
+}
+
+int str_collect_key_list(const char *str, struct stats *stats, ...)
+{
+  int rc = 0;
+  int errno_saved = errno;
+  va_list key_list;
+  va_start(key_list, stats);
+
+  const char *key;
+  while ((key = va_arg(key_list, const char *)) != NULL) {
+    char *end = NULL;
+    unsigned long long val;
+
+    errno = 0;
+    val = strtoull(str, &end, 0);
+    if (errno != 0) {
+      ERROR("cannot convert str `%s' for key `%s': %m\n", str, key);
+      goto out;
+    }
+
+    if (str == end) {
+      ERROR("no value in str `%s' for key `%s'\n", str, key);
+      goto out;
+    }
+
+    stats_set(stats, key, val);
+    str = end;
+    rc++;
+  }
+
+ out:
+  if (errno == 0)
+    errno = errno_saved;
 
   return rc;
 }

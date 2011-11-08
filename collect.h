@@ -15,4 +15,6 @@ int path_collect_key_list(const char *path, struct stats *stats, ...) __ATTRIBUT
 int path_collect_key_value(const char *path, struct stats *stats);
 int path_collect_key_value_dir(const char *dir_path, struct stats *stats);
 
+int str_collect_key_list(const char *str, struct stats *stats, ...) __ATTRIBUTE__SENTINEL;
+
 #endif
