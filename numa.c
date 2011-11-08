@@ -26,7 +26,7 @@
   X(local_node, "E", ""), \
   X(other_node, "E", "")
 
-static void collect_numa(struct stats_type *type)
+static void numa_collect(struct stats_type *type)
 {
   const char *dir_path = "/sys/devices/system/node";
   DIR *dir = NULL;
@@ -51,8 +51,8 @@ static void collect_numa(struct stats_type *type)
     if (stats == NULL)
       continue;
 
-    snprintf(path, sizeof(path), "/sys/devices/system/node/node%s/numastat", node);
-    collect_key_value_file(stats, path);
+    snprintf(path, sizeof(path), "%s/node%s/numastat", dir_path, node);
+    path_collect_key_value(path, stats);
   }
 
  out:
@@ -62,7 +62,7 @@ static void collect_numa(struct stats_type *type)
 
 struct stats_type numa_stats_type = {
   .st_name = "numa",
-  .st_collect = &collect_numa,
+  .st_collect = &numa_collect,
 #define X SCHEMA_DEF
   .st_schema_def = JOIN(KEYS),
 #undef X

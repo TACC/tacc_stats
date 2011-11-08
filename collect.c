@@ -7,7 +7,7 @@
 #include "collect.h"
 #include "string1.h"
 
-int collect_single(const char *path, unsigned long long *dest)
+int path_collect_single(const char *path, unsigned long long *dest)
 {
   int rc = 0;
   FILE *file = NULL;
@@ -34,7 +34,7 @@ int collect_single(const char *path, unsigned long long *dest)
   return rc;
 }
 
-int collect_list(const char *path, ...)
+int path_collect_list(const char *path, ...)
 {
   int rc = 0;
   FILE *file = NULL;
@@ -68,13 +68,13 @@ int collect_list(const char *path, ...)
   return rc;
 }
 
-int collect_key_list(struct stats *stats, const char *path, ...)
+int path_collect_key_list(const char *path, struct stats *stats, ...)
 {
   int rc = 0;
   FILE *file = NULL;
   char file_buf[4096];
   va_list key_list;
-  va_start(key_list, path);
+  va_start(key_list, stats);
 
   file = fopen(path, "r");
   if (file == NULL) {
@@ -104,7 +104,7 @@ int collect_key_list(struct stats *stats, const char *path, ...)
   return rc;
 }
 
-int collect_key_value_file(struct stats *stats, const char *path)
+int path_collect_key_value(const char *path, struct stats *stats)
 {
   int rc = 0;
   FILE *file = NULL;
@@ -142,7 +142,7 @@ int collect_key_value_file(struct stats *stats, const char *path)
   return rc;
 }
 
-int collect_key_value_dir(struct stats *stats, const char *dir_path)
+int path_collect_key_value_dir(const char *dir_path, struct stats *stats)
 {
   int rc = 0;
   DIR *dir = NULL;
@@ -167,7 +167,7 @@ int collect_key_value_dir(struct stats *stats, const char *dir_path)
     }
 
     unsigned long long val = 0;
-    if (collect_single(path, &val) != 1)
+    if (path_collect_single(path, &val) != 1)
       goto next;
 
     stats_set(stats, ent->d_name, val);

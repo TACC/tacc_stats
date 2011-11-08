@@ -11,7 +11,7 @@
   X(file_use, "", "number of file handles in use"), \
   X(inode_use, "", "number of inodes in use")
 
-static void collect_fs(struct stats_type *type)
+static void vfs_collect(struct stats_type *type)
 {
   struct stats *stats = NULL;
 #define X(k,r...) k = 0
@@ -34,7 +34,8 @@ static void collect_fs(struct stats_type *type)
    shrink_dcache_pages() and the dcache t pruned yet. */
 
   unsigned long long dentry_alloc = 0, dentry_free = 0;
-  if (collect_list("/proc/sys/fs/dentry-state", &dentry_alloc, &dentry_free, NULL) == 2)
+  if (path_collect_list("/proc/sys/fs/dentry-state",
+			&dentry_alloc, &dentry_free, NULL) == 2)
     dentry_use = dentry_alloc - dentry_free;
 
 /* $ cat /proc/sys/fs/file-nr
@@ -47,7 +48,7 @@ static void collect_fs(struct stats_type *type)
    error, it just means that the number of allocated file handles
    exactly matches the number of used file handles. */
 
-  collect_single("/proc/sys/fs/file-nr", &file_use);
+  path_collect_single("/proc/sys/fs/file-nr", &file_use);
 
 /* $ cat /proc/sys/fs/inode-state
    168192 59759 0 0 0 0 0
@@ -61,7 +62,8 @@ static void collect_fs(struct stats_type *type)
    prune the inode list instead of allocating more. */
 
   unsigned long long inode_alloc = 0, inode_free = 0;
-  if (collect_list("/proc/sys/fs/inode-state", &inode_alloc, &inode_free, NULL) == 2)
+  if (path_collect_list("/proc/sys/fs/inode-state",
+			&inode_alloc, &inode_free, NULL) == 2)
     inode_use = inode_alloc - inode_free;
 
 #define X(k,r...) stats_set(stats, #k, k)
@@ -71,7 +73,7 @@ static void collect_fs(struct stats_type *type)
 
 struct stats_type vfs_stats_type = {
   .st_name = "vfs",
-  .st_collect = &collect_fs,
+  .st_collect = &vfs_collect,
 #define X SCHEMA_DEF
   .st_schema_def = JOIN(KEYS),
 #undef X

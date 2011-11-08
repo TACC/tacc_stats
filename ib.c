@@ -61,7 +61,7 @@ static void collect_ib_dev(struct stats_type *type, const char *dev)
       goto next;
 
     snprintf(path, sizeof(path), "/sys/class/infiniband/%s/ports/%i/counters", dev, port);
-    collect_key_value_dir(stats, path);
+    path_collect_key_value_dir(path, stats);
 
     /* Get the LID for perfquery. */
     snprintf(path, sizeof(path), "/sys/class/infiniband/%s/ports/%i/lid", dev, port);
