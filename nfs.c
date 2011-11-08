@@ -242,7 +242,7 @@ static void nfs_collect(struct stats_type *type)
 
   /* device HOST:EXPORT mounted on MNT with fstype nfs statvers=1.0 */
 
-  char *rest, *dev, *mnt;
+  char *rest, *dev, *mnt, *ver;
   while (getline(&line, &line_size, file) >= 0) {
   skip_getline:
     rest = line;
@@ -254,8 +254,6 @@ static void nfs_collect(struct stats_type *type)
     if (dev == NULL || rest == NULL)
       continue;
 
-    TRACE("dev `%s'\n", dev);
-
     if (strip_crud(&rest, "mounted on ") < 0)
       continue;
 
@@ -264,15 +262,17 @@ static void nfs_collect(struct stats_type *type)
     if (mnt == NULL || rest == NULL)
       continue;
 
-    TRACE("mnt `%s'\n", mnt);
-
-    if (strip_crud(&rest, "with fstype nfs ") < 0)
+    if (strip_crud(&rest, "with fstype nfs statvers=") < 0)
       continue;
 
-    if (strstr(rest, "statsvers=1.0") == NULL) {
-      TRACE("unknown nfs statsvers `%s'\n", line);
+    ver = wsep(&rest);
+    if (strcmp(ver, "1.0") != 0) {
+      ERROR("NFS mount `%s', device `%s' has unknown statvers `%s'\n",
+	    mnt, dev, ver);
       continue;
     }
+
+    TRACE("dev `%s', mnt `%s', ver `%s'\n", dev, mnt, ver);
 
     struct stats *stats = get_current_stats(type, mnt);
     if (stats == NULL)
