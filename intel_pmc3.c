@@ -168,7 +168,7 @@ static int cpu_is_nehalem(char *cpu)
   return rc;
 }
 
-static int begin_pmc_cpu(char *cpu, uint64_t *events, size_t nr_events)
+static int intel_pmc3_begin_cpu(char *cpu, uint64_t *events, size_t nr_events)
 {
   int rc = -1;
   char msr_path[80];
@@ -241,7 +241,7 @@ static int begin_pmc_cpu(char *cpu, uint64_t *events, size_t nr_events)
 #define FP_COMP_OPS_EXE_SSE_FP_PACKED  PERF_EVENT(0x10, 0x10)
 #define FP_COMP_OPS_EXE_SSE_FP_SCALAR  PERF_EVENT(0x10, 0x20)
 
-static int begin_pmc(struct stats_type *type)
+static int intel_pmc3_begin(struct stats_type *type)
 {
   int nr = 0;
 
@@ -258,14 +258,14 @@ static int begin_pmc(struct stats_type *type)
     snprintf(cpu, sizeof(cpu), "%d", i);
 
     if (cpu_is_nehalem(cpu))
-      if (begin_pmc_cpu(cpu, events, 4) == 0)
+      if (intel_pmc3_begin_cpu(cpu, events, 4) == 0)
         nr++; /* HARD */
   }
 
   return nr > 0 ? 0 : -1;
 }
 
-static void collect_pmc_cpu(struct stats_type *type, char *cpu)
+static void intel_pmc3_collect_cpu(struct stats_type *type, char *cpu)
 {
   struct stats *stats = NULL;
   char msr_path[80];
@@ -300,7 +300,7 @@ static void collect_pmc_cpu(struct stats_type *type, char *cpu)
     close(msr_fd);
 }
 
-static void collect_pmc(struct stats_type *type)
+static void intel_pmc3_collect(struct stats_type *type)
 {
   int i;
   for (i = 0; i < nr_cpus; i++) {
@@ -308,14 +308,14 @@ static void collect_pmc(struct stats_type *type)
     snprintf(cpu, sizeof(cpu), "%d", i);
 
     if (cpu_is_nehalem(cpu))
-      collect_pmc_cpu(type, cpu);
+      intel_pmc3_collect_cpu(type, cpu);
   }
 }
 
 struct stats_type intel_pmc3_stats_type = {
   .st_name = "intel_pmc3",
-  .st_begin = &begin_pmc,
-  .st_collect = &collect_pmc,
+  .st_begin = &intel_pmc3_begin,
+  .st_collect = &intel_pmc3_collect,
 #define X SCHEMA_DEF
   .st_schema_def = JOIN(KEYS),
 #undef X
