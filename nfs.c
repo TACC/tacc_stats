@@ -7,36 +7,38 @@
 #include "string1.h"
 #include "trace.h"
 
-/* Support for NFS (client) version 3. */
+/* Copyright 2011 Charng-Da Lu <charngda@ccr.buffalo.edu>
+ * Revised 2011 John L. Hammond <jhammond@tacc.utexas.edu> */
 
-/* See fs/nfs/iostat.h and nfs_show_stats() in fs/nfs/super.c. */
+/* Event counters.  See fs/nfs/iostat.h and nfs_show_stats() in
+ * fs/nfs/super.c. */
 
 #define EVENT_KEYS \
-    X(inode_revalidate,  "E", ""), \
-    X(dentry_revalidate, "E", ""), \
-    X(data_invalidate,   "E", ""), \
-    X(attr_invalidate,   "E", ""), \
-    X(vfs_open,          "E", ""), \
-    X(vfs_lookup,        "E", ""), \
-    X(vfs_access,        "E", ""), \
-    X(vfs_updatepage,    "E", ""), \
-    X(vfs_readpage,      "E", ""), \
-    X(vfs_readpages,     "E", ""), \
-    X(vfs_writepage,     "E", ""), \
-    X(vfs_writepages,    "E", ""), \
-    X(vfs_getdents,      "E", ""), \
-    X(vfs_setattr,       "E", ""), \
-    X(vfs_flush,         "E", ""), \
-    X(vfs_fsync,         "E", ""), \
-    X(vfs_lock,          "E", ""), \
-    X(vfs_release,       "E", ""), \
-    X(congestion_wait,   "E", ""), \
-    X(setattr_trunc,     "E", ""), \
-    X(extend_write,      "E", ""), \
-    X(silly_rename,      "E", ""), \
-    X(short_read,        "E", ""), \
-    X(short_write,       "E", ""), \
-    X(delay,             "E", "")
+  X(inode_revalidate,  "E", ""), \
+  X(dentry_revalidate, "E", ""), \
+  X(data_invalidate,   "E", ""), \
+  X(attr_invalidate,   "E", ""), \
+  X(vfs_open,          "E", ""), \
+  X(vfs_lookup,        "E", ""), \
+  X(vfs_access,        "E", ""), \
+  X(vfs_updatepage,    "E", ""), \
+  X(vfs_readpage,      "E", ""), \
+  X(vfs_readpages,     "E", ""), \
+  X(vfs_writepage,     "E", ""), \
+  X(vfs_writepages,    "E", ""), \
+  X(vfs_getdents,      "E", ""), \
+  X(vfs_setattr,       "E", ""), \
+  X(vfs_flush,         "E", ""), \
+  X(vfs_fsync,         "E", ""), \
+  X(vfs_lock,          "E", ""), \
+  X(vfs_release,       "E", ""), \
+  X(congestion_wait,   "E", ""), \
+  X(setattr_trunc,     "E", ""), \
+  X(extend_write,      "E", ""), \
+  X(silly_rename,      "E", ""), \
+  X(short_read,        "E", ""), \
+  X(short_write,       "E", ""), \
+  X(delay,             "E", "")
 
 static void nfs_collect_mnt_events(struct stats *stats, char *str)
 {
@@ -45,7 +47,8 @@ static void nfs_collect_mnt_events(struct stats *stats, char *str)
 #undef X
 }
 
-/* FIXME Add U=P for page sized units. */
+/* "Bytes" counters, also from nfs_show_stats(). */
+/* TODO Add U=P for page sized units. */
 
 #define BYTE_KEYS \
   X(normal_read,  "E,U=B", ""), \
@@ -64,19 +67,21 @@ static void nfs_collect_mnt_bytes(struct stats *stats, char *str)
 #undef X
 }
 
-/* See xprt_rdma_print_stats() (net/sunrpc/xprtrdma/transport.c)
-   xs_tcp_print_stats(), and xs_udp_print_stats()
-   (net/sunrpc/xprtsock.c) and include/linux/sunrpc/xprt.h in the
-   Linux kernel source tree. */
-
-/* TODO rmda. */
+/* Export (xprt) counters.  See xprt_rdma_print_stats() in
+ * net/sunrpc/xprtrdma/transport.c, along with xs_tcp_print_stats()
+ * and xs_udp_print_stats() from net/sunrpc/xprtsock.c, and
+ * include/linux/sunrpc/xprt.h.
+ *
+ * Divide xprt_req_u / xprt_sends to get averge number of requests in
+ * flight, see xprt_transmit().  Similarly for xprt_bklog_u to get
+ * average backlog queue length. */
 
 #define XPRT_KEYS \
-  X(rpc_send,    "E", ""), \
-  X(rpc_recv,    "E", ""), \
-  X(rpc_bad_xid, "E", ""), \
-  X(rpc_req_u,   "E", ""), \
-  X(rpc_bklog_u, "E", "")
+  X(xprt_sends,    "E", ""), \
+  X(xprt_recvs,    "E", ""), \
+  X(xprt_bad_xids, "E", ""), \
+  X(xprt_req_u,    "E", "accumulated sum of requests in flight"), \
+  X(xprt_bklog_u,  "E", "backlog queue utilization")
 
 static void nfs_collect_mnt_xprt(struct stats *stats, char *str)
 {
@@ -85,7 +90,8 @@ static void nfs_collect_mnt_xprt(struct stats *stats, char *str)
     return;
 
   /* For UDP, skip port and bind_count.  For TCP, skip those,
-     connect_count, connect_time, and idle_time. */
+   * connect_count, connect_time, and idle_time.  RDMA has all of the
+   * TCP counters followed by 10 of its own. */
 
   int i, nr_to_skip = (strcmp(sock_type, "udp") == 0) ? 2 : 5;
 
@@ -100,8 +106,9 @@ static void nfs_collect_mnt_xprt(struct stats *stats, char *str)
 #undef X
 }
 
-/* See struct rpc_iostats in include/linux/sunrpc/metrics.h and
-   rpc_print_iostats() in net/sunrpc/stats.c. */
+/* Per-op counters.  See struct rpc_iostats in
+ * include/linux/sunrpc/metrics.h and rpc_print_iostats() in
+ * net/sunrpc/stats.c. */
 
 #define _OP_KEY(o) \
   X(o##_ops,        "E",      "count of "#o" oprations"), \
@@ -136,7 +143,6 @@ static void nfs_collect_mnt_xprt(struct stats *stats, char *str)
   _OP_KEY(SYMLINK),     \
   _OP_KEY(WRITE)
 
-
 static void nfs_collect_mnt_op(struct stats *stats, const char *op, char *str)
 {
   str_collect_prefix_key_list(str, stats, op,
@@ -148,19 +154,18 @@ static void nfs_collect_mnt_op(struct stats *stats, const char *op, char *str)
 
 #define KEYS EVENT_KEYS, BYTE_KEYS, XPRT_KEYS, OP_KEYS
 
-/* Return 0 if nfs_collect() should look at *p_line, -1 otherwise. */
+/* Return 0 if nfs_collect() should look at *p_line, -1 otherwise.
+ * Bail on lines that don't start with a tab character r error. */
 
 static int nfs_collect_mnt(struct stats *stats, FILE *file,
 			   char **p_line, size_t *p_line_size)
 {
-  char *rest, *tag;
-  
   /* Events, bytes, and export (xprt) stats. */
   while (1) {
     if (getline(p_line, p_line_size, file) < 0)
       return -1;
 
-    rest = *p_line;
+    char *rest = *p_line;
 
     if (*rest != '\t')
       return 0;
@@ -168,14 +173,12 @@ static int nfs_collect_mnt(struct stats *stats, FILE *file,
     if (strcmp(rest, "\tper-op statistics\n") == 0)
       break;
 
-    tag = wsep(&rest);
+    char *tag = wsep(&rest);
 
-    /*
-      events: 86104644 8232551112 1009346 29773140 77713963 3396235...
-      bytes:  4886067767364 671548484867 0 0 1268384471881 672425463273...
-      RPC iostats version: 1.0  p/v: 100003/3 (nfs)
-      xprt:   tcp 766 1 1 0 0 172670997 172670964 33 3451662215 293843845166
-    */
+    /* events: 86104644 8232551112 1009346 29773140 77713963 33967...
+     * bytes:  4886067767364 671548484867 0 0 1268384471881 672423...
+     * RPC iostats version: 1.0  p/v: 100003/3 (nfs)
+     * xprt:   tcp 766 1 1 0 0 172670997 172670964 33 3451662215 2... */
 
     if (strcmp(tag, "events:") == 0)
       nfs_collect_mnt_events(stats, rest);
@@ -185,23 +188,20 @@ static int nfs_collect_mnt(struct stats *stats, FILE *file,
       nfs_collect_mnt_xprt(stats, rest);
   }
 
-  /*
-    per-op statistics
-         NULL: 0 0 0 0 0 0 0 0
-      GETATTR: 86102054 86103087 0 13515430340 9643670764...
-    ...
-  */
+  /* per-op statistics
+   *     NULL: 0 0 0 0 0 0 0 0
+   *  GETATTR: 86102054 86103087 0 13515430340 9643670764 8980... */
 
   while (1) {
     if (getline(p_line, p_line_size, file) < 0)
       return -1;
 
-    rest = *p_line;
+    char *rest = *p_line;
 
     if (*rest != '\t')
       return 0;
 
-    tag = wsep(&rest);
+    char *tag = wsep(&rest);
 
     /* Strip colon from tag. */
     char *col = strchr(tag, ':');
@@ -242,8 +242,8 @@ static void nfs_collect(struct stats_type *type)
 
   /* device HOST:EXPORT mounted on MNT with fstype nfs statvers=1.0 */
 
-  char *rest, *dev, *mnt, *ver;
   while (getline(&line, &line_size, file) >= 0) {
+    char *rest, *dev, *mnt, *ver;
   skip_getline:
     rest = line;
 
