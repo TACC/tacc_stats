@@ -1,11 +1,15 @@
 #!/bin/bash
 
-PATH=$PATH:/share/home/01114/jhammond/tacc_stats
+# XXX Need to fixup $PATH for job_report.py, et al.
 
-prog="$(basename $0)"
-accounting_file=/share/sge6.2/default/common/accounting
-hostfile_dir=/share/sge6.2/default/tacc/hostfile_logs
-report_dir=/share/home/01114/jhammond/tacc_stats_report
+prog=$(basename "$0")
+prog_path=$([[ $0 == /* ]] && echo "$0" || echo "${PWD}/${0#./}")
+export PATH=$PATH:$(dirname "$prog_path")
+
+stats_home=${TACC_STATS_HOME-/scratch/projects/tacc_stats}
+accounting_file=$stats_home/accounting
+hostfile_dir=$stats_home/hostfiles
+report_dir=${report_dir-.} # /share/home/01114/jhammond/tacc_stats_report
 
 trace() {
     if [ -n "$DEBUG" ]; then
@@ -21,6 +25,8 @@ fatal() {
     echo "$1" >&2
     exit 1
 }
+
+trace "prog_path $prog, prog $prog, PATH $PATH"
 
 report_date=$1
 report_begin=$report_date

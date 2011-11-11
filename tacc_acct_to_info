@@ -24,25 +24,14 @@ fatal() {
     exit 1
 }
 
-report_begin=$1
-report_end=$2
-if [ -z "$report_begin" ]; then
-    fatal "$prog: must specify a start time"
-fi
-if ! report_begin=$(date --date="$report_begin" +%s); then
-    fatal "$prog: invalid start time"
-fi
-
-if [ -z "$report_end" ]; then
-    report_end=$((report_begin + 86400))
-elif ! report_end=$(date --date="$report_end" +%s); then
-    fatal "$prog: invalid end time"
-fi
-
 # Find the hostfile written during the prolog.  For example:
 # /share/sge6.2/default/tacc/hostfile_logs/2011/05/19/prolog_hostfile.1957000.IV32627
 
 get_host_file() {
+    if [ -z "$hostfile_dir" ]; then
+	echo NONE
+	return
+    fi
     id=$1
     begin_epoch=$2
     for delta in 0 -3600 3600; do
@@ -58,7 +47,7 @@ get_host_file() {
     done
 }
 
-awk -F: -v r0=$report_begin -v r1=$report_end 'r0 <= $11 && $11 < r1' $accounting_file | while read job_record; do
+while read job_record; do
     trace "job_record '$job_record'"
     OLD_IFS=$IFS
     IFS=:
@@ -107,6 +96,9 @@ awk -F: -v r0=$report_begin -v r1=$report_end 'r0 <= $11 && $11 < r1' $accountin
     echo exit_status ${job_info[12]}
     echo granted_pe ${job_info[33]}
     echo slots ${job_info[34]}
-    echo hosts $(cat $job_host_file)
+    if [ "$job_host_file" != "NONE" ]; then
+	echo hosts $(cat $job_host_file)
+    fi
     echo
 done
+
