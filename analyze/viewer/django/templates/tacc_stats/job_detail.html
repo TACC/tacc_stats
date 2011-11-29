@@ -1,0 +1,64 @@
+<html>
+<head>
+    <title>TACC Stats Web: Job detail</title>
+</head>
+<body>
+{% if job %}
+    <h1>Job {{ job.id }}</h1>
+    <table border="1" cellpadding="5">
+      <tr><th>Field</th><th>Value</th></tr>
+      <tr><td> id </td><td> {{job.id}} </td></tr>
+      <tr><td> owner </td><td> {{job.owner}} </td></tr>
+      <tr><td> queue </td><td> {{job.queue}} </td></tr>
+      <tr><td> queue_wait_time </td><td> {{job.queue_wait_time}} </td></tr>
+      <tr><td> begin </td><td> {{job.begin}} </td></tr>
+      <tr><td> end </td><td> {{job.end}} </td></tr>
+      <tr><td> run_time </td><td> {{job.run_time}} </td></tr>
+      <tr><td> nr_hosts </td><td> {{job.nr_hosts}} </td></tr>
+      <tr><td> nr_bad_hosts </td><td> {{job.nr_bad_hosts}} </td></tr>
+      <tr><td> nr_slots </td><td> {{job.nr_slots}} </td></tr>
+      <tr><td> pe </td><td> {{job.pe}} </td></tr>
+      <tr><td> failed </td><td> {{job.failed}} </td></tr>
+      <tr><td> exit_status </td><td> {{job.exit_status}} </td></tr>
+      <tr><td> USER_FLOPS </td><td> {{job.USER_FLOPS}} </td></tr>
+      <tr><td> SSE_FLOPS </td><td> {{job.SSE_FLOPS}} </td></tr>
+      <tr><td> DCSF </td><td> {{job.DCSF}} </td></tr>
+      <tr><td> DRAM </td><td> {{job.DRAM}} </td></tr>
+      <tr><td> HT0 </td><td> {{job.HT0}} </td></tr>
+      <tr><td> HT1 </td><td> {{job.HT1}} </td></tr>
+      <tr><td> HT2 </td><td> {{job.HT2}} </td></tr>
+      <tr><td> user </td><td> {{job.user}} </td></tr>
+      <tr><td> nice </td><td> {{job.nice}} </td></tr>
+      <tr><td> system </td><td> {{job.system}} </td></tr>
+      <tr><td> idle </td><td> {{job.idle}} </td></tr>
+      <tr><td> iowait </td><td> {{job.iowait}} </td></tr>
+      <tr><td> irq </td><td> {{job.irq}} </td></tr>
+      <tr><td> softirq </td><td> {{job.softirq}} </td></tr>
+      <tr><td> share_open </td><td> {{job.share_open}} </td></tr>
+      <tr><td> share_read_bytes </td><td> {{job.share_read_bytes}} </td></tr>
+      <tr><td> share_write_bytes </td><td> {{job.share_write_bytes}} </td></tr>
+      <tr><td> work_open </td><td> {{job.work_open}} </td></tr>
+      <tr><td> work_read_bytes </td><td> {{job.work_read_bytes}} </td></tr>
+      <tr><td> work_write_bytes </td><td> {{job.work_write_bytes}} </td></tr>
+      <tr><td> scratch_open </td><td> {{job.scratch_open}} </td></tr>
+      <tr><td> scratch_read_bytes </td><td> {{job.scratch_read_bytes}} </td></tr>
+      <tr><td> scratch_write_bytes </td><td> {{job.scratch_write_bytes}} </td></tr>
+      <tr><td> lnet_rx_bytes </td><td> {{job.lnet_rx_bytes}} </td></tr>
+      <tr><td> lnet_tx_bytes </td><td> {{job.lnet_tx_bytes}} </td></tr>
+      <tr><td> ib_sw_rx_bytes </td><td> {{job.ib_sw_rx_bytes}} </td></tr>
+      <tr><td> ib_sw_tx_bytes </td><td> {{job.ib_sw_tx_bytes}} </td></tr>
+      <tr><td> net_rx_bytes </td><td> {{job.net_rx_bytes}} </td></tr>
+      <tr><td> net_tx_bytes </td><td> {{job.net_tx_bytes}} </td></tr>
+      <tr><td> MemTotal </td><td> {{job.MemTotal}} </td></tr>
+      <tr><td> MemUsed </td><td> {{job.MemUsed}} </td></tr>
+      <tr><td> FilePages </td><td> {{job.FilePages}} </td></tr>
+      <tr><td> Mapped </td><td> {{job.Mapped}} </td></tr>
+      <tr><td> AnonPages </td><td> {{job.AnonPages}} </td></tr>
+      <tr><td> Slab </td><td> {{job.Slab}} </td></tr>
+
+    </table>
+{% else %}
+    <h1>Job not found</h1>
+{% endif %}
+</body>
+</html>

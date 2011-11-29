@@ -1,0 +1,33 @@
+<html>
+<head>
+    <title>TACC Stats Web</title>
+</head>
+<body>
+<h1>TACC Stats Web Home</h1>
+<a href="joblist">joblist</a>
+<h2> Charts at a glance </h2>
+
+<img src="job_timespent_hist" alt="Histogram of jobs" />
+<img src="job_memused_hist" alt="Histogram of jobs" />
+
+{% if job_list %}
+    <h1>Recent problem jobs</h1>
+    <table border="1" cellpadding="5">
+        <tr><th> ID </th><th> owner </th><th> time spent </th><th> memory used
+        </th><th> work open </th><th> irq </th></tr>
+    {% for job in job_list %}
+        <tr bgcolor="{{job.color}}">
+            <td><a href="job/{{ job.id }}/">{{ job.id }}</a>
+            <td>{{ job.owner }}</td>
+            <td align=right>{{ job.timespent }}</td>
+            <td align=right>{{ job.MemUsed }}</td>
+            <td align=right>{{ job.work_open }}</td>
+            <td align=right>{{ job.irq }}</td>
+        </tr>
+    {% endfor %}
+    </ul>
+{% else %}
+    <p>No jobs are available.</p>
+{% endif %}
+</body>
+</html>
