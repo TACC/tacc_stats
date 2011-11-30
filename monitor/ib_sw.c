@@ -44,7 +44,7 @@ static void collect_hca_port(struct stats *stats, char *hca_name, int hca_port)
     },
   };
 
-  char sw_info[64];
+  uint8_t sw_info[64];
   memset(sw_info, 0, sizeof(sw_info));
   if (smp_query_via(sw_info, &sw_port_id, IB_ATTR_PORT_INFO, 0, mad_timeout, mad_port) == NULL) {
     ERROR("cannot query port info: %m\n");
@@ -59,7 +59,7 @@ static void collect_hca_port(struct stats *stats, char *hca_name, int hca_port)
 
   sw_port_id.lid = sw_lid;
 
-  char sw_pma[1024];
+  uint8_t sw_pma[1024];
   memset(sw_pma, 0, sizeof(sw_pma));
   if (pma_query_via(sw_pma, &sw_port_id, sw_port, mad_timeout, IB_GSI_PORT_COUNTERS_EXT, mad_port) == NULL) {
     ERROR("cannot query performance counters of switch LID %d, port %d: %m\n", sw_lid, sw_port);
