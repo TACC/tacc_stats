@@ -6,6 +6,10 @@ import gzip, os, numpy, signal, string, subprocess, sys, time
 # TODO Sanity check on rollover.
 # TODO Check that input values are not wider than allowed.
 
+base_dir = "/scratch/projects/tacc_stats"
+archive_dir = os.path.join(base_dir, "archive")
+job_info_cmd = os.path.join(base_dir, "scripts", "tacc_job_info")
+
 verbose = True # XXX
 prog = os.path.basename(sys.argv[0])
 if prog == "":
@@ -25,8 +29,6 @@ def fatal(fmt, *args):
     sys.stderr.write(prog + ": " + msg)
     sys.exit(1)
 
-
-archive_dir = "/scratch/projects/tacc_stats/archive"
 JOB_TIME_PAD = 600
 FILE_TIME_MAX = 86400 + 3600 # XXX
 SF_SCHEMA_CHAR = '!'
@@ -35,7 +37,6 @@ SF_COMMENT_CHAR = '#'
 SF_PROPERTY_CHAR = '$'
 SF_MARK_CHAR = '%'
 
-job_info_cmd = "/share/home/01114/jhammond/tacc_stats/tacc_job_info" # XXX
 def get_job_info(id):
     id = str(id)
     info = {}
@@ -56,7 +57,6 @@ def get_job_info(id):
         error("%s returned info for wrong job, requested `%s', received `%s'\n", job_info_cmd, id, info_id)
         # return None
     return info
-
 
 # amd64
 # define PERF_EVENT(event_select, unit_mask) \
@@ -79,35 +79,39 @@ def amd64_perf_event(event_select, unit_mask):
 #define DCacheSysFills PERF_EVENT(0x42, 0x01) /* Counts DCache fills from beyond the L2 cache. */
 #define SSEFLOPS       PERF_EVENT(0x03, 0x7F) /* Counts single & double, add, multiply, divide & sqrt FLOPs. */
 
-dram_accesses = amd64_perf_event(0xE0, 0x07)
-ht_link_0_use = amd64_perf_event(0xF6, 0x37)
-ht_link_1_use = amd64_perf_event(0xF7, 0x37)
-ht_link_2_use = amd64_perf_event(0xF8, 0x37)
-user_cycles = amd64_perf_event(0x76, 0x00) & ~(1L << 17)
-dcache_sys_fills = amd64_perf_event(0x42, 0x01)
-sse_flops = amd64_perf_event(0x03, 0x7F)
+amd64_dram_accesses = amd64_perf_event(0xE0, 0x07)
+amd64_ht_link_0_use = amd64_perf_event(0xF6, 0x37)
+amd64_ht_link_1_use = amd64_perf_event(0xF7, 0x37)
+amd64_ht_link_2_use = amd64_perf_event(0xF8, 0x37)
+amd64_user_cycles = amd64_perf_event(0x76, 0x00) & ~(1L << 17)
+amd64_dcache_sys_fills = amd64_perf_event(0x42, 0x01)
+amd64_sse_flops = amd64_perf_event(0x03, 0x7F)
+
+amd64_core_schema = 'USER,E DCSF,E SSE_FLOPS,E'
 
 amd64_core_ctls = {
-    user_cycles: 0,
-    dcache_sys_fills: 1,
-    sse_flops: 2,
+    amd64_user_cycles: 0,
+    amd64_dcache_sys_fills: 1,
+    amd64_sse_flops: 2,
     }
 
+amd64_sock_schema = 'DRAM,E HT0,E HT1,E HT2,E'
+
 amd64_sock_ctls = {
-    dram_accesses: 0,
-    ht_link_0_use: 1,
-    ht_link_1_use: 2,
-    ht_link_2_use: 3,
+    amd64_dram_accesses: 0,
+    amd64_ht_link_0_use: 1,
+    amd64_ht_link_1_use: 2,
+    amd64_ht_link_2_use: 3,
     }
 
 amd64_mults = {
-    user_cycles: 1,
-    dcache_sys_fills: 64, # DCSFs are 64B.
-    sse_flops: 1,
-    dram_accesses: 64, # DRAM accesses are 64B.
-    ht_link_0_use: 4, # Each HT event counter increment represents 4B.
-    ht_link_1_use: 4,
-    ht_link_2_use: 4,
+    amd64_user_cycles: 1,
+    amd64_dcache_sys_fills: 64, # DCSFs are 64B.
+    amd64_sse_flops: 1,
+    amd64_dram_accesses: 64, # DRAM accesses are 64B.
+    amd64_ht_link_0_use: 4, # Each HT event counter increment represents 4B.
+    amd64_ht_link_1_use: 4,
+    amd64_ht_link_2_use: 4,
     }
 
 class Job(object):
@@ -138,18 +142,19 @@ class Job(object):
             for type_name, type_data in entry.types.iteritems():
                 for dev in type_data.devs():
                     self.types[type_name].devs.add(dev)
+        self.amd64_process()
         # TODO Warn about bad hosts.
-        if 'amd64_pmc' in self.types:
-            self.process_amd64()
-    def process_amd64(self):
-        self.get_schema('amd64_core', 'USER,E DCSF,E SSE_FLOPS,E')
+    def amd64_process(self):
+        if not 'amd64_pmc' in self.types:
+            return
+        self.get_schema('amd64_core', amd64_core_schema)
         self.types['amd64_core'].devs = set(map(str, range(0, 16))) # BLECH.
-        self.get_schema('amd64_sock', 'DRAM,E HT0,E HT1,E HT2,E')
+        self.get_schema('amd64_sock', amd64_sock_schema)
         self.types['amd64_sock'].devs = set(map(str, range(0, 4))) # BLECH.
         for host_entry in self.hosts.itervalues():
             orig_data = host_entry.types['amd64_pmc']
-            core_data = host_entry.add_type('amd64_core', 'USER,E DCSF,E SSE_FLOPS,E')
-            sock_data = host_entry.add_type('amd64_sock', 'DRAM,E HT0,E HT1,E HT2,E')
+            core_data = host_entry.add_type('amd64_core', amd64_core_schema)
+            sock_data = host_entry.add_type('amd64_sock', amd64_sock_schema)
             # Assume no stray times.
             times = orig_data.times['0']
             nr_rows = len(times)
@@ -321,6 +326,7 @@ class HostTypeData(object):
         self.times.setdefault(dev, []).append(time)
         self.stats.setdefault(dev, []).append(vals)
     def process_stats(self):
+        saved_err_settings = numpy.seterr(over='ignore')
         for dev in self.times.keys():
             self.times[dev] = numpy.array(self.times[dev], numpy.uint64)
             nr_rows = len(self.times[dev])
@@ -351,7 +357,7 @@ class HostTypeData(object):
                         val *= entry.mult
                     new_stats[row][new_col] = val
                 prev_vals = old_stats[row]
-
+        numpy.seterr(**saved_err_settings)
 
 class Schema(object):
     def __init__(self, name, desc):
