@@ -19,8 +19,16 @@ CPPFLAGS = -D_GNU_SOURCE \
 OBJS = main.o stats.o dict.o collect.o schema.o stats_file.o lustre_obd_to_mnt.o
 OBJS += $(patsubst %,%.o,$(TYPES))
 
+all: $(name) schema-$(version)-$(config)
+
 $(name): $(OBJS)
 	$(CC) $(LDFLAGS) $(OBJS) -o $@
+
+schema-$(version)-$(config): print-schema
+	./print-schema $@
+
+print-schema: print-schema.o stats.o dict.o schema.o $(patsubst %,%.o,$(TYPES))
+	$(CC) $(LDFLAGS) -Wl,--unresolved-symbols=ignore-all $^ -o $@
 
 stats.o: stats.x
 
@@ -35,4 +43,4 @@ stats.x: $(config)
 
 .PHONY: clean
 clean:
-	rm -f tacc_stats $(OBJS) $(OBJS:%.o=.%.d)
+	rm -f tacc_stats print-schema $(OBJS) $(OBJS:%.o=.%.d)
