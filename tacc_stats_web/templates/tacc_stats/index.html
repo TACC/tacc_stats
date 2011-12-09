@@ -17,7 +17,7 @@
         </th><th> work open </th><th> irq </th></tr>
     {% for job in job_list %}
         <tr bgcolor="{{job.color}}">
-            <td><a href="job/{{ job.id }}/">{{ job.id }}</a>
+            <td><a href="job/{{ job.acct_id }}/">{{ job.acct_id }}</a>
             <td>{{ job.owner }}</td>
             <td align=right>{{ job.timespent }}</td>
             <td align=right>{{ job.MemUsed }}</td>

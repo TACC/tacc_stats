@@ -8,7 +8,7 @@ from matplotlib.backends.backend_agg import FigureCanvasAgg
 from tacc_stats.models import Job
 
 def index(request):
-    job_list = Job.objects.all().order_by('-id')[:5]
+    job_list = Job.objects.all().order_by('-acct_id')[:5]
     return render_to_response("tacc_stats/index.html", {'job_list':job_list})
 
 def figure_to_response(f):

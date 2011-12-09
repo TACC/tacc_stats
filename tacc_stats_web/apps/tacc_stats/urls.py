@@ -7,7 +7,7 @@ urlpatterns = patterns('',
     url(r'^$', index),
     url(r'^joblist$',
         ListView.as_view(
-            queryset=Job.objects.order_by('-id')[:200],
+            queryset=Job.objects.order_by('-acct_id')[:200],
         #    context_object_name='latest_job_list',
         #    template_name='tacc_stats/index.html',
         )),

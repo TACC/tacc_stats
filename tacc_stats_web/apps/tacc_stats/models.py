@@ -2,8 +2,23 @@
 
 from django.db import models
 
+class System(models.Model):
+    """Details about the cluster"""
+    name = models.CharField(max_length=128)
+
+    def __unicode__(self):
+        return self.name
+
+class Node(models.Model):
+    name = models.CharField(max_length=128)
+    system = models.ForeignKey(System)
+
+    def __unicode__(self):
+        return "%s.%s" % (self.name, self.system.name)
+
 class Job(models.Model):
-    id = models.BigIntegerField(primary_key=True)
+    system = models.ForeignKey(System)
+    acct_id = models.BigIntegerField()
     owner = models.CharField(max_length=128)
     queue = models.CharField(max_length=16, null=True)
     queue_wait_time = models.IntegerField(null=True)
@@ -23,13 +38,6 @@ class Job(models.Model):
     HT0 = models.BigIntegerField(null=True)
     HT1 = models.BigIntegerField(null=True)
     HT2 = models.BigIntegerField(null=True)
-    user = models.BigIntegerField(null=True)
-    nice = models.IntegerField(null=True)
-    system = models.BigIntegerField(null=True)
-    idle = models.BigIntegerField(null=True)
-    iowait = models.BigIntegerField(null=True)
-    irq = models.BigIntegerField(null=True)
-    softirq = models.BigIntegerField(null=True)
     share_open = models.IntegerField(null=True)
     share_read_bytes = models.BigIntegerField(null=True)
     share_write_bytes = models.BigIntegerField(null=True)
@@ -52,6 +60,8 @@ class Job(models.Model):
     AnonPages = models.BigIntegerField(null=True)
     Slab = models.BigIntegerField(null=True)
 
+    unique_together = ("system", "acct_id")
+
     @property
     def timespent(self):
         return self.end - self.begin
@@ -65,3 +75,9 @@ class Job(models.Model):
         elif self.timespent > 3000:
             ret_val = "LightCoral"
         return ret_val
+
+
+class Monitor(models.Model):
+    kind = models.CharField(max_length=32)
+    system = models.ForeignKey(System)
+
