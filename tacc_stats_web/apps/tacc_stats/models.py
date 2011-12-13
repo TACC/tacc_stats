@@ -17,7 +17,7 @@ class Node(models.Model):
         return "%s.%s" % (self.name, self.system.name)
 
 class Job(models.Model):
-    system = models.ForeignKey(System)
+    system = models.ForeignKey(System, null=True)
     acct_id = models.BigIntegerField()
     owner = models.CharField(max_length=128)
     queue = models.CharField(max_length=16, null=True)
@@ -38,6 +38,13 @@ class Job(models.Model):
     HT0 = models.BigIntegerField(null=True)
     HT1 = models.BigIntegerField(null=True)
     HT2 = models.BigIntegerField(null=True)
+    user = models.BigIntegerField(null=True)
+    nice = models.BigIntegerField(null=True)
+    system_time = models.BigIntegerField(null=True)
+    idle = models.BigIntegerField(null=True)
+    iowait = models.BigIntegerField(null=True)
+    irq = models.BigIntegerField(null=True)
+    softirq = models.BigIntegerField(null=True)
     share_open = models.IntegerField(null=True)
     share_read_bytes = models.BigIntegerField(null=True)
     share_write_bytes = models.BigIntegerField(null=True)
@@ -60,7 +67,7 @@ class Job(models.Model):
     AnonPages = models.BigIntegerField(null=True)
     Slab = models.BigIntegerField(null=True)
 
-    unique_together = ("system", "acct_id")
+    #unique_together = ("system", "acct_id")
 
     @property
     def timespent(self):

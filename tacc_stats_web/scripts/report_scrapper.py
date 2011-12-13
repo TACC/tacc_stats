@@ -4,9 +4,14 @@ import os
 import sys
 import traceback
 
+os.environ['DJANGO_SETTINGS_MODULE'] = 'tacc_stats_web.settings'
+from django.conf import settings
+sys.path.insert(0, "/home/aterrel/workspace/tacc_stats/tacc_stats_web/apps")
+from tacc_stats.models import Job
+
 def fill_jobs( data ):
-    os.environ['DJANGO_SETTINGS_MODULE'] = 'tacc_stats.webapp.settings'
-    from tacc_stats.webapp.tacc_stats.models import Job
+    """Saves the job data"""
+
     for d in data:
         try:
             Job(**d).save()
@@ -24,6 +29,8 @@ def get_data_dict(filename, *args, **kws):
         first_line = fp.readline()
         dict_keys = first_line[1:].strip().split()
         dict_keys = map(lambda s: s.replace('/','').replace(':','_'), dict_keys)
+        dict_keys[dict_keys.index('id')] = 'acct_id'
+        dict_keys[dict_keys.index('system')] = 'system_time'
         dict_keys[dict_keys.index('USER')] = 'USER_FLOPS'
         items = []
         for line in fp.readlines():

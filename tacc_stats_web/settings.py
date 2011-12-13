@@ -8,6 +8,7 @@ DEBUG = True
 TEMPLATE_DEBUG = DEBUG
 
 PROJECT_DIR = os.path.dirname(os.path.abspath(__file__))
+print "PROJECT_DIR", PROJECT_DIR
 sys.path.insert(0, os.path.join(PROJECT_DIR, 'apps'))
 
 ADMINS = (
@@ -95,7 +96,7 @@ MIDDLEWARE_CLASSES = (
     'django.contrib.messages.middleware.MessageMiddleware',
 )
 
-ROOT_URLCONF = 'django_sites.urls'
+ROOT_URLCONF = 'tacc_stats_web.urls'
 
 TEMPLATE_DIRS = (
     # Put strings here, like "/home/html/django_templates" or "C:/www/django/templates".
