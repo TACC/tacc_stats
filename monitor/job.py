@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-import errno, gzip, numpy, os, sge_acct, sys, time
+import errno, gzip, numpy, os, sge_acct, sys, time, urllib
 # signal, string, subprocess
 
 TS_IN_DIR = '/tmp/TS/in'
@@ -86,13 +86,13 @@ def stats_file_discard_record(file):
 class Schema(object):
     __slots__ = ('entries', 'keys')
 
-    def __init__(self, desc):
+    def __init__(self, job, desc):
         # self.name = name
         # self.desc = desc
         self.entries = []
         self.keys = {}
         for i, s in enumerate(desc.split()):
-            e = SchemaEntry(i, s)
+            e = SchemaEntry(job, i, s)
             self.keys[e.key] = e
             self.entries.append(e)
 
@@ -106,7 +106,7 @@ class Schema(object):
 class SchemaEntry(object):
     __slots__ = ('key', 'index', 'is_control', 'is_event', 'width', 'mult', 'unit')
 
-    def __init__(self, i, s):
+    def __init__(self, job, i, s):
         opt_lis = s.split(',')
         self.key = opt_lis[0]
         self.index = i
@@ -137,7 +137,7 @@ class SchemaEntry(object):
                     self.unit = "B"
             else:
                 # XXX
-                error("unrecognized option `%s' in schema entry spec `%s'\n", opt, s)
+                job.error("unrecognized option `%s' in schema entry spec `%s'\n", opt, s)
 
     def __eq__(self, other):
         return isinstance(other, self.__class__) and \
@@ -159,11 +159,11 @@ class Host(object):
 
     def trace(self, fmt, *args):
         msg = fmt % args
-        self.job.trace(self.name + ': ' + msg)
+        self.job.trace('%s: %s', self.name, msg)
 
     def error(self, fmt, *args):
         msg = fmt % args
-        self.job.error(self.name + ': ' + msg)
+        self.job.error('%s: %s', self.name, msg)
 
     def get_stats_paths(self):
         in_host_stats_dir = os.path.join(in_stats_dir, self.name)
@@ -194,7 +194,7 @@ class Host(object):
                 c = line[0]
                 if c == SF_SCHEMA_CHAR:
                     type_name, schema_desc = line[1:].split(None, 1)
-                    schema[type_name] = Schema(schema_desc)
+                    schema[type_name] = Schema(self.job, schema_desc)
                 elif c == SF_PROPERTY_CHAR:
                     pass
                 elif c == SF_COMMENT_CHAR:
@@ -215,15 +215,6 @@ class Host(object):
             self.job.schema = schema
         return schema
 
-    def dev_file_open(self, type_name, type_schema, dev_name, mode):
-        # Some of the dev_names are mountpoint paths, etc.
-        enc_name = dev_name.replace('/', '\\') # XXX Policy.
-        dir = os.path.join(self.job.tmp_dir, type_name, self.name) # XXX Policy.
-        if mode == 'w' or mode == 'a':
-            mkdir_p(dir)
-        path = os.path.join(dir, enc_name)
-        return open(path, mode)
-
     def parse_stats(self, file, schema, rec_time, line):
         type_name, dev_name, rest = line.split(None, 2)
         type_schema = schema.get(type_name)
@@ -233,7 +224,8 @@ class Host(object):
         type_stats = self.stats.setdefault(type_name, {})
         dev_file = type_stats.get(dev_name)
         if not dev_file:
-            dev_file = self.dev_file_open(type_name, type_schema, dev_name, 'w') # Append?
+            dev_file = self.job.open(type_name, self.name, dev_name, 'w',
+                                     schema=type_schema)
             type_stats[dev_name] = dev_file
         # XXX dtype=numpy.uint64
         # XXX count=?
@@ -300,7 +292,7 @@ class Host(object):
                            file.name, str(exc), line)
                 stats_file_discard_record(file)
 
-    def read_stats(self):
+    def gather_stats(self):
         path_list = self.get_stats_paths()
         if len(path_list) == 0:
             self.error("no stats files overlapping job\n")
@@ -323,6 +315,14 @@ class Host(object):
         return True
 
 
+def path_quote(str):
+    return urllib.quote(str, safe='')
+
+
+def path_unquote(str):
+    return urllib.unquote(str)
+
+
 class Job(object):
     # TODO errors/comments
     __slots__ = ('id', 'start_time', 'end_time', 'acct', 'schema', 'hosts', 'times', 'tmp_dir')
@@ -339,13 +339,41 @@ class Job(object):
 
     def trace(self, fmt, *args):
         msg = fmt % args
-        trace(self.id + ': ' + msg)
+        trace('%s: %s', self.id, msg)
 
     def error(self, fmt, *args):
         msg = fmt % args
-        error(self.id + ': ' + msg)
+        error('%s: %s', self.id, msg)
 
-    def read_stats(self):
+    def open(self, type_name, host_name, dev_name, mode='r', schema=None):
+        type_ent = path_quote(type_name)
+        host_ent = path_quote(host_name)
+        dev_ent = path_quote(dev_name)
+        dir = os.path.join(self.tmp_dir, type_ent, host_ent) # XXX Policy.
+        if mode[0] == 'a' or mode[0] == 'w':
+            mkdir_p(dir)
+        path = os.path.join(dir, dev_ent)
+        return open(path, mode)
+
+    def iter_files(self, type_name, host_names=None, dev_names=None, mode='r'):
+        type_ent = path_quote(type_name)
+        type_dir = os.path.join(self.tmp_dir, type_ent)
+        if host_names == None:
+            host_ent_list = list(listdir_q(type_dir))
+        else:
+            host_ent_list = map(path_quote, host_names)
+        for host_ent in host_ent_list:
+            host_dir = os.path.join(type_dir, host_ent)
+            if dev_names == None:
+                dev_ent_list = list(listdir_q(host_dir))
+            else:
+                dev_ent_list = map(path_quote, dev_names)
+            for dev_ent in dev_ent_list:
+                yield (path_unquote(host_ent),
+                       path_unquote(dev_ent),
+                       open(os.path.join(host_dir, dev_ent), mode))
+
+    def gather_stats(self):
         host_list_path = os.path.join(host_list_dir, self.id)
         try:
             host_list_file = open(host_list_path, 'r')
@@ -361,10 +389,10 @@ class Job(object):
         self.tmp_dir = tmp_dir
         for host_name in host_list:
             host = Host(self, host_name)
-            if host.read_stats():
+            if host.gather_stats():
                 self.hosts[host_name] = host
             else:
-                pass #...
+                pass # FIXME
         if len(self.hosts) == 0:
             self.error("no good hosts\n")
             return False
@@ -437,18 +465,16 @@ class Job(object):
         return True
 
     def process_stats(self):
-        # TODO Glob.
         for type_name, type_schema in self.schema.iteritems():
-            type_dir = os.path.join(self.tmp_dir, type_name)
-            for host_ent in listdir_q(type_dir):
-                host_dir = os.path.join(type_dir, host_ent)
-                for dev_ent in listdir_q(host_dir):
-                    dev_in_path = os.path.join(host_dir, dev_ent)
-                    dev_out_path = dev_in_path + '~' # XXX
-                    dev_in_file = open(dev_in_path, 'r')
-                    dev_out_file = open(dev_out_path, 'w')
-                    if self.process_stats_file(type_schema, dev_in_file, dev_out_file):
-                        os.rename(dev_out_path, dev_in_path)
+            for host_name, dev_name, in_file in self.iter_files(type_name):
+                out_file = open(in_file.name + '~', 'w') # XXX.
+                if self.process_stats_file(type_schema, in_file, out_file):
+                    os.rename(out_file.name, in_file.name)
+                else:
+                    os.unlink(in_file.name)
+                    os.unlink(out_file.name)
+                in_file.close()
+                out_file.close()
 
 #if False:
 #     start_time = time.time() - 2 * 86400
@@ -458,13 +484,13 @@ class Job(object):
 #     for acct in sge_acct.reader(sge_acct_file, start_time=start_time, end_time=end_time):
 #        (acct)
 
-acct_file = open('accounting', 'r')
-acct_lis = [a for a in sge_acct.reader(acct_file)]
-# acct = acct_lis[0]
+# acct_file = open('accounting', 'r')
+# acct_lis = [a for a in sge_acct.reader(acct_file)]
+# # acct = acct_lis[0]
 # acct = filter(lambda acct: acct['id'] == "2255593", acct_lis)[0]
 
 # job = Job(acct)
-# job.read_stats()
+# job.gather_stats()
 # job.set_times()
 # job.process_stats()
 
