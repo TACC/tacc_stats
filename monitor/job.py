@@ -313,7 +313,6 @@ class Job(object):
         return True
 
     def munge_times(self):
-        # Ensure that times is sane and monotonically increasing.
         times_lis = []
         for host in self.hosts.itervalues():
             times_lis.append(host.times)
@@ -322,6 +321,7 @@ class Job(object):
         # Choose times to have median length.
         times = list(times_lis[len(times_lis) / 2])
         times.sort()
+        # Ensure that times is sane and monotonically increasing.
         t_min = self.start_time
         for i in range(0, len(times)): 
             t = max(times[i], t_min)
@@ -331,7 +331,7 @@ class Job(object):
                    len(times_lis[0]), len(times), len(times_lis[-1]))
         self.trace("job start to first collect %d\n", times[0] - self.start_time)
         self.trace("last collect to job end %d\n", self.end_time - times[-1])
-        self.times = times
+        self.times = numpy.array(times, dtype=numpy.uint64)
     
     def process_dev_stats(self, host, type_name, schema, dev_name, raw):
         def trace(fmt, *args):
@@ -341,23 +341,22 @@ class Job(object):
             return self.error("host `%s', type `%s', dev `%s': " + fmt,
                               host.name, type_name, dev_name, *args)
         m = len(self.times)
-        n = len(schema.entries) + 1
+        n = len(schema.entries)
         A = numpy.zeros((m, n), dtype=numpy.uint64) # Output.
-        A[:, 0] = self.times
         # First and last of A are first and last from raw.
-        A[0, 1:] = raw[0][1]
-        A[m - 1, 1:] = raw[-1][1]
+        A[0] = raw[0][1]
+        A[m - 1] = raw[-1][1]
         k = 0
         # len(raw) may not be equal to m, so we fill out A by choosing values
         # with the closest timestamps.
         for i in range(1, m - 1):
-            t = A[i, 0]
+            t = self.times[i]
             while k + 1 < len(raw) and abs(raw[k + 1][0] - t) < abs(raw[k][0] - t):
                 k += 1
-            A[i, 1:] = raw[k][1]
+            A[i] = raw[k][1]
         # OK, we fit the raw values into A.  Now fixup rollover and
         # convert units.
-        for j, e in enumerate(schema.entries, start=1): # + 1.
+        for j, e in enumerate(schema.entries):
             if e.is_event:
                 p = r = A[0, j] # Previous raw, rollover/baseline.
                 # Rebase, check for rollover.
@@ -367,18 +366,18 @@ class Job(object):
                         # Looks like rollover.
                         if e.width:
                             trace("time %d, counter `%s', rollover prev %d, curr %d\n",
-                                  A[i, 0], e.key, p, v)
+                                  self.times[i], e.key, p, v)
                             r -= numpy.uint64(1L << e.width)
                         elif v == 0:
                             # This happens with the IB counters.
                             # Ignore this value, use previous instead.
                             # TODO Interpolate or something.
                             trace("time %d, counter `%s', suspicious zero, prev %d\n",
-                                  A[i, 0], e.key, p)
+                                  self.times[i], e.key, p)
                             v = p # Ugh.
                         else:
                             error("time %d, counter `%s', 64-bit rollover prev %d, curr %d\n",
-                                  A[i, 0], e.key, p, v)
+                                  self.times[i], e.key, p, v)
                             # TODO Discard or something.
                     A[i, j] = v - r
                     p = v
@@ -399,6 +398,33 @@ class Job(object):
                                                        dev_name, raw_dev_stats)
                     type_stats[dev_name] = dev_stats
             del host.raw_stats
+        # TODO Clear mult, width from schemas.
+    
+    def aggregate_stats(self, type_name, host_names=None, dev_names=None):
+        # TODO Handle control registers.
+        schema = self.schema[type_name]
+        m = len(self.times)
+        n = len(schema.entries)
+        A = numpy.zeros((m, n), dtype=numpy.uint64) # Output.       
+        nr_hosts = 0
+        nr_devs = 0
+        if host_names:
+            host_list = [self.hosts[name] for name in host_names]
+        else:
+            host_list = self.hosts.itervalues()
+        for host in host_list:
+            type_stats = host.stats.get(type_name)
+            if not type_stats:
+                continue
+            nr_hosts += 1
+            if dev_names:
+                dev_list = [type_stats[name] for name in dev_names]
+            else:
+                dev_list = type_stats.itervalues()
+            for dev_stats in dev_list:
+                A += dev_stats
+                nr_devs += 1
+        return (A, nr_hosts, nr_devs)
 
 def test():
     jobid = '2255593'
