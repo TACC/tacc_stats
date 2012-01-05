@@ -1,17 +1,9 @@
 #!/usr/bin/env python
-import errno, gzip, numpy, os, sge_acct, sys, time, urllib
-# signal, string, subprocess
+import errno, gzip, numpy, os, sge_acct, sys, time
 
 TS_IN_DIR = '/tmp/TS/in'
 TS_OUT_DIR = '/tmp/TS/out'
-TS_TMP_DIR = '/tmp/TS/tmp'
 TS_VERBOSE = True # XXX
-
-# mkdir -p /tmp/TS/{in,out,tmp}
-# ln -s /scratch/projects/tacc_stats/archive /tmp/TS/in/stats
-# ln -s /scratch/projects/tacc_stats/accounting /tmp/TS/in/accounting
-# ln -s /scratch/projects/tacc_stats/hostfiles /tmp/TS/in/host_lists
-
 
 IN_STATS_TIME_MAX = 86400 + 2 * 3600
 IN_STATS_TIME_PAD = 1200
@@ -31,11 +23,8 @@ sge_acct_path = os.path.join(TS_IN_DIR, 'accounting')
 # host_lists/JOBID: job host list (in).
 host_list_dir = os.path.join(TS_IN_DIR, 'host_lists')
 
-# DB TODO (out).
-
 # job_stats_dir/JOBID: tar file per job (out).
 out_stats_dir = os.path.join(TS_OUT_DIR, 'stats')
-
 
 prog = os.path.basename(sys.argv[0])
 if prog == "":
@@ -53,30 +42,6 @@ def error(fmt, *args):
     sys.stderr.write(prog + ": " + msg)
     
 
-def fatal(fmt, *args):
-    msg = fmt % args
-    sys.stderr.write(prog + ": " + msg)
-    sys.exit(1)
-
-
-def mkdir_p(path):
-    try:
-        os.makedirs(path)
-    except OSError as (err, str):
-        if err != errno.EEXIST:
-            raise OSError(err, str)
-
-
-def listdir_q(dir):
-    try:
-        return os.listdir(dir)
-    except OSError as exc:
-        if exc.errno == errno.ENOENT:
-            return []
-        else:
-            raise exc
-
-
 def stats_file_discard_record(file):
     for line in file:
         if line.isspace():
@@ -87,8 +52,6 @@ class Schema(object):
     __slots__ = ('desc', 'entries', 'keys')
 
     def __init__(self, job, desc):
-        # self.name = name
-        # self.desc = desc
         self.desc = desc
         self.entries = []
         self.keys = {}
@@ -149,14 +112,14 @@ class SchemaEntry(object):
 
 
 class Host(object):
-    __slots__ = ('job', 'name', 'times', 'stats', 'marks')
+    # __slots__ = ('job', 'name', 'times', 'marks', 'raw_stats')
+
     def __init__(self, job, name):
-        # trace("job `%s', name `%s'\n", job.id, name)
         self.job = job
         self.name = name
         self.times = []
-        self.stats = {}
         self.marks = {}
+        self.raw_stats = {}
 
     def trace(self, fmt, *args):
         self.job.trace('%s: ' + fmt, self.name, *args)
@@ -186,7 +149,7 @@ class Host(object):
         path_list.sort(key=lambda tup: tup[1])
         return path_list
 
-    def read_stats_file_header(self, file, start_time):
+    def read_stats_file_header(self, start_time, file):
         schema = {}
         for line in file:
             try:
@@ -205,6 +168,7 @@ class Host(object):
                 self.trace("file `%s', caught `%s' discarding line `%s'\n",
                            file.name, exc, line)
                 break
+        # TODO Remove this.
         if self.job.schema:
             # Cheesy.
             if self.job.schema != schema:
@@ -215,32 +179,26 @@ class Host(object):
             self.job.schema = schema
         return schema
 
-    def parse_stats(self, file, schema, rec_time, line):
+    def parse_stats(self, rec_time, line, schema, file):
         type_name, dev_name, rest = line.split(None, 2)
         type_schema = schema.get(type_name)
         if not type_schema:
-            self.trace("file `%s', unknown type `%s'\n", file.name, type_name)
+            self.error("file `%s', unknown type `%s', discarding line `%s'\n",
+                       file.name, type_name, line)
             return
-        type_stats = self.stats.setdefault(type_name, {})
-        dev_file = type_stats.get(dev_name)
-        if not dev_file:
-            dev_file = self.job.open(type_name, self.name, dev_name, 'w',
-                                     schema=type_schema)
-            type_stats[dev_name] = dev_file
-        # XXX dtype=numpy.uint64
-        # XXX count=?
+        # TODO stats_dtype = numpy.uint64
+        # XXX count = ?
         vals = numpy.fromstring(rest, dtype=numpy.uint64, sep=' ')
-        # if vals.shape != (len(schema.entries),):
-        #     ...
-        FS = ' '
-        RS = '\n'
-        dev_file.write(str(rec_time))
-        dev_file.write(FS)
-        vals.tofile(dev_file, sep=FS)
-        dev_file.write(RS)
+        if len(type_schema.entries) != vals.shape[0]:
+            self.error("file `%s', type `%s', expected %d values, read %d, discarding line `%s'\n",
+                       file.name, type_name, len(schema.entries), vals.shape[0], line)
+            return
+        type_stats = self.raw_stats.setdefault(type_name, {})
+        dev_stats = type_stats.setdefault(dev_name, [])
+        dev_stats.append((rec_time, vals))
 
-    def read_stats_file(self, file, start_time):
-        schema = self.read_stats_file_header(file, start_time)
+    def read_stats_file(self, start_time, file):
+        schema = self.read_stats_file_header(start_time, file)
         if not schema:
             self.trace("file `%s' bad schema\n", file.name)
             return
@@ -279,7 +237,7 @@ class Host(object):
                                file.name, rec_time, rec_jobid)
                     self.times.append(rec_time)
                 elif c.isalpha():
-                    self.parse_stats(file, schema, rec_time, line)
+                    self.parse_stats(rec_time, line, schema, file)
                 elif c == SF_MARK_CHAR:
                     mark = line[1:].strip()
                     self.marks[mark] = True
@@ -297,35 +255,26 @@ class Host(object):
         if len(path_list) == 0:
             self.error("no stats files overlapping job\n")
             return False
+        # read_stats_file() and parse_stats() append stats records
+        # into lists of tuples in self.raw_stats.  The lists will be
+        # converted into numpy arrays below.
         for path, start_time in path_list:
             file = gzip.open(path) # XXX Gzip.
-            self.read_stats_file(file, start_time)
-        # Close all tmp files.
-        for d in self.stats.itervalues():
-            for f in d.itervalues():
-                f.close()
-#         begin_mark = 'begin %s' % self.job.id # No '%'.
-#         if not begin_mark in self.marks:
-#             self.error("no begin mark found\n")
-#             return False
-#         end_mark = 'end %s' % self.job.id # No '%'.
-#         if not end_mark in self.marks:
-#             self.error("no end mark found\n")
-#             return False
-        return True
-
-
-def path_quote(str):
-    return urllib.quote(str, safe='')
-
-
-def path_unquote(str):
-    return urllib.unquote(str)
+            self.read_stats_file(start_time, file)
+        # begin_mark = 'begin %s' % self.job.id # No '%'.
+        # if not begin_mark in self.marks:
+        #     self.error("no begin mark found\n")
+        #     return False
+        # end_mark = 'end %s' % self.job.id # No '%'.
+        # if not end_mark in self.marks:
+        #     self.error("no end mark found\n")
+        #     return False
+        return self.raw_stats
 
 
 class Job(object):
     # TODO errors/comments
-    __slots__ = ('id', 'start_time', 'end_time', 'acct', 'schema', 'hosts', 'times', 'tmp_dir')
+    __slots__ = ('id', 'start_time', 'end_time', 'acct', 'schema', 'hosts', 'times')
 
     def __init__(self, acct):
         self.id = acct['id']
@@ -335,41 +284,12 @@ class Job(object):
         self.schema = {}
         self.hosts = {}
         self.times = []
-        self.tmp_dir = None
 
     def trace(self, fmt, *args):
         trace('%s: ' + fmt, self.id, *args)
 
     def error(self, fmt, *args):
         error('%s: ' + fmt, self.id, *args)
-
-    def open(self, type_name, host_name, dev_name, mode='r', schema=None):
-        type_ent = path_quote(type_name)
-        host_ent = path_quote(host_name)
-        dev_ent = path_quote(dev_name)
-        dir = os.path.join(self.tmp_dir, type_ent, host_ent) # XXX Policy.
-        if mode[0] == 'a' or mode[0] == 'w':
-            mkdir_p(dir)
-        path = os.path.join(dir, dev_ent)
-        return open(path, mode)
-
-    def iter_files(self, type_name, host_names=None, dev_names=None, mode='r'):
-        type_ent = path_quote(type_name)
-        type_dir = os.path.join(self.tmp_dir, type_ent)
-        if host_names == None:
-            host_ent_list = list(listdir_q(type_dir))
-        else:
-            host_ent_list = map(path_quote, host_names)
-        for host_ent in host_ent_list:
-            host_dir = os.path.join(type_dir, host_ent)
-            if dev_names == None:
-                dev_ent_list = list(listdir_q(host_dir))
-            else:
-                dev_ent_list = map(path_quote, dev_names)
-            for dev_ent in dev_ent_list:
-                yield (path_unquote(host_ent),
-                       path_unquote(dev_ent),
-                       open(os.path.join(host_dir, dev_ent), mode))
 
     def gather_stats(self):
         host_list_path = os.path.join(host_list_dir, self.id)
@@ -382,24 +302,24 @@ class Job(object):
         if len(host_list) == 0:
             self.error("empty host list\n")
             return False
-        tmp_dir = os.path.join(TS_TMP_DIR, self.id)
-        os.mkdir(tmp_dir)
-        self.tmp_dir = tmp_dir
         for host_name in host_list:
+            # TODO Keep bad_hosts.
             host = Host(self, host_name)
             if host.gather_stats():
                 self.hosts[host_name] = host
-            else:
-                pass # FIXME
-        if len(self.hosts) == 0:
+        if not self.hosts:
             self.error("no good hosts\n")
             return False
         return True
 
     def munge_times(self):
         # Ensure that times is sane and monotonically increasing.
-        times_lis = [host.times for host in self.hosts.itervalues()]
+        times_lis = []
+        for host in self.hosts.itervalues():
+            times_lis.append(host.times)
+            del host.times
         times_lis.sort(key=lambda lis: len(lis))
+        # Choose times to have median length.
         times = list(times_lis[len(times_lis) / 2])
         times.sort()
         t_min = self.start_time
@@ -412,144 +332,73 @@ class Job(object):
         self.trace("job start to first collect %d\n", times[0] - self.start_time)
         self.trace("last collect to job end %d\n", self.end_time - times[-1])
         self.times = times
-
-    def process_stats_array(self, type_name, host_name, dev_name, schema, A):
+    
+    def process_dev_stats(self, host, type_name, schema, dev_name, raw):
         def trace(fmt, *args):
-            return self.trace("type `%s', host `%s', dev `%s': " + fmt,
-                              type_name, host_name, dev_name, *args)
-        
+            return self.trace("host `%s', type `%s', dev `%s': " + fmt,
+                              host.name, type_name, dev_name, *args)
         def error(fmt, *args):
-            return self.error("type `%s', host `%s', dev `%s': " + fmt,
-                              type_name, host_name, dev_name, *args)
-
-        m, n = A.shape
-        if n != len(schema.entries) + 1:
-            str = "found %d columns, expected %d\n" % (n, len(schema.entries) + 1)
-            raise ValueError, str
-        P = numpy.array(A[0], dtype=numpy.uint64) # Prev.
-        R = numpy.array(A[0], dtype=numpy.uint64) # Roll.
-        B = numpy.zeros((len(self.times), n), dtype=numpy.uint64) # Output.
-        for k, t in enumerate(self.times):
-            B[k, 0] = t
-            # Choose i so that A[i, 0] is as close to t as possible.
-            # This should be improved to avoid binary search.
-            i = numpy.searchsorted(A[:, 0], t)
-            # If 0 < i < m then A[i - 1, 0] <= t <= A[i, 0].
-            if i == 0:
-                pass
-            elif i < m:
-                if t - A[i - 1, 0] < A[i, 0] - t:
-                    i = i - 1
-            else:
-                i = m - 1
-            for j, e in enumerate(schema.entries, start=1): # + 1.
-                v = A[i, j]
-                if e.is_event:
-                    # Check for rollover.
-                    if v < P[j]:
+            return self.error("host `%s', type `%s', dev `%s': " + fmt,
+                              host.name, type_name, dev_name, *args)
+        m = len(self.times)
+        n = len(schema.entries) + 1
+        A = numpy.zeros((m, n), dtype=numpy.uint64) # Output.
+        A[:, 0] = self.times
+        # First and last of A are first and last from raw.
+        A[0, 1:] = raw[0][1]
+        A[m - 1, 1:] = raw[-1][1]
+        k = 0
+        # len(raw) may not be equal to m, so we fill out A by choosing values
+        # with the closest timestamps.
+        for i in range(1, m - 1):
+            t = A[i, 0]
+            while k + 1 < len(raw) and abs(raw[k + 1][0] - t) < abs(raw[k][0] - t):
+                k += 1
+            A[i, 1:] = raw[k][1]
+        # OK, we fit the raw values into A.  Now fixup rollover and
+        # convert units.
+        for j, e in enumerate(schema.entries, start=1): # + 1.
+            if e.is_event:
+                p = r = A[0, j] # Previous raw, rollover/baseline.
+                # Rebase, check for rollover.
+                for i in range(0, m):
+                    v = A[i, j]
+                    if v < p:
+                        # Looks like rollover.
                         if e.width:
                             trace("time %d, counter `%s', rollover prev %d, curr %d\n",
-                                  A[i, 0], e.key, P[j], v)
-                            R[j] -= numpy.uint64(1L << e.width)
+                                  A[i, 0], e.key, p, v)
+                            r -= numpy.uint64(1L << e.width)
                         elif v == 0:
-                            trace("time %d, counter `%s', rollover prev %d, curr %d\n",
-                                  A[i, 0], e.key, P[j], v)
-                            v = P[j] # Ugh.
+                            # This happens with the IB counters.
+                            # Ignore this value, use previous instead.
+                            # TODO Interpolate or something.
+                            trace("time %d, counter `%s', suspicious zero, prev %d\n",
+                                  A[i, 0], e.key, p)
+                            v = p # Ugh.
                         else:
-                            error("time %d, counter `%s', rollover prev %d, curr %d\n",
-                                  A[i, 0], e.key, P[j], v)
-                            # raise
-                    v -= R[j]
-                if e.mult:
-                    v *= e.mult
-                B[k, j] = v
-            P = A[i, :]
-        return (B, schema)
-
-#     def amd64_process_sock(self, type_name, host_name, sock_name, schema):
-#         m = len(self.times)
-#         n = 1 + 4
-#         A = numpy.zeros((m, n), dtype=numpy.uint64)
-#         sock = int(sock_name)
-#         for core in range(4 * sock, 4 * (sock + 1)):
-#             C = numpy.loadtxt(self.open(type_name, host_name, str(core)), dtype=numpy.uint64)
-#            
-#         for sock in range(0, 4):
-#             sock_name = str(sock)
-#             S = numpy.zeros(len(self.times), 4)
-#             for core in range(4 * sock, 4 * (sock + 1)):
-#                 core_name = str(core)
-#                 C = numpy.zeros(len()self.times), 3)
-#
-#         self.get_schema('amd64_core', amd64_core_schema)
-#         self.types['amd64_core'].devs = set(map(str, range(0, 16))) # BLECH.
-#         self.get_schema('amd64_sock', amd64_sock_schema)
-#         self.types['amd64_sock'].devs = set(map(str, range(0, 4))) # BLECH.
-#         for host_entry in self.hosts.itervalues():
-#             orig_data = host_entry.types['amd64_pmc']
-#             core_data = host_entry.add_type('amd64_core', amd64_core_schema)
-#             sock_data = host_entry.add_type('amd64_sock', amd64_sock_schema)
-#             # Assume no stray times.
-#             times = orig_data.times['0']
-#             nr_rows = len(times)
-#             for sock_nr in range(0, 4):
-#                 sock_dev = str(sock_nr)
-#                 sock_data.times[sock_dev] = numpy.array(times, numpy.uint64)
-#                 sock_stats = sock_data.stats[sock_dev] = numpy.zeros((nr_rows, 4), numpy.uint64)
-#                 for core_nr in range(4 * sock_nr, 4 * (sock_nr + 1)):
-#                     core_dev = str(core_nr)
-#                     orig_stats = orig_data.stats[core_dev]
-#                     core_data.times[core_dev] = numpy.array(times, numpy.uint64)
-#                     core_stats = core_data.stats[core_dev] = numpy.zeros((nr_rows, 3), numpy.uint64)
-#                     # Assume schema is still CTL{0..3} CTR{0..3}.
-#                     for row in range(0, nr_rows):
-#                         for ctl_nr in range(0, 4):
-#                             ctl = orig_stats[row][ctl_nr]
-#                             val = orig_stats[row][ctl_nr + 4]
-#                             if ctl in amd64_sock_ctls:
-#                                 col = amd64_sock_ctls[ctl]
-#                                 sock_stats[row][col] += val * amd64_mults[ctl]
-#                             elif ctl in amd64_core_ctls:
-#                                 col = amd64_core_ctls[ctl]
-#                                 core_stats[row][col] += val * amd64_mults[ctl]
-#                             else:
-#                                 # TODO Improve error detection.
-#                                 error("unknown PMC control value %d\n", ctl)
-#                                 del self.types['amd64_core']
-#                                 del self.types['amd64_sock']
-#                                 return
-
-    def process_stats_file(self, type_name, host_name, dev_name, schema,
-                           in_file, out_file):
-        # comment=
-        A = numpy.loadtxt(in_file, dtype=numpy.uint64)
-        # XXX We don't use returned schema.
-        B, schema = self.process_stats_array(type_name, host_name, dev_name,
-                                             schema, A)
-        # header=, footer=
-        numpy.savetxt(out_file, B, fmt='%u')
+                            error("time %d, counter `%s', 64-bit rollover prev %d, curr %d\n",
+                                  A[i, 0], e.key, p, v)
+                            # TODO Discard or something.
+                    A[i, j] = v - r
+                    p = v
+            if e.mult:
+                for i in range(0, m):
+                    A[i, j] *= e.mult
+        return A
 
     def process_stats(self):
-        for type_name, schema in self.schema.iteritems():
-            for host_name, dev_name, in_file in self.iter_files(type_name):
-                out_file = open(in_file.name + '~', 'w') # XXX w.
-                try:
-                    self.process_stats_file(type_name, host_name, dev_name,
-                                            schema, in_file, out_file)
-                    os.rename(out_file.name, in_file.name)
-                except:
-                    os.unlink(in_file.name)
-                    os.unlink(out_file.name)
-                in_file.close()
-                out_file.close()
-
-#if False:
-#     start_time = time.time() - 2 * 86400
-#     end_time = start_time + 86400
-#
-#     sge_acct_file = open(sge_acct_path, 'r')
-#     for acct in sge_acct.reader(sge_acct_file, start_time=start_time, end_time=end_time):
-#        (acct)
+        for host in self.hosts.itervalues():
+            host.stats = {}
+            for type_name, raw_type_stats in host.raw_stats.iteritems():
+                type_stats = host.stats[type_name] = {}
+                type_schema = self.schema[type_name]
+                for dev_name, raw_dev_stats in raw_type_stats.iteritems():
+                    dev_stats = self.process_dev_stats(host,
+                                                       type_name, type_schema,
+                                                       dev_name, raw_dev_stats)
+                    type_stats[dev_name] = dev_stats
+            del host.raw_stats
 
 def test():
     jobid = '2255593'
