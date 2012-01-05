@@ -8,7 +8,7 @@ import gzip, os, numpy, signal, string, subprocess, sys, time
 
 base_dir = "/scratch/projects/tacc_stats"
 archive_dir = os.path.join(base_dir, "archive")
-job_info_cmd = os.path.join(base_dir, "scripts", "tacc_job_info")
+job_info_cmd = "tacc_job_info"
 
 verbose = True # XXX
 prog = os.path.basename(sys.argv[0])
