@@ -1,12 +1,24 @@
 #!/usr/bin/env python
-import errno, gzip, numpy, os, sge_acct, sys, time
+import datetime, errno, glob, gzip, numpy, os, sge_acct, sys, time
 
-TS_IN_DIR = '/tmp/TS/in'
-TS_OUT_DIR = '/tmp/TS/out'
+TS_TMP_DIR = os.getenv('TS_TMP_DIR', '/tmp/TS')
 TS_VERBOSE = True # XXX
 
-IN_STATS_TIME_MAX = 86400 + 2 * 3600
-IN_STATS_TIME_PAD = 1200
+prog = os.path.basename(sys.argv[0])
+if prog == "":
+    prog = "***"
+
+def trace(fmt, *args):
+    if TS_VERBOSE:
+        msg = fmt % args
+        sys.stderr.write(prog + ": " + msg)
+
+def error(fmt, *args):
+    msg = fmt % args
+    sys.stderr.write(prog + ": " + msg)
+
+RAW_STATS_TIME_MAX = 86400 + 2 * 3600
+RAW_STATS_TIME_PAD = 1200
 
 SF_SCHEMA_CHAR = '!'
 SF_DEVICES_CHAR = '@'
@@ -14,33 +26,29 @@ SF_COMMENT_CHAR = '#'
 SF_PROPERTY_CHAR = '$'
 SF_MARK_CHAR = '%'
 
-# stats/HOST/TIMESTAMP: raw stats files (in).
-in_stats_dir = os.path.join(TS_IN_DIR, 'stats')
+# stats/HOST/TIMESTAMP: raw stats files.
+raw_stats_dir = os.path.join(TS_TMP_DIR, 'stats')
 
-# sge_acct: mirror of sge accounting file or a chunk of it (in).
-sge_acct_path = os.path.join(TS_IN_DIR, 'accounting')
+# accounting: mirror of sge accounting file or a chunk of it.
+# Only used in test.
+sge_acct_path = os.path.join(TS_TMP_DIR, 'accounting')
 
-# host_lists/JOBID: job host list (in).
-host_list_dir = os.path.join(TS_IN_DIR, 'host_lists')
+# prolog_host_lists/YYYY/MM/DD/prolog_hostfile.JOBID.*.
+# Symbolic link to /share/sge6.2/default/tacc/hostfile_logs.
+prolog_host_list_dir = os.path.join(TS_TMP_DIR, 'prolog_host_lists')
 
-# job_stats_dir/JOBID: tar file per job (out).
-out_stats_dir = os.path.join(TS_OUT_DIR, 'stats')
+def get_host_list_path(acct):
+    """Return the path of the host list written during the prolog."""
+    # Example: /tmp/TS/prolog_host_lists/2011/05/19/prolog_hostfile.1957000.IV32627
+    start_date = datetime.date.fromtimestamp(acct['start_time'])
+    base_glob = 'prolog_hostfile.' + acct['id'] + '.*'
+    for days in (0, -1, 1):
+        yyyy_mm_dd = (start_date + datetime.timedelta(days)).strftime("%Y/%m/%d")
+        full_glob = os.path.join(prolog_host_list_dir, yyyy_mm_dd, base_glob)
+        for path in glob.iglob(full_glob):
+            return path
+    return None
 
-prog = os.path.basename(sys.argv[0])
-if prog == "":
-    prog = "***"
-
-
-def trace(fmt, *args):
-    if TS_VERBOSE:
-        msg = fmt % args
-        sys.stderr.write(prog + ": " + msg)
-
-
-def error(fmt, *args):
-    msg = fmt % args
-    sys.stderr.write(prog + ": " + msg)
-    
 
 def stats_file_discard_record(file):
     for line in file:
@@ -128,20 +136,20 @@ class Host(object):
         self.job.error('%s: ' + fmt, self.name, *args)
 
     def get_stats_paths(self):
-        in_host_stats_dir = os.path.join(in_stats_dir, self.name)
-        job_start = self.job.start_time - IN_STATS_TIME_PAD
-        job_end = self.job.end_time + IN_STATS_TIME_PAD
+        raw_host_stats_dir = os.path.join(raw_stats_dir, self.name)
+        job_start = self.job.start_time - RAW_STATS_TIME_PAD
+        job_end = self.job.end_time + RAW_STATS_TIME_PAD
         path_list = []
         try:
-            for ent in os.listdir(in_host_stats_dir):
+            for ent in os.listdir(raw_host_stats_dir):
                 base, dot, ext = ent.partition(".")
                 if not base.isdigit():
                     continue
                 # Prune to files that might overlap with job.
                 ent_start = long(base)
-                ent_end = ent_start + IN_STATS_TIME_MAX
+                ent_end = ent_start + RAW_STATS_TIME_MAX
                 if max(job_start, ent_start) <= min(job_end, ent_end):
-                    full_path = os.path.join(in_host_stats_dir, ent)
+                    full_path = os.path.join(raw_host_stats_dir, ent)
                     path_list.append((full_path, ent_start))
                     self.trace("path `%s', start %d\n", full_path, ent_start)
         except:
@@ -259,8 +267,8 @@ class Host(object):
         # into lists of tuples in self.raw_stats.  The lists will be
         # converted into numpy arrays below.
         for path, start_time in path_list:
-            file = gzip.open(path) # XXX Gzip.
-            self.read_stats_file(start_time, file)
+            with gzip.open(path) as file: # XXX Gzip.
+                self.read_stats_file(start_time, file)
         # begin_mark = 'begin %s' % self.job.id # No '%'.
         # if not begin_mark in self.marks:
         #     self.error("no begin mark found\n")
@@ -292,12 +300,15 @@ class Job(object):
         error('%s: ' + fmt, self.id, *args)
 
     def gather_stats(self):
-        host_list_path = os.path.join(host_list_dir, self.id)
+        path = get_host_list_path(self.acct)
+        if not path:
+            self.error("no host list found\n", path)
+            return False
         try:
-            host_list_file = open(host_list_path, 'r')
-            host_list = [host for line in host_list_file for host in line.split()]
+            with open(path) as file:
+                host_list = [host for line in file for host in line.split()]
         except IOError as (err, str):
-            self.error("cannot open host list `%s': %s\n", host_list_path, str)
+            self.error("cannot open host list `%s': %s\n", path, str)
             return False
         if len(host_list) == 0:
             self.error("empty host list\n")
@@ -332,6 +343,7 @@ class Job(object):
         self.trace("job start to first collect %d\n", times[0] - self.start_time)
         self.trace("last collect to job end %d\n", self.end_time - times[-1])
         self.times = numpy.array(times, dtype=numpy.uint64)
+        return True
     
     def process_dev_stats(self, host, type_name, schema, dev_name, raw):
         def trace(fmt, *args):
@@ -399,6 +411,7 @@ class Job(object):
                     type_stats[dev_name] = dev_stats
             del host.raw_stats
         # TODO Clear mult, width from schemas.
+        return True
     
     def aggregate_stats(self, type_name, host_names=None, dev_names=None):
         # TODO Handle control registers.
@@ -425,14 +438,3 @@ class Job(object):
                 A += dev_stats
                 nr_devs += 1
         return (A, nr_hosts, nr_devs)
-
-def test():
-    jobid = '2255593'
-    acct_file = open('accounting', 'r')
-    acct_lis = [a for a in sge_acct.reader(acct_file)]
-    acct = filter(lambda acct: acct['id'] == jobid, acct_lis)[0]
-    job = Job(acct)
-    job.gather_stats()
-    job.munge_times()
-    job.process_stats()
-    return job
