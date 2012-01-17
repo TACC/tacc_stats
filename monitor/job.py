@@ -331,6 +331,8 @@ class Job(object):
         times_lis.sort(key=lambda lis: len(lis))
         # Choose times to have median length.
         times = list(times_lis[len(times_lis) / 2])
+        if not times:
+            return False
         times.sort()
         # Ensure that times is sane and monotonically increasing.
         t_min = self.start_time
@@ -438,3 +440,13 @@ class Job(object):
                 A += dev_stats
                 nr_devs += 1
         return (A, nr_hosts, nr_devs)
+
+
+def from_acct(acct):
+    """from_acct(acct)
+    Construct a Job object from the SGE accounting data acct, running
+    all required processing.
+    """
+    job = Job(acct)
+    job.gather_stats() and job.munge_times() and job.process_stats()
+    return job
