@@ -48,6 +48,7 @@ fields = (
     ('pe_taskid',       str, 'If this identifier is set the task was part of a parallel job and was passed to Sun Grid Engine via the qrsh -inherit interface.'),
     ('maxvmem',       float, 'The maximum vmem size in bytes.'), # Bogus.
     ('arid',            int, 'Advance reservation identifier. If the job used resources of an advance reservation then this field contains a positive integer identifier otherwise the value is 0.'),
+    ('ar_submission_time', int, 'If the job used resources of an advance reservation then this field contains the submission time (GMT unix time stamp) of the advance reservation, otherwise the value is 0.'),
 )
 
 field_names = [tup[0] for tup in fields]
