@@ -37,7 +37,7 @@ import sys
 
 sys.path.insert(0, '/home/aterrel/workspace/tacc_stats/monitor')
 
-from tacc_stats.models import Node, System
+from tacc_stats.models import Node, System, User
 from tacc_stats.models import Job as tsm_Job
 
 def get_job_shelf(archive_path):
@@ -48,16 +48,35 @@ def get_system(system_name):
     """Returns system, adding it if system if not in db."""
     systems = System.objects.filter(name=system_name)
     if len(systems) == 0:
-        print "adding system: %s" % system_name
-        systems = [System(name=system_name)]
-        systems[0].save()
-    return systems[0]
+        print "Adding system: %s" % system_name
+        system = System(name=system_name)
+        system.save()
+    else:
+        system = systems[0]
+    return system
 
-def add_node(system, node_name):
-    """Adds node, if it doesn't exist"""
-    if len(system.node_set.filter(name=node_name)) == 0:
-        system.node_set.create(name=node_name)
-        print "added node:", node_name
+def get_node(system, node_name):
+    """Returns node, if it doesn't exist it is created"""
+    node_name = strip_system_name(system.name, node_name)
+    nodes = system.node_set.filter(name=node_name)
+    if len(nodes) == 0:
+        print "Adding node: %s" % node_name
+        node = system.node_set.create(name=node_name)
+    else:
+        node = nodes[0]
+    return node
+
+def get_user(user_name, system):
+    """Returns the user cooresponding to the user_name, if it doesn't exist it is created"""
+    users = User.objects.filter(user_name=user_name)
+    if len(users) == 0:
+        print "Adding user:", user_name
+        user = User(user_name = user_name)
+        user.save()
+    else:
+        user = users[0]
+    user.systems.add(system)
+    return user
 
 def strip_system_name(system_name, node):
     """Removes the system name from a node"""
@@ -67,22 +86,29 @@ def strip_system_name(system_name, node):
         node = node[:end]
     return node
 
-def create_nodes_from_job(system, a_job):
-    """Grabs directory names in archive and addes the nodes to system"""
-    for host in a_job.hosts:
-        add_node(system, strip_system_name(system.name, host))
-
 def add_Job(system, a_job):
     if system.job_set.filter(acct_id=int(a_job.id)):
-        print "job %s already exists" % a_job.id
+        print "Job %s already exists" % a_job.id
         return
-    newJob = tsm_Job(acct_id=a_job.id, system=system)
-    newJob.owner = a_job.acct['account']
-    newJob.begin = a_job.start_time
-    newJob.end = a_job.end_time
-    newJob.runtime = a_job.end_time - a_job.start_time
-    newJob.nr_hosts = len(a_job.hosts)
+    owner = get_user(a_job.acct['account'], system)
+
+    job_dict = {
+        'system': system,
+        'acct_id': a_job.id,
+        'owner': owner,
+        'begin': a_job.start_time,
+        'end': a_job.end_time,
+        'nr_slots': a_job.acct['slots'],
+        'pe': a_job.acct['granted_pe'],
+        'failed': a_job.acct['failed'],
+        'exit_status': a_job.acct['exit_status'],
+    }
+    #newJob.nr_hosts = len(a_job.hosts)
+    newJob = tsm_Job(**job_dict)
     newJob.save()
+    hosts = map(lambda node: get_node(system, node), a_job.hosts.keys())
+    newJob.hosts = hosts
+
     print "Added job:", a_job.id
 
 def process_job_archive(system_name, archive_path):
@@ -90,7 +116,6 @@ def process_job_archive(system_name, archive_path):
     system = get_system(system_name)
     job_shelf = get_job_shelf(archive_path)
     for a_job in job_shelf.values():
-        create_nodes_from_job(system, a_job)
         add_Job(system, a_job)
 
 def build_database(system_name, archive_dir, clean=False):

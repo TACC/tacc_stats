@@ -16,16 +16,24 @@ class Node(models.Model):
     def __unicode__(self):
         return "%s.%s" % (self.name, self.system.name)
 
+class User(models.Model):
+    user_name = models.CharField(max_length=128)
+    systems = models.ManyToManyField(System)
+
+    def __unicode__(self):
+        return "User(%s)" % self.user_name
+
 class Job(models.Model):
-    system = models.ForeignKey(System, null=True)
+    system = models.ForeignKey(System)
     acct_id = models.BigIntegerField()
-    owner = models.CharField(max_length=128)
+    owner = models.ForeignKey(User)
+    hosts = models.ManyToManyField(Node)
     queue = models.CharField(max_length=16, null=True)
     queue_wait_time = models.IntegerField(null=True)
     begin = models.PositiveIntegerField(null=True)
     end = models.PositiveIntegerField(null=True)
-    run_time = models.IntegerField(null=True)
-    nr_hosts = models.IntegerField(null=True)
+    #run_time = models.IntegerField(null=True)
+    #nr_hosts = models.IntegerField(null=True)
     nr_bad_hosts = models.IntegerField(null=True)
     nr_slots = models.IntegerField(null=True)
     pe = models.CharField(max_length=8, null=True)
@@ -68,6 +76,14 @@ class Job(models.Model):
     Slab = models.BigIntegerField(null=True)
 
     #unique_together = ("system", "acct_id")
+
+    @property
+    def runtime(self):
+        self.end - self.begin
+
+    @property
+    def nr_hosts(self):
+        len(self.hosts.all())
 
     @property
     def timespent(self):
