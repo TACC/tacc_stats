@@ -1,7 +1,7 @@
 from django.conf.urls.defaults import patterns, url
 from django.views.generic import DetailView, ListView
 from tacc_stats.models import Job
-from tacc_stats.views import index, job_memused_hist, job_timespent_hist
+from tacc_stats.views import index, job_memused_hist, job_timespent_hist, job_mem_heatmap
 
 urlpatterns = patterns('',
     url(r'^$', index),
@@ -16,6 +16,7 @@ urlpatterns = patterns('',
             model=Job,
         #    template_name='tacc_stats/detail.html',
         )),
-    url(r'^job_memused_hist$', job_memused_hist ),
+    url(r'^job_memused_hist$', job_mem_heatmap ),
     url(r'^job_timespent_hist$', job_timespent_hist ),
+    url(r'^job_mem_heatmap$', job_mem_heatmap),
 )
