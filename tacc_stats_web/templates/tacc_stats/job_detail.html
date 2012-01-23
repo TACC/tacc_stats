@@ -4,10 +4,11 @@
 </head>
 <body>
 {% if job %}
-    <h1>Job {{ job.id }}</h1>
+    <h1>Job {{ job.acct_id }}</h1>
+
+    <h2>Accounting Details</h2>
     <table border="1" cellpadding="5">
       <tr><th>Field</th><th>Value</th></tr>
-      <tr><td> id </td><td> {{job.id}} </td></tr>
       <tr><td> owner </td><td> {{job.owner}} </td></tr>
       <tr><td> queue </td><td> {{job.queue}} </td></tr>
       <tr><td> queue_wait_time </td><td> {{job.queue_wait_time}} </td></tr>
@@ -15,47 +16,200 @@
       <tr><td> end </td><td> {{job.end}} </td></tr>
       <tr><td> run_time </td><td> {{job.run_time}} </td></tr>
       <tr><td> nr_hosts </td><td> {{job.nr_hosts}} </td></tr>
-      <tr><td> nr_bad_hosts </td><td> {{job.nr_bad_hosts}} </td></tr>
       <tr><td> nr_slots </td><td> {{job.nr_slots}} </td></tr>
       <tr><td> pe </td><td> {{job.pe}} </td></tr>
       <tr><td> failed </td><td> {{job.failed}} </td></tr>
       <tr><td> exit_status </td><td> {{job.exit_status}} </td></tr>
-      <tr><td> USER_FLOPS </td><td> {{job.USER_FLOPS}} </td></tr>
-      <tr><td> SSE_FLOPS </td><td> {{job.SSE_FLOPS}} </td></tr>
-      <tr><td> DCSF </td><td> {{job.DCSF}} </td></tr>
-      <tr><td> DRAM </td><td> {{job.DRAM}} </td></tr>
-      <tr><td> HT0 </td><td> {{job.HT0}} </td></tr>
-      <tr><td> HT1 </td><td> {{job.HT1}} </td></tr>
-      <tr><td> HT2 </td><td> {{job.HT2}} </td></tr>
-      <tr><td> user </td><td> {{job.user}} </td></tr>
-      <tr><td> nice </td><td> {{job.nice}} </td></tr>
-      <tr><td> system </td><td> {{job.system}} </td></tr>
-      <tr><td> idle </td><td> {{job.idle}} </td></tr>
-      <tr><td> iowait </td><td> {{job.iowait}} </td></tr>
-      <tr><td> irq </td><td> {{job.irq}} </td></tr>
-      <tr><td> softirq </td><td> {{job.softirq}} </td></tr>
-      <tr><td> share_open </td><td> {{job.share_open}} </td></tr>
-      <tr><td> share_read_bytes </td><td> {{job.share_read_bytes}} </td></tr>
-      <tr><td> share_write_bytes </td><td> {{job.share_write_bytes}} </td></tr>
-      <tr><td> work_open </td><td> {{job.work_open}} </td></tr>
-      <tr><td> work_read_bytes </td><td> {{job.work_read_bytes}} </td></tr>
-      <tr><td> work_write_bytes </td><td> {{job.work_write_bytes}} </td></tr>
-      <tr><td> scratch_open </td><td> {{job.scratch_open}} </td></tr>
-      <tr><td> scratch_read_bytes </td><td> {{job.scratch_read_bytes}} </td></tr>
-      <tr><td> scratch_write_bytes </td><td> {{job.scratch_write_bytes}} </td></tr>
-      <tr><td> lnet_rx_bytes </td><td> {{job.lnet_rx_bytes}} </td></tr>
-      <tr><td> lnet_tx_bytes </td><td> {{job.lnet_tx_bytes}} </td></tr>
-      <tr><td> ib_sw_rx_bytes </td><td> {{job.ib_sw_rx_bytes}} </td></tr>
-      <tr><td> ib_sw_tx_bytes </td><td> {{job.ib_sw_tx_bytes}} </td></tr>
-      <tr><td> net_rx_bytes </td><td> {{job.net_rx_bytes}} </td></tr>
-      <tr><td> net_tx_bytes </td><td> {{job.net_tx_bytes}} </td></tr>
-      <tr><td> MemTotal </td><td> {{job.MemTotal}} </td></tr>
-      <tr><td> MemUsed </td><td> {{job.MemUsed}} </td></tr>
-      <tr><td> FilePages </td><td> {{job.FilePages}} </td></tr>
-      <tr><td> Mapped </td><td> {{job.Mapped}} </td></tr>
-      <tr><td> AnonPages </td><td> {{job.AnonPages}} </td></tr>
-      <tr><td> Slab </td><td> {{job.Slab}} </td></tr>
+    </table>
 
+
+    <h2>Aggregate values of monitors</h2>
+    <table border="1" cellpadding="5">
+      <tr><td> amd64_pmc_CTL0 </td><td> {{job.amd64_pmc_CTL0}} </td></tr>
+      <tr><td> amd64_pmc_CTL1 </td><td> {{job.amd64_pmc_CTL1}} </td></tr>
+      <tr><td> amd64_pmc_CTL2 </td><td> {{job.amd64_pmc_CTL2}} </td></tr>
+      <tr><td> amd64_pmc_CTL3 </td><td> {{job.amd64_pmc_CTL3}} </td></tr>
+      <tr><td> amd64_pmc_CTR0 </td><td> {{job.amd64_pmc_CTR0}} </td></tr>
+      <tr><td> amd64_pmc_CTR1 </td><td> {{job.amd64_pmc_CTR1}} </td></tr>
+      <tr><td> amd64_pmc_CTR2 </td><td> {{job.amd64_pmc_CTR2}} </td></tr>
+      <tr><td> amd64_pmc_CTR3 </td><td> {{job.amd64_pmc_CTR3}} </td></tr>
+      <tr><td> block_in_flight </td><td> {{job.block_in_flight}} </td></tr>
+      <tr><td> block_io_ticks </td><td> {{job.block_io_ticks}} </td></tr>
+      <tr><td> block_rd_ios </td><td> {{job.block_rd_ios}} </td></tr>
+      <tr><td> block_rd_merges </td><td> {{job.block_rd_merges}} </td></tr>
+      <tr><td> block_rd_sectors </td><td> {{job.block_rd_sectors}} </td></tr>
+      <tr><td> block_rd_ticks </td><td> {{job.block_rd_ticks}} </td></tr>
+      <tr><td> block_time_in_queue </td><td> {{job.block_time_in_queue}} </td></tr>
+      <tr><td> block_wr_ios </td><td> {{job.block_wr_ios}} </td></tr>
+      <tr><td> block_wr_merges </td><td> {{job.block_wr_merges}} </td></tr>
+      <tr><td> block_wr_sectors </td><td> {{job.block_wr_sectors}} </td></tr>
+      <tr><td> block_wr_ticks </td><td> {{job.block_wr_ticks}} </td></tr>
+      <tr><td> cpu_idle </td><td> {{job.cpu_idle}} </td></tr>
+      <tr><td> cpu_iowait </td><td> {{job.cpu_iowait}} </td></tr>
+      <tr><td> cpu_irq </td><td> {{job.cpu_irq}} </td></tr>
+      <tr><td> cpu_nice </td><td> {{job.cpu_nice}} </td></tr>
+      <tr><td> cpu_softirq </td><td> {{job.cpu_softirq}} </td></tr>
+      <tr><td> cpu_system </td><td> {{job.cpu_system}} </td></tr>
+      <tr><td> cpu_user </td><td> {{job.cpu_user}} </td></tr>
+      <tr><td> ib_sw_rx_bytes </td><td> {{job.ib_sw_rx_bytes}} </td></tr>
+      <tr><td> ib_sw_rx_packets </td><td> {{job.ib_sw_rx_packets}} </td></tr>
+      <tr><td> ib_sw_tx_bytes </td><td> {{job.ib_sw_tx_bytes}} </td></tr>
+      <tr><td> ib_sw_tx_packets </td><td> {{job.ib_sw_tx_packets}} </td></tr>
+      <tr><td> llite_alloc_inode_scratch </td><td> {{job.llite_alloc_inode_scratch}} </td></tr>
+      <tr><td> llite_alloc_inode_share </td><td> {{job.llite_alloc_inode_share}} </td></tr>
+      <tr><td> llite_alloc_inode_work </td><td> {{job.llite_alloc_inode_work}} </td></tr>
+      <tr><td> llite_close_scratch </td><td> {{job.llite_close_scratch}} </td></tr>
+      <tr><td> llite_close_share </td><td> {{job.llite_close_share}} </td></tr>
+      <tr><td> llite_close_work </td><td> {{job.llite_close_work}} </td></tr>
+      <tr><td> llite_direct_read_scratch </td><td> {{job.llite_direct_read_scratch}} </td></tr>
+      <tr><td> llite_direct_read_share </td><td> {{job.llite_direct_read_share}} </td></tr>
+      <tr><td> llite_direct_read_work </td><td> {{job.llite_direct_read_work}} </td></tr>
+      <tr><td> llite_direct_write_scratch </td><td> {{job.llite_direct_write_scratch}} </td></tr>
+      <tr><td> llite_direct_write_share </td><td> {{job.llite_direct_write_share}} </td></tr>
+      <tr><td> llite_direct_write_work </td><td> {{job.llite_direct_write_work}} </td></tr>
+      <tr><td> llite_dirty_pages_hits_scratch </td><td> {{job.llite_dirty_pages_hits_scratch}} </td></tr>
+      <tr><td> llite_dirty_pages_hits_share </td><td> {{job.llite_dirty_pages_hits_share}} </td></tr>
+      <tr><td> llite_dirty_pages_hits_work </td><td> {{job.llite_dirty_pages_hits_work}} </td></tr>
+      <tr><td> llite_dirty_pages_misses_scratch </td><td> {{job.llite_dirty_pages_misses_scratch}} </td></tr>
+      <tr><td> llite_dirty_pages_misses_share </td><td> {{job.llite_dirty_pages_misses_share}} </td></tr>
+      <tr><td> llite_dirty_pages_misses_work </td><td> {{job.llite_dirty_pages_misses_work}} </td></tr>
+      <tr><td> llite_flock_scratch </td><td> {{job.llite_flock_scratch}} </td></tr>
+      <tr><td> llite_flock_share </td><td> {{job.llite_flock_share}} </td></tr>
+      <tr><td> llite_flock_work </td><td> {{job.llite_flock_work}} </td></tr>
+      <tr><td> llite_fsync_scratch </td><td> {{job.llite_fsync_scratch}} </td></tr>
+      <tr><td> llite_fsync_share </td><td> {{job.llite_fsync_share}} </td></tr>
+      <tr><td> llite_fsync_work </td><td> {{job.llite_fsync_work}} </td></tr>
+      <tr><td> llite_getattr_scratch </td><td> {{job.llite_getattr_scratch}} </td></tr>
+      <tr><td> llite_getattr_share </td><td> {{job.llite_getattr_share}} </td></tr>
+      <tr><td> llite_getattr_work </td><td> {{job.llite_getattr_work}} </td></tr>
+      <tr><td> llite_getxattr_scratch </td><td> {{job.llite_getxattr_scratch}} </td></tr>
+      <tr><td> llite_getxattr_share </td><td> {{job.llite_getxattr_share}} </td></tr>
+      <tr><td> llite_getxattr_work </td><td> {{job.llite_getxattr_work}} </td></tr>
+      <tr><td> llite_inode_permission_scratch </td><td> {{job.llite_inode_permission_scratch}} </td></tr>
+      <tr><td> llite_inode_permission_share </td><td> {{job.llite_inode_permission_share}} </td></tr>
+      <tr><td> llite_inode_permission_work </td><td> {{job.llite_inode_permission_work}} </td></tr>
+      <tr><td> llite_ioctl_scratch </td><td> {{job.llite_ioctl_scratch}} </td></tr>
+      <tr><td> llite_ioctl_share </td><td> {{job.llite_ioctl_share}} </td></tr>
+      <tr><td> llite_ioctl_work </td><td> {{job.llite_ioctl_work}} </td></tr>
+      <tr><td> llite_listxattr_scratch </td><td> {{job.llite_listxattr_scratch}} </td></tr>
+      <tr><td> llite_listxattr_share </td><td> {{job.llite_listxattr_share}} </td></tr>
+      <tr><td> llite_listxattr_work </td><td> {{job.llite_listxattr_work}} </td></tr>
+      <tr><td> llite_mmap_scratch </td><td> {{job.llite_mmap_scratch}} </td></tr>
+      <tr><td> llite_mmap_share </td><td> {{job.llite_mmap_share}} </td></tr>
+      <tr><td> llite_mmap_work </td><td> {{job.llite_mmap_work}} </td></tr>
+      <tr><td> llite_open_scratch </td><td> {{job.llite_open_scratch}} </td></tr>
+      <tr><td> llite_open_share </td><td> {{job.llite_open_share}} </td></tr>
+      <tr><td> llite_open_work </td><td> {{job.llite_open_work}} </td></tr>
+      <tr><td> llite_read_bytes_scratch </td><td> {{job.llite_read_bytes_scratch}} </td></tr>
+      <tr><td> llite_read_bytes_share </td><td> {{job.llite_read_bytes_share}} </td></tr>
+      <tr><td> llite_read_bytes_work </td><td> {{job.llite_read_bytes_work}} </td></tr>
+      <tr><td> llite_removexattr_scratch </td><td> {{job.llite_removexattr_scratch}} </td></tr>
+      <tr><td> llite_removexattr_share </td><td> {{job.llite_removexattr_share}} </td></tr>
+      <tr><td> llite_removexattr_work </td><td> {{job.llite_removexattr_work}} </td></tr>
+      <tr><td> llite_seek_scratch </td><td> {{job.llite_seek_scratch}} </td></tr>
+      <tr><td> llite_seek_share </td><td> {{job.llite_seek_share}} </td></tr>
+      <tr><td> llite_seek_work </td><td> {{job.llite_seek_work}} </td></tr>
+      <tr><td> llite_setattr_scratch </td><td> {{job.llite_setattr_scratch}} </td></tr>
+      <tr><td> llite_setattr_share </td><td> {{job.llite_setattr_share}} </td></tr>
+      <tr><td> llite_setattr_work </td><td> {{job.llite_setattr_work}} </td></tr>
+      <tr><td> llite_setxattr_scratch </td><td> {{job.llite_setxattr_scratch}} </td></tr>
+      <tr><td> llite_setxattr_share </td><td> {{job.llite_setxattr_share}} </td></tr>
+      <tr><td> llite_setxattr_work </td><td> {{job.llite_setxattr_work}} </td></tr>
+      <tr><td> llite_statfs_scratch </td><td> {{job.llite_statfs_scratch}} </td></tr>
+      <tr><td> llite_statfs_share </td><td> {{job.llite_statfs_share}} </td></tr>
+      <tr><td> llite_statfs_work </td><td> {{job.llite_statfs_work}} </td></tr>
+      <tr><td> llite_truncate_scratch </td><td> {{job.llite_truncate_scratch}} </td></tr>
+      <tr><td> llite_truncate_share </td><td> {{job.llite_truncate_share}} </td></tr>
+      <tr><td> llite_truncate_work </td><td> {{job.llite_truncate_work}} </td></tr>
+      <tr><td> llite_write_bytes_scratch </td><td> {{job.llite_write_bytes_scratch}} </td></tr>
+      <tr><td> llite_write_bytes_share </td><td> {{job.llite_write_bytes_share}} </td></tr>
+      <tr><td> llite_write_bytes_work </td><td> {{job.llite_write_bytes_work}} </td></tr>
+      <tr><td> lnet_rx_bytes </td><td> {{job.lnet_rx_bytes}} </td></tr>
+      <tr><td> lnet_rx_bytes_dropped </td><td> {{job.lnet_rx_bytes_dropped}} </td></tr>
+      <tr><td> lnet_rx_msgs </td><td> {{job.lnet_rx_msgs}} </td></tr>
+      <tr><td> lnet_rx_msgs_dropped </td><td> {{job.lnet_rx_msgs_dropped}} </td></tr>
+      <tr><td> lnet_tx_bytes </td><td> {{job.lnet_tx_bytes}} </td></tr>
+      <tr><td> lnet_tx_msgs </td><td> {{job.lnet_tx_msgs}} </td></tr>
+      <tr><td> mem_Active </td><td> {{job.mem_Active}} </td></tr>
+      <tr><td> mem_AnonPages </td><td> {{job.mem_AnonPages}} </td></tr>
+      <tr><td> mem_Bounce </td><td> {{job.mem_Bounce}} </td></tr>
+      <tr><td> mem_Dirty </td><td> {{job.mem_Dirty}} </td></tr>
+      <tr><td> mem_FilePages </td><td> {{job.mem_FilePages}} </td></tr>
+      <tr><td> mem_HugePages_Free </td><td> {{job.mem_HugePages_Free}} </td></tr>
+      <tr><td> mem_HugePages_Total </td><td> {{job.mem_HugePages_Total}} </td></tr>
+      <tr><td> mem_Inactive </td><td> {{job.mem_Inactive}} </td></tr>
+      <tr><td> mem_Mapped </td><td> {{job.mem_Mapped}} </td></tr>
+      <tr><td> mem_MemFree </td><td> {{job.mem_MemFree}} </td></tr>
+      <tr><td> mem_MemTotal </td><td> {{job.mem_MemTotal}} </td></tr>
+      <tr><td> mem_MemUsed </td><td> {{job.mem_MemUsed}} </td></tr>
+      <tr><td> mem_NFS_Unstable </td><td> {{job.mem_NFS_Unstable}} </td></tr>
+      <tr><td> mem_PageTables </td><td> {{job.mem_PageTables}} </td></tr>
+      <tr><td> mem_Slab </td><td> {{job.mem_Slab}} </td></tr>
+      <tr><td> mem_Writeback </td><td> {{job.mem_Writeback}} </td></tr>
+      <tr><td> net_collisions </td><td> {{job.net_collisions}} </td></tr>
+      <tr><td> net_multicast </td><td> {{job.net_multicast}} </td></tr>
+      <tr><td> net_rx_bytes </td><td> {{job.net_rx_bytes}} </td></tr>
+      <tr><td> net_rx_compressed </td><td> {{job.net_rx_compressed}} </td></tr>
+      <tr><td> net_rx_crc_errors </td><td> {{job.net_rx_crc_errors}} </td></tr>
+      <tr><td> net_rx_dropped </td><td> {{job.net_rx_dropped}} </td></tr>
+      <tr><td> net_rx_errors </td><td> {{job.net_rx_errors}} </td></tr>
+      <tr><td> net_rx_fifo_errors </td><td> {{job.net_rx_fifo_errors}} </td></tr>
+      <tr><td> net_rx_frame_errors </td><td> {{job.net_rx_frame_errors}} </td></tr>
+      <tr><td> net_rx_length_errors </td><td> {{job.net_rx_length_errors}} </td></tr>
+      <tr><td> net_rx_missed_errors </td><td> {{job.net_rx_missed_errors}} </td></tr>
+      <tr><td> net_rx_over_errors </td><td> {{job.net_rx_over_errors}} </td></tr>
+      <tr><td> net_rx_packets </td><td> {{job.net_rx_packets}} </td></tr>
+      <tr><td> net_tx_aborted_errors </td><td> {{job.net_tx_aborted_errors}} </td></tr>
+      <tr><td> net_tx_bytes </td><td> {{job.net_tx_bytes}} </td></tr>
+      <tr><td> net_tx_carrier_errors </td><td> {{job.net_tx_carrier_errors}} </td></tr>
+      <tr><td> net_tx_compressed </td><td> {{job.net_tx_compressed}} </td></tr>
+      <tr><td> net_tx_dropped </td><td> {{job.net_tx_dropped}} </td></tr>
+      <tr><td> net_tx_errors </td><td> {{job.net_tx_errors}} </td></tr>
+      <tr><td> net_tx_fifo_errors </td><td> {{job.net_tx_fifo_errors}} </td></tr>
+      <tr><td> net_tx_heartbeat_errors </td><td> {{job.net_tx_heartbeat_errors}} </td></tr>
+      <tr><td> net_tx_packets </td><td> {{job.net_tx_packets}} </td></tr>
+      <tr><td> net_tx_window_errors </td><td> {{job.net_tx_window_errors}} </td></tr>
+      <tr><td> numa_interleave_hit </td><td> {{job.numa_interleave_hit}} </td></tr>
+      <tr><td> numa_local_node </td><td> {{job.numa_local_node}} </td></tr>
+      <tr><td> numa_numa_foreign </td><td> {{job.numa_numa_foreign}} </td></tr>
+      <tr><td> numa_numa_hit </td><td> {{job.numa_numa_hit}} </td></tr>
+      <tr><td> numa_numa_miss </td><td> {{job.numa_numa_miss}} </td></tr>
+      <tr><td> numa_other_node </td><td> {{job.numa_other_node}} </td></tr>
+      <tr><td> ps_ctxt </td><td> {{job.ps_ctxt}} </td></tr>
+      <tr><td> ps_load_1 </td><td> {{job.ps_load_1}} </td></tr>
+      <tr><td> ps_load_15 </td><td> {{job.ps_load_15}} </td></tr>
+      <tr><td> ps_load_5 </td><td> {{job.ps_load_5}} </td></tr>
+      <tr><td> ps_nr_running </td><td> {{job.ps_nr_running}} </td></tr>
+      <tr><td> ps_nr_threads </td><td> {{job.ps_nr_threads}} </td></tr>
+      <tr><td> ps_processes </td><td> {{job.ps_processes}} </td></tr>
+      <tr><td> sysv_shm_mem_used </td><td> {{job.sysv_shm_mem_used}} </td></tr>
+      <tr><td> sysv_shm_segs_used </td><td> {{job.sysv_shm_segs_used}} </td></tr>
+      <tr><td> tmpfs_bytes_used </td><td> {{job.tmpfs_bytes_used}} </td></tr>
+      <tr><td> tmpfs_files_used </td><td> {{job.tmpfs_files_used}} </td></tr>
+      <tr><td> vfs_dentry_use </td><td> {{job.vfs_dentry_use}} </td></tr>
+      <tr><td> vfs_file_use </td><td> {{job.vfs_file_use}} </td></tr>
+      <tr><td> vfs_inode_use </td><td> {{job.vfs_inode_use}} </td></tr>
+      <tr><td> vm_allocstall </td><td> {{job.vm_allocstall}} </td></tr>
+      <tr><td> vm_kswapd_inodesteal </td><td> {{job.vm_kswapd_inodesteal}} </td></tr>
+      <tr><td> vm_kswapd_steal </td><td> {{job.vm_kswapd_steal}} </td></tr>
+      <tr><td> vm_pageoutrun </td><td> {{job.vm_pageoutrun}} </td></tr>
+      <tr><td> vm_pgactivate </td><td> {{job.vm_pgactivate}} </td></tr>
+      <tr><td> vm_pgalloc_normal </td><td> {{job.vm_pgalloc_normal}} </td></tr>
+      <tr><td> vm_pgdeactivate </td><td> {{job.vm_pgdeactivate}} </td></tr>
+      <tr><td> vm_pgfault </td><td> {{job.vm_pgfault}} </td></tr>
+      <tr><td> vm_pgfree </td><td> {{job.vm_pgfree}} </td></tr>
+      <tr><td> vm_pginodesteal </td><td> {{job.vm_pginodesteal}} </td></tr>
+      <tr><td> vm_pgmajfault </td><td> {{job.vm_pgmajfault}} </td></tr>
+      <tr><td> vm_pgpgin </td><td> {{job.vm_pgpgin}} </td></tr>
+      <tr><td> vm_pgpgout </td><td> {{job.vm_pgpgout}} </td></tr>
+      <tr><td> vm_pgrefill_normal </td><td> {{job.vm_pgrefill_normal}} </td></tr>
+      <tr><td> vm_pgrotated </td><td> {{job.vm_pgrotated}} </td></tr>
+      <tr><td> vm_pgscan_direct_normal </td><td> {{job.vm_pgscan_direct_normal}} </td></tr>
+      <tr><td> vm_pgscan_kswapd_normal </td><td> {{job.vm_pgscan_kswapd_normal}} </td></tr>
+      <tr><td> vm_pgsteal_normal </td><td> {{job.vm_pgsteal_normal}} </td></tr>
+      <tr><td> vm_pswpin </td><td> {{job.vm_pswpin}} </td></tr>
+      <tr><td> vm_pswpout </td><td> {{job.vm_pswpout}} </td></tr>
+      <tr><td> vm_slabs_scanned </td><td> {{job.vm_slabs_scanned}} </td></tr>
     </table>
 {% else %}
     <h1>Job not found</h1>

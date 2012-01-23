@@ -31,6 +31,8 @@ Commands
 """
 from django.conf import settings
 from django.core.management import call_command
+from django.db.utils import DatabaseError
+from django.db import transaction
 import os
 import shelve
 import sys
@@ -39,6 +41,8 @@ sys.path.insert(0, '/home/aterrel/workspace/tacc_stats/monitor')
 
 from tacc_stats.models import Node, System, User
 from tacc_stats.models import Job as tsm_Job
+import job
+
 
 def get_job_shelf(archive_path):
     """Returns the on-disk python job monitor database"""
@@ -91,21 +95,31 @@ def add_Job(system, a_job):
         print "Job %s already exists" % a_job.id
         return
     owner = get_user(a_job.acct['account'], system)
-
+    #nr_bad_hosts = len(filter(lambda h: len(h.times) < 2,
+    #                          a_job.hosts.values()))
     job_dict = {
         'system': system,
         'acct_id': a_job.id,
         'owner': owner,
+        'queue': a_job.acct['queue'],
+        'queue_wait_time': a_job.start_time - a_job.acct['submission_time'],
         'begin': a_job.start_time,
         'end': a_job.end_time,
+        #'nr_bad_hots': nr_bad_hosts,
         'nr_slots': a_job.acct['slots'],
         'pe': a_job.acct['granted_pe'],
         'failed': a_job.acct['failed'],
         'exit_status': a_job.acct['exit_status'],
     }
+    job_dict.update(job.JobAggregator(a_job).stats)
     #newJob.nr_hosts = len(a_job.hosts)
-    newJob = tsm_Job(**job_dict)
-    newJob.save()
+    try:
+        newJob = tsm_Job(**job_dict)
+        newJob.save()
+    except DatabaseError:
+        print "Error on job,", a_job.id
+        transaction.rollback()
+        return
     hosts = map(lambda node: get_node(system, node), a_job.hosts.keys())
     newJob.hosts = hosts
 

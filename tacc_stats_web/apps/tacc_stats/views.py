@@ -1,9 +1,10 @@
 from django.http import HttpResponse
 from django.shortcuts import render_to_response
 
-from pylab import figure, axes, pie, title, hist, xlabel, ylabel
 import matplotlib
+matplotlib.use('Agg')
 from matplotlib.backends.backend_agg import FigureCanvasAgg
+from pylab import figure, axes, pie, title, hist, xlabel, ylabel
 
 from tacc_stats.models import Job
 
@@ -20,7 +21,8 @@ def figure_to_response(f):
 
 def job_timespent_hist(request):
     f = figure()
-    job_times = [job.timespent / 60 for job in Job.objects.all()]
+    runtimes = [job.end - job.begin for job in Job.objects.all()]
+    job_times = [runtime / 60.0 for runtime in runtimes]
     hist(job_times, 50, log=True)
     title('Times spent by jobs')
     xlabel('Time (m)')
@@ -29,7 +31,7 @@ def job_timespent_hist(request):
 
 def job_memused_hist(request):
     f = figure()
-    job_mem = [job.MemUsed / 2**30 for job in Job.objects.all()]
+    job_mem = [job.mem_MemUsed / 2**30 for job in Job.objects.all()]
     hist(job_mem, 40, log=True)
     title('Memory used by jobs')
     xlabel('Memory (GB)')

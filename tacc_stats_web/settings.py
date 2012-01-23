@@ -8,6 +8,7 @@ DEBUG = True
 TEMPLATE_DEBUG = DEBUG
 
 PROJECT_DIR = os.path.dirname(os.path.abspath(__file__))
+print PROJECT_DIR
 sys.path.insert(0, os.path.join(PROJECT_DIR, 'apps'))
 
 ADMINS = (

@@ -9,12 +9,12 @@
         </th><th> work open </th><th> irq </th></tr>
     {% for job in job_list %}
         <tr bgcolor="{{job.color}}">
-            <td><a href="job/{{ job.id }}/">{{ job.id }}</a>
+            <td><a href="job/{{ job.id }}/">{{ job.acct_id }}</a>
             <td>{{ job.owner }}</td>
-            <td align=right>{{ job.timespent }}</td>
-            <td align=right>{{ job.MemUsed }}</td>
-            <td align=right>{{ job.work_open }}</td>
-            <td align=right>{{ job.irq }}</td>
+            <td align=right>{{ job.runtime }}</td>
+            <td align=right>{{ job.mem_MemUsed }}</td>
+            <td align=right>{{ job.llite_open_work }}</td>
+            <td align=right>{{ job.cpu_irq }}</td>
         </tr>
     {% endfor %}
     </ul>
