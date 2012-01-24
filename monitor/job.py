@@ -431,7 +431,6 @@ class JobAggregator(object):
     dont_collapse_devs = ['llite']
 
     def __init__(self, a_job):
-        #        import pdb;pdb.set_trace()
         self.job = a_job
         self.stats = self._collect_stats()
 
@@ -457,10 +456,7 @@ class JobAggregator(object):
                     type_stats = self.job.hosts[host].stats.get(monitor_type)
                     if type_stats is None:
                         continue
-                    try:
-                        val_ticks.append(type_stats[dev][:,st_idx])
-                    except:
-                        import pdb; pdb.set_trace()
+                    val_ticks.append(type_stats[dev][:,st_idx])
                 vals = [sum(ticks) for ticks in zip(*val_ticks)]
                 stats[key] = self._agg_val(schema.keys[subtype], vals)
 

@@ -230,11 +230,11 @@ class Job(models.Model):
 
     @property
     def runtime(self):
-        self.end - self.begin
+        return self.end - self.begin
 
     @property
     def nr_hosts(self):
-        len(self.hosts.all())
+        return len(self.hosts.all())
 
     def color(self):
         ret_val = "LightBlue"

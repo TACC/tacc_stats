@@ -3,7 +3,7 @@
 
 Synopsis
 --------
-    build_database.py [system_name] [archive_path]
+    build_database.py <command> [command args]
 
 Description
 -----------
