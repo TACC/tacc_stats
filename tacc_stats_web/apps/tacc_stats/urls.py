@@ -18,5 +18,6 @@ urlpatterns = patterns('',
         )),
     url(r'^job_memused_hist$', job_mem_heatmap ),
     url(r'^job_timespent_hist$', job_timespent_hist ),
-    url(r'^job_mem_heatmap$', job_mem_heatmap),
+    url(r'^job_mem_heatmap/(\d+)/$', job_mem_heatmap),
+    url(r'^job_files_opened_heatmap/(\d+)/$', job_files_opened_heatmap)
 )
