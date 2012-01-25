@@ -4,6 +4,10 @@
 </head>
 <body>
 {% if job %}
+    <img src="/tacc_stats/job_mem_heatmap/{{job.acct_id}}" alt="Job Memory Heatmap" />
+
+    <img src="/tacc_stats/job_files_opened_heatmap/{{job.acct_id}}" alt="Files Opened Heatmap" />
+    
     <h1>Job {{ job.id }}</h1>
     <table border="1" cellpadding="5">
       <tr><th>Field</th><th>Value</th></tr>
