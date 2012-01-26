@@ -1,6 +1,3 @@
-import sys
-sys.path.append('/home/dmalone/')
-
 from django.http import HttpResponse
 from django.shortcuts import render_to_response
 
@@ -10,12 +7,12 @@ from matplotlib.backends.backend_agg import FigureCanvasAgg
 from pylab import figure, axes, pie, title, hist, xlabel, ylabel
 from matplotlib import pyplot as PLT
 import shelve
-import job
 import numpy as NP
 
 from tacc_stats.models import Job
+import job
 
-SHELVE_DIR = '/home/dmalone/sample-jobs/jobs'
+SHELVE_DIR = '/home/tacc_stats/sample-jobs/jobs'
 
 def index(request):
     """ Creates a list of all currently running jobs """
