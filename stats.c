@@ -40,10 +40,14 @@ void key_stats_destroy(void *key)
 
 void stats_type_destroy(struct stats_type *st)
 {
-  extern char _edata[]; /* XXX */
-  if (st->st_schema_def >= _edata) {
+  //extern char _edata[]; /* XXX */
+  /* modified by charngda */
+  /* don't use the _edata hack */
+  //if (st->st_schema_def >= _edata) {
+  if (st->st_schema_def != st->orig_st_schema_def) {
     free(st->st_schema_def);
-    st->st_schema_def = NULL;
+    st->st_schema_def = st->orig_st_schema_def;
+    //st->st_schema_def = NULL;
   }
 
   schema_destroy(&st->st_schema);
@@ -162,6 +166,5 @@ void stats_inc(struct stats *stats, const char *key, unsigned long long val)
   TRACE("%s %s %s %llu %d\n",
         stats->s_type->st_name, stats->s_dev, key, val, i);
 
-  if (i >= 0)
-    stats->s_val[i] = val;
+  stats->s_val[i] = val;
 }

@@ -5,7 +5,7 @@ Release: 1
 License: GPL
 Vendor: TACC/Ranger
 Group: System Environment/Base
-Packager: TACC - jhammond@tacc.utexas.edu
+Packager: CCR - charngda@buffalo.edu
 Source: %{name}-%{version}.tar.gz
 BuildRoot: %{_tmppath}/%{name}-%{version}-%{release}-root
 %define _bindir /opt/%{name}
@@ -21,7 +21,9 @@ to trigger collection and archiving.
 %setup -q
 
 %build
-make name=%{name} version=%{version} %{?config: config=%{config}} stats_dir=%{stats_dir}
+sh build_ib
+echo The following must be built on a Myrinet node, e.g. f12n37
+sh build_mx
 
 %install
 rm -rf %{buildroot}

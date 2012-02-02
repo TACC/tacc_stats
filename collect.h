@@ -9,16 +9,10 @@
 
 struct stats;
 
-int path_collect_single(const char *path, unsigned long long *dest);
-int path_collect_list(const char *path, ...) __ATTRIBUTE__SENTINEL;
-int path_collect_key_list(const char *path, struct stats *stats, ...)
-  __ATTRIBUTE__SENTINEL;
-int path_collect_key_value(const char *path, struct stats *stats);
-int path_collect_key_value_dir(const char *dir_path, struct stats *stats);
+int collect_single(const char *path, unsigned long long *dest);
+int collect_list(const char *path, ...) __ATTRIBUTE__SENTINEL;
+int collect_key_list(struct stats *stats, const char *path, ...) __ATTRIBUTE__SENTINEL;
+int collect_key_value_file(struct stats *stats, const char *path);
+int collect_key_value_dir(struct stats *stats, const char *path);
 
-int str_collect_key_list(const char *str, struct stats *stats, ...)
-  __ATTRIBUTE__SENTINEL;
-int str_collect_prefix_key_list(const char *str, struct stats *stats,
-				const char *prefix, ...)
- __ATTRIBUTE__SENTINEL;
 #endif

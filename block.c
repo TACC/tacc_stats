@@ -1,4 +1,6 @@
-#include <stddef.h>
+//#include <stddef.h>
+#include <stdlib.h>
+#include <stdio.h>
 #include <string.h>
 #include <dirent.h>
 #include "stats.h"
@@ -23,7 +25,7 @@
   X(io_ticks,      "E,U=ms",   "time active"), \
   X(time_in_queue, "E,U=ms",   "wait time for all requests")
 
-static void block_collect_dev(struct stats_type *type, const char *dev)
+static void collect_block_dev(struct stats_type *type, const char *dev)
 {
   struct stats *stats = get_current_stats(type, dev);
   if (stats == NULL)
@@ -33,11 +35,11 @@ static void block_collect_dev(struct stats_type *type, const char *dev)
   snprintf(path, sizeof(path), "/sys/block/%s/stat", dev);
 
 #define X(k,r...) #k
-  path_collect_key_list(path, stats, KEYS, NULL);
+  collect_key_list(stats, path, KEYS, NULL);
 #undef X
 }
 
-static void block_collect(struct stats_type *type)
+static void collect_block(struct stats_type *type)
 {
   const char *path = "/sys/block";
   DIR *dir = NULL;
@@ -58,7 +60,7 @@ static void block_collect(struct stats_type *type)
     /* Ignore loop devices. ... */
     if (strncmp(ent->d_name, "loop", 4) == 0)
       continue;
-    block_collect_dev(type, ent->d_name);
+    collect_block_dev(type, ent->d_name);
   }
 
  out:
@@ -68,7 +70,7 @@ static void block_collect(struct stats_type *type)
 
 struct stats_type block_stats_type = {
   .st_name = "block",
-  .st_collect = &block_collect,
+  .st_collect = &collect_block,
 #define X SCHEMA_DEF
   .st_schema_def = JOIN(KEYS),
 #undef X

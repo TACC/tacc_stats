@@ -168,7 +168,7 @@ static int cpu_is_nehalem(char *cpu)
   return rc;
 }
 
-static int intel_pmc3_begin_cpu(char *cpu, uint64_t *events, size_t nr_events)
+static int begin_pmc_cpu(char *cpu, uint64_t *events, size_t nr_events)
 {
   int rc = -1;
   char msr_path[80];
@@ -232,6 +232,7 @@ static int intel_pmc3_begin_cpu(char *cpu, uint64_t *events, size_t nr_events)
 #define MEM_UNCORE_RETIRED_REMOTE_DRAM PERF_EVENT(0x0F, 0x10) /* CHECKME */
 #define MEM_UNCORE_RETIRED_LOCAL_DRAM  PERF_EVENT(0x0F, 0x20) /* CHECKME */
 #define FP_COMP_OPS_EXE_X87            PERF_EVENT(0x10, 0x01)
+#define FP_COMP_OPS_EXE_SSE            PERF_EVENT(0x10, 0x04) /* added by charngda, Jan 21, 2012 */
 #define MEM_LOAD_RETIRED_L1D_HIT       PERF_EVENT(0xCB, 0x01)
 #define MEM_LOAD_RETIRED_L2_HIT        PERF_EVENT(0xCB, 0x02)
 #define MEM_LOAD_RETIRED_L3_HIT        PERF_EVENT(0xCB, 0x0C)
@@ -241,14 +242,15 @@ static int intel_pmc3_begin_cpu(char *cpu, uint64_t *events, size_t nr_events)
 #define FP_COMP_OPS_EXE_SSE_FP_PACKED  PERF_EVENT(0x10, 0x10)
 #define FP_COMP_OPS_EXE_SSE_FP_SCALAR  PERF_EVENT(0x10, 0x20)
 
-static int intel_pmc3_begin(struct stats_type *type)
+static int begin_pmc(struct stats_type *type)
 {
   int nr = 0;
 
   uint64_t events[] = {
     MEM_UNCORE_RETIRED_REMOTE_DRAM,
     MEM_UNCORE_RETIRED_LOCAL_DRAM,
-    FP_COMP_OPS_EXE_X87,
+//    FP_COMP_OPS_EXE_X87,
+    FP_COMP_OPS_EXE_SSE,
     MEM_LOAD_RETIRED_L1D_HIT,
   };
 
@@ -258,14 +260,14 @@ static int intel_pmc3_begin(struct stats_type *type)
     snprintf(cpu, sizeof(cpu), "%d", i);
 
     if (cpu_is_nehalem(cpu))
-      if (intel_pmc3_begin_cpu(cpu, events, 4) == 0)
+      if (begin_pmc_cpu(cpu, events, 4) == 0)
         nr++; /* HARD */
   }
 
   return nr > 0 ? 0 : -1;
 }
 
-static void intel_pmc3_collect_cpu(struct stats_type *type, char *cpu)
+static void collect_pmc_cpu(struct stats_type *type, char *cpu)
 {
   struct stats *stats = NULL;
   char msr_path[80];
@@ -300,7 +302,7 @@ static void intel_pmc3_collect_cpu(struct stats_type *type, char *cpu)
     close(msr_fd);
 }
 
-static void intel_pmc3_collect(struct stats_type *type)
+static void collect_pmc(struct stats_type *type)
 {
   int i;
   for (i = 0; i < nr_cpus; i++) {
@@ -308,14 +310,14 @@ static void intel_pmc3_collect(struct stats_type *type)
     snprintf(cpu, sizeof(cpu), "%d", i);
 
     if (cpu_is_nehalem(cpu))
-      intel_pmc3_collect_cpu(type, cpu);
+      collect_pmc_cpu(type, cpu);
   }
 }
 
 struct stats_type intel_pmc3_stats_type = {
   .st_name = "intel_pmc3",
-  .st_begin = &intel_pmc3_begin,
-  .st_collect = &intel_pmc3_collect,
+  .st_begin = &begin_pmc,
+  .st_collect = &collect_pmc,
 #define X SCHEMA_DEF
   .st_schema_def = JOIN(KEYS),
 #undef X

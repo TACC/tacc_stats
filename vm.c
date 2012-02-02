@@ -26,7 +26,7 @@
   X(allocstall, "E", ""), \
   X(pgrotated, "E", "")
 
-static void vm_collect(struct stats_type *type)
+static void collect_vm(struct stats_type *type)
 {
   struct stats *stats = NULL;
 
@@ -34,12 +34,12 @@ static void vm_collect(struct stats_type *type)
   if (stats == NULL)
     return;
 
-  path_collect_key_value("/proc/vmstat", stats);
+  collect_key_value_file(stats, "/proc/vmstat");
 }
 
 struct stats_type vm_stats_type = {
   .st_name = "vm",
-  .st_collect = &vm_collect,
+  .st_collect = &collect_vm,
 #define X SCHEMA_DEF
   .st_schema_def = JOIN(KEYS),
 #undef X
