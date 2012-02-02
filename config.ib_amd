@@ -1,0 +1,38 @@
+TYPES += amd64_pmc
+TYPES += block
+TYPES += cpu
+#TYPES += ib
+# CPPFLAGS += -I/opt/ofed/include
+# LDFLAGS += -L/opt/ofed/lib64 -libmad
+TYPES += ib_ext
+#CPPFLAGS += -I/opt/ofed/include
+#LDFLAGS += -L/opt/ofed/lib64 -libmad
+#LDFLAGS += -L/usr/lib64/ -libmad
+# use static linking instead
+LDFLAGS += /usr/lib64/libibmad.a /usr/lib64/libibumad.a
+# TYPES += ib_sw
+# CPPFLAGS += -I/opt/ofed/include
+# LDFLAGS += -L/opt/ofed/lib64 -libmad
+#TYPES += intel_pmc3
+#TYPES += intel_uncore
+#TYPES += llite
+#TYPES += lnet
+#TYPES += mdc
+#TYPES += osc
+TYPES += mem
+TYPES += net
+TYPES += numa
+TYPES += ps
+TYPES += sysv_shm
+TYPES += tmpfs
+TYPES += vfs
+TYPES += vm
+TYPES += nfs
+TYPES += panfs
+
+#CPPFLAGS += -I/usr/local/mx/include
+#LDFLAGS += /usr/local/mx/lib64/libmyriexpress.a
+#TYPES += mx
+
+TYPES += irq
+TYPES += sched
