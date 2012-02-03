@@ -34,8 +34,22 @@ static int open_lock_timeout( const char *path, int timeout ) {
 
     fd = open( path, O_CREAT | O_RDWR, 0600 );
     if ( fd < 0 ) {
-        ERROR( "cannot open `%s': %m\n", path );
-        goto err;
+        /* create the required directory if necessary */
+        char *s = strdup( path );
+        char *t = strrchr( s, '/' );
+        if ( t ) *t = '\0';
+        t = NULL;
+        asprintf( &t, "mkdir -p %s ; chmod 770 %s", s, s );
+        if ( NULL != t ) {
+            system( t );
+            free( t );
+        }
+        free( s );
+        fd = open( path, O_CREAT | O_RDWR, 0600 );
+        if ( fd < 0 ) {
+            ERROR( "cannot open `%s': %m\n", path );
+            goto err;
+        }
     }
 
     if ( sigaction( SIGALRM, &alarm_action, NULL ) < 0 ) {
@@ -58,6 +72,16 @@ err:
     }
     alarm( 0 );
     return fd;
+}
+
+static void delete_old_logfile( const char *filename, time_t current_time, time_t cut_off ) {
+    struct stat filestat;
+    if ( !stat( filename, &filestat ) ) {
+        /* if the file exists; get its last modification time */
+        /* older than cut_off ? */
+        if ( current_time > filestat.st_mtime && ( current_time - filestat.st_mtime ) > cut_off )
+            unlink( filename );
+    }
 }
 
 static void usage( void ) {
@@ -262,18 +286,14 @@ DaemonLoopBeginHere:
         if ( !strftime( current_path, sizeof( current_path ), STATS_DIR_PATH "/day%d", localTmp ) )
             goto DaemonLoopBeginHere;
 
-        struct stat filestat;
-        if ( !stat( current_path, &filestat ) ) {
-            /* so the file already exists; get its last modification time */
-            /* older than 1 week ? */
-            if ( current_time > filestat.st_mtime && ( current_time - filestat.st_mtime ) > 86400 * 7 )
-                unlink( current_path );
-        }
+        /* older than 1 week ? */
+        delete_old_logfile( current_path,  current_time, 86400 * 7 ) ;
         if ( stats_file_open( &sf, current_path ) < 0 ) {
             goto DaemonLoopBeginHere;
         }
     }
     else {
+        delete_old_logfile( current_path,  current_time, 86400 * 7 ) ;
         if ( stats_file_open( &sf, current_path ) < 0 ) {
             rc = 1;
             goto out;
@@ -285,12 +305,25 @@ DaemonLoopBeginHere:
 
     if ( cmd_daemon != cmd ) {
         if ( sf.sf_empty ) {
-            char *link_path = strf( "%s/%ld", STATS_DIR_PATH, current_time );
-            if ( link_path == NULL )
-                ERROR( "cannot create path: %m\n" );
-            else if ( link( current_path, link_path ) < 0 )
-                ERROR( "cannot link `%s' to `%s': %m\n", current_path, link_path );
-            free( link_path );
+            /* modified by charngda */
+            struct tm *localTmp;
+            localTmp = localtime( &current_time );
+            char link_path[sizeof( STATS_DIR_PATH ) + 100];
+            if ( !strftime( link_path, sizeof( link_path ), STATS_DIR_PATH "/day%d", localTmp ) )
+                ERROR( "strftime failed: %m\n" );
+
+            /* delete anything older than 1 week */
+            int i;
+            char old_log_path[sizeof( STATS_DIR_PATH ) + 100];
+            for( i = 1; i <= 31; ++i ) {
+                sprintf( old_log_path,  STATS_DIR_PATH "/day%02d", i );
+                delete_old_logfile( old_log_path, current_time, 86400 * 7 );
+            }
+            if ( link( current_path, link_path ) < 0 ) {
+                unlink( link_path );
+                if ( link( current_path, link_path ) < 0 ) /* retry */
+                    ERROR( "cannot link `%s' to `%s': %m\n", current_path, link_path );
+            }
             enable_all = 1;
             select_all = 1;
         }
