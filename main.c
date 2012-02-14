@@ -218,6 +218,8 @@ int main( int argc, char *argv[] ) {
             while ( ( ent = readdir( dir ) ) != NULL ) {
                 if ( ent->d_name[0] == '.' )
                     continue;
+                if ( !strstr( ent->d_name, "edu.SC" ) )
+                    continue;
                 t = strchr( ent->d_name, '.' );
                 if ( t ) *t = 0;
                 strcat( current_jobid, ent->d_name );
