@@ -3,21 +3,30 @@ sys.path.append('/home/dmalone/other/src/tacc_stats/monitor')
 
 from django.http import HttpResponse
 from django.shortcuts import render_to_response
+from django.views.decorators.csrf import csrf_protect
+from django.shortcuts import render
+from django.views.generic import DetailView, ListView
 
 import matplotlib
 matplotlib.use('Agg')
 from matplotlib.backends.backend_agg import FigureCanvasAgg
 from pylab import figure, axes, pie, title, hist, xlabel, ylabel
 from matplotlib import pyplot as PLT
+from matplotlib.colors import LogNorm
 
 import shelve
 import job
 import numpy as NP
+import math
 
 from tacc_stats.models import Job
 import job
 
 SHELVE_DIR = '/home/tacc_stats/sample-jobs/jobs'
+
+SHELVE_DIR = '/home/dmalone/sample-jobs/jobs'
+
+from forms import SearchForm
 
 SHELVE_DIR = '/home/dmalone/sample-jobs/jobs'
 
@@ -92,8 +101,31 @@ def _files_open_intensity(job, host):
     for filesystem in job.hosts[host].stats['llite']:
         files_opened = files_opened + job.hosts[host].stats['llite'][filesystem][: , files_opened_index]
 
-    difference = NP.diff(files_opened)
-    intensity = NP.append(0, difference) / difference.max()
+    intensity = NP.diff(files_opened)
+
+    return intensity
+
+def _flops_intensity(job, host):
+    """
+    Helper function which creates a time-array of flops used by a job on a host
+    
+    The value is a percent of the maximum value of the array
+    
+    Arguments:
+    job -- the job being accessed
+    host -- the host being charted
+    """
+    RANGER_MAX_FLOPS = 88326000000000
+    flops_used = [0] * job.times.size
+
+    cpu_data = job.hosts[host].interpret_amd64_pmc_cpu()
+
+    for key, val in cpu_data.iteritems():
+        if (key[:4] == 'core'):
+            flops_used = flops_used + val['SSEFLOPS']
+
+    intensity = NP.log(NP.diff(flops_used)) / math.log(RANGER_MAX_FLOPS)
+    
     return intensity
 
 def _flops_intensity(job, host):
@@ -138,7 +170,7 @@ def create_subheatmap(intensity, job, host, n, num_hosts):
     intensity = NP.array([intensity]*2, dtype=NP.float64)
 
     PLT.subplot(num_hosts, 1, n)
-    PLT.pcolor(x, NP.array([0, 1]), intensity, cmap=matplotlib.cm.Reds, vmin = 0, vmax = 1)
+    PLT.pcolor(x, NP.array([0, 1]), intensity, cmap=matplotlib.cm.Reds, vmin = 0, vmax = 1, edgecolors='none')
 
     if (n != num_hosts):
         PLT.xticks([])
@@ -198,3 +230,48 @@ def create_heatmap(request, job_id, trait):
 
     f.set_size_inches(10,num_hosts*.3+1.5)
     return figure_to_response(f)
+
+@csrf_protect
+def search(request):
+    """ 
+    Creates a search form that can be used to navigate through the list 
+    of jobs.
+    """
+    if request.method == 'POST':
+        print request.POST
+
+        form = SearchForm(request.POST)
+        query = request.POST
+
+        job_list = Job.objects.all()
+
+        if form["acct_id"].value():
+            job_list = job_list.filter(acct_id = form["acct_id"].value())
+        if form["owner"].value():
+            job_list = job_list.filter(owner = form["owner"].value())
+        if form["begin"].value():
+            job_list = job_list.filter(begin__gte = form["begin"].value())
+        if form["end"].value():
+            job_list = job_list.filter(end__lte = form["end"].value())
+
+    else:
+        form = SearchForm()
+        job_list = Job.objects.order_by('-begin')[:200]
+
+    return render(request, 'tacc_stats/search.html', {'form' : form, 'job_list' : job_list })
+
+class JobListView(ListView):
+
+    def get_queryset(self):
+        if self.request.method == 'POST':
+            query = self.request.POST
+            return Job.objects.order_by('-begin')[:200]
+            #return Job.objects.filter(
+            #        owner = query.__getitem__("owner"),
+            #        begin = query.__getitem__("begin"),
+            #        end = query.__getitem__("end"),
+            #        hosts = query.__getitem__("hosts"),
+            #        acct_id = query.__getitem__("acct_id")
+            #        )
+        else:
+            return Job.objects.order_by('-begin')[:200]

@@ -1,16 +1,18 @@
-<html>
-<head>
-    <title>TACC Stats Web: Job list</title>
-</head>
-<body>
+<form action="/tacc_stats/search/" method="POST">{% csrf_token %}
+    <table>
+        {{ form.as_table }}
+    </table>
+    <p><input type="submit" value="Submit"></p>
+<form>
+
 {% if job_list %}
     <table border="1" cellpadding="5">
         <tr><th> name </th><th> owner </th><th> hosts </th>
-	<th> time spent </th><th> begin </th><th> memory used </th>
-	<th> work open </th><th> irq </th></tr>
+        <th> time spent </th><th> begin </th><th> memory used </th>
+        <th> work open </th><th> irq </th></tr>
     {% for job in job_list %}
         <tr style="{{job.color}}">
-            <td><a href="job/{{ job.id }}/">{{ job.acct_id }}</a>
+            <td><a href="/tacc_stats/job/{{ job.id }}/">{{ job.acct_id }}</a>
             <td>{{ job.owner }}</td>
             <td align=right>{{ job.nr_hosts }}</td>
             <td align=right>{{ job.timespent }}</td>
@@ -24,5 +26,3 @@
 {% else %}
     <p>No jobs are available.</p>
 {% endif %}
-</body>
-</html>

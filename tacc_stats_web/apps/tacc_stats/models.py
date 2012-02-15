@@ -1,6 +1,7 @@
 """The database models of tacc stats"""
 
 from django.db import models
+import time
 
 class System(models.Model):
     """Details about the cluster"""
@@ -19,6 +20,9 @@ class Node(models.Model):
 class User(models.Model):
     user_name = models.CharField(max_length=128)
     systems = models.ManyToManyField(System)
+
+    def __str__(self):
+        return self.user_name
 
     def __unicode__(self):
         return "User(%s)" % self.user_name
@@ -237,15 +241,20 @@ class Job(models.Model):
         return len(self.hosts.all())
 
     def color(self):
-        ret_val = "LightBlue"
+        ret_val = "background-color: rgba(0%, 0%, 100%, .3);"
         if self.llite_open_work > 3000:
-            ret_val = "red"
+            ret_val = "background-color: rgba(100%, 0%, 0%, .3);"
         elif self.mem_MemUsed > 30*2**30:
-            ret_val = "orange"
+            ret_val = "background-color: rgba(80%, 30%, 0%, .3)"
         elif self.runtime > 3000:
-            ret_val = "LightCoral"
+            ret_val = "background-color: rgba(0%, 100%, 0%, .3)"
         return ret_val
 
+    def timespent(self):
+        return time.strftime('%H:%M:%S', time.gmtime(self.runtime))
+
+    def start_time(self):
+        return time.ctime(self.begin)
 
 class Monitor(models.Model):
     kind = models.CharField(max_length=32)
