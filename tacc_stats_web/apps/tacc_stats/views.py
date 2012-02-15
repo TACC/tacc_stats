@@ -1,6 +1,3 @@
-import sys
-sys.path.append('/home/dmalone/other/src/tacc_stats/monitor')
-
 from django.http import HttpResponse
 from django.shortcuts import render_to_response
 from django.views.decorators.csrf import csrf_protect
@@ -24,11 +21,7 @@ import job
 
 SHELVE_DIR = '/home/tacc_stats/sample-jobs/jobs'
 
-SHELVE_DIR = '/home/dmalone/sample-jobs/jobs'
-
 from forms import SearchForm
-
-SHELVE_DIR = '/home/dmalone/sample-jobs/jobs'
 
 def index(request):
     """ Creates a list of all currently running jobs """
@@ -85,7 +78,7 @@ def _memory_intensity(job, host):
     return intensity
 
 def _files_open_intensity(job, host):
-    """ 
+    """
     Helper function which creates an time-array of the files opened by a specific job on a specific host.
 
     The value is a percent of the maximum value in the array. The initial datapoint is set to zero to preserve the length of the list
@@ -108,9 +101,9 @@ def _files_open_intensity(job, host):
 def _flops_intensity(job, host):
     """
     Helper function which creates a time-array of flops used by a job on a host
-    
+
     The value is a percent of the maximum value of the array
-    
+
     Arguments:
     job -- the job being accessed
     host -- the host being charted
@@ -125,15 +118,15 @@ def _flops_intensity(job, host):
             flops_used = flops_used + val['SSEFLOPS']
 
     intensity = NP.log(NP.diff(flops_used)) / math.log(RANGER_MAX_FLOPS)
-    
+
     return intensity
 
 def _flops_intensity(job, host):
     """
     Helper function which creates a time-array of flops used by a job on a host
-    
+
     The value is a percent of the maximum value of the array
-    
+
     Arguments:
     job -- the job being accessed
     host -- the host being charted
@@ -178,7 +171,7 @@ def create_subheatmap(intensity, job, host, n, num_hosts):
         PLT.xlabel('Hours From Job Beginning')
     PLT.yticks([])
 
-    PLT.autoscale(enable=True,axis='both',tight=True)
+    #PLT.autoscale(enable=True,axis='both',tight=True)
 
     host_name = host.replace('.tacc.utexas.edu', '')
     PLT.ylabel(host_name, fontsize ='small', rotation='horizontal')
@@ -186,7 +179,7 @@ def create_subheatmap(intensity, job, host, n, num_hosts):
 def create_heatmap(request, job_id, trait):
     """
     Creates a heatmap with its intensity correlated with a specific datapoint
-    
+
     Arguments:
     job_id -- the SGE identification number of the job being charted
     trait -- the type of heatmap being created, can take values:
@@ -194,14 +187,14 @@ def create_heatmap(request, job_id, trait):
              files -- intensity is correlated to the number of files opened
              flops -- intenisty is correlated to the number of floating point
                       operations performed by the host
-    """ 
+    """
     job_shelf = shelve.open(SHELVE_DIR)
 
     job = job_shelf[job_id]
 
     hosts = job.hosts.keys()
-            
-    n = 1 
+
+    n = 1
     num_hosts = len(job.hosts)
     PLT.subplots_adjust(hspace = 0)
 
@@ -233,8 +226,8 @@ def create_heatmap(request, job_id, trait):
 
 @csrf_protect
 def search(request):
-    """ 
-    Creates a search form that can be used to navigate through the list 
+    """
+    Creates a search form that can be used to navigate through the list
     of jobs.
     """
     if request.method == 'POST':
