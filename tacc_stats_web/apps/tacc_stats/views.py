@@ -1,3 +1,6 @@
+import sys
+sys.path.append('/home/dmalone/other/src/tacc_stats/monitor')
+
 from django.http import HttpResponse
 from django.shortcuts import render_to_response
 
@@ -6,13 +9,17 @@ matplotlib.use('Agg')
 from matplotlib.backends.backend_agg import FigureCanvasAgg
 from pylab import figure, axes, pie, title, hist, xlabel, ylabel
 from matplotlib import pyplot as PLT
+
 import shelve
+import job
 import numpy as NP
 
 from tacc_stats.models import Job
 import job
 
 SHELVE_DIR = '/home/tacc_stats/sample-jobs/jobs'
+
+SHELVE_DIR = '/home/dmalone/sample-jobs/jobs'
 
 def index(request):
     """ Creates a list of all currently running jobs """
@@ -89,6 +96,28 @@ def _files_open_intensity(job, host):
     intensity = NP.append(0, difference) / difference.max()
     return intensity
 
+def _flops_intensity(job, host):
+    """
+    Helper function which creates a time-array of flops used by a job on a host
+    
+    The value is a percent of the maximum value of the array
+    
+    Arguments:
+    job -- the job being accessed
+    host -- the host being charted
+    """
+    flops_used = [0] * job.times.size
+
+    cpu_data = job.hosts[host].interpret_amd64_pmc_cpu()
+
+    for key, val in cpu_data.iteritems():
+        if (key[:4] == 'core'):
+            flops_used = flops_used + val['SSEFLOPS']
+
+    difference = NP.diff(flops_used)
+    intensity = NP.append(0, difference) / difference.max()
+    return intensity
+
 def create_subheatmap(intensity, job, host, n, num_hosts):
     """
     Creates a heatmap in a subplot.
@@ -104,7 +133,7 @@ def create_subheatmap(intensity, job, host, n, num_hosts):
     end = job.end_time
     start = job.start_time
 
-    x = NP.linspace(0, (end - start) / 3600., length * 1)
+    x = NP.linspace(0, (end - start) / 3600.0, length * 1)
 
     intensity = NP.array([intensity]*2, dtype=NP.float64)
 
@@ -122,48 +151,46 @@ def create_subheatmap(intensity, job, host, n, num_hosts):
     host_name = host.replace('.tacc.utexas.edu', '')
     PLT.ylabel(host_name, fontsize ='small', rotation='horizontal')
 
-def job_mem_heatmap(request, job_id):
+def create_heatmap(request, job_id, trait):
     """
-    Creates a heatmap with intensity correlated with the amount of memory used by the job
-    """
-    job_shelf = shelve.open(SHELVE_DIR)
-
-    job = job_shelf[job_id]
-
-    hosts = job.hosts.keys()
-
-    n = 1
-    num_hosts = len(job.hosts)
-    PLT.subplots_adjust(hspace = 0)
-    PLT.suptitle('Memory Used By Host', fontsize = 12)
-
-    for host in hosts:
-        intensity = _memory_intensity(job, host)
-        create_subheatmap(intensity, job, host, n, num_hosts)
-        n += 1
-
-    f = PLT.gcf()
-
-    f.set_size_inches(10,num_hosts*.3+1.5)
-    return figure_to_response(f)
+    Creates a heatmap with its intensity correlated with a specific datapoint
     
-def job_files_open_heatmap(request, job_id):
-    """
-    Creates a heatmap with intensity correlated with the amount of files a job opens
-    """
+    Arguments:
+    job_id -- the SGE identification number of the job being charted
+    trait -- the type of heatmap being created, can take values:
+             memory -- intensity is correlated to memory used by the job
+             files -- intensity is correlated to the number of files opened
+             flops -- intenisty is correlated to the number of floating point
+                      operations performed by the host
+    """ 
     job_shelf = shelve.open(SHELVE_DIR)
 
     job = job_shelf[job_id]
 
     hosts = job.hosts.keys()
-
-    n = 1
+            
+    n = 1 
     num_hosts = len(job.hosts)
     PLT.subplots_adjust(hspace = 0)
-    PLT.suptitle('Files Used By Host', fontsize = 12)
+
+    if (trait == 'memory'):
+        PLT.suptitle('Memory Used By Host', fontsize = 12)
+    elif (trait == 'files'):
+        PLT.suptitle('Files Opened By Host', fontsize = 12)
+    elif (trait == 'flops'):
+        PLT.suptitle('Flops Performed By Host', fontsize = 12)
+
 
     for host in hosts:
-        intensity = _files_open_intensity(job, host)
+        intensity = [0]
+
+        if (trait == 'memory'):
+            intensity = _memory_intensity(job, host)
+        elif (trait == 'files'):
+            intensity = _files_open_intensity(job, host)
+        elif (trait == 'flops'):
+            intensity = _flops_intensity(job, host)
+
         create_subheatmap(intensity, job, host, n, num_hosts)
         n += 1
 

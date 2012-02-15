@@ -163,6 +163,7 @@ class Host(object):
                 elif c == SF_COMMENT_CHAR:
                     pass
                 else:
+
                     break
             except Exception as exc:
                 self.trace("file `%s', caught `%s' discarding line `%s'\n",
@@ -271,6 +272,52 @@ class Host(object):
         #     return False
         return self.raw_stats
 
+    def interpret_amd64_pmc_cpu(self):
+        '''
+        This function returns a dictionary containing:
+        flops, user cycles, and dcache fills for all 16 cores in the AMD CPU
+        DRAM access and link use by the three HTlinks for all 4 sockets
+        '''
+        EVENTS = [
+        ['DRAMaccesses', 'UserCycles', 'DCacheSysFills', 'SSEFLOPS'],
+        ['UserCycles', 'HTlink0Use', 'DCacheSysFills', 'SSEFLOPS'],
+        ['UserCycles', 'DCacheSysFills', 'HTlink1Use', 'SSEFLOPS'],
+        ['UserCycles', 'DCacheSysFills', 'SSEFLOPS', 'HTlink2Use']]
+
+	cpus = self.stats['amd64_pmc']
+
+        CNTRS = dict()
+
+        for core, stats in cpus.iteritems():
+             core_str = "core" + core
+	     core = int(core)
+
+             SSEFLOPS_CNTR = EVENTS[core % 4].index('SSEFLOPS') + 4
+             UserCycles_CNTR = EVENTS[core % 4].index('UserCycles') + 4
+             DCacheSysFills_CNTR = EVENTS[core % 4].index('DCacheSysFills') + 4             
+             core_cntrs = dict()
+             core_cntrs['SSEFLOPS'] = stats[ : , SSEFLOPS_CNTR]
+             core_cntrs['UserCycles'] = stats[ :, UserCycles_CNTR]
+             core_cntrs['DCacheSysFills'] = stats[ :, DCacheSysFills_CNTR]
+
+             CNTRS[core_str] = core_cntrs
+             
+             #soc_index returns the index in the EVENTS array of the element
+             # which has not been accessed
+             soc_index = 4*3 + 6 - SSEFLOPS_CNTR - UserCycles_CNTR - DCacheSysFills_CNTR
+             soc_field = EVENTS[core % 4][soc_index]
+             soc_str = "soc" + repr(core / 4)
+             
+             soc_cntrs = dict()
+	     if CNTRS.has_key(soc_str):
+                 soc_cntrs = CNTRS[soc_str]
+             
+             soc_cntrs[soc_field] = stats[ :, soc_index + 4]
+
+             CNTRS[soc_str] = soc_cntrs
+
+
+        return CNTRS
 
 class Job(object):
     # TODO errors/comments
