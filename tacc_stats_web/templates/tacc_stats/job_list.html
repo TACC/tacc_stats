@@ -10,7 +10,7 @@
 	<th> work open </th><th> irq </th></tr>
     {% for job in job_list %}
         <tr style="{{job.color}}">
-            <td><a href="job/{{ job.id }}/">{{ job.acct_id }}</a>
+            <td><a href="/{{ job.pe }}/{{ job.acct_id }}/">{{ job.acct_id }}</a>
             <td>{{ job.owner }}</td>
             <td align=right>{{ job.nr_hosts }}</td>
             <td align=right>{{ job.timespent }}</td>

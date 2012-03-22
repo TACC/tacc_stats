@@ -2,6 +2,15 @@
 
 from django.db import models
 import time
+import math
+
+COLORS = { 
+    'Normal' : "background-color: rgba(0%, 0%, 100%, .2);",
+    'High Files Open' : "background-color: rgba(100%, 0%, 0%, .2);",
+    'High Memory Used' : "background-color: rgba(80%, 30%, 0%, .2)",
+    'High Runtime' : "background-color: rgba(0%, 100%, 0%, .2)",
+    'High Idle' : "background-color: rgba(50%, 0%, 50%, .2)"
+}
 
 class System(models.Model):
     """Details about the cluster"""
@@ -11,6 +20,7 @@ class System(models.Model):
         return self.name
 
 class Node(models.Model):
+    """Details about the specific node run on """
     name = models.CharField(max_length=128)
     system = models.ForeignKey(System)
 
@@ -18,6 +28,7 @@ class Node(models.Model):
         return "%s.%s" % (self.name, self.system.name)
 
 class User(models.Model):
+    """ The person who submitted the job to the queue """
     user_name = models.CharField(max_length=128)
     systems = models.ManyToManyField(System)
 
@@ -28,9 +39,12 @@ class User(models.Model):
         return "User(%s)" % self.user_name
 
 class Job(models.Model):
+    """
+    Details about the task submitted to the compute cluster
+    """
     system = models.ForeignKey(System)
     acct_id = models.BigIntegerField()
-    owner = models.ForeignKey(User)
+    owner = models.ForeignKey(User, null=True)
     hosts = models.ManyToManyField(Node)
     queue = models.CharField(max_length=16, null=True)
     queue_wait_time = models.IntegerField(null=True)
@@ -234,27 +248,52 @@ class Job(models.Model):
 
     @property
     def runtime(self):
+        """ Returns the total length of the job in seconds """
         return self.end - self.begin
 
     @property
     def nr_hosts(self):
+        """ Returns the total number of hosts used by the job """
         return len(self.hosts.all())
 
+    def height(self):
+        """ Returns a value to scale the table row height by in html """
+        return math.log(len(self.hosts.all())) * 10
+
+    def get_owner(self):
+        """ Returns a formatted version of the owner field """
+        return self.owner.__str__()
+
     def color(self):
-        ret_val = "background-color: rgba(0%, 0%, 100%, .3);"
+        """
+        Returns the color of the job row as a css style field
+        """
+        ret_val = COLORS['Normal']
         if self.llite_open_work > 3000:
-            ret_val = "background-color: rgba(100%, 0%, 0%, .3);"
+            ret_val = COLORS['High Files Open']
         elif self.mem_MemUsed > 30*2**30:
-            ret_val = "background-color: rgba(80%, 30%, 0%, .3)"
+            ret_val = COLORS['High Memory Used']
         elif self.runtime > 3000:
-            ret_val = "background-color: rgba(0%, 100%, 0%, .3)"
+            ret_val = COLORS['High Runtime']
         return ret_val
 
     def timespent(self):
+        """ Returns the runtime of the job in a readable format """
         return time.strftime('%H:%M:%S', time.gmtime(self.runtime))
 
     def start_time(self):
+        """ Returns the start time of a the job in a readable format """
         return time.ctime(self.begin)
+
+    def host_names(self):
+        """ Returns a formatted list of the hosts of a job. """
+        return ', '.join([host.name for host in self.hosts.all()])
+
+    def host_list(self):
+
+        hosts = []
+        hosts.append(host.name for host in self.hosts.all())
+        return hosts
 
 class Monitor(models.Model):
     kind = models.CharField(max_length=32)

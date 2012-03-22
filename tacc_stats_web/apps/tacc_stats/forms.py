@@ -3,11 +3,14 @@ from django.forms import ModelForm
 from models import Job
 
 class SearchForm(ModelForm):
+    begin = forms.DateTimeField()
+    end = forms.DateTimeField()
+
     class Meta:
         model = Job
-        fields = ('owner', 'begin', 'end', 'hosts', 'acct_id')
+        fields = ('owner', 'begin', 'end', 'acct_id')
 #        widgets = {
-#            'hosts': forms.TextInput(attrs={'size':'40'}),
+#            'begin': forms.DateTimeField(),
 #        }
 
     def __init__(self, *args, **kwargs):

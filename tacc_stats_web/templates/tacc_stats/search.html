@@ -1,19 +1,46 @@
+<head>
+<script src="{{ STATIC_URL }}sorttable.js"></script>
+<style type="text/css">
+<!--
+@import url("{{ STATIC_URL }}style.css");
+-->
+</style>
+<title>Job Search Page</title> 
+</head>
+<div style="width:100%;height:30%">
+<div style="float:left;">
 <form action="/tacc_stats/search/" method="POST">{% csrf_token %}
     <table>
         {{ form.as_table }}
     </table>
     <p><input type="submit" value="Submit"></p>
 <form>
-
+</div>
+<div style="float:right;">
+{% if COLORS %}
+    <table id="hor-minimalist-a" border ="1" cellpadding="5">
+        <tr><th> Color Legend <th></tr>
+        {% for key, value in COLORS.items %}
+            <tr style="{{value}}">
+                <td>{{ key }}</td>
+		<td><br></td>
+            </tr>
+         {% endfor %}
+    </table>
+{% endif %}
+</div>
+</div>
+<div>
+<div style="height:65%;width:90%">
 {% if job_list %}
-    <table border="1" cellpadding="5">
-        <tr><th> name </th><th> owner </th><th> hosts </th>
+    <table id="box-table-a" border="1" cellpadding="5" class="sortable">
+        <tr><th> ID </th><th> owner </th><th> hosts </th>
         <th> time spent </th><th> begin </th><th> memory used </th>
         <th> work open </th><th> irq </th></tr>
     {% for job in job_list %}
         <tr style="{{job.color}}">
-            <td><a href="/tacc_stats/job/{{ job.id }}/">{{ job.acct_id }}</a>
-            <td>{{ job.owner }}</td>
+            <td height="{{ job.height }}"><a href="/tacc_stats/{{ job.system }}/{{ job.acct_id }}/">{{ job.acct_id }}</a>
+            <td>{{ job.get_owner }}</td>
             <td align=right>{{ job.nr_hosts }}</td>
             <td align=right>{{ job.timespent }}</td>
             <td align=right>{{ job.start_time }}</td>
@@ -26,3 +53,22 @@
 {% else %}
     <p>No jobs are available.</p>
 {% endif %}
+</div>
+<div style="height:5%;clear:both;">
+{% if pages %}
+    [
+    {% for i in pages %}
+         {% if i == page %}
+             <a href="/tacc_stats/search?p={{ i }}{{ query_string }}"><b>{{ i }}</b></a>
+         {% else %}
+             {% if i == '...' %}
+                 {{ i }}
+             {% else %}
+                 <a href="/tacc_stats/search?p={{ i }}{{ query_string }}">{{ i }}</a> 
+             {% endif %}
+         {% endif %}
+    {% endfor %}
+    ]
+{% endif %}
+</div>
+</div>
