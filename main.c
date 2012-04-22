@@ -183,7 +183,7 @@ int main( int argc, char *argv[] ) {
         if ( 0 > pid ) FATAL( "cannot fork\n" );
         if ( 0 < pid ) exit( 0 );
         /* create a unique session ID for the child process */
-        //        if ( setsid() < 0 )	FATAL( "cannot setsid\n" );
+        //        if ( setsid() < 0 )   FATAL( "cannot setsid\n" );
         setsid();
         //        if ( chdir( "/" ) < 0 ) FATAL( "cannot change current working directory to '/'\n" );
         chdir( "/" );
@@ -216,9 +216,7 @@ int main( int argc, char *argv[] ) {
             current_jobid[0] = 0;
             char *t;
             while ( ( ent = readdir( dir ) ) != NULL ) {
-                if ( ent->d_name[0] == '.' )
-                    continue;
-                if ( !strstr( ent->d_name, "edu.SC" ) )
+                if ( !strstr( ent->d_name, "edu.JB" ) )
                     continue;
                 t = strchr( ent->d_name, '.' );
                 if ( t ) *t = 0;
@@ -385,6 +383,21 @@ DaemonLoopBeginHere:
     else if ( cmd == cmd_begin || cmd == cmd_end )
         /* On begin set mark to "begin JOBID", and similar for end. */
         stats_file_mark( &sf, "%s %s", cmd_str, arg_count > 0 ? arg_list[0] : "-" );
+
+    {
+    /* added by charngda */
+    /* store the output from ps */
+       FILE *f = popen("/bin/ps -AFT|/bin/egrep -v '^(root|rpc|condor|postfix)'|/bin/gzip|base64 -w 0","r");
+       if (f) {
+          char *s = NULL;
+          size_t n = 0;
+          if (0 < getline(&s, &n, f)) {
+            stats_file_mark( &sf, "ps %s", s );
+            free(s);
+          }
+          pclose(f);
+       }
+    }
 
     if ( stats_file_close( &sf ) < 0 )
         rc = 1;
