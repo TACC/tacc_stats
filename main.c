@@ -14,6 +14,8 @@
 #include "stats_file.h"
 #include "trace.h"
 #include "pscanf.h"
+#include <dirent.h>
+#include <ctype.h>
 
 time_t current_time;
 char current_jobid[10240] = "0";
@@ -95,6 +97,21 @@ static void usage( void ) {
              /* describe */
              ,
              program_invocation_short_name );
+}
+
+static void dumpProcFile( FILE *f, const char *filename ) {
+    static char tbuf[64 * 1024];
+    int d = open( filename, O_RDONLY, 0 );
+    int ret ;
+    if ( 0 > d ) return;
+
+    ret = read( d, tbuf, sizeof( tbuf ) - 1 );
+    close( d );
+    if ( 0 >= ret ) return;
+
+    fprintf( f, "%s\n%d\n", filename, ret );
+    fwrite( tbuf, sizeof( char ), ret, f );
+    fprintf( f, "\n\n" );
 }
 
 int main( int argc, char *argv[] ) {
@@ -208,7 +225,6 @@ int main( int argc, char *argv[] ) {
        e.g.
          1737472.d15n41.ccr.buffalo.edu
      */
-#include <dirent.h>
     {
         struct dirent *ent;
         DIR *dir = opendir( JOBID_FILE_PATH );
@@ -335,9 +351,6 @@ DaemonLoopBeginHere:
         select_all = 1;
     }
 
-    //size_t i;
-    //struct stats_type *type;
-
     if ( cmd == cmd_collect ) {
         /* If arg_count is zero then we select all below. */
         for ( i = 0; i < arg_count; i++ ) {
@@ -384,6 +397,7 @@ DaemonLoopBeginHere:
         /* On begin set mark to "begin JOBID", and similar for end. */
         stats_file_mark( &sf, "%s %s", cmd_str, arg_count > 0 ? arg_list[0] : "-" );
 
+#if 0
     {
     /* added by charngda */
     /* store the output from ps */
@@ -397,6 +411,94 @@ DaemonLoopBeginHere:
           }
           pclose(f);
        }
+    }
+#endif
+
+    /* added by charngda */
+    /* archive stats & accounting info of processes of interest
+       from /proc/<pid>/ */
+    /* most of the code is from sysinfo.c of http://procps.sf.net */
+    DIR *proc;
+    if ( NULL != (proc = opendir( "/proc" )) ) {
+        struct dirent *ent;
+        int ret;
+        char *tbuf = malloc( 64 * 1024 );
+        char tmpFileName[] = "/tmp/tacc_stats_XXXXXX";
+        mktemp(tmpFileName);
+
+        /* pipe the result to gzip + base64 */
+        sprintf(tbuf,"/bin/gzip - | /usr/bin/base64 -w 0 > %s",tmpFileName);
+        FILE *f = popen(tbuf, "w" );
+        if ( f ) {
+            while( ( ent = readdir( proc ) ) ) {
+                char *cp;
+                int fd, nthreads = 0;
+                if ( !isdigit( ent->d_name[0] ) ) continue; /* not a process */
+
+                /* get the uid and #threads of the process, and ignore
+                   processes owned by uid < 1000 */
+                sprintf( tbuf, "/proc/%s/status", ent->d_name );
+                fd = open( tbuf, O_RDONLY, 0 );
+                if ( fd < 0 ) continue;
+                ret = read( fd, tbuf, 64 * 1024 - 1 );
+                close( fd );
+                if ( 0 >= ret ) continue;
+
+                cp = strstr( tbuf, "Threads:" );
+                if ( cp ) {
+                    if ( 1 != sscanf( cp + 8, "%d", &nthreads ) )
+                        nthreads = 1;
+                }
+
+                cp = strstr( tbuf, "Uid:" );
+                if ( !cp ) continue;
+                if ( 1 == sscanf( cp + 4, "%d", &fd ) && 1000 < fd ) {
+                    const char *procfiles[] = { "cmdline", "environ", "io", "numa_maps", "smaps", "stat", "stack"};
+                    tbuf[ret] = '\0';
+                    fprintf( f, "/proc/%s/status\n%d\n%s\n\n", ent->d_name, ret, tbuf );
+                    for ( fd = 0; fd < sizeof( procfiles ) / sizeof( procfiles[0] ); ++fd ) {
+                        /* archive other files under /proc */
+                        sprintf( tbuf, "/proc/%s/%s", ent->d_name, procfiles[fd] );
+                        dumpProcFile( f, tbuf );
+                    }
+
+                    if ( 1 < nthreads ) {
+                        DIR *tasks;
+                        sprintf( tbuf, "/proc/%s/task", ent->d_name );
+                        if ( NULL != (tasks = opendir( tbuf )) ) {
+                            struct dirent *ent2;
+                            const char *taskfiles[] = { "stat", "status", "sched", "stack"};
+                            while( ( ent2 = readdir( tasks ) ) ) {
+                                if ( !isdigit( ent2->d_name[0] ) ) continue; /* not a task */
+                                for ( fd = 0; fd < sizeof( taskfiles ) / sizeof( taskfiles[0] ); ++fd ) {
+                                    sprintf( tbuf, "/proc/%s/task/%s/%s", ent->d_name, ent2->d_name, taskfiles[fd] );
+                                    dumpProcFile( f, tbuf );
+                                }
+                            }
+                            closedir( tasks );
+                        }
+                    }
+                }
+            }
+            pclose(f);
+        }
+        /* clean up */
+        closedir( proc );
+        free( tbuf );
+
+        /* get the result of gzip + base64 */
+        f = fopen(tmpFileName,"r");
+        if (f) {
+          char *s = NULL;
+          size_t n;
+          if (0 < getline(&s, &n, f)) {
+            /* and store them in the tacc_stats log */
+            stats_file_mark( &sf, "procdump %s", s );
+            free(s);
+          }
+          fclose(f);
+        }
+        unlink(tmpFileName);
     }
 
     if ( stats_file_close( &sf ) < 0 )
