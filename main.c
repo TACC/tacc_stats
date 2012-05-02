@@ -102,15 +102,18 @@ static void usage( void ) {
 static void dumpProcFile( FILE *f, const char *filename ) {
     static char tbuf[64 * 1024];
     int d = open( filename, O_RDONLY, 0 );
-    int ret ;
+    int siz = 0;
+    int ret;
     if ( 0 > d ) return;
 
-    ret = read( d, tbuf, sizeof( tbuf ) - 1 );
+    while ( siz <= sizeof( tbuf ) - 1 && 0 < ( ret = read( d, tbuf + siz, sizeof( tbuf ) - 1 - siz ) )  ) {
+        siz += ret;
+    }
     close( d );
-    if ( 0 >= ret ) return;
+    if ( 0 >= siz ) return;
 
-    fprintf( f, "%s\n%d\n", filename, ret );
-    fwrite( tbuf, sizeof( char ), ret, f );
+    fprintf( f, "%s\n%d\n", filename, siz );
+    fwrite( tbuf, sizeof( char ), siz, f );
     fprintf( f, "\n\n" );
 }
 
@@ -399,18 +402,18 @@ DaemonLoopBeginHere:
 
 #if 0
     {
-    /* added by charngda */
-    /* store the output from ps */
-       FILE *f = popen("/bin/ps -AFT|/bin/egrep -v '^(root|rpc|condor|postfix)'|/bin/gzip|base64 -w 0","r");
-       if (f) {
-          char *s = NULL;
-          size_t n = 0;
-          if (0 < getline(&s, &n, f)) {
-            stats_file_mark( &sf, "ps %s", s );
-            free(s);
-          }
-          pclose(f);
-       }
+        /* added by charngda */
+        /* store the output from ps */
+        FILE *f = popen( "/bin/ps -AFT|/bin/egrep -v '^(root|rpc|condor|postfix)'|/bin/gzip|base64 -w 0", "r" );
+        if ( f ) {
+            char *s = NULL;
+            size_t n = 0;
+            if ( 0 < getline( &s, &n, f ) ) {
+                stats_file_mark( &sf, "ps %s", s );
+                free( s );
+            }
+            pclose( f );
+        }
     }
 #endif
 
@@ -419,16 +422,16 @@ DaemonLoopBeginHere:
        from /proc/<pid>/ */
     /* most of the code is from sysinfo.c of http://procps.sf.net */
     DIR *proc;
-    if ( NULL != (proc = opendir( "/proc" )) ) {
+    if ( NULL != ( proc = opendir( "/proc" ) ) ) {
         struct dirent *ent;
         int ret;
         char *tbuf = malloc( 64 * 1024 );
         char tmpFileName[] = "/tmp/tacc_stats_XXXXXX";
-        mktemp(tmpFileName);
+        mktemp( tmpFileName );
 
         /* pipe the result to gzip + base64 */
-        sprintf(tbuf,"/bin/gzip - | /usr/bin/base64 -w 0 > %s",tmpFileName);
-        FILE *f = popen(tbuf, "w" );
+        sprintf( tbuf, "/bin/gzip - | /usr/bin/base64 -w 0 > %s", tmpFileName );
+        FILE *f = popen( tbuf, "w" );
         if ( f ) {
             while( ( ent = readdir( proc ) ) ) {
                 char *cp;
@@ -465,7 +468,7 @@ DaemonLoopBeginHere:
                     if ( 1 < nthreads ) {
                         DIR *tasks;
                         sprintf( tbuf, "/proc/%s/task", ent->d_name );
-                        if ( NULL != (tasks = opendir( tbuf )) ) {
+                        if ( NULL != ( tasks = opendir( tbuf ) ) ) {
                             struct dirent *ent2;
                             const char *taskfiles[] = { "stat", "status", "sched", "stack"};
                             while( ( ent2 = readdir( tasks ) ) ) {
@@ -480,25 +483,25 @@ DaemonLoopBeginHere:
                     }
                 }
             }
-            pclose(f);
+            pclose( f );
         }
         /* clean up */
         closedir( proc );
         free( tbuf );
 
         /* get the result of gzip + base64 */
-        f = fopen(tmpFileName,"r");
-        if (f) {
-          char *s = NULL;
-          size_t n;
-          if (0 < getline(&s, &n, f)) {
-            /* and store them in the tacc_stats log */
-            stats_file_mark( &sf, "procdump %s", s );
-            free(s);
-          }
-          fclose(f);
+        f = fopen( tmpFileName, "r" );
+        if ( f ) {
+            char *s = NULL;
+            size_t n;
+            if ( 0 < getline( &s, &n, f ) ) {
+                /* and store them in the tacc_stats log */
+                stats_file_mark( &sf, "procdump %s", s );
+                free( s );
+            }
+            fclose( f );
         }
-        unlink(tmpFileName);
+        unlink( tmpFileName );
     }
 
     if ( stats_file_close( &sf ) < 0 )
