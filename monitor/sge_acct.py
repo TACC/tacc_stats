@@ -1,4 +1,4 @@
-import csv
+import csv, os
 
 # Fields in the sge accounting file.
 # From /opt/sge6.2/man/man5/accounting.5
@@ -55,10 +55,17 @@ field_names = [tup[0] for tup in fields]
 
 # Return an iterator for all jobs that finished between start_time and end_time.
 
-def reader(file, start_time=0, end_time=9223372036854775807L):
+def reader(file, start_time=0, end_time=9223372036854775807L, seek=0):
+    if type(file) == str:
+        file = open(file)
+    if seek:
+        file.seek(seek, os.SEEK_SET)
     for d in csv.DictReader(file, delimiter=':', fieldnames=field_names):
-        for n, t, x in fields:
-            d[n] = t(d[n])
+        try:
+            for n, t, x in fields:
+                d[n] = t(d[n])
+        except:
+            pass
         if start_time <= d['end_time'] and d['end_time'] < end_time:
             yield d
 
