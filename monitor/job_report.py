@@ -4,10 +4,6 @@ import human, job_stats, numpy, signal, string, sys
 if __name__ == '__main__':
     signal.signal(signal.SIGPIPE, signal.SIG_DFL)
 
-def first_value(dict):
-    for value in dict.itervalues():
-        return value
-
 amd64_core_by_dev = False
 amd64_sock_by_dev = False
 
