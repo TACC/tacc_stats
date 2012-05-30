@@ -61,12 +61,12 @@ class Report(object):
         self.add_key_val(None, None, key, val, comment=comment)
 
     def add_events(self, job, type_name, dev=None, keys=None):
-        schema = job.schema.get(type_name)
+        schema = job.schemas.get(type_name)
         if not schema:
             for key in keys:
                 self.add_key_val(type_name, dev, key, None)
             return
-        vals = numpy.zeros(len(schema.entries), numpy.uint64)
+        vals = numpy.zeros(len(schema), numpy.uint64)
         for host in job.hosts.itervalues():
             stats = host.stats[type_name]
             if dev:
@@ -75,15 +75,15 @@ class Report(object):
                 for dev_stats in stats.itervalues():
                     vals += dev_stats[-1]
         for key in keys:
-            self.add_key_val(type_name, dev, key, vals[schema.keys[key].index])
+            self.add_key_val(type_name, dev, key, vals[schema[key].index])
 
     def add_gauges(self, job, type_name, dev=None, keys=None):
-        schema = job.schema.get(type_name)
+        schema = job.schemas.get(type_name)
         if not schema:
             for key in keys:
                 self.add_key_val(type_name, dev, key, None)
             return
-        vals = numpy.zeros(len(schema.entries), numpy.uint64)
+        vals = numpy.zeros(len(schema), numpy.uint64)
         for host in job.hosts.itervalues():
             stats = host.stats[type_name]
             nr_times = len(job.times)
@@ -96,7 +96,7 @@ class Report(object):
             else:
                 vals += sum(stats[1:-1]) / (nr_times - 2) # Interior average.
         for key in keys:
-            self.add_key_val(type_name, dev, key, vals[schema.keys[key].index])
+            self.add_key_val(type_name, dev, key, vals[schema[key].index])
 
     def col_str(self, type_name, dev, key):
         str = ""
