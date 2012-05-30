@@ -1,9 +1,8 @@
-#!/opt/apps/python/2.7.1/bin/python
+#!/usr/bin/env python
 import human, job_stats, numpy, signal, string, sys
 
 if __name__ == '__main__':
     signal.signal(signal.SIGPIPE, signal.SIG_DFL)
-
 
 def first_value(dict):
     for value in dict.itervalues():
@@ -18,18 +17,17 @@ class Report(object):
         self.dict = {}
         self.comments = {}
         self.add_info('id', job.id)
-        self.add_info('owner', job.info['owner'])
-        self.add_info('queue', job.info['queue_name'])
-        self.add_info('queue_wait_time', job.begin - long(job.info['submission_time']))
-        self.add_info('begin', job.begin, comment=human.ftime(job.begin))
-        self.add_info('end', job.end, comment=human.ftime(job.end))
-        self.add_info('run_time', job.end - job.begin)
+        self.add_info('owner', job.acct['owner'])
+        self.add_info('queue', job.acct['queue'])
+        self.add_info('queue_wait_time', job.start_time - long(job.acct['submission_time']))
+        self.add_info('begin', job.start_time, comment=human.ftime(job.start_time))
+        self.add_info('end', job.end_time, comment=human.ftime(job.end_time))
+        self.add_info('run_time', job.end_time - job.start_time)
         self.add_info('nr_hosts', len(job.hosts))
-        self.add_info('nr_bad_hosts', len(job.bad_hosts))
-        self.add_info('nr_slots', long(job.info['slots']))
-        self.add_info('pe', job.info['granted_pe'])
-        self.add_info('failed', job.info['failed'])
-        self.add_info('exit_status', job.info['exit_status'])
+        self.add_info('nr_slots', long(job.acct['slots']))
+        self.add_info('pe', job.acct['granted_pe'])
+        self.add_info('failed', job.acct['failed'])
+        self.add_info('exit_status', job.acct['exit_status'])
         if amd64_core_by_dev:
             for core in range(0, 16):
                 self.add_events(job, 'amd64_core', dev=str(core), keys=['USER', 'SSE_FLOPS', 'DCSF'])
@@ -50,55 +48,56 @@ class Report(object):
         self.add_gauges(job, 'mem', keys=['MemTotal', 'MemUsed', 'FilePages', 'Mapped', 'AnonPages', 'Slab'])
         self.cpu_total = sum(self.dict.get(("cpu", None, key), 0) for key in ['user', 'nice', 'system', 'idle', 'iowait', 'irq', 'softirq'])
         # self.add_events(job, 'vm', keys=['pgactivate', 'pgdeactivate'])
+        self.add_events(job, 'ps', keys=['ctxt', 'processes'])
+
     def add_key_val(self, type_name, dev, key, val, comment=None):
         col = (type_name, dev, key)
         self.cols.append(col)
         self.dict[col] = val
         if comment:
             self.comments[col] = comment
+
     def add_info(self, key, val, comment=None):
         self.add_key_val(None, None, key, val, comment=comment)
+
     def add_events(self, job, type_name, dev=None, keys=None):
-        schema = job.get_schema(type_name)
+        schema = job.schema.get(type_name)
         if not schema:
             for key in keys:
                 self.add_key_val(type_name, dev, key, None)
             return
         vals = numpy.zeros(len(schema.entries), numpy.uint64)
         for host in job.hosts.itervalues():
-            type_data = host.types[type_name]
+            stats = host.stats[type_name]
             if dev:
-                vals += type_data.stats[dev][-1]
+                vals += stats[dev][-1]
             else:
-                for stats in type_data.stats.itervalues():
-                    vals += stats[-1]
+                for dev_stats in stats.itervalues():
+                    vals += dev_stats[-1]
         for key in keys:
             self.add_key_val(type_name, dev, key, vals[schema.keys[key].index])
+
     def add_gauges(self, job, type_name, dev=None, keys=None):
-        schema = job.get_schema(type_name)
+        schema = job.schema.get(type_name)
         if not schema:
             for key in keys:
                 self.add_key_val(type_name, dev, key, None)
             return
         vals = numpy.zeros(len(schema.entries), numpy.uint64)
         for host in job.hosts.itervalues():
-            type_data = host.types[type_name]
+            stats = host.stats[type_name]
+            nr_times = len(job.times)
             if dev:
-                nr_times = len(type_data.times[dev])
+                stats = stats[dev]
             else:
-                nr_times = len(first_value(type_data.times))
-            if nr_times == 0:
-                continue
-            if dev:
-                stats = type_data.stats[dev]
-            else:
-                stats = sum(type_data.stats.itervalues()) # Sum over all devices.
+                stats = sum(stats.itervalues()) # Sum over all devices.
             if nr_times == 1 or nr_times == 2:
                 vals += stats[-1]
             else:
                 vals += sum(stats[1:-1]) / (nr_times - 2) # Interior average.
         for key in keys:
             self.add_key_val(type_name, dev, key, vals[schema.keys[key].index])
+
     def col_str(self, type_name, dev, key):
         str = ""
         if type_name and type_name not in ["amd64_core", "amd64_sock", "cpu", "llite", "mem"]:
@@ -106,12 +105,15 @@ class Report(object):
         if dev:
             str += dev + ":"
         return str + key
+
     def print_header(self, file=None, prefix="", field_separator=" "):
         header = field_separator.join(self.col_str(type_name, dev, key) for type_name, dev, key in self.cols)
         print >>file, prefix + header
+
     def print_values(self, file=None, prefix="", field_separator=" "):
         values = field_separator.join(str(self.dict.get(col, 0)) for col in self.cols)
         print >>file, prefix + values
+
     def comment(self, type_name, dev, key, val):
         str = self.comments.get((type_name, dev, key))
         if str:
@@ -143,6 +145,7 @@ class Report(object):
         if str != "":
             str = " # " + str
         return str
+
     def display(self, file=None):
         col_width = 24 # max(len(col) for col in self.cols) + 1
         val_width = 20 # max(len(str(val)) for val in self.dict.itervalues()) + 1
@@ -179,22 +182,10 @@ def display_job_report(info):
     report.display()
     print
 
-
 if __name__ == '__main__':
     job_stats.verbose = False
     if len(sys.argv) > 1:
         for arg in sys.argv[1:]:
-            job_info = job_stats.get_job_info(arg)
-            if job_info:
-                display_job_report(job_info)
-    else:
-        job_info = {}
-        for line in sys.stdin:
-            key, sep, val = line.strip().partition(" ")
-            if key != "":
-                job_info[key] = val
-            elif len(job_info) != 0:
-                display_job_report(job_info)
-                job_info = {}
-        if len(job_info) != 0:
-            display_job_report(job_info)
+            job = job_stats.from_id(arg)
+            report = Report(job)
+            report.display()
