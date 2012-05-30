@@ -91,14 +91,14 @@ def process_host(host, times):
     del host.stats['amd64_pmc']
 
 def process_job(job):
-    pmc_schema = job.schema.get('amd64_pmc')
+    pmc_schema = job.schemas.get('amd64_pmc')
     if not pmc_schema:
         return
     if pmc_schema.desc != pmc_schema_desc:
         # XXX
         return
-    core_schema = job.get_type_schema('amd64_core', core_schema_desc)
-    sock_schema = job.get_type_schema('amd64_sock', sock_schema_desc)
+    core_schema = job.get_schema('amd64_core', core_schema_desc)
+    sock_schema = job.get_schema('amd64_sock', sock_schema_desc)
     for host in job.hosts.itervalues():
         process_host(host, job.times)
-    del job.schema['amd64_pmc']
+    del job.schemas['amd64_pmc']

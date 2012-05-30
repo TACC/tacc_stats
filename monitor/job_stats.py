@@ -46,48 +46,10 @@ try:
 except ImportError:
     have_amd64_pmc = False
 
-def get_host_list_path(acct):
-    """Return the path of the host list written during the prolog."""
-    # Example: /share/sge6.2/default/tacc/hostfile_logs/2011/05/19/prolog_hostfile.1957000.IV32627
-    start_date = datetime.date.fromtimestamp(acct['start_time'])
-    base_glob = 'prolog_hostfile.' + acct['id'] + '.*'
-    for days in (0, -1, 1):
-        yyyy_mm_dd = (start_date + datetime.timedelta(days)).strftime("%Y/%m/%d")
-        full_glob = os.path.join(host_list_dir, yyyy_mm_dd, base_glob)
-        for path in glob.iglob(full_glob):
-            return path
-    return None
-
-
-def stats_file_discard_record(file):
-    for line in file:
-        if line.isspace():
-            return
-
-
-class Schema(object):
-    __slots__ = ('desc', 'entries', 'keys')
-
-    def __init__(self, job, desc):
-        self.desc = desc
-        self.entries = []
-        self.keys = {}
-        for i, s in enumerate(desc.split()):
-            e = SchemaEntry(job, i, s)
-            self.keys[e.key] = e
-            self.entries.append(e)
-
-    def __eq__(self, other):
-        return isinstance(other, self.__class__) and \
-               all(self.__getattribute__(attr) == other.__getattribute__(attr) for attr in self.__slots__)
-
-    def __ne__(self, other):
-        return not self.__eq__(other)
-
 class SchemaEntry(object):
     __slots__ = ('key', 'index', 'is_control', 'is_event', 'width', 'mult', 'unit')
 
-    def __init__(self, job, i, s):
+    def __init__(self, i, s):
         opt_lis = s.split(',')
         self.key = opt_lis[0]
         self.index = i
@@ -118,14 +80,108 @@ class SchemaEntry(object):
                     self.unit = "B"
             else:
                 # XXX
-                job.error("unrecognized option `%s' in schema entry spec `%s'\n", opt, s)
+                raise ValueError("unrecognized option `%s' in schema entry spec `%s'\n", opt, s)
 
     def __eq__(self, other):
         return isinstance(other, self.__class__) and \
-               all(self.__getattribute__(attr) == other.__getattribute__(attr) for attr in self.__slots__)
+               all(self.__getattribute__(attr) == other.__getattribute__(attr) \
+                   for attr in self.__slots__)
 
     def __ne__(self, other):
         return not self.__eq__(other)
+
+    def __repr__(self):
+        lis = [] # 'index=%d' % self.index
+        if self.is_event:
+            lis.append('is_event=True')
+        elif self.is_control:
+            lis.append('is_control=True')
+        if self.width:
+            lis.append('width=%d' % int(self.width))
+        if self.mult:
+            lis.append('mult=%d' % int(self.mult))
+        if self.unit:
+            lis.append('unit=%s' % self.unit)
+        return '(' + ', '.join(lis) + ')'
+
+
+class Schema(dict):
+    def __init__(self, desc):
+        dict.__init__(self)
+        self.desc = desc
+        self._key_list = []
+        self._value_list = []
+        for i, s in enumerate(desc.split()):
+            e = SchemaEntry(i, s)
+            dict.__setitem__(self, e.key, e)
+            self._key_list.append(e.key)
+            self._value_list.append(e)
+
+    def __iter__(self):
+        return self._key_list.__iter__()
+
+    def __repr__(self):
+        return '{' + ', '.join(("'%s': %s" % (k, repr(self[k]))) \
+                               for k in self._key_list) + '}'
+
+    def _notsup(self, s):
+        raise TypeError("'Schema' object does not support %s" % s)
+
+    def __setitem__(self, k, v):
+        self._notsup('item assignment')
+
+    def __delitem__(self, k, v):
+        self._notsup('item deletion')
+
+    def pop(self, k, d=None):
+        self._notsup('removal')
+
+    def popitem(self):
+        self._notsup('removal')
+
+    def setdefault(self, k, d=None):
+        self._notsup("item assignment")
+
+    def update(self, **args):
+        self._notsup("update")
+
+    def items(self):
+        return zip(self._key_list, self._value_list)
+
+    def iteritems(self):
+        for k in self._key_list:
+            yield (k, dict.__getitem__(self, k))
+
+    def iterkeys(self):
+        return self._key_list.__iter__()
+
+    def itervalues(self):
+        return self._value_list.__iter__()
+
+    def keys(self):
+        return self._key_list
+
+    def values(self):
+        return self._value_list
+
+
+def get_host_list_path(acct):
+    """Return the path of the host list written during the prolog."""
+    # Example: /share/sge6.2/default/tacc/hostfile_logs/2011/05/19/prolog_hostfile.1957000.IV32627
+    start_date = datetime.date.fromtimestamp(acct['start_time'])
+    base_glob = 'prolog_hostfile.' + acct['id'] + '.*'
+    for days in (0, -1, 1):
+        yyyy_mm_dd = (start_date + datetime.timedelta(days)).strftime("%Y/%m/%d")
+        full_glob = os.path.join(host_list_dir, yyyy_mm_dd, base_glob)
+        for path in glob.iglob(full_glob):
+            return path
+    return None
+
+
+def stats_file_discard_record(file):
+    for line in file:
+        if line.isspace():
+            return
 
 
 class Host(object):
@@ -167,15 +223,15 @@ class Host(object):
         return path_list
 
     def read_stats_file_header(self, start_time, file):
-        file_schema = {}
+        file_schemas = {}
         for line in file:
             try:
                 c = line[0]
                 if c == SF_SCHEMA_CHAR:
                     type_name, schema_desc = line[1:].split(None, 1)
-                    type_schema = self.job.get_type_schema(type_name, schema_desc)
-                    if type_schema:
-                        file_schema[type_name] = type_schema
+                    schema = self.job.get_schema(type_name, schema_desc)
+                    if schema:
+                        file_schemas[type_name] = schema
                     else:
                         self.error("file `%s', type `%s', schema mismatch desc `%s'\n",
                                    file.name, type_name, schema_desc)
@@ -189,30 +245,30 @@ class Host(object):
                 self.trace("file `%s', caught `%s' discarding line `%s'\n",
                            file.name, exc, line)
                 break
-        return file_schema
+        return file_schemas
 
-    def parse_stats(self, rec_time, line, schema, file):
+    def parse_stats(self, rec_time, line, file_schemas, file):
         type_name, dev_name, rest = line.split(None, 2)
-        type_schema = schema.get(type_name)
-        if not type_schema:
+        schema = file_schemas.get(type_name)
+        if not schema:
             self.error("file `%s', unknown type `%s', discarding line `%s'\n",
                        file.name, type_name, line)
             return
         # TODO stats_dtype = numpy.uint64
         # XXX count = ?
         vals = numpy.fromstring(rest, dtype=numpy.uint64, sep=' ')
-        if len(type_schema.entries) != vals.shape[0]:
+        if vals.shape[0] != len(schema):
             self.error("file `%s', type `%s', expected %d values, read %d, discarding line `%s'\n",
-                       file.name, type_name, len(schema.entries), vals.shape[0], line)
+                       file.name, type_name, len(schema), vals.shape[0], line)
             return
         type_stats = self.raw_stats.setdefault(type_name, {})
         dev_stats = type_stats.setdefault(dev_name, [])
         dev_stats.append((rec_time, vals))
 
     def read_stats_file(self, start_time, file):
-        schema = self.read_stats_file_header(start_time, file)
-        if not schema:
-            self.trace("file `%s' bad schema\n", file.name)
+        file_schemas = self.read_stats_file_header(start_time, file)
+        if not file_schemas:
+            self.trace("file `%s' bad header\n", file.name)
             return
         # Scan file for records belonging to JOBID.
         rec_time = start_time
@@ -249,7 +305,7 @@ class Host(object):
                                file.name, rec_time, rec_jobid)
                     self.times.append(rec_time)
                 elif c.isalpha():
-                    self.parse_stats(rec_time, line, schema, file)
+                    self.parse_stats(rec_time, line, file_schemas, file)
                 elif c == SF_MARK_CHAR:
                     mark = line[1:].strip()
                     self.marks[mark] = True
@@ -286,14 +342,14 @@ class Host(object):
 
 class Job(object):
     # TODO errors/comments
-    __slots__ = ('id', 'start_time', 'end_time', 'acct', 'schema', 'hosts', 'times')
+    __slots__ = ('id', 'start_time', 'end_time', 'acct', 'schemas', 'hosts', 'times')
 
     def __init__(self, acct):
         self.id = acct['id']
         self.start_time = acct['start_time']
         self.end_time = acct['end_time']
         self.acct = acct
-        self.schema = {}
+        self.schemas = {}
         self.hosts = {}
         self.times = []
 
@@ -303,14 +359,15 @@ class Job(object):
     def error(self, fmt, *args):
         error('%s: ' + fmt, self.id, *args)
 
-    def get_type_schema(self, type_name, desc=None):
-        type_schema = self.schema.get(type_name)
-        if type_schema:
-            if desc and type_schema.desc != desc:
+    def get_schema(self, type_name, desc=None):
+        schema = self.schemas.get(type_name)
+        if schema:
+            if desc and schema.desc != desc:
+                # ...
                 return None
         elif desc:
-            type_schema = self.schema[type_name] = Schema(self, desc)
-        return type_schema
+            schema = self.schemas[type_name] = Schema(desc)
+        return schema
 
     def gather_stats(self):
         path = get_host_list_path(self.acct)
@@ -368,7 +425,7 @@ class Job(object):
             return self.error("host `%s', type `%s', dev `%s': " + fmt,
                               host.name, type_name, dev_name, *args)
         m = len(self.times)
-        n = len(schema.entries)
+        n = len(schema)
         A = numpy.zeros((m, n), dtype=numpy.uint64) # Output.
         # First and last of A are first and last from raw.
         A[0] = raw[0][1]
@@ -383,7 +440,8 @@ class Job(object):
             A[i] = raw[k][1]
         # OK, we fit the raw values into A.  Now fixup rollover and
         # convert units.
-        for j, e in enumerate(schema.entries):
+        for e in schema.itervalues():
+            j = e.index
             if e.is_event:
                 p = r = A[0, j] # Previous raw, rollover/baseline.
                 # Rebase, check for rollover.
@@ -417,24 +475,28 @@ class Job(object):
         for host in self.hosts.itervalues():
             host.stats = {}
             for type_name, raw_type_stats in host.raw_stats.iteritems():
-                type_stats = host.stats[type_name] = {}
-                type_schema = self.schema[type_name]
+                stats = host.stats[type_name] = {}
+                schema = self.schemas[type_name]
                 for dev_name, raw_dev_stats in raw_type_stats.iteritems():
-                    dev_stats = self.process_dev_stats(host,
-                                                       type_name, type_schema,
-                                                       dev_name, raw_dev_stats)
-                    type_stats[dev_name] = dev_stats
+                    stats[dev_name] = self.process_dev_stats(host, type_name, schema,
+                                                             dev_name, raw_dev_stats)
             del host.raw_stats
-        if have_amd64_pmc and 'amd64_pmc' in self.schema:
+        if have_amd64_pmc and 'amd64_pmc' in self.schemas:
             amd64_pmc.process_job(self)
-        # TODO Clear mult, width from schemas.
+        # Clear mult, width from schemas.
+        for schema in self.schemas.itervalues():
+            for e in schema.itervalues():
+                e.width = None
+                e.mult = None
         return True
     
     def aggregate_stats(self, type_name, host_names=None, dev_names=None):
+        """Job.aggregate_stats(type_name, host_names=None, dev_names=None)
+        """
         # TODO Handle control registers.
-        schema = self.schema[type_name]
+        schema = self.schemas[type_name]
         m = len(self.times)
-        n = len(schema.entries)
+        n = len(schema)
         A = numpy.zeros((m, n), dtype=numpy.uint64) # Output.       
         nr_hosts = 0
         nr_devs = 0
@@ -466,12 +528,12 @@ def from_acct(acct):
     job.gather_stats() and job.munge_times() and job.process_stats()
     return job
 
-def from_id(id):
-    """from_id(id)
+def from_id(id, path=sge_acct_path):
+    """from_id(id, path=None)
     Construct a Job object for the job with SGE id ID.
     """
     id = str(id)
-    with open(sge_acct_path) as acct_file:
+    with open(path) as acct_file:
         for acct in sge_acct.reader(acct_file):
             if acct['id'] == id:
                 return from_acct(acct)
