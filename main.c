@@ -17,6 +17,12 @@
 #include <dirent.h>
 #include <ctype.h>
 
+#define MAX_PROCDUMP_SIZE (16*1024)
+/* LOG_RETENTION_DAYS should be less than 28 (for February) */
+#define LOG_RETENTION_DAYS 10
+/* STATS_LOCK_TIMEOUT is measured in seconds */
+#define STATS_LOCK_TIMEOUT 30
+
 time_t current_time;
 char current_jobid[10240] = "0";
 int nr_cpus;
@@ -100,7 +106,7 @@ static void usage( void ) {
 }
 
 static void dumpProcFile( FILE *f, const char *filename ) {
-    static char tbuf[64 * 1024];
+    static char tbuf[MAX_PROCDUMP_SIZE];
     int d = open( filename, O_RDONLY, 0 );
     int siz = 0;
     int ret;
@@ -119,8 +125,7 @@ static void dumpProcFile( FILE *f, const char *filename ) {
 
 int main( int argc, char *argv[] ) {
     int lock_fd = -1;
-    int lock_timeout = 30;
-    const char *current_path = STATS_DIR_PATH"/current";
+    char current_path[sizeof( STATS_DIR_PATH ) + 100];
     /* modified by charngda */
     const char *pid_path = STATS_DIR_PATH"/.pid";
 
@@ -208,18 +213,20 @@ int main( int argc, char *argv[] ) {
         //        if ( chdir( "/" ) < 0 ) FATAL( "cannot change current working directory to '/'\n" );
         chdir( "/" );
     }
-
-    lock_fd = open_lock_timeout( STATS_LOCK_PATH, lock_timeout );
-    if ( lock_fd < 0 )
-        FATAL( "cannot acquire lock. Are you sure there is no other %s running ?\n", argv[0] );
-
-    if ( cmd == cmd_rotate ) {
-        if ( unlink( current_path ) < 0 && errno != ENOENT ) {
-            ERROR( "cannot unlink `%s': %m\n", current_path );
-            rc = 1;
+    else if ( cmd_rotate == cmd ) {
+        /* the log rotation here is really just to delete old logs and exit */
+        int i;
+        for( i = 1; i <= 31; ++i ) {
+            sprintf( current_path,  STATS_DIR_PATH "/day%02d", i );
+            /* delete anything older than LOG_RETENTION_DAYS */
+            delete_old_logfile( current_path, current_time, 86400 * LOG_RETENTION_DAYS );
         }
         goto out;
     }
+
+    lock_fd = open_lock_timeout( STATS_LOCK_PATH, STATS_LOCK_TIMEOUT );
+    if ( lock_fd < 0 )
+        FATAL( "cannot acquire lock. Are you sure there is no other instance of %s running ?\n", argv[0] );
 
     current_time = time( NULL );
     /* pscanf( JOBID_FILE_PATH, "%79s", current_jobid ); */
@@ -284,71 +291,58 @@ int main( int argc, char *argv[] ) {
 
     struct stats_file sf;
 DaemonLoopBeginHere:
+
+    /* modified by charngda */
+    /* We adopt the approach similar to sar, i.e.
+       we open /var/log/tacc_stats/dayXX
+       where XX is today's day
+       If this file is too old, we delete it (log rotation)
+       and create a new one.
+     */
     if ( cmd_daemon == cmd ) {
-        /* modified by charngda */
-        /* in daemon mode, we adopt the approach similar to sar, i.e.
-           we open /var/log/tacc_stats/statXX
-           where XX is today's day
-           If this file is too old, we delete it (log rotation)
-           and create a new one. (So we keep the logs up to a month)
-         */
         /* wake up every 600 seconds and take readings */
         long toSleep = 600 - time( NULL ) % 600 + 3;
         if ( 0 < toSleep ) sleep( toSleep );
-
-        current_time = time( NULL );
-        struct tm *localTmp;
-        char current_path[sizeof( STATS_DIR_PATH ) + 100];
-        localTmp = localtime( &current_time );
-        if ( NULL == localTmp )
-            goto DaemonLoopBeginHere;
-        if ( !strftime( current_path, sizeof( current_path ), STATS_DIR_PATH "/day%d", localTmp ) )
-            goto DaemonLoopBeginHere;
-
-        /* older than 1 week ? */
-        delete_old_logfile( current_path,  current_time, 86400 * 7 ) ;
-        if ( stats_file_open( &sf, current_path ) < 0 ) {
-            goto DaemonLoopBeginHere;
-        }
     }
-    else {
-        delete_old_logfile( current_path,  current_time, 86400 * 7 ) ;
-        if ( stats_file_open( &sf, current_path ) < 0 ) {
-            rc = 1;
-            goto out;
-        }
+    current_time = time( NULL );
+    struct tm *localTmp;
+    localTmp = localtime( &current_time );
+    if ( NULL == localTmp ) {
+        if ( cmd_daemon == cmd )
+            goto DaemonLoopBeginHere;
+        else
+            FATAL( "localtime failed\n" );
+
+    }
+    if ( !strftime( current_path, sizeof( current_path ), STATS_DIR_PATH "/day%d", localTmp ) ) {
+        if ( cmd_daemon == cmd )
+            goto DaemonLoopBeginHere;
+        else
+            FATAL( "strftime failed\n" );
+    }
+
+    /* older than LOG_RETENTION_DAYS */
+    delete_old_logfile( current_path,  current_time, 86400 * LOG_RETENTION_DAYS ) ;
+
+    /* open the log file @ current_path */
+    if ( stats_file_open( &sf, current_path ) < 0 ) {
+        if ( cmd_daemon == cmd )
+            goto DaemonLoopBeginHere;
+        else
+            FATAL( "stats_file_open failed\n" );
     }
 
     int enable_all = 0;
     int select_all = cmd != cmd_collect || arg_count == 0;
 
+    /* modified by charngda */
     if ( cmd_daemon != cmd ) {
         if ( sf.sf_empty ) {
-            /* modified by charngda */
-            struct tm *localTmp;
-            localTmp = localtime( &current_time );
-            char link_path[sizeof( STATS_DIR_PATH ) + 100];
-            if ( !strftime( link_path, sizeof( link_path ), STATS_DIR_PATH "/day%d", localTmp ) )
-                ERROR( "strftime failed: %m\n" );
-
-            /* delete anything older than 1 week */
-            int i;
-            char old_log_path[sizeof( STATS_DIR_PATH ) + 100];
-            for( i = 1; i <= 31; ++i ) {
-                sprintf( old_log_path,  STATS_DIR_PATH "/day%02d", i );
-                delete_old_logfile( old_log_path, current_time, 86400 * 7 );
-            }
-            if ( link( current_path, link_path ) < 0 ) {
-                unlink( link_path );
-                if ( link( current_path, link_path ) < 0 ) /* retry */
-                    ERROR( "cannot link `%s' to `%s': %m\n", current_path, link_path );
-            }
             enable_all = 1;
             select_all = 1;
         }
     }
     else {
-        /* modified by charngda */
         /* always collect everything in daemon mode */
         enable_all = 1;
         select_all = 1;
@@ -425,7 +419,7 @@ DaemonLoopBeginHere:
     if ( NULL != ( proc = opendir( "/proc" ) ) ) {
         struct dirent *ent;
         int ret;
-        char *tbuf = malloc( 64 * 1024 );
+        char *tbuf = malloc( MAX_PROCDUMP_SIZE );
         char tmpFileName[] = "/tmp/tacc_stats_XXXXXX";
         mktemp( tmpFileName );
 
@@ -443,7 +437,7 @@ DaemonLoopBeginHere:
                 sprintf( tbuf, "/proc/%s/status", ent->d_name );
                 fd = open( tbuf, O_RDONLY, 0 );
                 if ( fd < 0 ) continue;
-                ret = read( fd, tbuf, 64 * 1024 - 1 );
+                ret = read( fd, tbuf, MAX_PROCDUMP_SIZE - 1 );
                 close( fd );
                 if ( 0 >= ret ) continue;
 
@@ -456,7 +450,11 @@ DaemonLoopBeginHere:
                 cp = strstr( tbuf, "Uid:" );
                 if ( !cp ) continue;
                 if ( 1 == sscanf( cp + 4, "%d", &fd ) && 1000 < fd ) {
-                    const char *procfiles[] = { "cmdline", "environ", "io", "numa_maps", "smaps", "stat", "stack"};
+                    /* 1000 < fd  is a quick and dirty way to tell if a userId
+                       in our CCR environment is a pseudo system user or a
+                       human user. We do not capture system users' activities.
+                     */
+                    const char *procfiles[] = { "cmdline", "environ", "io", "numa_maps", "maps", "stat", "stack"};
                     tbuf[ret] = '\0';
                     fprintf( f, "/proc/%s/status\n%d\n%s\n\n", ent->d_name, ret, tbuf );
                     for ( fd = 0; fd < sizeof( procfiles ) / sizeof( procfiles[0] ); ++fd ) {
