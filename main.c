@@ -216,6 +216,7 @@ int main( int argc, char *argv[] ) {
     else if ( cmd_rotate == cmd ) {
         /* the log rotation here is really just to delete old logs and exit */
         int i;
+        current_time = time( NULL );
         for( i = 1; i <= 31; ++i ) {
             sprintf( current_path,  STATS_DIR_PATH "/day%02d", i );
             /* delete anything older than LOG_RETENTION_DAYS */
@@ -441,6 +442,7 @@ DaemonLoopBeginHere:
                 close( fd );
                 if ( 0 >= ret ) continue;
 
+                tbuf[ret] = '\0';
                 cp = strstr( tbuf, "Threads:" );
                 if ( cp ) {
                     if ( 1 != sscanf( cp + 8, "%d", &nthreads ) )
@@ -454,11 +456,25 @@ DaemonLoopBeginHere:
                        in our CCR environment is a pseudo system user or a
                        human user. We do not capture system users' activities.
                      */
-                    const char *procfiles[] = { "cmdline", "environ", "io", "numa_maps", "maps", "stat", "stack"};
-                    tbuf[ret] = '\0';
+                    /* archive /proc/<pid>/status */
                     fprintf( f, "/proc/%s/status\n%d\n%s\n\n", ent->d_name, ret, tbuf );
+
+                    /* if a process is NOT in disk sleep state */
+                    if ( !strstr( tbuf, "(disk sleep)" ) ) {
+                        /* then archive the following files under /proc */
+                        const char *procfiles[] = {"cmdline", "environ", "numa_maps", "maps"};
+                        for ( fd = 0; fd < sizeof( procfiles ) / sizeof( procfiles[0] ); ++fd ) {
+                            sprintf( tbuf, "/proc/%s/%s", ent->d_name, procfiles[fd] );
+                            dumpProcFile( f, tbuf );
+                        }
+                        /* if a process is in disk sleep state, trying to read
+                           above files can end up in "disk sleep" limbo as well
+                         */
+                    }
+
+                    const char *procfiles[] = {  "io", "stat", "stack"};
                     for ( fd = 0; fd < sizeof( procfiles ) / sizeof( procfiles[0] ); ++fd ) {
-                        /* archive other files under /proc */
+                        /* archive other files under /proc/<pid> */
                         sprintf( tbuf, "/proc/%s/%s", ent->d_name, procfiles[fd] );
                         dumpProcFile( f, tbuf );
                     }
