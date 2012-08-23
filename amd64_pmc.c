@@ -22,9 +22,9 @@
 
 // CAVEAT: Linux kernel will grab one of the performance monitor counters
 // for CPU lockup detection. This is documented in
-// Documentation/nmi_watchdog.txt in Linux kernel source tree and the 
+// Documentation/nmi_watchdog.txt in Linux kernel source tree and the
 // implementation is arch/x86/kernel/cpu/perfctr-watchdog.c
-// A quick way to see if Linux kernel is using one of the performance 
+// A quick way to see if Linux kernel is using one of the performance
 // monitor counters, look for messages like
 //
 //   "NMI watchdog enabled, takes one hw-pmu counter."
