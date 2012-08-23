@@ -20,6 +20,17 @@
 // are monitored.  All of the events are specified in section 3.14
 // [Performance Counter Events].
 
+// CAVEAT: Linux kernel will grab one of the performance monitor counters
+// for CPU lockup detection. This is documented in
+// Documentation/nmi_watchdog.txt in Linux kernel source tree and the 
+// implementation is arch/x86/kernel/cpu/perfctr-watchdog.c
+// A quick way to see if Linux kernel is using one of the performance 
+// monitor counters, look for messages like
+//
+//   "NMI watchdog enabled, takes one hw-pmu counter."
+//
+// during the boot (e.g. dmesg or /var/log/messages)
+//
 #define MSR_PERF_CTL0 0xC0010000
 #define MSR_PERF_CTL1 0xC0010001
 #define MSR_PERF_CTL2 0xC0010002
@@ -163,7 +174,7 @@ static int begin_pmc(struct stats_type *type)
   int nr = 0;
 
   uint64_t events[4][4] = {
-    { DRAMaccesses, UserCycles,     DCacheSysFills, SSEFLOPS, },
+    { UserCycles,   DRAMaccesses,   DCacheSysFills, SSEFLOPS, },
     { UserCycles,   HTlink0Use,     DCacheSysFills, SSEFLOPS, },
     { UserCycles,   DCacheSysFills, HTlink1Use,     SSEFLOPS, },
     { UserCycles,   DCacheSysFills, SSEFLOPS,       HTlink2Use, },
