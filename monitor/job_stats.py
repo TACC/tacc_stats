@@ -1,5 +1,6 @@
 #!/usr/bin/env python
-import datetime, errno, glob, gzip, numpy, os, sge_acct, sys, time
+import datetime, errno, glob, gzip, numpy, os, sys, time
+import amd64_pmc, sge_acct
 
 verbose = os.getenv('TACC_STATS_VERBOSE')
 
@@ -10,9 +11,6 @@ stats_home = os.getenv('TACC_STATS_HOME', '/scratch/projects/tacc_stats')
 
 # raw_stats_dir/HOST/TIMESTAMP: raw stats files.
 raw_stats_dir = os.getenv('TACC_STATS_RAW', os.path.join(stats_home, 'archive'))
-
-# accounting: mirror of sge accounting file or a chunk of it.
-sge_acct_path = os.getenv('TACC_STATS_ACCT', os.path.join(stats_home, 'accounting'))
 
 # prolog_host_lists/YYYY/MM/DD/prolog_hostfile.JOBID.*.
 # Symbolic link to /share/sge6.2/default/tacc/hostfile_logs.
@@ -39,12 +37,6 @@ SF_DEVICES_CHAR = '@'
 SF_COMMENT_CHAR = '#'
 SF_PROPERTY_CHAR = '$'
 SF_MARK_CHAR = '%'
-
-try:
-    import amd64_pmc
-    have_amd64_pmc = True
-except ImportError:
-    have_amd64_pmc = False
 
 class SchemaEntry(object):
     __slots__ = ('key', 'index', 'is_control', 'is_event', 'width', 'mult', 'unit')
@@ -481,9 +473,8 @@ class Job(object):
                     stats[dev_name] = self.process_dev_stats(host, type_name, schema,
                                                              dev_name, raw_dev_stats)
             del host.raw_stats
-        if have_amd64_pmc and 'amd64_pmc' in self.schemas:
-            amd64_pmc.process_job(self)
-        # Clear mult, width from schemas.
+        amd64_pmc.process_job(self)
+        # Clear mult, width from schemas. XXX
         for schema in self.schemas.itervalues():
             for e in schema.itervalues():
                 e.width = None
@@ -521,19 +512,26 @@ class Job(object):
 
 def from_acct(acct):
     """from_acct(acct)
-    Construct a Job object from the SGE accounting data acct, running
+    Return a Job object constructed from the SGE accounting data acct, running
     all required processing.
     """
     job = Job(acct)
     job.gather_stats() and job.munge_times() and job.process_stats()
     return job
 
-def from_id(id, path=sge_acct_path):
-    """from_id(id, path=None)
-    Construct a Job object for the job with SGE id ID.
+
+def from_id(id, **kwargs):
+    """from_id(id, acct_file=None, acct_path=sge_acct_path, use_awk=True)
+    Return Job object for the job with SGE id ID, or None if no such job was found.
     """
-    id = str(id)
-    with open(path) as acct_file:
-        for acct in sge_acct.reader(acct_file):
-            if acct['id'] == id:
-                return from_acct(acct)
+    acct = sge_acct.from_id(id, **kwargs)
+    if acct:
+        return from_acct(acct)
+    else:
+        return None
+
+# if True:
+#     t0 = time.time()
+#     j = job_stats.from_id(2294341)
+#     t1 = time.time()
+#     print t1 - t0
