@@ -7,6 +7,8 @@ if __name__ == '__main__':
 amd64_core_by_dev = False
 amd64_sock_by_dev = False
 
+# FIXME jobs with no good hosts may break this.
+
 class Report(object):
     def __init__(self, job):
         self.cols = []
@@ -102,13 +104,19 @@ class Report(object):
             str += dev + ":"
         return str + key
 
-    def print_header(self, file=None, prefix="", field_separator=" "):
-        header = field_separator.join(self.col_str(type_name, dev, key) for type_name, dev, key in self.cols)
+    def print_header(self, **kwargs):
+        prefix = kwargs.get('prefix', '+')
+        delim = kwargs.get('delim', ' ')
+        file = kwargs.get('file')
+        header = delim.join(self.col_str(type_name, dev, key) for type_name, dev, key in self.cols)
         print >>file, prefix + header
 
-    def print_values(self, file=None, prefix="", field_separator=" "):
-        values = field_separator.join(str(self.dict.get(col, 0)) for col in self.cols)
-        print >>file, prefix + values
+    def print_record(self, **kwargs):
+        prefix = kwargs.get('prefix', '+')
+        delim = kwargs.get('delim', ' ')
+        file = kwargs.get('file')
+        record = delim.join(str(self.dict.get(col, 0)) for col in self.cols)
+        print >>file, prefix + record
 
     def comment(self, type_name, dev, key, val):
         str = self.comments.get((type_name, dev, key))
@@ -142,7 +150,12 @@ class Report(object):
             str = " # " + str
         return str
 
-    def display(self, file=None):
+    def display(self, **kwargs):
+        if kwargs.get('print_header'):
+            self.print_header(**kwargs)
+        if kwargs.get('print_record'):
+            self.print_values(**kwargs)
+        file = kwargs.get('file')
         col_width = 24 # max(len(col) for col in self.cols) + 1
         val_width = 20 # max(len(str(val)) for val in self.dict.itervalues()) + 1
         for col in self.cols:
@@ -154,34 +167,57 @@ class Report(object):
             else:
                 val_str = '-'
             comment = self.comment(type_name, dev, key, val)
-            print >>file, (col_str + ' ').ljust(col_width, '.') + (' ' + val_str).rjust(val_width, '.') + comment
+            print >>file, (col_str + ' ').ljust(col_width, '.') + \
+                  (' ' + val_str).rjust(val_width, '.') + comment
 
-opt_print_header = True
-opt_print_values = True
 
-def display_job_report(info):
-    global opt_print_header
-    id = info.get("id")
-    if not id:
-        job_stats.error("no id in job info\n")
-        return
-    job = job_stats.Job(id, info=info)
-    if len(job.hosts) == 0:
-        job_stats.error("job `%s' has no good hosts, skipping\n", job.id)
-        return
-    report = Report(job)
-    if opt_print_values:
-        if opt_print_header:
-            report.print_header(prefix='+')
-            opt_print_header = False
-        report.print_values(prefix='+')
-    report.display()
-    print
+def display(arg, **kwargs):
+    """display(arg, file=None, print_header=False, print_record=False, prefix='+', delim=' ')
+    """
+    if type(arg) is Report:
+        report = arg
+    elif type(arg) is job_stats.Job:
+        report = Report(arg)
+    elif type(arg) is int or type(arg) is long or type(arg) is str:
+        job = job_stats.from_id(str(arg))
+        if not job:
+            job_stats.error("no job for id `%s'\n", str(arg))
+            return
+        report = Report(arg)
+    else:
+        raise ValueError("cannot convert arg `%s' to Job or Report" % str(arg))
+    report.display(**kwargs)
+
+
+def display_list(lis, **kwargs):
+    id_dict = {}
+    for arg in lis:
+        if type(arg) is Report or type(arg) is job_stats.Job:
+            pass
+        elif str(arg).isdigit(): # XXX
+            id_dict[str(arg)] = None
+        else:
+            raise ValueError("cannot convert arg `%s' to Job or Report" % str(arg))
+    if id_dict:
+        sge_acct.fill(id_dict)
+    for arg in lis:
+        report = None
+        if type(arg) is Report:
+            report = arg
+        elif type(arg) is job_stats.Job:
+            report = Report(arg)
+        else:
+            acct = id_dict[str(arg)]
+            if acct:
+                job = job_stats.from_acct(acct)
+                report = Report(job)
+            else:
+                job_stats.error("no accounting data found for job `%s'\n", arg)
+        if report:
+            report.display(**kwargs)
+            kwargs['print_header'] = False
+
 
 if __name__ == '__main__':
     job_stats.verbose = False
-    if len(sys.argv) > 1:
-        for arg in sys.argv[1:]:
-            job = job_stats.from_id(arg)
-            report = Report(job)
-            report.display()
+    display_list(argv[1:])
