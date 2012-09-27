@@ -36,20 +36,23 @@ def main():
                       default='SSE_FLOPS')
   parser.add_argument('filearg', help='File, directory, or quoted'
                       ' glob pattern', nargs='?',default='jobs')
-#  parser.add_argument('-f', help='Set full mode', action='store_true')
+  parser.add_argument('-f', help='Set full mode', action='store_true')
   n=parser.parse_args()
 
   filelist=tspl.getfilelist(n.filearg)
 
   threshold=n.threshold
-  fk1=n.keya1
-  fk2=n.keya2
-  sk1=n.keyb1
-  sk2=n.keyb2
-  
+  k1=[n.keya1, n.keyb1]
+  k2=[n.keya2, n.keyb2]
+
   for file in filelist:
     try:
-      ts=tspl.TSPickleLoader(file,[fk1,sk1],[fk2,sk2])
+      if n.f:
+        full='_full'
+        ts=tspl.TSPickleLoaderFull(file,k1,k2)
+      else:
+        full=''
+        ts=tspl.TSPickleLoader(file,k1,k2)
     except Exception as inst:
       print type(inst)     # the exception instance
       print inst           # __str__ allows args to printed directly
@@ -98,7 +101,7 @@ def main():
       ax[1][0].set_ylim(bottom=tmid[-1]*1.05/3600.,top=0.)
       ax[0][1].set_ylim(bottom=0.,top=1.1*my)
       fname1='graph_'+ts.j.id+'_'+ts.k1[0]+'_'+ts.k2[0]+ \
-             '_vs_'+ts.k1[1]+'_'+ts.k2[1]
+             '_vs_'+ts.k1[1]+'_'+ts.k2[1]+full
       fig.savefig(fname1)
       plt.close()
 

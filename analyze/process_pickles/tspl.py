@@ -88,8 +88,8 @@ class TSPickleLoaderFull(TSPLBase):
           self.data[i][k]=s[:,self.index[i]]
 
   
-# Check a TSPickleLoader object to see if its job has a minimum run time and is
-# exactly a certain wayness
+# Check a TSPickleLoader object to see if its job has a minimum run time and has
+# its wayness in a list
 def checkjob(ts, minlen, way):
   if ts.t[len(ts.t)-1] < minlen:
     print ts.j.id + ': %(time)8.3f' % {'time' : ts.t[len(ts.t)-1]/3600} \
@@ -118,3 +118,7 @@ def getfilelist(filearg):
       filelist=[filearg]
   return filelist
   
+def expand_range(xmin,xmax,factor):
+  xc=(xmin+xmax)/2.
+  return [(xmin-xc)*(1.+factor)+xc,
+          (xmax-xc)*(1.+factor)+xc]

@@ -77,9 +77,7 @@ def main():
     # Compute y-axis min and max, expand the limits by 10%
     ymin=min(numpy.minimum(ratio,ratio2))
     ymax=max(numpy.maximum(ratio,ratio2))
-    yc=(ymin+ymax)/2.
-    ymin=(ymin-yc)*1.1+yc
-    ymax=(ymax-yc)*1.1+yc
+    ymin,ymax=tspl.expand_range(ymin,ymax,0.1)
 
     var=scipy.stats.tmean(ratio) # mean of ratios is the threshold statistic
 
@@ -95,8 +93,14 @@ def main():
       ax[0].plot(tmid/3600,ratio2)
       ax[0].legend(('Std Dev','Max Diff'), loc=4)
       ax[1].hold=True
+      ymin1=0. # This is wrong in general, but we don't want the min to be > 0.
+      ymax1=0.
       for v in rate:
+        ymin1=min(ymin1,min(v))
+        ymax1=max(ymax1,max(v))
         ax[1].plot(tmid/3600,v)
+
+      ymin1,ymax1=tspl.expand_range(ymin1,ymax1,0.1)
 
       title=ts.title + ', V: %(V)-8.3g' % {'V' : var}
       ax[0].set_title(title)
@@ -105,6 +109,7 @@ def main():
       ax[1].set_xlabel('Time (hr)')
       ax[1].set_ylabel('Total ' + ts.k1[0] + ' ' + ts.k2[0] + '/s')
       ax[0].set_ylim(bottom=ymin,top=ymax)
+      ax[1].set_ylim(bottom=ymin1,top=ymax1)
 
       fname='_'.join(['graph',ts.j.id,ts.k1[0],ts.k2[0],'imbalance'+full])
       fig.savefig(fname)
