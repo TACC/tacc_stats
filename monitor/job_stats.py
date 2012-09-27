@@ -328,6 +328,14 @@ class Host(object):
         #     return False
         return self.raw_stats
 
+    def get_stats(self, type_name, dev_name, key_name):
+        """Host.get_stats(type_name, dev_name, key_name)
+        Return the vector of stats for the given type, dev, and key.
+        """
+        schema = self.job.get_schema(type_name)
+        index = schema[key_name].index
+        return self.stats[type_name][dev_name][:, index]
+
 
 class Job(object):
     # TODO errors/comments
@@ -505,6 +513,18 @@ class Job(object):
                 A += dev_stats
                 nr_devs += 1
         return (A, nr_hosts, nr_devs)
+
+    def get_stats(self, type_name, dev_name, key_name):
+        """Job.get_stats(type_name, dev_name, key_name)
+        Return a dictionary with keys host names and values the vector
+        of stats for the given type, dev, and key.
+        """
+        schema = self.get_schema(type_name)
+        index = schema[key_name].index
+        host_stats = {}
+        for host_name, host in self.hosts.iteritems():
+            host_stats[host_name] = host.stats[type_name][dev_name][:, index]
+        return host_stats
 
 
 def from_acct(acct):
