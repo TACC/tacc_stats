@@ -37,9 +37,12 @@ def main():
     for k in ts.j.hosts.keys():
       m=ts.data[0][k]-ts.data[1][k]
       m-=ts.data[0][k][0]
-      ax.plot(ts.t,m)
+      ax.plot(ts.t/3600.,m)
 
-    ax.set_title(ts.title)
+    ax.set_ylabel('MemUsed - AnonPages ' +
+                  ts.j.get_schema(ts.k1[0])[ts.k2[0]].unit)
+    ax.set_xlabel('Time (hr)')
+    plt.suptitle(ts.title)
 
     fname='graph_'+ts.j.id+'_'+ts.k1[0]+'_'+ts.k2[0]+'.png'
     fig.savefig(fname)

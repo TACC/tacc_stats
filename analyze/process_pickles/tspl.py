@@ -52,6 +52,15 @@ class TSPLBase:
 
     return self.data[y][k]
 
+  def label(self,k1,k2):
+    l=k1 + ' ' + k2
+    s=self.j.get_schema(k1)[k2]
+    if not s.unit is None:
+      l+=' ' + s.unit
+      
+    return l
+      
+
 # Load a job file and sum a socket-based or core-based counter into
 # time-dependent arrays for each key pair. Takes a tacc stats pickle file and
 # two lists of keys. 
@@ -86,7 +95,6 @@ class TSPickleLoaderFull(TSPLBase):
         h=self.j.hosts[k]
         for s in h.stats[self.k1[i]].values():
           self.data[i][k]=s[:,self.index[i]]
-
   
 # Check a TSPickleLoader object to see if its job has a minimum run time and has
 # its wayness in a list

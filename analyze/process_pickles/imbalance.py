@@ -107,7 +107,7 @@ def main():
       ax[0].set_xlabel('Time (hr)')
       ax[0].set_ylabel('Imbalance Ratios')
       ax[1].set_xlabel('Time (hr)')
-      ax[1].set_ylabel('Total ' + ts.k1[0] + ' ' + ts.k2[0] + '/s')
+      ax[1].set_ylabel('Total ' + ts.label(ts.k1[0],ts.k2[0]) + '/s')
       ax[0].set_ylim(bottom=ymin,top=ymax)
       ax[1].set_ylim(bottom=ymin1,top=ymax1)
 

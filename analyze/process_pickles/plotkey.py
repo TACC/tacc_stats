@@ -57,7 +57,7 @@ def main():
 
     ax.set_title(ts.title)
     ax.set_xlabel('Time (hr)')
-    ax.set_ylabel('Total ' + ts.k1[0] + ' ' + ts.k2[0] + '/s')
+    ax.set_ylabel('Total ' + ts.label(ts.k1[0],ts.k2[0]) + '/s')
     fname='_'.join(['graph',ts.j.id,ts.k1[0],ts.k2[0],'vs_t'+full])
     fig.savefig(fname)
     plt.close()

@@ -85,12 +85,12 @@ def main():
         ax[1][0].plot(first_rate[::-1],tmid[::-1]/3600.)
         ax[0][1].plot(tmid/3600.,second_rate)
 
-      ax[0][0].set_xlabel('Total ' + ts.k1[0] + ' ' + ts.k2[0] + '/s')
-      ax[0][0].set_ylabel('Total ' + ts.k1[1] + ' ' + ts.k2[1] + '/s')
+      ax[0][0].set_xlabel('Total ' + ts.label(ts.k1[0],ts.k2[0]) + '/s')
+      ax[0][0].set_ylabel('Total ' + ts.label(ts.k1[1],ts.k2[1]) + '/s')
       ax[1][0].set_ylabel('Time (hr)')
-      ax[1][0].set_xlabel('Total ' + ts.k1[0] + ' ' + ts.k2[0] + '/s')
+      ax[1][0].set_xlabel('Total ' + ts.label(ts.k1[0],ts.k2[0]) + '/s')
       ax[0][1].set_xlabel('Time (hr)')
-      ax[0][1].set_ylabel('Total ' + ts.k1[1] + ' ' + ts.k2[1] + '/s')
+      ax[0][1].set_ylabel('Total ' + ts.label(ts.k1[1],ts.k2[1]) + '/s')
 
       plt.subplots_adjust(hspace=.25)
       title=ts.title + ', R=%(R)-8.3g' % { 'R' : r}
