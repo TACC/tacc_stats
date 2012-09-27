@@ -119,9 +119,6 @@ class Schema(dict):
     def _notsup(self, s):
         raise TypeError("'Schema' object does not support %s" % s)
 
-    def __setitem__(self, k, v):
-        self._notsup('item assignment')
-
     def __delitem__(self, k, v):
         self._notsup('item deletion')
 
