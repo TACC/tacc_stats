@@ -5,7 +5,6 @@ import cPickle as pickle
 prog_name = os.path.basename(sys.argv[0])
 acct_path = '/share/sge6.2/default/common/accounting'
 host_list_dir = '/share/sge6.2/default/tacc/hostfile_logs'
-pickle_dir = '/dev/shm/tacc_stats_pickles'
 pickle_prot = pickle.HIGHEST_PROTOCOL
 
 def FATAL(str):
@@ -62,23 +61,23 @@ def get_host_list(acct):
 def short_host_name(str):
     return str.split('.')[0]
 
-if len(sys.argv) != 3:
-    USAGE("START_DATE END_DATE");
+if len(sys.argv) != 4:
+    USAGE("DIR START_DATE END_DATE");
 
-start = getdate(sys.argv[1])
-end = getdate(sys.argv[2])
+pickle_dir = sys.argv[1]
+start = getdate(sys.argv[2])
+end = getdate(sys.argv[3])
 seek = 800 << 20 # XXX
 
 # Run though all jobs that ended after start and before end + 3 days.
 
 for acct in sge_acct.reader(open(acct_path),
                             start_time=start,
-                            end_time=end + 2 * 86400,
+                            end_time=end,
                             seek=seek):
     if acct['end_time'] == 0:
         continue
-    if max(acct['start_time'], start) <= min(acct['end_time'], end):
-        job = job_stats.from_acct(acct)
-        pickle_path = os.path.join(pickle_dir, job.id)
-        pickle_file = open(pickle_path, 'w')
-        pickle.dump(job, pickle_file, pickle_prot)
+    job = job_stats.from_acct(acct)
+    pickle_path = os.path.join(pickle_dir, job.id)
+    pickle_file = open(pickle_path, 'w')
+    pickle.dump(job, pickle_file, pickle_prot)
