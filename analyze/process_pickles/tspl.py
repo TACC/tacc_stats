@@ -117,7 +117,9 @@ def getfilelist(filearg):
     else:
       filelist=[filearg]
   return filelist
-  
+
+# Center, expand, and decenter a range
+
 def expand_range(xmin,xmax,factor):
   xc=(xmin+xmax)/2.
   return [(xmin-xc)*(1.+factor)+xc,
