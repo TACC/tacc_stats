@@ -30,8 +30,8 @@ dcache_sys_fills = perf_event(0x42, 0x01)
 sse_flops = perf_event(0x03, 0x7F)
 
 pmc_schema_desc = 'CTL0,C CTL1,C CTL2,C CTL3,C CTR0,E,W=48 CTR1,E,W=48 CTR2,E,W=48 CTR3,E,W=48\n'
-core_schema_desc = 'USER,E DCSF,E SSE_FLOPS,E'
-sock_schema_desc = 'DRAM,E HT0,E HT1,E HT2,E'
+core_schema_desc = 'USER,E DCSF,E,U=B SSE_FLOPS,E' # mult is handled below.
+sock_schema_desc = 'DRAM,E,U=B HT0,E,U=B HT1,E,U=B HT2,E,U=B'
 
 ctr_info = {
     #                 (is_core, col, mult)
