@@ -105,10 +105,10 @@ def checkjob(ts, minlen, way):
     return False
   elif getattr(way, '__iter__', False):
     if ts.wayness not in way:
-      print ts.j.id + ': skipping ' + str(ts.wayness)
+      print ts.j.id + ': skipping ' + str(ts.wayness) + '-way'
       return False
   elif ts.wayness != way:
-    print ts.j.id + ': skipping ' + str(ts.wayness)
+    print ts.j.id + ': skipping ' + str(ts.wayness) + '-way'
     return False
   return True
 
