@@ -44,7 +44,6 @@ def main():
 
     tmid=(ts.t[:-1]+ts.t[1:])/2.0
 
-    rate={}
     fig,ax=plt.subplots(1,1,figsize=(8,6),dpi=80)
     ax.hold=True
     mean=[]
