@@ -49,7 +49,7 @@ def main():
 
     tmid=(ts.t[:-1]+ts.t[1:])/2.0
 
-    reduction=[]
+    reduction=[] # place to store reductions via func
     for v in ts:
       rate=numpy.divide(numpy.diff(v),numpy.diff(ts.t))
       reduction.append(func(rate))
