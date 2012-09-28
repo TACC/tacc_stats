@@ -15,6 +15,10 @@ class TSPLBase:
     self.f.close()
     self.wayness=int(re.findall('\d+',self.j.acct['granted_pe'])[0])
     self.numhosts=len(self.j.hosts.keys())
+
+    if self.numhosts == 0:
+      print 'No hosts'
+      raise TSPLException('No hosts')
     
     self.k1=k1
     self.k2=k2
