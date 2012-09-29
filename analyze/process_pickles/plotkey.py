@@ -20,6 +20,7 @@ def main():
   parser.add_argument('filearg', help='File, directory, or quoted'
                       ' glob pattern', nargs='?',default='jobs')
   parser.add_argument('-f', help='Set full mode', action='store_true')
+  parser.add_argument('-m', help='Set heatmap mode', action='store_true')
   parser.add_argument('--max', help='Use max instead of mean',
                       action='store_true')
   n=parser.parse_args(sys.argv[1:])
@@ -45,8 +46,6 @@ def main():
     if not tspl.checkjob(ts,3600,16):
       continue
 
-    tmid=(ts.t[:-1]+ts.t[1:])/2.0
-
     reduction=[] # place to store reductions via func
     for v in ts:
       rate=numpy.divide(numpy.diff(v),numpy.diff(ts.t))
@@ -54,26 +53,70 @@ def main():
       m=func(reduction)
     if not n.t or m > float(n.t):
       print ts.j.id + ': ' + str(m)
-      fig,ax=plt.subplots(1,1,figsize=(8,6),dpi=80)
-      ax.hold=True
-      ymin=0. # Wrong in general, but min must be 0. or less
-      ymax=0.
-      for v in ts:
-        rate=numpy.divide(numpy.diff(v),numpy.diff(ts.t))
-        ymin=min(ymin,min(rate))
-        ymax=max(ymax,max(rate))
-        ax.plot(tmid/3600,rate)
-      ymin,ymax=tspl.expand_range(ymin,ymax,0.1)
-      ax.set_ylim(bottom=ymin,top=ymax)
-      title=ts.title + ', V: %(V)-8.3g' % {'V' : m}
-      plt.suptitle(title)
-      ax.set_xlabel('Time (hr)')
-      ax.set_ylabel('Total ' + ts.label(ts.k1[0],ts.k2[0]) + '/s')
-      fname='_'.join(['graph',ts.j.id,ts.k1[0],ts.k2[0],'vs_t'+full])
-      fig.savefig(fname)
-      plt.close()
+      if n.m:
+        heatmap(ts,n,m,full)
+      else:
+        lineplot(ts,n,m,full)
     else:
       print ts.j.id + ': under threshold, ' + str(m) + ' < ' + n.t
+      
+
+def lineplot(ts,n,m,full):
+  tmid=(ts.t[:-1]+ts.t[1:])/2.0
+  fig,ax=plt.subplots(1,1,figsize=(8,6),dpi=80)
+  ax.hold=True
+  ymin=0. # Wrong in general, but min must be 0. or less
+  ymax=0.
+  for v in ts:
+    rate=numpy.divide(numpy.diff(v),numpy.diff(ts.t))
+    ymin=min(ymin,min(rate))
+    ymax=max(ymax,max(rate))
+    ax.plot(tmid/3600,rate)
+  ymin,ymax=tspl.expand_range(ymin,ymax,0.1)
+  ax.set_ylim(bottom=ymin,top=ymax)
+  title=ts.title + ', V: %(V)-8.3g' % {'V' : m}
+  plt.suptitle(title)
+  ax.set_xlabel('Time (hr)')
+  ax.set_ylabel('Total ' + ts.label(ts.k1[0],ts.k2[0]) + '/s')
+  fname='_'.join(['graph',ts.j.id,ts.k1[0],ts.k2[0],'vs_t'+full])
+  fig.savefig(fname)
+  plt.close()
+
+def heatmap(ts,n,m,full):
+  tmid=(ts.t[:-1]+ts.t[1:])/2.0
+  fig,ax=plt.subplots(1,1,figsize=(8,6),dpi=80)
+  ymin=0. # Wrong in general, but min must be 0. or less
+  ymax=0.
+  first=True
+  for v in ts:
+    rate=numpy.divide(numpy.diff(v),numpy.diff(ts.t))
+    if first:
+      r=rate
+      first=False
+    else:
+      r=numpy.vstack((r,rate))
+
+    ymin=min(ymin,min(rate))
+    ymax=max(ymax,max(rate))
+  ymin,ymax=tspl.expand_range(ymin,ymax,0.1)
+
+  l=r.shape[0]
+  y=numpy.arange(l)
+  plt.pcolor(tmid/3600,y,r)
+  plt.colorbar()
+  plt.clim(ymin,ymax)
+  
+  title=ts.title + ', V: %(V)-8.3g' % {'V' : m}
+  plt.suptitle(title)
+  ax.set_xlabel('Time (hr)')
+  if n.f:
+    ax.set_ylabel('Item')
+  else:
+    ax.set_ylabel('Host')
+  fname='_'.join(['graph',ts.j.id,ts.k1[0],ts.k2[0],'heatmap'+full])
+  fig.savefig(fname)
+  plt.close()
+
 
 if __name__ == '__main__':
   main()
