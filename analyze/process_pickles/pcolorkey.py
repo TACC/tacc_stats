@@ -2,7 +2,7 @@
 
 import sys
 sys.path.append('../../monitor')
-import datetime, glob, job_stats, os, subprocess, time
+import datetime, glob, job_stats, os, subprocess, time, traceback
 import matplotlib.pyplot as plt
 import numpy
 import scipy, scipy.stats
@@ -39,9 +39,7 @@ def main():
       else:
         full=''
         ts=tspl.TSPickleLoader(file,[n.key1],[n.key2])
-    except Exception as inst:
-      print type(inst)     # the exception instance
-      print inst           # __str__ allows args to printed directly
+    except tspl.TSPLException as e:
       continue
 
     if not tspl.checkjob(ts,3600,16):
@@ -60,7 +58,6 @@ def main():
     if not n.t or m > float(n.t):
       print ts.j.id + ': ' + str(m)
       fig,ax=plt.subplots(1,1,figsize=(8,6),dpi=80)
-      ax.hold=True
       ymin=0. # Wrong in general, but min must be 0. or less
       ymax=0.
       first=True
@@ -74,19 +71,20 @@ def main():
 
         ymin=min(ymin,min(rate))
         ymax=max(ymax,max(rate))
-#        ax.plot(tmid/3600,rate)
       ymin,ymax=tspl.expand_range(ymin,ymax,0.1)
 
       l=len(ts.j.hosts.keys())
       y=numpy.arange(l)
-      ax.pcolor(tmid/3600,y,r)
+      plt.pcolor(tmid/3600,y,r)
+      plt.colorbar()
+      plt.clim(ymin,ymax)
       
 #      ax.set_ylim(bottom=ymin,top=ymax)
       title=ts.title + ', V: %(V)-8.3g' % {'V' : m}
       ax.set_title(title)
       ax.set_xlabel('Time (hr)')
       ax.set_ylabel('Host')
-      fname='_'.join(['graph',ts.j.id,ts.k1[0],ts.k2[0],'vs_t'+full])
+      fname='_'.join(['graph',ts.j.id,ts.k1[0],ts.k2[0],'heatmap'+full])
       fig.savefig(fname)
       plt.close()
     else:

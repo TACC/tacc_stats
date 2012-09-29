@@ -53,9 +53,7 @@ def main():
       else:
         full=''
         ts=tspl.TSPickleLoader(file,k1,k2)
-    except Exception as inst:
-      print type(inst)     # the exception instance
-      print inst           # __str__ allows args to printed directly
+    except tspl.TSPLException as e:
       continue
 
     if not tspl.checkjob(ts,3600,16):

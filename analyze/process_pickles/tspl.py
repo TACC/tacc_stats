@@ -6,7 +6,7 @@ import re
 class TSPLException(Exception):
   def __init__(self,arg):
     self.value=arg
-    print arg
+    print self.value
 
 class TSPLBase:
   def __init__(self,file,k1,k2):
@@ -17,9 +17,10 @@ class TSPLBase:
     self.numhosts=len(self.j.hosts.keys())
 
     if self.numhosts == 0:
-      print 'No hosts'
       raise TSPLException('No hosts')
-    
+    elif not 'amd64_core' in self.j.hosts.values()[0].stats:
+      raise TSPLException('No PMC data for: ' + self.j.id)
+        
     self.k1=k1
     self.k2=k2
 
