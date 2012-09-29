@@ -50,7 +50,7 @@ def main():
     try:
       if n.f:
         full='_full'
-        ts=tspl.TSPickleLoaderFull(file,k1,k2)
+        ts=tspl.TSPLBase(file,k1,k2)
       else:
         full=''
         ts=tspl.TSPickleLoader(file,k1,k2)

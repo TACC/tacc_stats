@@ -23,7 +23,7 @@ def main():
   parser.add_argument('-m', help='Set heatmap mode', action='store_true')
   parser.add_argument('--max', help='Use max instead of mean',
                       action='store_true')
-  n=parser.parse_args(sys.argv[1:])
+  n=parser.parse_args()
 
   filelist=tspl.getfilelist(n.filearg)
 
@@ -36,7 +36,7 @@ def main():
     try:
       if n.f:
         full='_full'
-        ts=tspl.TSPickleLoaderFull(file,[n.key1],[n.key2])
+        ts=tspl.TSPLBase(file,[n.key1],[n.key2])
       else:
         full=''
         ts=tspl.TSPickleLoader(file,[n.key1],[n.key2])
@@ -60,7 +60,8 @@ def main():
     else:
       print ts.j.id + ': under threshold, ' + str(m) + ' < ' + n.t
       
-
+# Plot key pair vs. time in a a traditional y vs. t line plot--one line per host
+# (normal) or one line per data stream (full)
 def lineplot(ts,n,m,full):
   tmid=(ts.t[:-1]+ts.t[1:])/2.0
   fig,ax=plt.subplots(1,1,figsize=(8,6),dpi=80)
@@ -82,6 +83,8 @@ def lineplot(ts,n,m,full):
   fig.savefig(fname)
   plt.close()
 
+# Plot a heat map of the data. X-axis time, Y-axis host (normal) or data stream
+# (full). Colorbar for data range.
 def heatmap(ts,n,m,full):
   tmid=(ts.t[:-1]+ts.t[1:])/2.0
   fig,ax=plt.subplots(1,1,figsize=(8,6),dpi=80)

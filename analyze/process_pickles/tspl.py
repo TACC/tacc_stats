@@ -39,6 +39,24 @@ class TSPLBase:
            { 'ID' : self.j.id,'u': self.j.acct['owner'],
              'name': self.j.acct['name'], 'nh' : self.numhosts }
 
+    # Create an array of dictionaries of lists initialized and constructed using
+    # derived class methods for the keys of interest.
+    # self.index embedds the location of self.k2 in the sechma
+    self.data=[]
+    for i in range(len(self.k1)):
+      self.data.append({})
+      for k in self.j.hosts.keys():
+        h=self.j.hosts[k]
+        self.data[i][k]=self.data_init()
+        for s in h.stats[self.k1[i]].values():
+          self.data_assign(self.data[i][k],s[:,self.index[i]])
+
+  # Initialize to an empty array and accumulate with appending
+  def data_init(self):
+    return []
+  def data_assign(self,d,v):
+    d.append(v)
+
   # Generate a label for title strings
   def label(self,k1,k2):
     l=k1 + ' ' + k2
@@ -74,35 +92,13 @@ class TSPickleLoader(TSPLBase):
   def __init__(self,file,k1,k2):
     TSPLBase.__init__(self,file,k1,k2)
 
-    # Array of dictionaries giving the sum of each key pair for each
-    # host. Dictionary key is the hostname. self.index embedds the location of
-    # self.k2 in the sechma
-    self.data=[]
-    for i in range(len(self.k1)):
-      self.data.append({})
-      for k in self.j.hosts.keys():
-        h=self.j.hosts[k]
-        self.data[i][k]=[numpy.zeros(self.size)]
-        for s in h.stats[self.k1[i]].values():
-          self.data[i][k][0]+=s[:,self.index[i]]
-
-## Same, but doesn't sum anything.
-class TSPickleLoaderFull(TSPLBase):
-  def __init__(self,file,k1,k2):
-    TSPLBase.__init__(self,file,k1,k2)
-
-    # Create an array of dictionaries  containing all the arrays for all the
-    # keys of interest. self.index embedds the location of self.k2 in the sechma
-    self.data=[]
-    for i in range(len(self.k1)):
-      self.data.append({})
-      for k in self.j.hosts.keys():
-        h=self.j.hosts[k]
-        self.data[i][k]=[]
-        for s in h.stats[self.k1[i]].values():
-          self.data[i][k].append(s[:,self.index[i]])
-
-
+  # Initialize with an zero array and accumuluate to the first list element with
+  # a sum
+  def data_init(self):
+    return [numpy.zeros(self.size)]
+  def data_assign(self,d,v):
+    d[0]+=v
+  
 # Check a TSPickleLoader object to see if its job has a minimum run time and has
 # its wayness in a list
 def checkjob(ts, minlen, way):

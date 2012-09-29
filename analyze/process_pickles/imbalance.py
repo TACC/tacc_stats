@@ -32,7 +32,7 @@ def main():
     try:
       if n.f:
         full='_full'
-        ts=tspl.TSPickleLoaderFull(file,[n.key1],[n.key2])
+        ts=tspl.TSPLBase(file,[n.key1],[n.key2])
       else:
         full=''
         ts=tspl.TSPickleLoader(file,[n.key1],[n.key2])

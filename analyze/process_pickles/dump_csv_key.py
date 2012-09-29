@@ -18,7 +18,7 @@ def main():
                       default='SSE_FLOPS')
   parser.add_argument('filearg', help='File, directory, or quoted'
                       ' glob pattern', nargs='?',default='jobs')
-  n=parser.parse_args(sys.argv[1:])
+  n=parser.parse_args()
 
   filelist=tspl.getfilelist(n.filearg)
 
