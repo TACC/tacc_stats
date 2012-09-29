@@ -66,7 +66,7 @@ def main():
       ymin,ymax=tspl.expand_range(ymin,ymax,0.1)
       ax.set_ylim(bottom=ymin,top=ymax)
       title=ts.title + ', V: %(V)-8.3g' % {'V' : m}
-      ax.set_title(title)
+      plt.suptitle(title)
       ax.set_xlabel('Time (hr)')
       ax.set_ylabel('Total ' + ts.label(ts.k1[0],ts.k2[0]) + '/s')
       fname='_'.join(['graph',ts.j.id,ts.k1[0],ts.k2[0],'vs_t'+full])

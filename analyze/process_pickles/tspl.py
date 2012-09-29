@@ -39,24 +39,7 @@ class TSPLBase:
            { 'ID' : self.j.id,'u': self.j.acct['owner'],
              'name': self.j.acct['name'], 'nh' : self.numhosts }
 
-  # These iterator fuctions iterate linearly over the array of dictionaries. We
-  # should probably create a sorted version, but this works for now.
-  def __iter__(self):
-    self.ind=-1
-    self.maxi=len(self.k1)*len(self.j.hosts.keys())
-    return(self)
-
-  def next(self):
-    if self.ind == self.maxi-1:
-      raise StopIteration
-    self.ind += 1
-
-    x=self.ind/len(self.k1)
-    y=self.ind - x*len(self.k1)
-    k=self.j.hosts.keys()[x]
-
-    return self.data[y][k]
-
+  # Generate a label for title strings
   def label(self,k1,k2):
     l=k1 + ' ' + k2
     s=self.j.get_schema(k1)[k2]
@@ -65,6 +48,23 @@ class TSPLBase:
       
     return l
       
+  # These iterator fuctions iterate linearly over the array of dictionaries. We
+  # should probably create a sorted version, but this works for now.
+  def __iter__(self):
+    self.ind=-1
+    self.a=len(self.data)
+    self.b=len(self.data[0].keys())
+    self.c=len(self.data[0][self.data[0].keys()[0]])
+
+    return(self)
+
+  def next(self):
+    if self.ind == self.a*self.b*self.c-1:
+      raise StopIteration
+    self.ind += 1
+    inds=numpy.unravel_index(self.ind,(self.a,self.b,self.c))
+    k=self.data[inds[0]].keys()[inds[1]]
+    return self.data[inds[0]][k][inds[2]]
 
 # Load a job file and sum a socket-based or core-based counter into
 # time-dependent arrays for each key pair. Takes a tacc stats pickle file and
@@ -82,9 +82,9 @@ class TSPickleLoader(TSPLBase):
       self.data.append({})
       for k in self.j.hosts.keys():
         h=self.j.hosts[k]
-        self.data[i][k]=numpy.zeros(self.size)
+        self.data[i][k]=[numpy.zeros(self.size)]
         for s in h.stats[self.k1[i]].values():
-          self.data[i][k]+=s[:,self.index[i]]
+          self.data[i][k][0]+=s[:,self.index[i]]
 
 ## Same, but doesn't sum anything.
 class TSPickleLoaderFull(TSPLBase):
@@ -98,9 +98,11 @@ class TSPickleLoaderFull(TSPLBase):
       self.data.append({})
       for k in self.j.hosts.keys():
         h=self.j.hosts[k]
+        self.data[i][k]=[]
         for s in h.stats[self.k1[i]].values():
-          self.data[i][k]=s[:,self.index[i]]
-  
+          self.data[i][k].append(s[:,self.index[i]])
+
+
 # Check a TSPickleLoader object to see if its job has a minimum run time and has
 # its wayness in a list
 def checkjob(ts, minlen, way):

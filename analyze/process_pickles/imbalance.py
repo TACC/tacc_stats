@@ -101,7 +101,7 @@ def main():
       ymin1,ymax1=tspl.expand_range(ymin1,ymax1,0.1)
 
       title=ts.title + ', V: %(V)-8.3g' % {'V' : var}
-      ax[0].set_title(title)
+      plt.suptitle(title)
       ax[0].set_xlabel('Time (hr)')
       ax[0].set_ylabel('Imbalance Ratios')
       ax[1].set_xlabel('Time (hr)')

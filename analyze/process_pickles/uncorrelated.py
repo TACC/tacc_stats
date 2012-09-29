@@ -13,9 +13,10 @@ import tspl
 def pearson(ts):
   p=[]
   for k in ts.data[0].keys():
-    p.append(scipy.stats.
-             pearsonr(numpy.diff(ts.data[1][k])/numpy.diff(ts.t),
-                      numpy.diff(ts.data[0][k])/numpy.diff(ts.t))[0])
+    for i in range(len(ts.data[0][k])):
+      p.append(scipy.stats.
+               pearsonr(numpy.diff(ts.data[1][k][i])/numpy.diff(ts.t),
+                        numpy.diff(ts.data[0][k][i])/numpy.diff(ts.t))[0])
 
   return(min(p))
 
@@ -74,14 +75,15 @@ def main():
       my=0.
 
       for k in ts.data[0].keys():
-        first_rate=numpy.diff(ts.data[0][k])/numpy.diff(ts.t)
-        second_rate=numpy.diff(ts.data[1][k])/numpy.diff(ts.t)
-        mx=max(mx,max(first_rate))
-        my=max(my,max(second_rate))
-        
-        ax[0][0].plot(first_rate,second_rate,'.')
-        ax[1][0].plot(first_rate[::-1],tmid[::-1]/3600.)
-        ax[0][1].plot(tmid/3600.,second_rate)
+        print len(ts.data[0][k])
+        for i in range(len(ts.data[0][k])):
+          first_rate=numpy.diff(ts.data[0][k][i])/numpy.diff(ts.t)
+          second_rate=numpy.diff(ts.data[1][k][i])/numpy.diff(ts.t)
+          mx=max(mx,max(first_rate))
+          my=max(my,max(second_rate))
+          ax[0][0].plot(first_rate,second_rate,'.')
+          ax[1][0].plot(first_rate[::-1],tmid[::-1]/3600.)
+          ax[0][1].plot(tmid/3600.,second_rate)
 
       ax[0][0].set_xlabel('Total ' + ts.label(ts.k1[0],ts.k2[0]) + '/s')
       ax[0][0].set_ylabel('Total ' + ts.label(ts.k1[1],ts.k2[1]) + '/s')

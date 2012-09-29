@@ -44,9 +44,6 @@ def main():
 
     if not tspl.checkjob(ts,3600,16):
       continue
-    if len(ts.j.hosts.keys()) == 1:
-      print ts.j.id + ': 1 host'
-      continue
 
     tmid=(ts.t[:-1]+ts.t[1:])/2.0
 
@@ -73,7 +70,7 @@ def main():
         ymax=max(ymax,max(rate))
       ymin,ymax=tspl.expand_range(ymin,ymax,0.1)
 
-      l=len(ts.j.hosts.keys())
+      l=r.shape[0]
       y=numpy.arange(l)
       plt.pcolor(tmid/3600,y,r)
       plt.colorbar()
@@ -81,9 +78,12 @@ def main():
       
 #      ax.set_ylim(bottom=ymin,top=ymax)
       title=ts.title + ', V: %(V)-8.3g' % {'V' : m}
-      ax.set_title(title)
+      plt.suptitle(title)
       ax.set_xlabel('Time (hr)')
-      ax.set_ylabel('Host')
+      if n.f:
+        ax.set_ylabel('Item')
+      else:
+        ax.set_ylabel('Host')
       fname='_'.join(['graph',ts.j.id,ts.k1[0],ts.k2[0],'heatmap'+full])
       fig.savefig(fname)
       plt.close()
