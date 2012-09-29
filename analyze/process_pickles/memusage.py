@@ -20,7 +20,7 @@ def main():
 
   for file in filelist:
     try:
-      ts=tspl.TSPickleLoader(file,['mem','mem'],['MemUsed','AnonPages'])
+      ts=tspl.TSPLSum(file,['mem','mem'],['MemUsed','AnonPages'])
     except tspl.TSPLException as e:
       continue
 

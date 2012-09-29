@@ -88,7 +88,7 @@ class TSPLBase:
 # time-dependent arrays for each key pair. Takes a tacc stats pickle file and
 # two lists of keys. 
 
-class TSPickleLoader(TSPLBase):
+class TSPLSum(TSPLBase):
   def __init__(self,file,k1,k2):
     TSPLBase.__init__(self,file,k1,k2)
 

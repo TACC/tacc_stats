@@ -35,7 +35,7 @@ def main():
         ts=tspl.TSPLBase(file,[n.key1],[n.key2])
       else:
         full=''
-        ts=tspl.TSPickleLoader(file,[n.key1],[n.key2])
+        ts=tspl.TSPLSum(file,[n.key1],[n.key2])
     except tspl.TSPLException as e:
       continue
 

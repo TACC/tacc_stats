@@ -25,7 +25,7 @@ def main():
 
   for file in filelist:
     try:
-      ts=tspl.TSPickleLoader(file,k1,k2)
+      ts=tspl.TSPLSum(file,k1,k2)
     except tspl.TSPLException as e:
       continue
 
