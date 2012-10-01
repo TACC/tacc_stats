@@ -72,7 +72,7 @@ def lineplot(ts,n,m,full):
     rate=numpy.divide(numpy.diff(v),numpy.diff(ts.t))
     ymin=min(ymin,min(rate))
     ymax=max(ymax,max(rate))
-    ax.plot(tmid/3600,rate)
+    ax.plot(tmid/3600,rate,'o-')
   ymin,ymax=tspl.expand_range(ymin,ymax,0.1)
   ax.set_ylim(bottom=ymin,top=ymax)
   title=ts.title + ', V: %(V)-8.3g' % {'V' : m}
