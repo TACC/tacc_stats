@@ -48,8 +48,8 @@ def main():
       continue
 
     tmid=(ts.t[:-1]+ts.t[1:])/2.0
-    rng=range(1,len(tmid))
-    tmid=tmid[rng]
+    rng=range(1,len(tmid)) # Throw out first and last
+    tmid=tmid[rng]         
 
     maxval=numpy.zeros(len(rng))
     minval=numpy.ones(len(rng))*1e100
