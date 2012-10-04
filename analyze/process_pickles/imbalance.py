@@ -46,34 +46,15 @@ def plot_ratios(ts,tmid,ratio,ratio2,rate,var,fig,ax,full):
   fig.savefig(fname)
   plt.close()
 
-
-def main():
-
-  parser = argparse.ArgumentParser(description='Look for imbalance between'
-                                   'hosts for a pair of keys')
-  parser.add_argument('threshold', help='Treshold ratio for std dev:mean',
-                      nargs='?', default=0.25)
-  parser.add_argument('key1', help='First key', nargs='?',
-                      default='amd64_core')
-  parser.add_argument('key2', help='Second key', nargs='?',
-                      default='SSE_FLOPS')
-  parser.add_argument('filearg', help='File, directory, or quoted'
-                      ' glob pattern', nargs='?',default='jobs')
-  parser.add_argument('-f', help='Set full mode', action='store_true')
-  parser.add_argument('-n', help='Disable plots', action='store_true')
-  n=parser.parse_args()
-
-  filelist=tspl.getfilelist(n.filearg)
-
-  ratios={} # Place to store per job ranking metric
+def compute_imbalance(ratios,filelist,k1,k2):
   for file in filelist:
     try:
       if n.f:
         full='_full'
-        ts=tspl.TSPLBase(file,[n.key1],[n.key2])
+        ts=tspl.TSPLBase(file,k1,k2)
       else:
         full=''
-        ts=tspl.TSPLSum(file,[n.key1],[n.key2])
+        ts=tspl.TSPLSum(file,k1,k2)
     except tspl.TSPLException as e:
       continue
 
@@ -121,6 +102,29 @@ def main():
       fig,ax=plt.subplots(2,1,figsize=(8,8),dpi=80)
       plot_ratios(ts,tmid,ratio,ratio2,rate,var,fig,ax,full)
 
+
+
+
+def main():
+
+  parser = argparse.ArgumentParser(description='Look for imbalance between'
+                                   'hosts for a pair of keys')
+  parser.add_argument('threshold', help='Treshold ratio for std dev:mean',
+                      nargs='?', default=0.25)
+  parser.add_argument('key1', help='First key', nargs='?',
+                      default='amd64_core')
+  parser.add_argument('key2', help='Second key', nargs='?',
+                      default='SSE_FLOPS')
+  parser.add_argument('filearg', help='File, directory, or quoted'
+                      ' glob pattern', nargs='?',default='jobs')
+  parser.add_argument('-f', help='Set full mode', action='store_true')
+  parser.add_argument('-n', help='Disable plots', action='store_true')
+  n=parser.parse_args()
+
+  filelist=tspl.getfilelist(n.filearg)
+
+  ratios={} # Place to store per job ranking metric
+  compute_imbalance(ratios,filelist,[n.key1],[n.key2],n.n)
   # Find the top bad users and their jobs
   users={}
   for k in ratios.keys():
