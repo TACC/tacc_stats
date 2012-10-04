@@ -57,23 +57,18 @@ def main():
     ax.hold=True
     xmin,xmax=[0.,0.]
     c=Colors()
-    class Found(Exception):
-      pass
-    try:
-      for k in ts.j.hosts.keys():
-        h=ts.j.hosts[k]
-        col=c.next()
-        for i in range(3):
-          for j in range(4):
-            rate=numpy.divide(numpy.diff(ts.data[i][k][j]),dt)
-            xmin,xmax=[min(xmin,min(rate)),max(xmax,max(rate))]
-            ax.plot(tmid/3600,rate,'-'+col)
-            if xmax > 2.0e9:
-              print ts.j.id + ' over limit: %(v)8.3f' % {'v' : xmax}
-            else:
-              plt.close()
-              raise Found
-    except Found:
+    for k in ts.j.hosts.keys():
+      h=ts.j.hosts[k]
+      col=c.next()
+      for i in range(3):
+        for j in range(4):
+          rate=numpy.divide(numpy.diff(ts.data[i][k][j]),dt)
+          xmin,xmax=[min(xmin,min(rate)),max(xmax,max(rate))]
+          ax.plot(tmid/3600,rate,'-'+col)
+    if xmax > 2.0e9:
+      print ts.j.id + ' over limit: %(v)8.3f' % {'v' : xmax}
+    else:
+      plt.close()
       continue
 
     plt.suptitle(ts.title)
