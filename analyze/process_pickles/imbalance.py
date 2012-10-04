@@ -5,18 +5,19 @@ sys.path.append('../../monitor')
 import datetime, glob, job_stats, os, subprocess, time
 import operator
 import matplotlib
-matplotlib.use('Agg')
+if not 'matplotlib.pyplot' in sys.modules:
+  matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 import numpy
 import scipy, scipy.stats
 import argparse
-import tspl
+import tspl, tspl_utils
 
 def plot_ratios(ts,tmid,ratio,ratio2,rate,var,fig,ax,full):
   # Compute y-axis min and max, expand the limits by 10%
   ymin=min(numpy.minimum(ratio,ratio2))
   ymax=max(numpy.maximum(ratio,ratio2))
-  ymin,ymax=tspl.expand_range(ymin,ymax,0.1)
+  ymin,ymax=tspl_utils.expand_range(ymin,ymax,0.1)
 
   print '---------------------'
   ax[0].plot(tmid/3600,ratio)
@@ -31,7 +32,7 @@ def plot_ratios(ts,tmid,ratio,ratio2,rate,var,fig,ax,full):
     ymax1=max(ymax1,max(v))
     ax[1].plot(tmid/3600,v)
 
-  ymin1,ymax1=tspl.expand_range(ymin1,ymax1,0.1)
+  ymin1,ymax1=tspl_utils.expand_range(ymin1,ymax1,0.1)
 
   title=ts.title + ', V: %(V)-8.3g' % {'V' : var}
   plt.suptitle(title)
@@ -58,7 +59,7 @@ def compute_imbalance(ratios,filelist,k1,k2,threshold,plot_flag,full_flag):
     except tspl.TSPLException as e:
       continue
 
-    if not tspl.checkjob(ts,3600,16): # 1 hour, 16way only
+    if not tspl_utils.checkjob(ts,3600,16): # 1 hour, 16way only
       continue
     elif ts.numhosts < 2: # At least 2 hosts
       print ts.j.id + ': 1 host'
@@ -121,7 +122,7 @@ def main():
   parser.add_argument('-n', help='Disable plots', action='store_true')
   n=parser.parse_args()
 
-  filelist=tspl.getfilelist(n.filearg)
+  filelist=tspl_utils.getfilelist(n.filearg)
 
   ratios={} # Place to store per job ranking metric
   compute_imbalance(ratios,filelist,[n.key1],[n.key2],

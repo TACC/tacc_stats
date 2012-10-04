@@ -4,34 +4,30 @@ import sys
 sys.path.append('../../monitor')
 import datetime, glob, job_stats, os, subprocess, time
 import matplotlib
-matplotlib.use('Agg')
+if not 'matplotlib.pyplot' in sys.modules:
+  matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 import numpy
 import scipy, scipy.stats
 import argparse
-import tspl
+import tspl, tspl_utils
 
-def main():
-
-  parser = argparse.ArgumentParser(description='Plot important stats for jobs')
-  parser.add_argument('filearg', help='File, directory, or quoted'
-                      ' glob pattern', nargs='?',default='jobs')
-  n=parser.parse_args()
-
-  filelist=tspl.getfilelist(n.filearg)
-
+def master_plot(filelist,threshold=False):
   k1=['amd64_core','amd64_core','amd64_sock','lnet','lnet','ib_sw','ib_sw',
       'cpu']
   k2=['SSE_FLOPS','DCSF','DRAM','rx_bytes','tx_bytes','rx_bytes','tx_bytes',
       'user']
 
+  i=-1
   for file in filelist:
+    i=i+1
     try:
+      print file
       ts=tspl.TSPLSum(file,k1,k2)
     except tspl.TSPLException as e:
       continue
 
-    if not tspl.checkjob(ts,3600,16):
+    if not tspl_utils.checkjob(ts,3600,16):
       continue
     elif ts.numhosts < 2:
       print ts.j.id + ': 1 host'
@@ -46,7 +42,7 @@ def main():
     ax[0].hold=True 
     for k in ts.j.hosts.keys():
       h=ts.j.hosts[k]
-      rate=numpy.divide(numpy.diff(ts.data[0][k]),numpy.diff(ts.t))
+      rate=numpy.divide(numpy.diff(ts.data[0][k][0]),numpy.diff(ts.t))
       ax[0].plot(tmid/3600,rate)
     ax[0].set_ylabel('Total ' + ts.k1[0] + '\n' + ts.k2[0] + '/s')
 
@@ -54,7 +50,7 @@ def main():
     ax[1].hold=True
     for k in ts.j.hosts.keys():
       h=ts.j.hosts[k]
-      rate=numpy.divide(numpy.diff(ts.data[1][k]),numpy.diff(ts.t))
+      rate=numpy.divide(numpy.diff(ts.data[1][k][0]),numpy.diff(ts.t))
       ax[1].plot(tmid/3600,rate)
     ax[1].set_ylabel('Total ' + ts.k1[1] + '\n' + ts.k2[1] + '/s')
 
@@ -62,7 +58,7 @@ def main():
     ax[2].hold=True
     for k in ts.j.hosts.keys():
       h=ts.j.hosts[k]
-      rate=numpy.divide(numpy.diff(ts.data[2][k]),numpy.diff(ts.t))
+      rate=numpy.divide(numpy.diff(ts.data[2][k][0]),numpy.diff(ts.t))
       ax[2].plot(tmid/3600,rate)
     ax[2].set_ylabel('Total ' + ts.k1[2] + '\n' + ts.k2[2] + '/s')
 
@@ -70,7 +66,7 @@ def main():
     ax[3].hold=True
     for k in ts.j.hosts.keys():
       h=ts.j.hosts[k]
-      rate=numpy.divide(numpy.diff(ts.data[3][k]+ts.data[4][k]),
+      rate=numpy.divide(numpy.diff(ts.data[3][k][0]+ts.data[4][k][0]),
                         numpy.diff(ts.t))
       ax[3].plot(tmid/3600,rate/(1024.*1024.))
     ax[3].set_ylabel('Total lnet MB/s')
@@ -79,7 +75,7 @@ def main():
     ax[4].hold=True
     for k in ts.j.hosts.keys():
       h=ts.j.hosts[k]
-      v=ts.data[5][k]+ts.data[6][k]-(ts.data[3][k]+ts.data[4][k])
+      v=ts.data[5][k][0]+ts.data[6][k][0]-(ts.data[3][k][0]+ts.data[4][k][0])
       rate=numpy.divide(numpy.diff(v),numpy.diff(ts.t))
       ax[4].plot(tmid/3600,rate/(1024*1024.))
     ax[4].set_ylabel('Total (ib_sw-lnet) MB/s')
@@ -88,18 +84,38 @@ def main():
     ax[5].hold=True
     for k in ts.j.hosts.keys():
       h=ts.j.hosts[k]
-      rate=numpy.divide(numpy.diff(ts.data[7][k]/100/ts.wayness),
+      rate=numpy.divide(numpy.diff(ts.data[7][k][0]/100/ts.wayness),
                         numpy.diff(ts.t))
       ax[5].plot(tmid/3600,rate)
     ax[5].set_ylabel('Total ' + ts.k1[7] + '\n' + ts.k2[7] + '/s')
-    ax[4].set_xlabel('Time (hr)')
+    ax[5].set_xlabel('Time (hr)')
     
     print ts.j.id + ': '
 
-    plt.suptitle(ts.title)
+    title=ts.title
+    if threshold:
+      title+=', V: %(v)-8.3f' % {'v': threshold[i]}
+
+    plt.suptitle(title)
+    plt.subplots_adjust(hspace=0.35)
+    for a in ax:
+      tspl_utils.adjust_yaxis_range(a,0.1)
+
     fname='_'.join(['graph',ts.j.id,'master'])
     fig.savefig(fname)
     plt.close()
+
+
+def main():
+
+  parser = argparse.ArgumentParser(description='Plot important stats for jobs')
+  parser.add_argument('filearg', help='File, directory, or quoted'
+                      ' glob pattern', nargs='?',default='jobs')
+  n=parser.parse_args()
+
+  filelist=tspl_utils.getfilelist(n.filearg)
+  master_plot(filelist)
+
 
 if __name__ == '__main__':
   main()

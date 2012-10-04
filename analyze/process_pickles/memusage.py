@@ -5,12 +5,13 @@ sys.path.append('../../monitor')
 import datetime, glob, job_stats, os, subprocess, time
 import cPickle as pickle
 import matplotlib
-matplotlib.use('Agg')
+if not 'matplotlib.pyplot' in sys.modules:
+  matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 import numpy
 import scipy
 import argparse
-import tspl
+import tspl, tspl_utils
 
 def main():
   
@@ -18,7 +19,7 @@ def main():
   parser.add_argument('filearg', help='File, directory, or quoted'
                       ' glob pattern', nargs='?',default='jobs')
   n=parser.parse_args()
-  filelist=tspl.getfilelist(n.filearg)
+  filelist=tspl_utils.getfilelist(n.filearg)
 
   for file in filelist:
     try:
@@ -26,7 +27,7 @@ def main():
     except tspl.TSPLException as e:
       continue
 
-    if not tspl.checkjob(ts,3600,16):
+    if not tspl_utils.checkjob(ts,3600,16):
       continue
     else:
       print ts.j.id
@@ -35,8 +36,8 @@ def main():
     ax=fig.gca()
     ax.hold=True
     for k in ts.j.hosts.keys():
-      m=ts.data[0][k]-ts.data[1][k]
-      m-=ts.data[0][k][0]
+      m=ts.data[0][k][0]-ts.data[1][k][0]
+      m-=ts.data[0][k][0][0]
       ax.plot(ts.t/3600.,m)
 
     ax.set_ylabel('MemUsed - AnonPages ' +

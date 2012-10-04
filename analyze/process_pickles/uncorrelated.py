@@ -3,12 +3,13 @@ import sys
 sys.path.append('../../monitor')
 import datetime, glob, job_stats, os, subprocess, time
 import matplotlib
-matplotlib.use('Agg')
+if not 'matplotlib.pyplot' in sys.modules:
+  matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 import numpy
 import scipy, scipy.stats
 import argparse
-import tspl
+import tspl, tspl_utils
 
 # Compute Pearson's R of the rates over all hosts in the loaded job
 # Return the smallest R for
@@ -42,7 +43,7 @@ def main():
   parser.add_argument('-f', help='Set full mode', action='store_true')
   n=parser.parse_args()
 
-  filelist=tspl.getfilelist(n.filearg)
+  filelist=tspl_utils.getfilelist(n.filearg)
 
   threshold=n.threshold
   k1=[n.keya1, n.keyb1]
@@ -55,11 +56,11 @@ def main():
         ts=tspl.TSPLBase(file,k1,k2)
       else:
         full=''
-        ts=tspl.TSPickleLoader(file,k1,k2)
+        ts=tspl.TSPLSum(file,k1,k2)
     except tspl.TSPLException as e:
       continue
 
-    if not tspl.checkjob(ts,3600,16):
+    if not tspl_utils.checkjob(ts,3600,16):
       continue
     
     r=pearson(ts)

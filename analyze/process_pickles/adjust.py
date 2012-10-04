@@ -4,12 +4,13 @@ import sys
 sys.path.append('../../monitor')
 import datetime, glob, job_stats, os, subprocess, time
 import matplotlib
-matplotlib.use('Agg')
+if not 'matplotlib.pyplot' in sys.modules:
+  matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 import numpy
 import scipy, scipy.stats
 import argparse
-import tspl
+import tspl, tspl_utils
 
 def main():
   parser = argparse.ArgumentParser()
@@ -22,7 +23,7 @@ def main():
                       ' glob pattern', nargs='?',default='jobs')
 
   n=parser.parse_args()
-  filelist=tspl.getfilelist(n.filearg)
+  filelist=tspl_utils.getfilelist(n.filearg)
 
   for file in filelist:
     try:
@@ -35,7 +36,7 @@ def main():
     except tspl.TSPLException as e:
       continue
     
-    if not tspl.checkjob(ts,3600,16): # 1 hour, 16way only
+    if not tspl_utils.checkjob(ts,3600,16): # 1 hour, 16way only
       continue
     elif ts.numhosts < 2: # At least 2 hosts
       print ts.j.id + ': 1 host'
@@ -64,8 +65,8 @@ def main():
       ax[0].plot(tmid,rate)
       ax[1].plot(tmid,rate-d)
 
-    xmin,xmax=tspl.expand_range(xmin,xmax,.1)
-    xmin1,xmax1=tspl.expand_range(xmin1,xmax1,.1)
+    xmin,xmax=tspl_utils.expand_range(xmin,xmax,.1)
+    xmin1,xmax1=tspl_utils.expand_range(xmin1,xmax1,.1)
 
     ax[0].set_ylim(bottom=xmin,top=xmax)
     ax[1].set_ylim(bottom=xmin1,top=xmax1)

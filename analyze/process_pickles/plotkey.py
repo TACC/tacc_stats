@@ -4,12 +4,13 @@ import sys
 sys.path.append('../../monitor')
 import datetime, glob, job_stats, os, subprocess, time
 import matplotlib
-matplotlib.use('Agg')
+if not 'matplotlib.pyplot' in sys.modules:
+  matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 import numpy
 import scipy, scipy.stats
 import argparse
-import tspl
+import tspl, tspl_utils
 
 def main():
 
@@ -27,7 +28,7 @@ def main():
                       action='store_true')
   n=parser.parse_args()
 
-  filelist=tspl.getfilelist(n.filearg)
+  filelist=tspl_utils.getfilelist(n.filearg)
 
   if n.max:
     func=max
@@ -45,7 +46,7 @@ def main():
     except tspl.TSPLException as e:
       continue
 
-    if not tspl.checkjob(ts,3600,16):
+    if not tspl_utils.checkjob(ts,3600,16):
       continue
 
     reduction=[] # place to store reductions via func
@@ -75,7 +76,7 @@ def lineplot(ts,n,m,full):
     ymin=min(ymin,min(rate))
     ymax=max(ymax,max(rate))
     ax.plot(tmid/3600,rate,'o-')
-  ymin,ymax=tspl.expand_range(ymin,ymax,0.1)
+  ymin,ymax=tspl_utils.expand_range(ymin,ymax,0.1)
   ax.set_ylim(bottom=ymin,top=ymax)
   title=ts.title + ', V: %(V)-8.3g' % {'V' : m}
   plt.suptitle(title)
@@ -103,7 +104,7 @@ def heatmap(ts,n,m,full):
 
     ymin=min(ymin,min(rate))
     ymax=max(ymax,max(rate))
-  ymin,ymax=tspl.expand_range(ymin,ymax,0.1)
+  ymin,ymax=tspl_utils.expand_range(ymin,ymax,0.1)
 
   l=r.shape[0]
   y=numpy.arange(l)
