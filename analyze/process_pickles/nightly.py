@@ -7,7 +7,13 @@ import numpy
 import scipy, scipy.stats
 import argparse
 import re
+import multiprocessing
+import functools
 import tspl, tspl_utils, imbalance, masterplot
+
+def do_work(arg):
+  imbalance.compute_imbalance(*arg)
+  
 
 def main():
   parser=argparse.ArgumentParser(description='Deal with a directory of pickle'
@@ -20,9 +26,16 @@ def main():
 
   filelist=tspl_utils.getfilelist(n.filearg)
 
-  ratios={}
-  imbalance.compute_imbalance(ratios,filelist,['amd64_core'],['SSE_FLOPS'],
-                              float(n.threshold),False,False)
+  pool   = multiprocessing.Pool(processes=4)
+  m      = multiprocessing.Manager()
+  ratios = m.dict()
+  partial_imbal=functools.partial(imbalance.compute_imbalance,
+                                  k1=['amd64_core'],
+                                  k2=['SSE_FLOPS'],
+                                  threshold=float(n.threshold),
+                                  plot_flag=False,full_flag=False,
+                                  ratios=ratios)
+  pool.map(partial_imbal,filelist)
 
   badfiles=[]
   th=[]

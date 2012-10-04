@@ -47,61 +47,60 @@ def plot_ratios(ts,tmid,ratio,ratio2,rate,var,fig,ax,full):
   fig.savefig(fname)
   plt.close()
 
-def compute_imbalance(ratios,filelist,k1,k2,threshold,plot_flag,full_flag):
-  for file in filelist:
-    try:
-      if full_flag:
-        full='_full'
-        ts=tspl.TSPLBase(file,k1,k2)
-      else:
-        full=''
-        ts=tspl.TSPLSum(file,k1,k2)
-    except tspl.TSPLException as e:
-      continue
+def compute_imbalance(file,k1,k2,threshold,plot_flag,full_flag,ratios):
+  try:
+    if full_flag:
+      full='_full'
+      ts=tspl.TSPLBase(file,k1,k2)
+    else:
+      full=''
+      ts=tspl.TSPLSum(file,k1,k2)
+  except tspl.TSPLException as e:
+    return
 
-    if not tspl_utils.checkjob(ts,3600,16): # 1 hour, 16way only
-      continue
-    elif ts.numhosts < 2: # At least 2 hosts
-      print ts.j.id + ': 1 host'
-      continue
+  if not tspl_utils.checkjob(ts,3600,16): # 1 hour, 16way only
+    return
+  elif ts.numhosts < 2: # At least 2 hosts
+    print ts.j.id + ': 1 host'
+    return
 
-    tmid=(ts.t[:-1]+ts.t[1:])/2.0
-    rng=range(1,len(tmid)) # Throw out first and last
-    tmid=tmid[rng]         
+  tmid=(ts.t[:-1]+ts.t[1:])/2.0
+  rng=range(1,len(tmid)) # Throw out first and last
+  tmid=tmid[rng]         
 
-    maxval=numpy.zeros(len(rng))
-    minval=numpy.ones(len(rng))*1e100
+  maxval=numpy.zeros(len(rng))
+  minval=numpy.ones(len(rng))*1e100
 
-    rate=[]
-    for v in ts:
-      rate.append(numpy.divide(numpy.diff(v)[rng],
-                               numpy.diff(ts.t)[rng]))
-      maxval=numpy.maximum(maxval,rate[-1])
-      minval=numpy.minimum(minval,rate[-1])
+  rate=[]
+  for v in ts:
+    rate.append(numpy.divide(numpy.diff(v)[rng],
+                             numpy.diff(ts.t)[rng]))
+    maxval=numpy.maximum(maxval,rate[-1])
+    minval=numpy.minimum(minval,rate[-1])
 
-    vals=[]
-    mean=[]
-    std=[]
-    for j in range(len(rng)):
-      vals.append([])
-      for v in rate:
-        vals[j].append(v[j])
-      mean.append(scipy.stats.tmean(vals[j]))
-      std.append(scipy.stats.tstd(vals[j]))
-      
-    imbl=maxval-minval
-    ratio=numpy.divide(std,mean)
-    ratio2=numpy.divide(imbl,maxval)
+  vals=[]
+  mean=[]
+  std=[]
+  for j in range(len(rng)):
+    vals.append([])
+    for v in rate:
+      vals[j].append(v[j])
+    mean.append(scipy.stats.tmean(vals[j]))
+    std.append(scipy.stats.tstd(vals[j]))
+    
+  imbl=maxval-minval
+  ratio=numpy.divide(std,mean)
+  ratio2=numpy.divide(imbl,maxval)
 
-    var=scipy.stats.tmean(ratio) # mean of ratios is the threshold statistic
+  var=scipy.stats.tmean(ratio) # mean of ratios is the threshold statistic
 
-    # Save away a list of ratios per user
-    ratios[ts.j.id]=[var,ts.j.acct['owner']] 
-    print ts.j.id + ': ' + str(var)
-    # If over the threshold, plot this job
-    if plot_flag and abs(var) > threshold:
-      fig,ax=plt.subplots(2,1,figsize=(8,8),dpi=80)
-      plot_ratios(ts,tmid,ratio,ratio2,rate,var,fig,ax,full)
+  # Save away a list of ratios per user
+  ratios[ts.j.id]=[var,ts.j.acct['owner']] 
+  print ts.j.id + ': ' + str(var)
+  # If over the threshold, plot this job
+  if plot_flag and abs(var) > threshold:
+    fig,ax=plt.subplots(2,1,figsize=(8,8),dpi=80)
+    plot_ratios(ts,tmid,ratio,ratio2,rate,var,fig,ax,full)
 
 
 
@@ -125,8 +124,9 @@ def main():
   filelist=tspl_utils.getfilelist(n.filearg)
 
   ratios={} # Place to store per job ranking metric
-  compute_imbalance(ratios,filelist,[n.key1],[n.key2],
-                    float(n.threshold),not n.n,n.f)
+  for file in filelist:
+    compute_imbalance(file,[n.key1],[n.key2],
+                      float(n.threshold),not n.n,n.f,ratios)
   # Find the top bad users and their jobs
   users={}
   for k in ratios.keys():
