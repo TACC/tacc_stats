@@ -99,7 +99,7 @@ def compute_imbalance(ratios,filelist,k1,k2,threshold,plot_flag,full_flag):
     ratios[ts.j.id]=[var,ts.j.acct['owner']] 
     print ts.j.id + ': ' + str(var)
     # If over the threshold, plot this job
-    if not plot_flag and abs(var) > threshold:
+    if plot_flag and abs(var) > threshold:
       fig,ax=plt.subplots(2,1,figsize=(8,8),dpi=80)
       plot_ratios(ts,tmid,ratio,ratio2,rate,var,fig,ax,full)
 
