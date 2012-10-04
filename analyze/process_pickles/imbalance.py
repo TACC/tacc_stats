@@ -46,10 +46,10 @@ def plot_ratios(ts,tmid,ratio,ratio2,rate,var,fig,ax,full):
   fig.savefig(fname)
   plt.close()
 
-def compute_imbalance(ratios,filelist,k1,k2):
+def compute_imbalance(ratios,filelist,k1,k2,threshold,plot_flag,full_flag):
   for file in filelist:
     try:
-      if n.f:
+      if full_flag:
         full='_full'
         ts=tspl.TSPLBase(file,k1,k2)
       else:
@@ -98,7 +98,7 @@ def compute_imbalance(ratios,filelist,k1,k2):
     ratios[ts.j.id]=[var,ts.j.acct['owner']] 
     print ts.j.id + ': ' + str(var)
     # If over the threshold, plot this job
-    if not n.n and abs(var) > float(n.threshold):
+    if not plot_flag and abs(var) > threshold:
       fig,ax=plt.subplots(2,1,figsize=(8,8),dpi=80)
       plot_ratios(ts,tmid,ratio,ratio2,rate,var,fig,ax,full)
 
@@ -124,7 +124,8 @@ def main():
   filelist=tspl.getfilelist(n.filearg)
 
   ratios={} # Place to store per job ranking metric
-  compute_imbalance(ratios,filelist,[n.key1],[n.key2],n.n)
+  compute_imbalance(ratios,filelist,[n.key1],[n.key2],
+                    float(n.threshold),not n.n,n.f)
   # Find the top bad users and their jobs
   users={}
   for k in ratios.keys():
