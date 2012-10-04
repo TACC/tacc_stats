@@ -60,6 +60,7 @@ def main():
   parser.add_argument('filearg', help='File, directory, or quoted'
                       ' glob pattern', nargs='?',default='jobs')
   parser.add_argument('-f', help='Set full mode', action='store_true')
+  parser.add_argument('-n', help='Disable plots', action='store_true')
   n=parser.parse_args()
 
   filelist=tspl.getfilelist(n.filearg)
@@ -116,7 +117,7 @@ def main():
     ratios[ts.j.id]=[var,ts.j.acct['owner']] 
     print ts.j.id + ': ' + str(var)
     # If over the threshold, plot this job
-    if abs(var) > float(n.threshold):
+    if not n.n and abs(var) > float(n.threshold):
       fig,ax=plt.subplots(2,1,figsize=(8,8),dpi=80)
       plot_ratios(ts,tmid,ratio,ratio2,rate,var,fig,ax,full)
 
