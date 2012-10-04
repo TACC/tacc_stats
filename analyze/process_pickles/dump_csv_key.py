@@ -3,7 +3,6 @@
 import sys
 sys.path.append('../../monitor')
 import datetime, glob, job_stats, os, subprocess, time
-import matplotlib.pyplot as plt
 import numpy
 import scipy, scipy.stats
 import argparse

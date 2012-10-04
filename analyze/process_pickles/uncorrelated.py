@@ -2,6 +2,8 @@
 import sys
 sys.path.append('../../monitor')
 import datetime, glob, job_stats, os, subprocess, time
+import matplotlib
+matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 import numpy
 import scipy, scipy.stats
