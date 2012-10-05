@@ -102,6 +102,26 @@ def compute_imbalance(file,k1,k2,threshold,plot_flag,full_flag,ratios):
     fig,ax=plt.subplots(2,1,figsize=(8,8),dpi=80)
     plot_ratios(ts,tmid,ratio,ratio2,rate,var,fig,ax,full)
 
+def find_top_users(ratios):
+  users={}
+  for k in ratios.keys():
+    u=ratios[k][1]
+    if not u in users:
+      users[u]=[]
+      users[u].append(0.)
+      users[u].append([])
+    else:
+      users[u][0]=max(users[u][0],ratios[k][0])
+      users[u][1].append(k)
+
+  a=[ x[0] for x in sorted(users.iteritems(),
+                           key=operator.itemgetter(1), reverse=True) ]
+  maxi=len(a)+1
+  maxi=min(10,maxi)
+  print '---------top 10----------'
+  for u in a[0:maxi]:
+    print u + ' ' + str(users[u][0]) + ' ' + ' '.join(users[u][1])
+  return users
 
 
 
@@ -128,24 +148,7 @@ def main():
     compute_imbalance(file,[n.key1],[n.key2],
                       float(n.threshold),not n.n,n.f,ratios)
   # Find the top bad users and their jobs
-  users={}
-  for k in ratios.keys():
-    u=ratios[k][1]
-    if not u in users:
-      users[u]=[]
-      users[u].append(0.)
-      users[u].append([])
-    else:
-      users[u][0]=max(users[u][0],ratios[k][0])
-      users[u][1].append(k)
-
-  a=[ x[0] for x in sorted(users.iteritems(),
-                           key=operator.itemgetter(1), reverse=True) ]
-  maxi=len(a)+1
-  maxi=min(10,maxi)
-  print '---------top 10----------'
-  for u in a[0:maxi]:
-    print u + ' ' + str(users[u][0]) + ' ' + ' '.join(users[u][1])
+  find_top_users(ratios)
 
 if __name__ == '__main__':
   main()

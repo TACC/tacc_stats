@@ -50,6 +50,7 @@ def main():
 
   pool.map(do_mp,zip(badfiles,th)) # Pool.starmap should exist....
 
+  bad_users=imbalance.find_top_users(ratios)
   
 if __name__ == "__main__":
   main()
