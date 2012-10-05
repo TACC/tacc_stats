@@ -11,9 +11,8 @@ import multiprocessing
 import functools
 import tspl, tspl_utils, imbalance, masterplot
 
-def do_work(arg):
-  imbalance.compute_imbalance(*arg)
-  
+def do_mp(arg):
+  masterplot.master_plot(*arg)
 
 def main():
   parser=argparse.ArgumentParser(description='Deal with a directory of pickle'
@@ -47,7 +46,8 @@ def main():
           badfiles.append(f)
           th.append(v)
 
-  masterplot.master_plot(badfiles,th)
+  pool.map(do_mp,zip(badfiles,th)) # Pool.starmap should exist....
+
   
 if __name__ == "__main__":
   main()
