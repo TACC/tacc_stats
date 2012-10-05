@@ -14,18 +14,21 @@ import tspl, tspl_utils, imbalance, masterplot, uncorrelated
 def do_mp(arg):
   masterplot.master_plot(*arg)
 
-def do_un(file):
+def do_un(arg):
+  file,output_dir=arg
   try:
     ts=tspl.TSPLSum(file,['amd64_core','cpu'],['SSE_FLOPS','user'])
   except tspl.TSPLException as e:
     return
-  uncorrelated.plot_correlation(ts,uncorrelated.pearson(ts),'')
+  uncorrelated.plot_correlation(ts,uncorrelated.pearson(ts),'',output_dir)
 
 def main():
   parser=argparse.ArgumentParser(description='Deal with a directory of pickle'
                                  ' files nightly')
   parser.add_argument('-p', help='Set number of processes',
                       nargs=1, type=int, default=[1])
+  parser.add_argument('-o', help='Output directory',
+                      nargs=1, type=str, default=['.'], metavar='output_dir')
   parser.add_argument('threshold', help='Treshold ratio for std dev:mean',
                       nargs='?', default=0.25)
   parser.add_argument('filearg', help='File, directory, or quoted'
@@ -47,6 +50,7 @@ def main():
 
   badfiles=[]
   th=[]
+  dirs=[]
   for i in ratios.keys():
     v=ratios[i][0]
     if v > float(n.threshold):
@@ -54,12 +58,13 @@ def main():
         if re.search(i,f):
           badfiles.append(f)
           th.append(v)
-
-  pool.map(do_mp,zip(badfiles,th)) # Pool.starmap should exist....
+          dirs.append(n.o[0])
+          
+  pool.map(do_mp,zip(badfiles,th,dirs)) # Pool.starmap should exist....
 
   bad_users=imbalance.find_top_users(ratios)
 
-  pool.map(do_un,badfiles)
+  pool.map(do_un,zip(badfiles,dirs))
   
 if __name__ == "__main__":
   main()

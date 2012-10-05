@@ -12,7 +12,7 @@ import scipy, scipy.stats
 import argparse
 import tspl, tspl_utils
 
-def master_plot(file,threshold=False):
+def master_plot(file,threshold=False,output_dir='.'):
   k1=['amd64_core','amd64_core','amd64_sock','lnet','lnet','ib_sw','ib_sw',
       'cpu']
   k2=['SSE_FLOPS','DCSF','DRAM','rx_bytes','tx_bytes','rx_bytes','tx_bytes',
@@ -99,7 +99,7 @@ def master_plot(file,threshold=False):
     tspl_utils.adjust_yaxis_range(a,0.1)
 
   fname='_'.join(['graph',ts.j.id,'master'])
-  fig.savefig(fname)
+  fig.savefig(output_dir+'/'+fname)
   plt.close()
 
 

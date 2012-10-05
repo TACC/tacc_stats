@@ -23,7 +23,7 @@ def pearson(ts):
 
   return(min(p))
 
-def plot_correlation(ts,r,full):
+def plot_correlation(ts,r,full,output_dir='.'):
   tmid=(ts.t[:-1]+ts.t[1:])/2.0
   fig, ax=plt.subplots(2,2,figsize=(10, 10), dpi=80)
   ax[0][0].hold=True
@@ -66,7 +66,7 @@ def plot_correlation(ts,r,full):
   ax[0][1].set_xlim(left=tmin,right=tmax)
   fname1='graph_'+ts.j.id+'_'+ts.k1[0]+'_'+ts.k2[0]+ \
          '_vs_'+ts.k1[1]+'_'+ts.k2[1]+full
-  fig.savefig(fname1)
+  fig.savefig(output_dir+'/'+fname1)
   plt.close()
 
 
