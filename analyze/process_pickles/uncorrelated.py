@@ -24,7 +24,6 @@ def pearson(ts):
   return(min(p))
 
 def plot_correlation(ts,r,full):
-  print '---------------------'
   tmid=(ts.t[:-1]+ts.t[1:])/2.0
   fig, ax=plt.subplots(2,2,figsize=(10, 10), dpi=80)
   ax[0][0].hold=True
