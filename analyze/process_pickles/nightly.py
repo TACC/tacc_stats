@@ -9,7 +9,7 @@ import argparse
 import re
 import multiprocessing
 import functools
-import tspl, tspl_utils, imbalance, masterplot
+import tspl, tspl_utils, imbalance, masterplot, uncorrelated
 
 def do_mp(arg):
   masterplot.master_plot(*arg)
@@ -51,6 +51,13 @@ def main():
   pool.map(do_mp,zip(badfiles,th)) # Pool.starmap should exist....
 
   bad_users=imbalance.find_top_users(ratios)
+
+  for file in badfiles:
+    try:
+      ts=tspl.TSPLSum(file,['amd64_core','cpu'],['SSE_FLOPS','user'])
+    except tspl.TSPLException as e:
+      continue
+    uncorrelated.plot_correlation(ts,uncorrelated.pearson(ts),'')
   
 if __name__ == "__main__":
   main()

@@ -23,6 +23,49 @@ def pearson(ts):
 
   return(min(p))
 
+def plot_correlation(ts,r,full):
+  print '---------------------'
+  tmid=(ts.t[:-1]+ts.t[1:])/2.0
+  fig, ax=plt.subplots(2,2,figsize=(10, 10), dpi=80)
+  ax[0][0].hold=True
+  ax[0][1].hold=True
+  ax[1][0].hold=True
+  ax[1][1].clear()
+
+  mx=0.
+  my=0.
+
+  for k in ts.data[0].keys():
+    for i in range(len(ts.data[0][k])):
+      first_rate=numpy.diff(ts.data[0][k][i])/numpy.diff(ts.t)
+      second_rate=numpy.diff(ts.data[1][k][i])/numpy.diff(ts.t)
+      mx=max(mx,max(first_rate))
+      my=max(my,max(second_rate))
+      ax[0][0].plot(first_rate,second_rate,'.')
+      ax[1][0].plot(first_rate[::-1],tmid[::-1]/3600.)
+      ax[0][1].plot(tmid/3600.,second_rate)
+
+  ax[0][0].set_xlabel('Total ' + ts.label(ts.k1[0],ts.k2[0]) + '/s')
+  ax[0][0].set_ylabel('Total ' + ts.label(ts.k1[1],ts.k2[1]) + '/s')
+  ax[1][0].set_ylabel('Time (hr)')
+  ax[1][0].set_xlabel('Total ' + ts.label(ts.k1[0],ts.k2[0]) + '/s')
+  ax[0][1].set_xlabel('Time (hr)')
+  ax[0][1].set_ylabel('Total ' + ts.label(ts.k1[1],ts.k2[1]) + '/s')
+
+  plt.subplots_adjust(hspace=.25)
+  title=ts.title + ', R=%(R)-8.3g' % { 'R' : r}
+  plt.suptitle(title)
+  ax[0][0].set_xlim(left=0.,right=1.1*mx)
+  ax[0][0].set_ylim(bottom=0.,top=1.1*my)
+  ax[1][0].set_xlim(left=0.,right=1.1*mx)
+  ax[1][0].set_ylim(bottom=tmid[-1]*1.05/3600.,top=0.)
+  ax[0][1].set_ylim(bottom=0.,top=1.1*my)
+  fname1='graph_'+ts.j.id+'_'+ts.k1[0]+'_'+ts.k2[0]+ \
+         '_vs_'+ts.k1[1]+'_'+ts.k2[1]+full
+  fig.savefig(fname1)
+  plt.close()
+
+
 # Compute Pearson's R and plot a graph if the correlation is low
 def main():
 
@@ -66,47 +109,7 @@ def main():
     r=pearson(ts)
     print ts.j.id + ': ' + str(r)
     if abs(r) < float(threshold) :
-      print '---------------------'
-      tmid=(ts.t[:-1]+ts.t[1:])/2.0
-      fig, ax=plt.subplots(2,2,figsize=(10, 10), dpi=80)
-      ax[0][0].hold=True
-      ax[0][1].hold=True
-      ax[1][0].hold=True
-      ax[1][1].clear()
-
-      mx=0.
-      my=0.
-
-      for k in ts.data[0].keys():
-        print len(ts.data[0][k])
-        for i in range(len(ts.data[0][k])):
-          first_rate=numpy.diff(ts.data[0][k][i])/numpy.diff(ts.t)
-          second_rate=numpy.diff(ts.data[1][k][i])/numpy.diff(ts.t)
-          mx=max(mx,max(first_rate))
-          my=max(my,max(second_rate))
-          ax[0][0].plot(first_rate,second_rate,'.')
-          ax[1][0].plot(first_rate[::-1],tmid[::-1]/3600.)
-          ax[0][1].plot(tmid/3600.,second_rate)
-
-      ax[0][0].set_xlabel('Total ' + ts.label(ts.k1[0],ts.k2[0]) + '/s')
-      ax[0][0].set_ylabel('Total ' + ts.label(ts.k1[1],ts.k2[1]) + '/s')
-      ax[1][0].set_ylabel('Time (hr)')
-      ax[1][0].set_xlabel('Total ' + ts.label(ts.k1[0],ts.k2[0]) + '/s')
-      ax[0][1].set_xlabel('Time (hr)')
-      ax[0][1].set_ylabel('Total ' + ts.label(ts.k1[1],ts.k2[1]) + '/s')
-
-      plt.subplots_adjust(hspace=.25)
-      title=ts.title + ', R=%(R)-8.3g' % { 'R' : r}
-      plt.suptitle(title)
-      ax[0][0].set_xlim(left=0.,right=1.1*mx)
-      ax[0][0].set_ylim(bottom=0.,top=1.1*my)
-      ax[1][0].set_xlim(left=0.,right=1.1*mx)
-      ax[1][0].set_ylim(bottom=tmid[-1]*1.05/3600.,top=0.)
-      ax[0][1].set_ylim(bottom=0.,top=1.1*my)
-      fname1='graph_'+ts.j.id+'_'+ts.k1[0]+'_'+ts.k2[0]+ \
-             '_vs_'+ts.k1[1]+'_'+ts.k2[1]+full
-      fig.savefig(fname1)
-      plt.close()
-
+      plot_correlation(ts,r,full)
+      
 if __name__ == "__main__":
   main()
