@@ -17,6 +17,8 @@ def do_mp(arg):
 def main():
   parser=argparse.ArgumentParser(description='Deal with a directory of pickle'
                                  ' files nightly')
+  parser.add_argument('-p', help='Set number of processes',
+                      nargs=1, type=int, default=[1])
   parser.add_argument('threshold', help='Treshold ratio for std dev:mean',
                       nargs='?', default=0.25)
   parser.add_argument('filearg', help='File, directory, or quoted'
@@ -25,7 +27,7 @@ def main():
 
   filelist=tspl_utils.getfilelist(n.filearg)
 
-  pool   = multiprocessing.Pool(processes=4)
+  pool   = multiprocessing.Pool(processes=n.p[0])
   m      = multiprocessing.Manager()
   ratios = m.dict()
   partial_imbal=functools.partial(imbalance.compute_imbalance,
