@@ -54,11 +54,16 @@ def plot_correlation(ts,r,full):
   plt.subplots_adjust(hspace=.25)
   title=ts.title + ', R=%(R)-8.3g' % { 'R' : r}
   plt.suptitle(title)
-  ax[0][0].set_xlim(left=0.,right=1.1*mx)
-  ax[0][0].set_ylim(bottom=0.,top=1.1*my)
-  ax[1][0].set_xlim(left=0.,right=1.1*mx)
-  ax[1][0].set_ylim(bottom=tmid[-1]*1.05/3600.,top=0.)
-  ax[0][1].set_ylim(bottom=0.,top=1.1*my)
+
+  xmin,xmax=tspl_utils.expand_range(0.,mx,.1)
+  ymin,ymax=tspl_utils.expand_range(0.,my,.1)
+  tmin,tmax=tspl_utils.expand_range(0.,tmid[-1]/3600,.1)
+  ax[0][0].set_xlim(left=xmin,right=xmax)
+  ax[0][0].set_ylim(bottom=ymin,top=ymax)
+  ax[1][0].set_xlim(left=xmin,right=xmax)
+  ax[1][0].set_ylim(bottom=tmax,top=tmin)
+  ax[0][1].set_ylim(bottom=ymin,top=ymax)
+  ax[0][1].set_xlim(left=tmin,right=tmax)
   fname1='graph_'+ts.j.id+'_'+ts.k1[0]+'_'+ts.k2[0]+ \
          '_vs_'+ts.k1[1]+'_'+ts.k2[1]+full
   fig.savefig(fname1)
