@@ -1,14 +1,27 @@
 #!/bin/bash
 
+wd=/work/00564/bbarth/tacc_stats/analyze/process_pickles
 d=`date +%Y-%m-%d`
 y=`date -d yesterday +%Y-%m-%d`
+tsd=/scratch/projects/tacc_stats/pickles
+jd=${wd}/nightly_jobs
+nf=${tsd}/${y}.tar.gz
 
-cd /work/00654/bbarth/tacc_stats/analyze/process_pickles/
+cd $wd
 
-mkdir -p $d
+if [ -f $nf ]; then
+  mkdir $jd
+  cd $jd
+  tar xf $nf
 
-module load python
+  cd $wd
+  mkdir -p $wd/$y
+  module load python
 
-export PYTHONUNBUFFERED=yes
+  export PYTHONUNBUFFERED=yes
 
-time ./nightly.py -o $y -p 32 1.0 "jobs/$y" > nightly-${d}.log 2>&1 
+  time ./nightly.py -o ${wd}/$y -p 32 1.0 "jobs/$y" > nightly-${y}.log 2>&1
+else
+  echo "$nf not available"
+  exit 1
+fi
