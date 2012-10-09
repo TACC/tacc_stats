@@ -5,7 +5,7 @@ sys.path.append('../../monitor')
 import datetime, glob, job_stats, os, subprocess, time
 import matplotlib
 if not 'matplotlib.pyplot' in sys.modules:
-  matplotlib.use('Agg')
+  matplotlib.use('pdf')
 import matplotlib.pyplot as plt
 import numpy
 import scipy, scipy.stats
@@ -41,23 +41,23 @@ def master_plot(file,threshold=False,output_dir='.'):
     h=ts.j.hosts[k]
     rate=numpy.divide(numpy.diff(ts.data[0][k][0]),numpy.diff(ts.t))
     ax[0].plot(tmid/3600,rate)
-  ax[0].set_ylabel('Total ' + ts.k1[0] + '\n' + ts.k2[0] + '/s')
+  ax[0].set_ylabel('Total ' + ts.label(k1[1],k2[0]) +  '/s')
 
   # Plot DCSF rate
   ax[1].hold=True
   for k in ts.j.hosts.keys():
     h=ts.j.hosts[k]
-    rate=numpy.divide(numpy.diff(ts.data[1][k][0]),numpy.diff(ts.t))
+    rate=numpy.divide(numpy.diff(ts.data[1][k][0])/1e9,numpy.diff(ts.t))
     ax[1].plot(tmid/3600,rate)
-  ax[1].set_ylabel('Total ' + ts.k1[1] + '\n' + ts.k2[1] + '/s')
+  ax[1].set_ylabel('Total ' + ts.label(k1[1],k2[1],1e9) + '/s')
 
   #Plot DRAM rate
   ax[2].hold=True
   for k in ts.j.hosts.keys():
     h=ts.j.hosts[k]
-    rate=numpy.divide(numpy.diff(ts.data[2][k][0]),numpy.diff(ts.t))
+    rate=numpy.divide(numpy.diff(ts.data[2][k][0])/1e9,numpy.diff(ts.t))
     ax[2].plot(tmid/3600,rate)
-  ax[2].set_ylabel('Total ' + ts.k1[2] + '\n' + ts.k2[2] + '/s')
+  ax[2].set_ylabel('Total ' + ts.label(k1[2],k2[2],1e9) +  '/s')
 
   # Plot lnet sum rate
   ax[3].hold=True
@@ -65,7 +65,7 @@ def master_plot(file,threshold=False,output_dir='.'):
     h=ts.j.hosts[k]
     rate=numpy.divide(numpy.diff(ts.data[3][k][0]+ts.data[4][k][0]),
                       numpy.diff(ts.t))
-    ax[3].plot(tmid/3600,rate/(1024.*1024.))
+    ax[3].plot(tmid/3600,rate/1024.*1024.)
   ax[3].set_ylabel('Total lnet MB/s')
 
   # Plot remaining IB sum rate
@@ -84,7 +84,7 @@ def master_plot(file,threshold=False,output_dir='.'):
     rate=numpy.divide(numpy.diff(ts.data[7][k][0]/100/ts.wayness),
                       numpy.diff(ts.t))
     ax[5].plot(tmid/3600,rate)
-  ax[5].set_ylabel('Total ' + ts.k1[7] + '\n' + ts.k2[7] + '/s')
+  ax[5].set_ylabel('Total user cpu\nfraction/s')
   ax[5].set_xlabel('Time (hr)')
   
   print ts.j.id + ': '
@@ -98,7 +98,7 @@ def master_plot(file,threshold=False,output_dir='.'):
   for a in ax:
     tspl_utils.adjust_yaxis_range(a,0.1)
 
-  fname='_'.join(['graph',ts.j.id,'master'])
+  fname='_'.join(['graph',ts.j.id,ts.j.acct['owner'],'master'])
   fig.savefig(output_dir+'/'+fname)
   plt.close()
 

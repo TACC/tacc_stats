@@ -4,7 +4,7 @@ sys.path.append('../../monitor')
 import datetime, glob, job_stats, os, subprocess, time
 import matplotlib
 if not 'matplotlib.pyplot' in sys.modules:
-  matplotlib.use('Agg')
+  matplotlib.use('pdf')
 import matplotlib.pyplot as plt
 import numpy
 import scipy, scipy.stats
@@ -64,8 +64,9 @@ def plot_correlation(ts,r,full,output_dir='.'):
   ax[1][0].set_ylim(bottom=tmax,top=tmin)
   ax[0][1].set_ylim(bottom=ymin,top=ymax)
   ax[0][1].set_xlim(left=tmin,right=tmax)
-  fname1='graph_'+ts.j.id+'_'+ts.k1[0]+'_'+ts.k2[0]+ \
-         '_vs_'+ts.k1[1]+'_'+ts.k2[1]+full
+  fname1='_'.join(['graph',ts.j.id,ts.j.acct['owner'],
+                   ts.k1[0],ts.k2[0],'vs',
+                   ts.k1[1],ts.k2[1],full])
   fig.savefig(output_dir+'/'+fname1)
   plt.close()
 

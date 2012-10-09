@@ -6,7 +6,7 @@ import datetime, glob, job_stats, os, subprocess, time
 import operator
 import matplotlib
 if not 'matplotlib.pyplot' in sys.modules:
-  matplotlib.use('Agg')
+  matplotlib.use('pdf')
 import matplotlib.pyplot as plt
 import numpy
 import scipy, scipy.stats
@@ -43,7 +43,8 @@ def plot_ratios(ts,tmid,ratio,ratio2,rate,var,fig,ax,full):
   ax[0].set_ylim(bottom=ymin,top=ymax)
   ax[1].set_ylim(bottom=ymin1,top=ymax1)
 
-  fname='_'.join(['graph',ts.j.id,ts.k1[0],ts.k2[0],'imbalance'+full])
+  fname='_'.join(['graph',ts.j.id,ts.j.acct['owner'],
+                  ts.k1[0],ts.k2[0],'imbalance'+full])
   fig.savefig(fname)
   plt.close()
 

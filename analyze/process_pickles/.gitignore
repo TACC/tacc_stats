@@ -7,3 +7,6 @@ jobs
 *.gz
 *.csv
 TAGS
+nightly_jobs
+nightlies
+

@@ -58,11 +58,23 @@ class TSPLBase:
     d.append(v)
 
   # Generate a label for title strings
-  def label(self,k1,k2):
+  def label(self,k1,k2,mod=1.):
+    u=''
+    if mod==1e9 or mod == 1024.**3:
+      u='G'
+    elif mod==1e6 or mod == 1024.**2:
+      u='M'
+
     l=k1 + ' ' + k2
     s=self.j.get_schema(k1)[k2]
     if not s.unit is None:
-      l+=' ' + s.unit
+      l+=' ' + u + s.unit
+
+    if len(l) > 10:
+      l=k1 + '\n' + k2
+      s=self.j.get_schema(k1)[k2]
+      if not s.unit is None:
+        l+=' ' + u + s.unit
       
     return l
       
