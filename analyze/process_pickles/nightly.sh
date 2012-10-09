@@ -16,6 +16,8 @@ cd $wd
 if [ -f $nf ]; then
   if [ ! -d $jd ]; then
     mkdir $jd
+  fi
+  if [ ! -d ${jd}/${y} ]; then
     cd $jd
     tar xf $nf
   fi
@@ -24,6 +26,11 @@ if [ -f $nf ]; then
 
   if [ ! -d $od ]; then
     mkdir -p $od
+  fi
+
+  if ! type -p modules > /dev/null; then
+    . /etc/tacc/tacc_functions
+    export MODULEPATH=/opt/apps/modulefiles
   fi
   module load python
 
