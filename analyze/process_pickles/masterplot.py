@@ -84,7 +84,7 @@ def master_plot(file,threshold=False,output_dir='.'):
     rate=numpy.divide(numpy.diff(ts.data[7][k][0]/100/ts.wayness),
                       numpy.diff(ts.t))
     ax[5].plot(tmid/3600,rate)
-  ax[5].set_ylabel('Total user cpu\nfraction/s')
+  ax[5].set_ylabel('Total cpu user\nfraction')
   ax[5].set_xlabel('Time (hr)')
   
   print ts.j.id + ': '
