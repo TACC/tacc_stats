@@ -65,7 +65,7 @@ def master_plot(file,threshold=False,output_dir='.'):
     h=ts.j.hosts[k]
     rate=numpy.divide(numpy.diff(ts.data[3][k][0]+ts.data[4][k][0]),
                       numpy.diff(ts.t))
-    ax[3].plot(tmid/3600,rate/1024.*1024.)
+    ax[3].plot(tmid/3600,rate/(1024.*1024.))
   ax[3].set_ylabel('Total lnet MB/s')
 
   # Plot remaining IB sum rate
