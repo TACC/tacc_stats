@@ -31,7 +31,7 @@ def master_plot(file,threshold=False,output_dir='.'):
     return
 
   tmid=(ts.t[:-1]+ts.t[1:])/2.0
-  
+
 
   fig,ax=plt.subplots(6,1,figsize=(8,12),dpi=80)
   

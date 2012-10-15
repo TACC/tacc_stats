@@ -19,6 +19,7 @@ if [ -f $nf ]; then
   fi
   if [ ! -d ${jd}/${y} ]; then
     cd $jd
+    stat $nf
     tar xf $nf
   fi
   
