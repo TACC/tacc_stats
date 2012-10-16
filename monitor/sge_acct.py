@@ -71,7 +71,9 @@ def reader(file, start_time=0, end_time=9223372036854775807L, seek=0):
                 d[n] = t(d[n])
         except:
             pass
-        if start_time <= d['end_time'] and d['end_time'] < end_time:
+        # Accounting records with pe_taskid != NONE are generated for
+        # sub_tasks of a tightly integrated job and should be ignored.
+        if start_time <= d['end_time'] and d['end_time'] < end_time and d['pe_taskid'] == 'NONE':
             yield d
 
 
@@ -90,7 +92,7 @@ def from_id_with_file(id, acct_file, **kwargs):
     id = str(id)
     if kwargs.get('use_awk', True):
         # Use awk to filter accounting file (2s with, 100s without).
-        prog = '$6 == "%s" { print $0; exit 0; }' % id
+        prog = '$6 == "%s" && $42 == "NONE" { print $0; exit 0; }' % id
         pipe = subprocess.Popen(['/bin/awk', '-F:', prog],
                                 bufsize=-1,
                                 stdin=acct_file,
@@ -134,7 +136,7 @@ def fill_with_file(id_dict, acct_file, **kwargs):
         a_defs = ''
         for id in id_dict:
             a_defs += 'a["%s"] = 1;' % id
-        prog = 'BEGIN { %s } $6 in a { print $0; }' % a_defs
+        prog = 'BEGIN { %s } $6 in a && $42 == "NONE" { print $0; }' % a_defs
         pipe = subprocess.Popen(['/bin/awk', '-F:', prog],
                                 bufsize=-1,
                                 stdin=acct_file,
