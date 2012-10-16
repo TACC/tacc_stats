@@ -20,7 +20,7 @@ if [ -f $nf ]; then
   if [ ! -d ${jd}/${y} ]; then
     cd $jd
     stat $nf
-    tar xf $nf
+    tar zxf $nf
   fi
   
   cd $wd
