@@ -21,7 +21,7 @@ def getuser(file,user,files):
     return
 
   if ts.j.acct['owner'] == user:
-    files.append(file)
+    masterplot.master_plot(file)
 
 def main():
   parser=argparse.ArgumentParser(description='Deal with a directory of pickle'
@@ -42,17 +42,8 @@ def main():
   m      = multiprocessing.Manager()
   files  = m.list()
 
-  
   partial_getuser=functools.partial(getuser,user=n.u[0],files=files)
   pool.map(partial_getuser,filelist)
-
-  th   = []
-  dirs = []
-  for f in files:
-    th.append(0.)
-    dirs.append(n.o[0])
-
-  pool.map(do_mp,zip(files,th,dirs)) # Pool.starmap should exist....
 
 if __name__ == "__main__":
   main()
