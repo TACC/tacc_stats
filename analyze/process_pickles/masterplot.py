@@ -28,11 +28,11 @@ def plot_lines(ax, ts, index, xscale=1.0, yscale=1.0, xlabel='', ylabel=''):
   else:
     ax.set_ylabel('Total ' + ts.label(ts.k1[index],ts.k2[index],yscale) + '/s' )
   tspl_utils.adjust_yaxis_range(ax,0.1)
+  ax.yaxis.set_major_locator( matplotlib.ticker.MaxNLocator(nbins=6))
 
 # Plots "time histograms" for every host
 # This code is likely inefficient
 def plot_thist(ax, ts, index, xscale=1.0, yscale=1.0, xlabel='', ylabel=''):
-  tmid=(ts.t[:-1]+ts.t[1:])/2.0
   d=[]
   for k in ts.j.hosts.keys():
     d.append(numpy.divide(numpy.diff(ts.data[index][k][0]),numpy.diff(ts.t)))
@@ -42,13 +42,14 @@ def plot_thist(ax, ts, index, xscale=1.0, yscale=1.0, xlabel='', ylabel=''):
   mn=numpy.min(a)
   mx=numpy.max(a)
   n=float(len(ts.j.hosts.keys()))
-  for i in range(len(tmid)):
-    hist=numpy.histogram(a[:,i],n,(mn,mx))
+  for i in range(len(ts.t)-1):
+    hist=numpy.histogram(a[:,i],30,(mn,mx))
     h.append(hist[0])
 
   h2=numpy.transpose(numpy.array(h))
 
-  ax.pcolor(tmid/xscale,hist[1],h2,edgecolors='none')
+  ax.pcolor(ts.t/xscale,hist[1],h2,
+            edgecolors='none',rasterized=True,cmap='spectral')
 
   if xlabel != '':
     ax.set_xlabel(xlabel)
@@ -56,6 +57,8 @@ def plot_thist(ax, ts, index, xscale=1.0, yscale=1.0, xlabel='', ylabel=''):
     ax.set_ylabel(ylabel)
   else:
     ax.set_ylabel('Total ' + ts.label(ts.k1[index],ts.k2[index],yscale) + '/s' )
+
+  ax.yaxis.set_major_locator( matplotlib.ticker.MaxNLocator(nbins=4))
 
 
 def master_plot(file,n,threshold=False,output_dir='.'):
@@ -100,20 +103,23 @@ def master_plot(file,n,threshold=False,output_dir='.'):
   # Plot lnet sum rate
   ax[3].hold=True
   for k in ts.j.hosts.keys():
-    h=ts.j.hosts[k]
     rate=numpy.divide(numpy.diff(ts.data[3][k][0]+ts.data[4][k][0]),
                       numpy.diff(ts.t))
     ax[3].plot(tmid/3600,rate/(1024.*1024.))
   ax[3].set_ylabel('Total lnet MB/s')
+  ax[3].yaxis.set_major_locator( matplotlib.ticker.MaxNLocator(nbins=5))
+  tspl_utils.adjust_yaxis_range(ax[3],0.1)
+
 
   # Plot remaining IB sum rate
   ax[4].hold=True
   for k in ts.j.hosts.keys():
-    h=ts.j.hosts[k]
     v=ts.data[5][k][0]+ts.data[6][k][0]-(ts.data[3][k][0]+ts.data[4][k][0])
     rate=numpy.divide(numpy.diff(v),numpy.diff(ts.t))
     ax[4].plot(tmid/3600,rate/(1024*1024.))
   ax[4].set_ylabel('Total (ib_sw-lnet) MB/s')
+  ax[4].yaxis.set_major_locator( matplotlib.ticker.MaxNLocator(nbins=5))
+  tspl_utils.adjust_yaxis_range(ax[4],0.1)
 
   #Plot CPU user time
   plot_lines(ax[5],ts,7,3600.,ts.wayness*100.,
