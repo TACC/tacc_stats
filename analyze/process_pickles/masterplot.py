@@ -61,7 +61,7 @@ def plot_thist(ax, ts, index, xscale=1.0, yscale=1.0, xlabel='', ylabel=''):
   ax.yaxis.set_major_locator( matplotlib.ticker.MaxNLocator(nbins=4))
 
 
-def master_plot(file,n,threshold=False,output_dir='.'):
+def master_plot(file,do_hist,threshold=False,output_dir='.'):
   k1=['amd64_core','amd64_core','amd64_sock','lnet','lnet','ib_sw','ib_sw',
       'cpu']
   k2=['SSE_FLOPS','DCSF','DRAM','rx_bytes','tx_bytes','rx_bytes','tx_bytes',
@@ -82,19 +82,19 @@ def master_plot(file,n,threshold=False,output_dir='.'):
   fig,ax=plt.subplots(6,1,figsize=(8,12),dpi=80)
   
   # Plot SSE FLOPS
-  if n.hist:
+  if do_hist:
     plot_thist(ax[0],ts,0,3600.)
   else:
     plot_lines(ax[0],ts,0,3600.)
     
   # Plot DCSF rate
-  if n.hist:
+  if do_hist:
     plot_thist(ax[1],ts,1,3600.,1e9)
   else:
     plot_lines(ax[1],ts,1,3600.,1e9)
 
   #Plot DRAM rate
-  if n.hist:
+  if do_hist:
     plot_thist(ax[2],ts,2,3600.,1e9)
   else:
     plot_lines(ax[2],ts,2,3600.,1e9)
@@ -136,7 +136,7 @@ def master_plot(file,n,threshold=False,output_dir='.'):
   plt.subplots_adjust(hspace=0.35)
 
   fname='_'.join(['graph',ts.j.id,ts.j.acct['owner'],'master'])
-  if n.hist:
+  if do_hist:
     fname+='_hist'
   fig.savefig(output_dir+'/'+fname)
   plt.close()
@@ -152,7 +152,7 @@ def main():
 
   filelist=tspl_utils.getfilelist(n.filearg)
   for file in filelist:
-    master_plot(file,n)
+    master_plot(file,n.hist)
 
 
 if __name__ == '__main__':
