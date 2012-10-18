@@ -80,24 +80,20 @@ def master_plot(file,do_hist,threshold=False,output_dir='.'):
     return
 
   fig,ax=plt.subplots(6,1,figsize=(8,12),dpi=80)
+
+  if do_hist:
+    plot=plot_thist
+  else:
+    plot=plot_lines
   
   # Plot SSE FLOPS
-  if do_hist:
-    plot_thist(ax[0],ts,0,3600.)
-  else:
-    plot_lines(ax[0],ts,0,3600.)
+  plot(ax[0],ts,0,3600.)
     
   # Plot DCSF rate
-  if do_hist:
-    plot_thist(ax[1],ts,1,3600.,1e9)
-  else:
-    plot_lines(ax[1],ts,1,3600.,1e9)
+  plot(ax[1],ts,1,3600.,1e9)
 
   #Plot DRAM rate
-  if do_hist:
-    plot_thist(ax[2],ts,2,3600.,1e9)
-  else:
-    plot_lines(ax[2],ts,2,3600.,1e9)
+  plot(ax[2],ts,2,3600.,1e9)
   
   tmid=(ts.t[:-1]+ts.t[1:])/2.0
   # Plot lnet sum rate
