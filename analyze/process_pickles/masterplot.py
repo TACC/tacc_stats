@@ -3,6 +3,7 @@
 import sys
 sys.path.append('../../monitor')
 import datetime, glob, job_stats, os, subprocess, time
+import math
 import matplotlib
 if not 'matplotlib.pyplot' in sys.modules:
   matplotlib.use('pdf')
@@ -12,6 +13,24 @@ import scipy, scipy.stats
 import argparse
 import tspl, tspl_utils
 
+# Reduce data from ts object
+# add and subtract arrays from data based on sign of index variable in
+# accumulator, v
+def assemble(data,index,key,jndex):
+  v=numpy.zeros_like(data[0][key][jndex])
+  for i in index:
+    i2=abs(i)
+    v+=math.copysign(1,i)*data[i2][key][jndex]
+  return v
+
+def setlabels(ax,ts,index,xlabel,ylabel,yscale):
+  if xlabel != '':
+    ax.set_xlabel(xlabel)
+  if ylabel != '':
+    ax.set_ylabel(ylabel)
+  else:
+    ax.set_ylabel('Total ' + ts.label(ts.k1[index[0]],
+                                      ts.k2[index[0]],yscale) + '/s' )
 
 # Consolidate several near identical plots to a function
 # Plots lines for each host
@@ -19,27 +38,25 @@ def plot_lines(ax, ts, index, xscale=1.0, yscale=1.0, xlabel='', ylabel=''):
   tmid=(ts.t[:-1]+ts.t[1:])/2.0
   ax.hold=True
   for k in ts.j.hosts.keys():
-    rate=numpy.divide(numpy.diff(ts.data[index][k][0]),numpy.diff(ts.t))
+    v=assemble(ts.data,index,k,0)
+    rate=numpy.divide(numpy.diff(v),numpy.diff(ts.t))
     ax.plot(tmid/xscale,rate/yscale)
-  if xlabel != '':
-    ax.set_xlabel(xlabel)
-  if ylabel != '':
-    ax.set_ylabel(ylabel)
-  else:
-    ax.set_ylabel('Total ' + ts.label(ts.k1[index],ts.k2[index],yscale) + '/s' )
   tspl_utils.adjust_yaxis_range(ax,0.1)
   ax.yaxis.set_major_locator( matplotlib.ticker.MaxNLocator(nbins=6))
+  setlabels(ax,ts,index,xlabel,ylabel,yscale)
 
 # Plots "time histograms" for every host
 # This code is likely inefficient
 def plot_thist(ax, ts, index, xscale=1.0, yscale=1.0, xlabel='', ylabel=''):
   d=[]
   for k in ts.j.hosts.keys():
-    d.append(numpy.divide(numpy.diff(ts.data[index][k][0]),numpy.diff(ts.t)))
+    v=assemble(ts.data,index,k,0)
+    d.append(numpy.divide(numpy.diff(v),numpy.diff(ts.t)))
   a=numpy.array(d)
 
   h=[]
   mn=numpy.min(a)
+  mn=min(0.,mn)
   mx=numpy.max(a)
   n=float(len(ts.j.hosts.keys()))
   for i in range(len(ts.t)-1):
@@ -48,15 +65,10 @@ def plot_thist(ax, ts, index, xscale=1.0, yscale=1.0, xlabel='', ylabel=''):
 
   h2=numpy.transpose(numpy.array(h))
 
-  ax.pcolor(ts.t/xscale,hist[1],h2,
+  ax.pcolor(ts.t/xscale,hist[1]/yscale,h2,
             edgecolors='none',rasterized=True,cmap='spectral')
 
-  if xlabel != '':
-    ax.set_xlabel(xlabel)
-  if ylabel != '':
-    ax.set_ylabel(ylabel)
-  else:
-    ax.set_ylabel('Total ' + ts.label(ts.k1[index],ts.k2[index],yscale) + '/s' )
+  setlabels(ax,ts,index,xlabel,ylabel,yscale)
 
   ax.yaxis.set_major_locator( matplotlib.ticker.MaxNLocator(nbins=4))
 
@@ -87,40 +99,25 @@ def master_plot(file,do_hist,threshold=False,output_dir='.'):
     plot=plot_lines
   
   # Plot SSE FLOPS
-  plot(ax[0],ts,0,3600.)
+  plot(ax[0],ts,[0],3600.)
     
   # Plot DCSF rate
-  plot(ax[1],ts,1,3600.,1e9)
+  plot(ax[1],ts,[1],3600.,1e9)
 
   #Plot DRAM rate
-  plot(ax[2],ts,2,3600.,1e9)
+  plot(ax[2],ts,[2],3600.,1e9)
   
   tmid=(ts.t[:-1]+ts.t[1:])/2.0
   # Plot lnet sum rate
-  ax[3].hold=True
-  for k in ts.j.hosts.keys():
-    rate=numpy.divide(numpy.diff(ts.data[3][k][0]+ts.data[4][k][0]),
-                      numpy.diff(ts.t))
-    ax[3].plot(tmid/3600,rate/(1024.*1024.))
-  ax[3].set_ylabel('Total lnet MB/s')
-  ax[3].yaxis.set_major_locator( matplotlib.ticker.MaxNLocator(nbins=5))
-  tspl_utils.adjust_yaxis_range(ax[3],0.1)
-
+  plot(ax[3],ts,[3,4],3600.,1024.**2,ylabel='Total lnet MB/s')
 
   # Plot remaining IB sum rate
-  ax[4].hold=True
-  for k in ts.j.hosts.keys():
-    v=ts.data[5][k][0]+ts.data[6][k][0]-(ts.data[3][k][0]+ts.data[4][k][0])
-    rate=numpy.divide(numpy.diff(v),numpy.diff(ts.t))
-    ax[4].plot(tmid/3600,rate/(1024*1024.))
-  ax[4].set_ylabel('Total (ib_sw-lnet) MB/s')
-  ax[4].yaxis.set_major_locator( matplotlib.ticker.MaxNLocator(nbins=5))
-  tspl_utils.adjust_yaxis_range(ax[4],0.1)
+  plot(ax[4],ts,[5,6,-3,-4],3600.,1024.**2,ylabel='Total (ib_sw-lnet) MB/s') 
 
   #Plot CPU user time
-  plot_lines(ax[5],ts,7,3600.,ts.wayness*100.,
-             xlabel='Time (hr)',
-             ylabel='Total cpu user\nfraction')
+  plot(ax[5],ts,[7],3600.,ts.wayness*100.,
+       xlabel='Time (hr)',
+       ylabel='Total cpu user\nfraction')
   
   print ts.j.id + ': '
 
