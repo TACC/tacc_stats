@@ -11,13 +11,15 @@ import matplotlib.pyplot as plt
 import numpy
 import scipy, scipy.stats
 import argparse
-import tspl, tspl_utils
+import tspl, tspl_utils, lariat_utils
 
 def plot_ratios(ts,tmid,ratio,ratio2,rate,var,fig,ax,full):
   # Compute y-axis min and max, expand the limits by 10%
   ymin=min(numpy.minimum(ratio,ratio2))
   ymax=max(numpy.maximum(ratio,ratio2))
   ymin,ymax=tspl_utils.expand_range(ymin,ymax,0.1)
+
+  ld=lariat_utils.LariatData(ts.j.id,ts.j.end_time,'lariatData')
 
   print '---------------------'
   ax[0].plot(tmid/3600,ratio)
@@ -34,7 +36,10 @@ def plot_ratios(ts,tmid,ratio,ratio2,rate,var,fig,ax,full):
 
   ymin1,ymax1=tspl_utils.expand_range(ymin1,ymax1,0.1)
 
-  title=ts.title + ', V: %(V)-8.3g' % {'V' : var}
+  title=ts.title
+  if ld.exc != 'unknown':
+    title += ', E: ' + ld.exc.split('/')[-1]
+  title += ', V: %(V)-8.3g' % {'V' : var}
   plt.suptitle(title)
   ax[0].set_xlabel('Time (hr)')
   ax[0].set_ylabel('Imbalance Ratios')
