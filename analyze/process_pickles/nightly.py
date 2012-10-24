@@ -67,6 +67,9 @@ def main():
   bad_users=imbalance.find_top_users(ratios)
 
   pool.map(do_un,zip(badfiles,dirs))
+
+  pool.close()
+  pool.join()
   
 if __name__ == "__main__":
   main()

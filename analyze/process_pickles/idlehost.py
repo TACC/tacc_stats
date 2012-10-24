@@ -76,6 +76,8 @@ def main():
     if idleness[i]:
       print i.split('/')[-1]
 
+  pool.close()
+  pool.join()
 
 if __name__ == '__main__':
   main()

@@ -38,6 +38,8 @@ if [ -f $nf ]; then
   export PYTHONUNBUFFERED=yes
 
   ./nightly.py -o $od -p 32 1.0 ${jd}/${y} > ${od}/nightly-${y}.log 2>&1
+  ./idlehost.py -p 32 ${jd}/${y} > ${od}/idle-${y}.log 2>&1
+  
 else
   echo "$nf not available"
   exit 1
