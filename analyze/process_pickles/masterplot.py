@@ -11,7 +11,7 @@ import matplotlib.pyplot as plt
 import numpy
 import scipy, scipy.stats
 import argparse
-import tspl, tspl_utils
+import tspl, tspl_utils, lariat_utils
 
 # Reduce data from ts object
 # add and subtract arrays from data based on sign of index variable in
@@ -161,6 +161,9 @@ def master_plot(file,mode='lines',threshold=False,output_dir='.'):
     title+=', V: %(v)-8.3f' % {'v': threshold}
   if mode == 'percentile':
     title='Percentiles, ' + title
+  ld=lariat_utils.LariatData(ts.j.id,ts.j.end_time,'/scratch/projects/lariatData')
+  title += '\n' + ld.title()
+
 
   plt.suptitle(title)
   plt.subplots_adjust(hspace=0.35)
