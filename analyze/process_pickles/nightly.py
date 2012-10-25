@@ -43,8 +43,8 @@ def main():
   m      = multiprocessing.Manager()
   ratios = m.dict()
   partial_imbal=functools.partial(imbalance.compute_imbalance,
-                                  k1=['amd64_core'],
-                                  k2=['SSE_FLOPS'],
+                                  k1=['amd64_sock'],
+                                  k2=['DRAM'],
                                   threshold=float(n.threshold),
                                   plot_flag=False,full_flag=False,
                                   ratios=ratios)
