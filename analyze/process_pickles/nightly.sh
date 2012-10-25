@@ -37,8 +37,9 @@ if [ -f $nf ]; then
 
   export PYTHONUNBUFFERED=yes
 
-  ./nightly.py -o $od -p 32 1.0 ${jd}/${y} > ${od}/nightly-${y}.log 2>&1
+  ./nightly.py -o $od -p 32 1.0 ${jd}/${y} > ${od}/imbalanced-${y}.log 2>&1
   ./idlehost.py -p 32 ${jd}/${y} > ${od}/idle-${y}.log 2>&1
+  ./lowflops.py -o $od -p 32 -t 0.001 ${jd}/${y} > ${od}/lowflops-${y}.log 2>&1
   
 else
   echo "$nf not available"

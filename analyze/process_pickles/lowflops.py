@@ -12,8 +12,8 @@ import tspl, tspl_utils, lariat_utils, masterplot
 
 def do_mp(arg):
   (file,thresh,out_dir)=arg
-  masterplot.master_plot(file,'lines',thresh,out_dir)
-  masterplot.master_plot(file,'percentile',thresh,out_dir)
+  masterplot.master_plot(file,'lines',thresh,out_dir,'lowflops')
+  masterplot.master_plot(file,'percentile',thresh,out_dir,'lowflops')
 
 def do_floppy(file,thresh,floppy):
   floppy[file]=is_unfloppy(file,thresh)
@@ -61,7 +61,9 @@ def main():
                       nargs=1, type=int, default=[1])
   parser.add_argument('-t', metavar='threshold',
                       help='Treshold flopiness',
-                      nargs=1, default=[0.001])
+                      nargs=1, type=float, default=[0.001])
+  parser.add_argument('-o', help='Output directory',
+                      nargs=1, type=str, default=['.'], metavar='output_dir')
   parser.add_argument('filearg', help='File, directory, or quoted'
                       ' glob pattern', nargs='?',default='jobs')
   n=parser.parse_args()
@@ -72,26 +74,29 @@ def main():
   m      = multiprocessing.Manager()
   floppy = m.dict()
   thresh = n.t[0]
+  outdir = n.o[0]
   
   partial_floppy=functools.partial(do_floppy,thresh=thresh,floppy=floppy)
 
   pool.map(partial_floppy,filelist)
 
-  print '----------- Low Flops -----------'
   badjobs=[]
   for i in floppy.keys():
     if floppy[i]:
-      print i.split('/')[-1]
       badjobs.append(i)
-
+  
   pool.map(do_mp,zip(badjobs,
                      [thresh for x in range(len(badjobs))],
-                     ['.' for x in range(len(badjobs))])) 
-
+                     [outdir for x in range(len(badjobs))])) 
 
   pool.close()
   pool.join()
 
+
+  print '----------- Low Flops -----------'
+  for i in badjobs:
+    print i.split('/')[-1]
+  
 if __name__ == '__main__':
   main()
   

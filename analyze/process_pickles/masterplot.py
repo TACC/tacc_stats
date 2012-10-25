@@ -107,7 +107,8 @@ def plot_mmm(ax, ts, index, xscale=1.0, yscale=1.0, xlabel='', ylabel=''):
   ax.yaxis.set_major_locator( matplotlib.ticker.MaxNLocator(nbins=4))
   tspl_utils.adjust_yaxis_range(ax,0.1)
 
-def master_plot(file,mode='lines',threshold=False,output_dir='.'):
+def master_plot(file,mode='lines',threshold=False,
+                output_dir='.',prefix='graph'):
   k1=['amd64_core','amd64_core','amd64_sock','lnet','lnet','ib_sw','ib_sw',
       'cpu']
   k2=['SSE_FLOPS','DCSF','DRAM','rx_bytes','tx_bytes','rx_bytes','tx_bytes',
@@ -168,7 +169,7 @@ def master_plot(file,mode='lines',threshold=False,output_dir='.'):
   plt.suptitle(title)
   plt.subplots_adjust(hspace=0.35)
 
-  fname='_'.join(['graph',ts.j.id,ts.j.acct['owner'],'master'])
+  fname='_'.join([prefix,ts.j.id,ts.j.acct['owner'],'master'])
   if mode == 'hist':
     fname+='_hist'
   elif mode == 'percentile':
