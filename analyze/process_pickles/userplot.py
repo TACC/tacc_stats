@@ -44,6 +44,8 @@ def main():
 
   partial_getuser=functools.partial(getuser,user=n.u[0],files=files)
   pool.map(partial_getuser,filelist)
+  pool.close()
+  pool.join()
 
 if __name__ == "__main__":
   main()
