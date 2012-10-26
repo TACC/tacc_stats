@@ -189,11 +189,20 @@ def main():
                       nargs=1, type=str, default=['.'], metavar='output_dir')
   parser.add_argument('filearg', help='File, directory, or quoted'
                       ' glob pattern', nargs='?',default='jobs')
+  parser.add_argument('-p', help='Set number of processes',
+                      nargs=1, type=int, default=[1])
   n=parser.parse_args()
 
+#  pool   = multiprocessing.Pool(processes=n.p[0])
+#  m      = multiprocessing.Manager()
+
   filelist=tspl_utils.getfilelist(n.filearg)
-  for file in filelist:
-    master_plot(file,n.m[0],output_dir=n.o[0])
+
+  r=range(len(filelist))
+  map(master_plot,zip(filelist,
+                      [n.m[0] for x in r],
+                      [False  for x in r],
+                      [n.o[o] for x in r])
 
 
 if __name__ == '__main__':
