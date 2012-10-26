@@ -69,7 +69,7 @@ def plot_thist(ax, ts, index, xscale=1.0, yscale=1.0, xlabel='', ylabel=''):
   ax.pcolor(ts.t/xscale,hist[1]/yscale,h2,
             edgecolors='none',rasterized=True,cmap='spectral')
   setlabels(ax,ts,index,xlabel,ylabel,yscale)
-  ax.yaxis.set_major_locator( matplotlib.ticker.MaxNLocator(nbins=4))
+  ax.autoscale(tight=True)
 
 def plot_mmm(ax, ts, index, xscale=1.0, yscale=1.0, xlabel='', ylabel=''):
   tmid=(ts.t[:-1]+ts.t[1:])/2.0
@@ -133,7 +133,7 @@ def master_plot(file,mode='lines',threshold=False,
   fig,ax=plt.subplots(6,1,figsize=(8,12),dpi=80)
 
   if mode == 'hist':
-    plot=plot_hist
+    plot=plot_thist
   elif mode == 'percentile':
     plot=plot_mmm
   else:
@@ -202,7 +202,6 @@ def main():
   filelist=tspl_utils.getfilelist(n.filearg)
 
   r=range(len(filelist))
-  print r
   pool.map(do_mp,zip(filelist,
                      [n.m[0]  for x in r],
                      [False   for x in r],

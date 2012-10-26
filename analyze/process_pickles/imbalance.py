@@ -93,7 +93,7 @@ def compute_imbalance(file,k1,k2,threshold,plot_flag,full_flag,ratios):
       vals[j].append(v[j])
     mean.append(scipy.stats.tmean(vals[j]))
     std.append(scipy.stats.tstd(vals[j]))
-    
+
   imbl=maxval-minval
   ratio=numpy.divide(std,mean)
   ratio2=numpy.divide(imbl,maxval)
