@@ -11,6 +11,7 @@ import matplotlib.pyplot as plt
 import numpy
 import scipy, scipy.stats
 import argparse
+import multiprocessing
 import tspl, tspl_utils, lariat_utils
 
 # Reduce data from ts object
@@ -107,6 +108,9 @@ def plot_mmm(ax, ts, index, xscale=1.0, yscale=1.0, xlabel='', ylabel=''):
   ax.yaxis.set_major_locator( matplotlib.ticker.MaxNLocator(nbins=4))
   tspl_utils.adjust_yaxis_range(ax,0.1)
 
+def do_mp(arg):
+  master_plot(*arg)
+
 def master_plot(file,mode='lines',threshold=False,
                 output_dir='.',prefix='graph'):
   k1=['amd64_core','amd64_core','amd64_sock','lnet','lnet','ib_sw','ib_sw',
@@ -193,16 +197,20 @@ def main():
                       nargs=1, type=int, default=[1])
   n=parser.parse_args()
 
-#  pool   = multiprocessing.Pool(processes=n.p[0])
-#  m      = multiprocessing.Manager()
+  pool   = multiprocessing.Pool(processes=n.p[0])
 
   filelist=tspl_utils.getfilelist(n.filearg)
 
   r=range(len(filelist))
-  map(master_plot,zip(filelist,
-                      [n.m[0] for x in r],
-                      [False  for x in r],
-                      [n.o[o] for x in r])
+  print r
+  pool.map(do_mp,zip(filelist,
+                     [n.m[0]  for x in r],
+                     [False   for x in r],
+                     [n.o[0]  for x in r],
+                     ['graph' for x in r]))
+
+  pool.close()
+  pool.join()
 
 
 if __name__ == '__main__':
