@@ -124,7 +124,7 @@ def master_plot(file,mode='lines',threshold=False,
   except tspl.TSPLException as e:
     return
 
-  if not tspl_utils.checkjob(ts,3600,16):
+  if not tspl_utils.checkjob(ts,3600,[x + 1 for x in range(16)]):
     return
   elif ts.numhosts < 2:
     print ts.j.id + ': 1 host'
