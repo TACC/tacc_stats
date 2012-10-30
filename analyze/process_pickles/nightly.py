@@ -13,8 +13,10 @@ import tspl, tspl_utils, imbalance, masterplot, uncorrelated
 
 def do_mp(arg):
   (file,thresh,out_dir)=arg
-  masterplot.master_plot(file,'lines',thresh,out_dir,'imbalanced')
-  masterplot.master_plot(file,'percentile',thresh,out_dir,'imbalanced')
+  masterplot.master_plot(file,'lines',thresh,out_dir,'imbalance',
+                         header='Potentially Imbalanced')
+  masterplot.master_plot(file,'percentile',thresh,out_dir,'imbalance',
+                         header='Potentially Imbalanced (Percentiles)')
 
 def do_un(arg):
   file,output_dir=arg

@@ -12,8 +12,10 @@ import tspl, tspl_utils, lariat_utils, masterplot
 
 def do_mp(arg):
   (file,thresh,out_dir)=arg
-  masterplot.master_plot(file,'lines',thresh,out_dir,'lowflops')
-  masterplot.master_plot(file,'percentile',thresh,out_dir,'lowflops')
+  masterplot.master_plot(file,'lines',thresh,out_dir,'lowflops',
+                         header='Measured Low Flops')
+  masterplot.master_plot(file,'percentile',thresh,out_dir,'lowflops',
+                         header='Measured Low Flops')
 
 def do_floppy(file,thresh,floppy):
   floppy[file]=is_unfloppy(file,thresh)

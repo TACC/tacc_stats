@@ -109,7 +109,8 @@ def plot_mmm(ax, ts, index, xscale=1.0, yscale=1.0, xlabel='', ylabel=''):
   tspl_utils.adjust_yaxis_range(ax,0.1)
 
 def master_plot(file,mode='lines',threshold=False,
-                output_dir='.',prefix='graph',mintime=3600,wayness=16):
+                output_dir='.',prefix='graph',mintime=3600,wayness=16,
+                header='Master'):
   k1=['amd64_core','amd64_core','amd64_sock','lnet','lnet','ib_sw','ib_sw',
       'cpu']
   k2=['SSE_FLOPS','DCSF','DRAM','rx_bytes','tx_bytes','rx_bytes','tx_bytes',
@@ -155,11 +156,9 @@ def master_plot(file,mode='lines',threshold=False,
   
   print ts.j.id + ': '
 
-  title=ts.title
+  title=header+'\n'+ts.title
   if threshold:
     title+=', V: %(v)-8.3f' % {'v': threshold}
-  if mode == 'percentile':
-    title='Percentiles, ' + title
   ld=lariat_utils.LariatData(ts.j.id,ts.j.end_time,'/scratch/projects/lariatData')
   title += '\n' + ld.title()
 
