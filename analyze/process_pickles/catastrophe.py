@@ -3,14 +3,14 @@
 import sys
 sys.path.append('../../monitor')
 import datetime, glob, job_stats, os, subprocess, time
-import itertools, argparse, functools
+import itertools, argparse, functools, multiprocessing
 import matplotlib
 if not 'matplotlib.pyplot' in sys.modules:
   matplotlib.use('pdf')
 import matplotlib.pyplot as plt
 import numpy
 import math
-import tspl, tspl_utils
+import tspl, tspl_utils, masterplot
 
 def compute_fit_params(ts,ind):
 
@@ -28,7 +28,7 @@ def compute_fit_params(ts,ind):
     
                       
 
-def fit_step(fn,k1,k2,genplot=False):
+def fit_step(fn,k1,k2,genplot=False,res={}):
   
   try:
     ts=tspl.TSPLSum(fn,k1,k2)
@@ -61,47 +61,47 @@ def fit_step(fn,k1,k2,genplot=False):
     fig.savefig('foo.pdf')
     plt.close()
 
-  res=[]
+  r=[]
   for i in range(m):
     jnd=numpy.argmin(brr[i,:])
-    res.append((jnd,brr[i,jnd]))
+    r.append((jnd,brr[i,jnd]))
 
-  return res
-               
+  res[fn]=r
+
 
 def main():
   parser = argparse.ArgumentParser(description='')
   parser.add_argument('-p', help='Set number of processes',
                       nargs=1, type=int, default=[1])
+  parser.add_argument('-o', help='Output directory',
+                      nargs=1, type=str, default=['.'], metavar='output_dir')
   parser.add_argument('filearg', help='File, directory, or quoted'
                       ' glob pattern', nargs='?',default='jobs')
   n=parser.parse_args()
   
   filelist=tspl_utils.getfilelist(n.filearg)
 
-  k1=['amd64_core']
-  k2=['SSE_FLOPS']
-  
-  fit_partial=functools.partial(fit_step,k1=k1,k2=k2,genplot=False)
-                                             
+  k1=['amd64_sock']
+  k2=['DRAM']
 
-  res=map(fit_partial,filelist)
+  pool   = multiprocessing.Pool(processes=n.p[0])
+  m      = multiprocessing.Manager()
+  res    = m.dict()                                         
 
-  print res
+  fit_partial=functools.partial(fit_step,k1=k1,k2=k2,genplot=False,res=res)
 
-  cnt=0
-  for i in res:
-    if i != None:
-      for (ind,ratio) in i:
-        if ratio < 1e-3:
-          print filelist[cnt] + ': ' + str(i)
-          break
-    cnt+=1
-      
-    
-    
-#  print vals
+  pool.map(fit_partial,filelist)
 
+  pool.close()
+  pool.join()
+
+  for fn in res.keys():
+    for (ind,ratio) in res[fn]:
+      if ratio < 1e-3:
+        print fn + ': ' + str(res[fn])
+        masterplot.master_plot(fn,'lines',False,n.o[0],'catastrophe',
+                               1,[x+1 for x in range(16)])
+        break
    
 if __name__ == '__main__':
   main()

@@ -11,7 +11,7 @@ import matplotlib.pyplot as plt
 import numpy
 import scipy, scipy.stats
 import argparse
-import multiprocessing
+import multiprocessing, functools
 import tspl, tspl_utils, lariat_utils
 
 # Reduce data from ts object
@@ -108,11 +108,8 @@ def plot_mmm(ax, ts, index, xscale=1.0, yscale=1.0, xlabel='', ylabel=''):
   ax.yaxis.set_major_locator( matplotlib.ticker.MaxNLocator(nbins=4))
   tspl_utils.adjust_yaxis_range(ax,0.1)
 
-def do_mp(arg):
-  master_plot(*arg)
-
 def master_plot(file,mode='lines',threshold=False,
-                output_dir='.',prefix='graph'):
+                output_dir='.',prefix='graph',mintime=3600,wayness=16):
   k1=['amd64_core','amd64_core','amd64_sock','lnet','lnet','ib_sw','ib_sw',
       'cpu']
   k2=['SSE_FLOPS','DCSF','DRAM','rx_bytes','tx_bytes','rx_bytes','tx_bytes',
@@ -124,10 +121,7 @@ def master_plot(file,mode='lines',threshold=False,
   except tspl.TSPLException as e:
     return
 
-  if not tspl_utils.checkjob(ts,3600,[x + 1 for x in range(16)]):
-    return
-  elif ts.numhosts < 2:
-    print ts.j.id + ': 1 host'
+  if not tspl_utils.checkjob(ts,mintime,wayness):
     return
 
   fig,ax=plt.subplots(6,1,figsize=(8,12),dpi=80)
@@ -195,19 +189,24 @@ def main():
                       ' glob pattern', nargs='?',default='jobs')
   parser.add_argument('-p', help='Set number of processes',
                       nargs=1, type=int, default=[1])
+  parser.add_argument('-s', help='Set minimum time in seconds',
+                      nargs=1, type=int, default=[3600])
   n=parser.parse_args()
 
-  pool   = multiprocessing.Pool(processes=n.p[0])
-
   filelist=tspl_utils.getfilelist(n.filearg)
+  procs  = min(len(filelist),n.p[0])
+  pool   = multiprocessing.Pool(processes=procs)
 
-  r=range(len(filelist))
-  pool.map(do_mp,zip(filelist,
-                     [n.m[0]  for x in r],
-                     [False   for x in r],
-                     [n.o[0]  for x in r],
-                     ['graph' for x in r]))
 
+  partial_master=functools.partial(master_plot,mode=n.m[0],
+                                   threshold=False,
+                                   output_dir=n.o[0],
+                                   prefix='graph',
+                                   mintime=n.s[0],
+                                   wayness=[x+1 for x in range(16)])
+  
+  pool.map(partial_master,filelist)
+  
   pool.close()
   pool.join()
 
