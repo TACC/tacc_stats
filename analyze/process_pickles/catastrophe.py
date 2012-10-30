@@ -100,7 +100,7 @@ def main():
       if ratio < 1e-3:
         print fn + ': ' + str(res[fn])
         masterplot.master_plot(fn,'lines',False,n.o[0],'catastrophe',
-                               1,[x+1 for x in range(16)])
+                               1,[x+1 for x in range(16)]) 
         break
    
 if __name__ == '__main__':
