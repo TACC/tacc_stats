@@ -12,7 +12,7 @@ import numpy
 import scipy, scipy.stats
 import argparse
 import multiprocessing, functools
-import tspl, tspl_utils, lariat_utils
+import tspl, tspl_utils, lariat_utils, my_utils
 
 # Reduce data from ts object
 # add and subtract arrays from data based on sign of index variable in
@@ -126,6 +126,7 @@ def master_plot(file,mode='lines',threshold=False,
     return
 
   fig,ax=plt.subplots(6,1,figsize=(8,12),dpi=80)
+  ax=my_utils.flatten(ax)
 
   if mode == 'hist':
     plot=plot_thist

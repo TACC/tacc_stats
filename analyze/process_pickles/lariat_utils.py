@@ -31,12 +31,23 @@ class LariatData:
       try:
         self.user=self.ld[jobid][0]['user']
         self.exc=self.ld[jobid][0]['exec']
+        self.cwd=self.ld[jobid][0]['cwd']
       except KeyError:
-        print jobid + ' did not call ibrun or got killed before ibrun finished'
+        print jobid + ' did not call ibrun' + \
+              ' or has no lariat data for some other reason'
         self.user='nobody'
         self.exc='unknown'
+        self.cwd='unknown'
 
   def title(self):
-    return 'E: ' + self.exc
+    title='E: ' + self.exc
+    if (self.cwd != 'unknown'):
+      if ((len(self.exc) + len (self.cwd)) > 50):
+        sep=',\n'
+      else:
+        sep=', '
+      title += sep + 'CWD: ' + self.cwd
+    return title
+  
       
 
