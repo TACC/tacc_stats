@@ -8,7 +8,7 @@ import matplotlib
 if not 'matplotlib.pyplot' in sys.modules:
   matplotlib.use('pdf')
 import matplotlib.pyplot as plt
-import numpy, scipy, scipy.interpolate
+import numpy
 import tspl, tspl_utils
 import multiprocessing, functools
 import pprint
@@ -21,68 +21,57 @@ def get_samples(fn,times):
 
   times.append(sorted(list(ts.j.times)))
 
-def global_interp_lnet_data(ts,samples):
-  vals=numpy.zeros(len(samples))
-  accum=numpy.zeros(len(ts.j.times))
-  for i in range(2):
-    for h in ts.data[i].values():
-      accum+=h[0]
-
-  if len(ts.j.times)<2:
-    return vals
-  
-  f=scipy.interpolate.interp1d(ts.j.times,accum)
-
-  mint=min(ts.j.times)
-  maxt=max(ts.j.times)
-  for (s,i) in zip(samples,range(len(samples))):
-    if s < mint:
-      continue
-    elif s > maxt:
-      vals[i]+=accum[-1]
-    else:
-      vals[i]+=f(s)
-
-  return vals
-
-def get_lnet_data_file(fn,samples,histories):
-  print fn
+def get_lnet_data_file(fn,k1,k2,samples,histories):
   try:
-    ts=tspl.TSPLSum(fn,['lnet','lnet'],['tx_bytes','rx_bytes'])
+    ts=tspl.TSPLSum(fn,k1,k2)
   except tspl.TSPLException as e:
     return
 
-  histories[ts.j.id]=global_interp_lnet_data(ts,samples)
+  histories[ts.j.id]=tspl_utils.global_interp_data(ts,samples)
 
 def main():
 
   parser = argparse.ArgumentParser(description='')
-  parser.add_argument('filearg', help='File, directory, or quoted'
-                      ' glob pattern', nargs='?',default='jobs')
   parser.add_argument('-p', help='Set number of processes',
                       nargs=1, type=int, default=[1])
+  parser.add_argument('-k1', help='Set first key',
+                      nargs='+', type=str, default=['amd64_sock'])
+  parser.add_argument('-k2', help='Set second key',
+                      nargs='+', type=str, default=['DRAM'])
+  parser.add_argument('-f', help='File, directory, or quoted'
+                      ' glob pattern', nargs=1, type=str, default=['jobs'])
   n=parser.parse_args()
-  
-  filelist=tspl_utils.getfilelist(n.filearg)
+
+  filelist=tspl_utils.getfilelist(n.f[0])
 
   procs=min(len(filelist),n.p[0])
-  pool=multiprocessing.Pool(processes=procs)
   m      = multiprocessing.Manager()
   histories = m.dict()
   times = m.list()
 
-  partial_get_samples=functools.partial(get_samples,times=times)
-  pool.map(partial_get_samples,filelist)
+#  print 'Getting samples'
+#  partial_get_samples=functools.partial(get_samples,times=times)
+#  pool=multiprocessing.Pool(processes=procs)
+#  pool.map(partial_get_samples,filelist)
+#
+#  pool.close()
+#  pool.join()
+#
+#  samples=set([])
+#  for t in times:
+#    samples=samples.union(t)
 
-  samples=set([])
-  for t in times:
-    samples=set(sorted(samples.union(set(sorted(t)))))
+#  samples=numpy.array(sorted(samples))
 
-  samples=numpy.array(sorted(samples))
+  samples=numpy.array(range(1349067600,1352440800+1,3600))
 
-  partial_glndf=functools.partial(get_lnet_data_file,
+  print len(samples)
+
+  partial_glndf=functools.partial(get_lnet_data_file,k1=n.k1,k2=n.k2,
                                   samples=samples,histories=histories)
 
+  print 'Getting data'
+  pool=multiprocessing.Pool(processes=procs)
   pool.map(partial_glndf,filelist)
   pool.close()
   pool.join()
@@ -91,12 +80,13 @@ def main():
   for h in histories.values():
     accum+=h
 
+  print 'Plotting'
   fig,ax=plt.subplots(1,1,dpi=80)
 
   t=numpy.array([float(x) for x in samples])
 
   t-=t[0]
-  ax.plot(t[:-1]/3600.,numpy.diff(accum)/numpy.diff(t)/1e9)
+  ax.plot(t[:-1]/3600.,numpy.diff(accum)/numpy.diff(t))
 
   fig.savefig('bar')
   plt.close()
