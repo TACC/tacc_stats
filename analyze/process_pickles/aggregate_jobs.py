@@ -49,21 +49,21 @@ def main():
   histories = m.dict()
   times = m.list()
 
-#  print 'Getting samples'
-#  partial_get_samples=functools.partial(get_samples,times=times)
-#  pool=multiprocessing.Pool(processes=procs)
-#  pool.map(partial_get_samples,filelist)
-#
-#  pool.close()
-#  pool.join()
-#
-#  samples=set([])
-#  for t in times:
-#    samples=samples.union(t)
+  print 'Getting samples'
+  partial_get_samples=functools.partial(get_samples,times=times)
+  pool=multiprocessing.Pool(processes=procs)
+  pool.map(partial_get_samples,filelist)
 
-#  samples=numpy.array(sorted(samples))
+  pool.close()
+  pool.join()
 
-  samples=numpy.array(range(1349067600,1352440800+1,3600))
+  samples=set([])
+  for t in times:
+    samples=samples.union(t)
+
+  samples=numpy.array(sorted(samples))
+
+#  samples=numpy.array(range(1349067600,1352440800+1,3600))
 
   print len(samples)
 

@@ -1,6 +1,6 @@
 import cPickle as pickle
 import numpy
-import glob, os, stat, time
+import glob, os, stat, time, datetime
 import re
 
 class TSPLException(Exception):
@@ -35,9 +35,13 @@ class TSPLBase:
     g=self.j.hosts[self.j.hosts.keys()[0]]
     self.size=len(g.stats[self.k1[0]].values()[0])
 
-    self.title='ID: %(ID)s, user: %(u)s, N: %(name)s, NH: %(nh)d' % \
+    d=datetime.datetime.fromtimestamp(self.j.acct['end_time'])
+    self.end_date=d.strftime('%Y-%m-%d %H:%M:%S')
+
+    self.title='ID: %(ID)s, u: %(u)s, N: %(name)s, D: %(date)s, NH: %(nh)d' % \
            { 'ID' : self.j.id,'u': self.j.acct['owner'],
-             'name': self.j.acct['name'], 'nh' : self.numhosts }
+             'name': self.j.acct['name'], 'nh' : self.numhosts,
+             'date': self.end_date }
 
     # Create an array of dictionaries of lists initialized and constructed using
     # derived class methods for the keys of interest.
