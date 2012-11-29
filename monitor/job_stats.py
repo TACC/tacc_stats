@@ -421,6 +421,8 @@ class Job(object):
         def error(fmt, *args):
             return self.error("host `%s', type `%s', dev `%s': " + fmt,
                               host.name, type_name, dev_name, *args)
+        # raw is a list of pairs with car the timestamp and cdr a 1d
+        # numpy array of values.
         m = len(self.times)
         n = len(schema)
         A = numpy.zeros((m, n), dtype=numpy.uint64) # Output.
@@ -432,7 +434,7 @@ class Job(object):
         # with the closest timestamps.
         for i in range(1, m - 1):
             t = self.times[i]
-            while k + 1 < len(raw) and abs(raw[k + 1][0] - t) < abs(raw[k][0] - t):
+            while k + 1 < len(raw) and abs(raw[k + 1][0] - t) <= abs(raw[k][0] - t):
                 k += 1
             A[i] = raw[k][1]
         # OK, we fit the raw values into A.  Now fixup rollover and
