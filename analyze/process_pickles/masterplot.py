@@ -116,6 +116,7 @@ def master_plot(file,mode='lines',threshold=False,
   k2=['SSE_FLOPS','DCSF','DRAM','rx_bytes','tx_bytes','rx_bytes','tx_bytes',
       'user']
 
+  print 'aa'
   try:
     print file
     ts=tspl.TSPLSum(file,k1,k2)
@@ -127,7 +128,7 @@ def master_plot(file,mode='lines',threshold=False,
 
   fig,ax=plt.subplots(6,1,figsize=(8,12),dpi=80)
   ax=my_utils.flatten(ax)
-
+  print 'bb'
   if mode == 'hist':
     plot=plot_thist
   elif mode == 'percentile':
@@ -156,13 +157,14 @@ def master_plot(file,mode='lines',threshold=False,
        ylabel='Total cpu user\nfraction')
   
   print ts.j.id + ': '
-
+  print 'cc'
+  
   title=header+'\n'+ts.title
   if threshold:
     title+=', V: %(v)-8.3f' % {'v': threshold}
   ld=lariat_utils.LariatData(ts.j.id,ts.j.end_time,'/scratch/projects/lariatData')
   title += '\n' + ld.title()
-
+  print 'dd'
 
   plt.suptitle(title)
   plt.subplots_adjust(hspace=0.35)
@@ -195,8 +197,12 @@ def main():
 
   filelist=tspl_utils.getfilelist(n.filearg)
   procs  = min(len(filelist),n.p[0])
-  pool   = multiprocessing.Pool(processes=procs)
 
+  if procs < 1:
+    print 'Must have at least one file'
+    exit(1)
+    
+  pool   = multiprocessing.Pool(processes=procs)
 
   partial_master=functools.partial(master_plot,mode=n.m[0],
                                    threshold=False,

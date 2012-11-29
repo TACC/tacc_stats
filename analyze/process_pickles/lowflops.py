@@ -80,19 +80,24 @@ def main():
   
   partial_floppy=functools.partial(do_floppy,thresh=thresh,floppy=floppy)
 
-  pool.map(partial_floppy,filelist)
+  if len(filelist) != 0:
+    pool.map(partial_floppy,filelist)
+    pool.close()
+    pool.join()
 
   badjobs=[]
   for i in floppy.keys():
     if floppy[i]:
       badjobs.append(i)
   
-  pool.map(do_mp,zip(badjobs,
-                     [thresh for x in range(len(badjobs))],
-                     [outdir for x in range(len(badjobs))])) 
 
-  pool.close()
-  pool.join()
+  pool   = multiprocessing.Pool(processes=n.p[0])
+  if len(badjobs) != 0:
+    pool.map(do_mp,zip(badjobs,
+                       [thresh for x in range(len(badjobs))],
+                       [outdir for x in range(len(badjobs))])) 
+    pool.close()
+    pool.join()
 
 
   print '----------- Low Flops -----------'

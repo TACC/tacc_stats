@@ -68,7 +68,10 @@ def main():
   
   partial_isidle=functools.partial(do_isidle,thresh=thresh,idleness=idleness)
 
-  pool.map(partial_isidle,filelist)
+  if len(filelist) != 0:
+    pool.map(partial_isidle,filelist)
+    pool.close()
+    pool.join()
 
 
   print '----------- Idle Jobs -----------'
@@ -76,9 +79,7 @@ def main():
     if idleness[i]:
       print i.split('/')[-1]
 
-  pool.close()
-  pool.join()
-
+  
 if __name__ == '__main__':
   main()
   

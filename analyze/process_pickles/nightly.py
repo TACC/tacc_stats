@@ -13,6 +13,7 @@ import tspl, tspl_utils, imbalance, masterplot, uncorrelated
 
 def do_mp(arg):
   (file,thresh,out_dir)=arg
+  
   masterplot.master_plot(file,'lines',thresh,out_dir,'imbalance',
                          header='Potentially Imbalanced')
   masterplot.master_plot(file,'percentile',thresh,out_dir,'imbalance',
@@ -50,7 +51,11 @@ def main():
                                   threshold=float(n.threshold),
                                   plot_flag=False,full_flag=False,
                                   ratios=ratios)
-  pool.map(partial_imbal,filelist)
+  if len(filelist) != 0:
+    pool.map(partial_imbal,filelist)
+
+    pool.close()
+    pool.join()
 
   badfiles=[]
   th=[]
@@ -63,16 +68,18 @@ def main():
           badfiles.append(f)
           th.append(v)
           dirs.append(n.o[0])
-          
-  pool.map(do_mp,zip(badfiles,th,dirs)) # Pool.starmap should exist....
+
+  
+  if len(badfiles) != 0 or len(th) != 0 or len(dirs) != 0:
+    pool = multiprocessing.Pool(processes=n.p[0])
+    pool.map(do_mp,zip(badfiles,th,dirs)) # Pool.starmap should exist....
+    pool.close()
+    pool.join()
 
   bad_users=imbalance.find_top_users(ratios)
 
 #### Not presently useful
 #### pool.map(do_un,zip(badfiles,dirs))
 
-  pool.close()
-  pool.join()
-  
 if __name__ == "__main__":
   main()

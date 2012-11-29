@@ -63,6 +63,9 @@ def compute_imbalance(file,k1,k2,threshold,plot_flag,full_flag,ratios):
       ts=tspl.TSPLSum(file,k1,k2)
   except tspl.TSPLException as e:
     return
+  except EOFError as e:
+    print 'End of file found reading: ' + file
+    return
 
   if not tspl_utils.checkjob(ts,3600,16): # 1 hour, 16way only
     return

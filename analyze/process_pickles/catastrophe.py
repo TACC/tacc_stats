@@ -90,10 +90,10 @@ def main():
 
   fit_partial=functools.partial(fit_step,k1=k1,k2=k2,genplot=False,res=res)
 
-  pool.map(fit_partial,filelist)
-
-  pool.close()
-  pool.join()
+  if len(filelist) != 0:
+    pool.map(fit_partial,filelist)
+    pool.close()
+    pool.join()
 
   for fn in res.keys():
     for (ind,ratio) in res[fn]:
