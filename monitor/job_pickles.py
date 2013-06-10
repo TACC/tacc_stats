@@ -3,8 +3,8 @@ import datetime, glob, job_stats, os, sge_acct, subprocess, sys, time
 import cPickle as pickle
 
 prog_name = os.path.basename(sys.argv[0])
-acct_path = '/share/sge6.2/default/common/accounting'
-host_list_dir = '/share/sge6.2/default/tacc/hostfile_logs'
+acct_path = os.getenv('TACC_STATS_ACCT_PATH', '/share/sge6.2/default/common/accounting')
+host_list_dir = os.getenv('TACC_STATS_HOST_LIST_DIR', '/share/sge6.2/default/tacc/hostfile_logs')
 pickle_prot = pickle.HIGHEST_PROTOCOL
 
 def FATAL(str):
