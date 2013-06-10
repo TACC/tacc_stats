@@ -1,12 +1,18 @@
 #!/bin/bash
 
 # README
-# This script is used to generate pickles for certain dates.
-# Make sure to edit pickle.conf for your specific environment.
-# Note that this script will create the pickle for the start
-# date and all the dates inbetween but not the end date.
-# Also note that the date arguments can be in any format because
-# they are converted into the correct format inside the script.
+# This script is used to generate pickles for certain dates. For
+# each day in the range specified (except for the last day) it
+# will create a YYYY-MM-DD.tar.gz in the $dst_dir (specified in
+# pickle.conf) that contains the pickle files for the jobs that
+# ended on that date. Make sure to edit pickle.conf for your
+# specific environment. Note that the date arguments can be in
+# any format because they are converted into the correct format
+# inside the script.
+
+# ARGUMENTS
+# $1 - start date
+# $2 - end date
 
 # HOW TO RUN
 # ./do_job_pickles.sh 2013-01-01 2013-02-01
