@@ -1,27 +1,37 @@
 #!/bin/bash
-set -eux
 
+# README
+# This script is used to generate pickles for certain dates.
+# Make sure to edit pickle.conf for your specific environment.
+# Note that this script will create the pickle for the start
+# date and all the dates inbetween but not the end date.
+# Also note that the date arguments can be in any format because
+# they are converted into the correct format inside the script.
+
+# HOW TO RUN
+# ./do_job_pickles.sh 2013-01-01 2013-02-01
+
+
+set -eux
 prog=$(basename $0)
 prog_dir=$(readlink -f $(dirname $0))
 export PATH=$PATH:$prog_dir
-export PYTHONPATH=$PYTHONPATH:$prog_dir
+export PYTHONPATH=$prog_dir
 
-tmp_dir=${tmp_dir:-/dev/shm/}
-dst_dir=${dst_dir:-/scratch/projects/tacc_stats/pickles/}
+# read the configuration file
+source $prog_dir/pickle.conf
 
-arg_start_date=${1:-}
-arg_end_date=${2:-}
-
-start_date=$(date --date="$arg_start_date" +%F)
-end_date=$(date --date="$arg_end_date" +%F)
+# convert dates to format needed YYYY-MM-DD
+start_date=$(date --date="$1" +%F)
+end_date=$(date --date="$2" +%F)
 
 if [ x"$start_date" = x ] || [ x"$end_date" = x ]; then
     echo "Usage: $prog START_DATE END_DATE" >&2
     exit 1
 fi
 
+# go through each date and create pickles
 date=$start_date
-
 while [[ $date < $end_date ]]; do
     for hours in 22 23 24 25 26; do
         next_date=$(date --date="$date + $hours hours" +%F)
