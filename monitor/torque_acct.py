@@ -1,17 +1,32 @@
 import csv, os, subprocess
 
-# Fields in the TORQUE/PBS accounting file.
-# clusterresources.com/torquedocs21/9.1accounting.shtml
-# docs.adaptivecomputing.com/torque/4-1-3/help.htm
+# TORQUE/PBS accounting file
+# docs.adaptivecomputing.com/torque/4-1-3/help.htm#topics/9-accounting/accountingRecords.htm
+
+# TORQUE maintains accounting records for batch jobs in the following directory:
+#  $TORQUEROOT/server_priv/accounting/<TIMESTAMP>
+#  $TORQUEROOT defaults to /usr/spool/PBS and <TIMESTAMP> is in the format: YYYYMMDD.
+# These records include events, time stamps, and information on resources requested and used.
+# Records for four different event types are produced and are described in the following table:
+
+# RECORD MARKER / TYPE / DESCRIPTION
+# A - Abort        Job has been aborted by the server
+# C - checkpoing   Job has been checkpointed and held
+# D - delete       job has been deleted
+# E - exit         Job has exited, either successfully or unsuccessfully
+# Q - queue        Job has been submitted/queued
+# R - rerun        Attempt to rerun the job has been made
+# S - start        Attempt to start the job has been made
+# T - restart      Attempt to restart the job (from checkpoint) has been made
+
+# Accounting Variable Descriptions
+# ctime            Time job was created
+# etime            Time job became eligible to run
+# qtime            Time job was queued
+# start            Time job started to run
 
 # NOTES
 #  - how to figure out end time? current_time - start_time if status == E
-
-# RECORD STATUS
-#  D - delete (job has been deleted)
-#  E - exit (job has exited, either successfully or unsuccessfully)
-#  Q - queue (job has been submitted/queued)
-#  S - start (an attempt to start the job has been made)
 
 
 stats_home = os.getenv('TACC_STATS_HOME', '/scratch/projects/tacc_stats')
