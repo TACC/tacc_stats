@@ -67,9 +67,9 @@ if len(sys.argv) != 4:
 pickle_dir = sys.argv[1]
 start = getdate(sys.argv[2])
 end = getdate(sys.argv[3])
-seek = 800 << 20 # XXX
+seek = 0
 
-# Run though all jobs that ended after start and before end + 3 days.
+# Run though all jobs
 
 for acct in sge_acct.reader(open(acct_path),
                             start_time=start,
