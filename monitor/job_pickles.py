@@ -1,10 +1,12 @@
 #!/usr/bin/env python
 import datetime, glob, job_stats, os, sge_acct, subprocess, sys, time
 import cPickle as pickle
+import socket
+
+configfilename='pickles.'+socket.gethostname().split('.')[0]+'.conf'
+execfile(configfilename)
 
 prog_name = os.path.basename(sys.argv[0])
-acct_path = '/share/sge6.2/default/common/accounting'
-host_list_dir = '/share/sge6.2/default/tacc/hostfile_logs'
 pickle_prot = pickle.HIGHEST_PROTOCOL
 
 def FATAL(str):
@@ -17,7 +19,7 @@ def USAGE(str):
 
 def getdate(date_str):
     try:
-        out = subprocess.check_output(['/bin/date', '--date', date_str, '+%s'])
+        out = subprocess.check_output(['date', '--date', date_str, '+%s'])
         return long(out)
     except subprocess.CalledProcessError, e:
         FATAL("Invalid date: `%s'" % (date_str,))
@@ -29,7 +31,9 @@ def read_host_file_dir(day):
     if day in host_file_dates:
         return
     dir_path = os.path.join(host_list_dir, day.strftime("%Y/%m/%d"))
+    print dir_path
     for ent in os.listdir(dir_path):
+        print ent
         tup = ent.split('.')
         if len(tup) == 3 and tup[0] == 'prolog_hostfile' and tup[1].isdigit():
             host_file_path_dict[tup[1]] = os.path.join(dir_path, ent)

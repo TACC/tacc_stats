@@ -14,7 +14,8 @@ raw_stats_dir = os.getenv('TACC_STATS_RAW', os.path.join(stats_home, 'archive'))
 
 # prolog_host_lists/YYYY/MM/DD/prolog_hostfile.JOBID.*.
 # Symbolic link to /share/sge6.2/default/tacc/hostfile_logs.
-host_list_dir = os.getenv('TACC_STATS_HOSTFILES', os.path.join(stats_home, 'hostfiles'))
+host_list_dir = os.getenv('TACC_STATS_HOSTFILES', os.path.join(stats_home,
+                                                               'hostfiles'))
 
 prog = os.path.basename(sys.argv[0])
 if prog == "":
