@@ -81,7 +81,7 @@ for acct in sge_acct.reader(open(acct_path),
                             seek=seek):
     if acct['end_time'] == 0:
         continue
-    job = job_stats.from_acct(acct)
+    job = job_stats.from_acct(acct, os.getenv('TACC_STATS_HOME','/scratch/projects/tacc_stats'))
     pickle_path = os.path.join(pickle_dir, job.id)
     pickle_file = open(pickle_path, 'w')
     pickle.dump(job, pickle_file, pickle_prot)
