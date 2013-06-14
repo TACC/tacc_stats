@@ -30,29 +30,29 @@ stats_home = os.getenv('TACC_STATS_HOME', '/scratch/projects/tacc_stats')
 acct_path = os.getenv('TACC_STATS_ACCT', os.path.join(stats_home, 'accounting'))
 
 fields = (
-    ('id'                          int, 'Job identifier'),
-    ('hostname'                    str, 'Hostname of the head execution node'),
-    ('user'                        str, 'User that is running the job'),
-    ('group'                       str, 'Group name of the job owner'),
-    ('jobname'                     str, 'Job name'),
-    ('queue'                       str, 'Queue name the job is running on'),
-    ('ctime'                       int, 'Time job was created (unix time stamp)'),
-    ('qtime'                       int, 'Time job was queued (unix time stamp)'),
-    ('etime'                       int, 'Time job was eligible to run (unix time stamp)'),
-    ('start'                       int, 'Time job started to run (unix time stamp)'),
-    ('owner'                       str, 'Owner of the job at hostname'),
-    ('exec_host'                   str, 'List of nodes used'),
-    ('Resource_List.neednodes'     str, 'Requested nodes needed'),
-    ('Resource_List.nodect'        str, 'Requested number of nodes'),
-    ('Resource_List.nodes'         str, 'Requested nodes'),
-    ('Resource_List.walltime'      str, 'Requested walltime'),
-    ('session'                     int, 'Session id'),
-    ('end'                         int, 'Time job ended (unix time stamp)'),
-    ('Exit_status'                 int, 'Exit status of job'),
-    ('resources_used.cput'         str, 'CPU time used'),
-    ('resources_used.mem'          str, 'Memory used'),
-    ('resources_used.vmem'         str, 'Virtual memory used'),
-    ('resources_used.walltime'     str, 'Walltime'),
+    ('id',                          int, 'Job identifier'),
+    ('hostname',                    str, 'Hostname of the head execution node'),
+    ('user',                        str, 'User that is running the job'),
+    ('group',                       str, 'Group name of the job owner'),
+    ('jobname',                     str, 'Job name'),
+    ('queue',                       str, 'Queue name the job is running on'),
+    ('ctime',                       int, 'Time job was created (unix time stamp)'),
+    ('qtime',                       int, 'Time job was queued (unix time stamp)'),
+    ('etime',                       int, 'Time job was eligible to run (unix time stamp)'),
+    ('start',                       int, 'Time job started to run (unix time stamp)'),
+    ('owner',                       str, 'Owner of the job at hostname'),
+    ('exec_host',                   str, 'List of nodes used'),
+    ('Resource_List.neednodes',     str, 'Requested nodes needed'),
+    ('Resource_List.nodect',        int, 'Requested number of nodes'),
+    ('Resource_List.nodes',         str, 'Requested nodes'),
+    ('Resource_List.walltime',      str, 'Requested walltime'),
+    ('session',                     int, 'Session id'),
+    ('end',                         int, 'Time job ended (unix time stamp)'),
+    ('Exit_status',                 int, 'Exit status of job'),
+    ('resources_used.cput',         str, 'CPU time used'),
+    ('resources_used.mem',          str, 'Memory used'),
+    ('resources_used.vmem',         str, 'Virtual memory used'),
+    ('resources_used.walltime',     str, 'Walltime')
 )
 
 
@@ -68,11 +68,6 @@ fields = (
 #   Iterator for all jobs that finished between start_time and end_time, the
 #   iterator is returned with the yield command so it will use less memory.
 def reader(dir, start_time=0, end_time=9223372036854775807L):
-
-    # check if a directory is given, accounting files for TORQUE are stored in
-    # a directory named by the date YYYYMMDD
-    if not os.path.isdir(dir)
-        return None
 
     # turn unix timestamp into date object
     start_date = datetime.date.fromtimestamp(start_time)
@@ -97,7 +92,7 @@ def reader(dir, start_time=0, end_time=9223372036854775807L):
                 acct_data = acct_data[3].split(' ')
 
                 for stat in acct_data:
-                    acct_data_arr[ stat[:stat.find('=')] ] = stat[stat.find('=')+1:]
+                    acct_data_arr[ stat[:stat.find('=')] ] = stat[stat.find('=')+1:].strip()
 
                 acct_data_arr['hostname'] = acct_data_arr['exec_host'][:acct_data_arr['exec_host'].find('/')]
 
