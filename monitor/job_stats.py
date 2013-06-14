@@ -16,6 +16,8 @@ raw_stats_dir = os.getenv('TACC_STATS_RAW', os.path.join(stats_home, 'archive'))
 # Symbolic link to /share/sge6.2/default/tacc/hostfile_logs.
 host_list_dir = os.getenv('TACC_STATS_HOSTFILES', os.path.join(stats_home, 'hostfiles'))
 
+scheduler = os.getenv('TACC_STATS_JOB_SCHEDULER')
+
 prog = os.path.basename(sys.argv[0])
 if prog == "":
     prog = "***"
@@ -190,6 +192,8 @@ class Host(object):
         self.job.error('%s: ' + fmt, self.name, *args)
 
     def get_stats_paths(self):
+        # returns the list path_list that contains all the paths to files
+        # for the current node that exist within the time specified
         raw_host_stats_dir = os.path.join(raw_stats_dir, self.name)
         job_start = self.job.start_time - RAW_STATS_TIME_PAD
         job_end = self.job.end_time + RAW_STATS_TIME_PAD
@@ -367,28 +371,55 @@ class Job(object):
         return schema
 
     def gather_stats(self):
-        path = get_host_list_path(self.acct)
-        if not path:
-            self.error("no host list found\n")
+
+        if scheduler == 'sge':
+
+            path = get_host_list_path(self.acct)
+            if not path:
+                self.error("no host list found\n")
+                return False
+            try:
+                with open(path) as file:
+                    host_list = [host for line in file for host in line.split()]
+            except IOError as (err, str):
+                self.error("cannot open host list `%s': %s\n", path, str)
+                return False
+            if len(host_list) == 0:
+                self.error("empty host list\n")
+                return False
+            for host_name in host_list:
+                # TODO Keep bad_hosts.
+                host = Host(self, host_name)
+                if host.gather_stats():
+                    self.hosts[host_name] = host
+            if not self.hosts:
+                self.error("no good hosts\n")
+                return False
+            return True
+
+        elif scheduler == 'torque':
+
+            # get list of hostnames from acct dict
+            host_list_tmp = self.acct['exec_host'].split('+')
+            host_list = []
+            for host_name in host_list_tmp:
+                # remove cpu number from hostname
+                host_list.append( host_name[:host_name.find('/')] )
+            # create a set (unique list of no duplicate hostnames)
+            host_list = list(set(host_list))
+
+            # go through each host
+            for host_name in host_list:
+                host = Host(self, host_name)
+                if host.gather_stats():
+                    self.hosts[host_name] = host
+            if not self.hosts:
+                self.error("no good hosts\n")
+                return False
+            return True
+
+        else:
             return False
-        try:
-            with open(path) as file:
-                host_list = [host for line in file for host in line.split()]
-        except IOError as (err, str):
-            self.error("cannot open host list `%s': %s\n", path, str)
-            return False
-        if len(host_list) == 0:
-            self.error("empty host list\n")
-            return False
-        for host_name in host_list:
-            # TODO Keep bad_hosts.
-            host = Host(self, host_name)
-            if host.gather_stats():
-                self.hosts[host_name] = host
-        if not self.hosts:
-            self.error("no good hosts\n")
-            return False
-        return True
 
     def munge_times(self):
         times_lis = []

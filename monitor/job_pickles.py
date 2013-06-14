@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-import datetime, glob, job_stats, os, sge_acct, subprocess, sys, time
+import datetime, glob, job_stats, os, sge_acct, torque_acct, subprocess, sys, time
 import cPickle as pickle
 
 prog_name = os.path.basename(sys.argv[0])
@@ -67,14 +67,15 @@ if len(sys.argv) != 4:
 pickle_dir = sys.argv[1]
 start = getdate(sys.argv[2])
 end = getdate(sys.argv[3])
-seek = 0
 
-# Run though all jobs
+# get the correct scheduler based on environment variable
+job_scheduler = os.getenv('TACC_STATS_JOB_SCHEDULER')
+if not job_scheduler:
+    FATAL('Environment variable TACC_STATS_JOB_SCHEDULER not set')
+scheduler_acct = eval(job_scheduler + '_acct')
 
-for acct in sge_acct.reader(open(acct_path),
-                            start_time=start,
-                            end_time=end,
-                            seek=seek):
+# Run through all jobs
+for acct in scheduler_acct.reader(acct_path, start_time=start, end_time=end):
     if acct['end_time'] == 0:
         continue
     job = job_stats.from_acct(acct)
