@@ -9,50 +9,29 @@ import csv, os, subprocess, datetime
 # These records include events, time stamps, and information on resources requested and used.
 # Records for four different event types are produced and are described in the following table:
 
-# RECORD MARKER / TYPE / DESCRIPTION
-# A - Abort        Job has been aborted by the server
-# C - checkpoing   Job has been checkpointed and held
-# D - delete       job has been deleted
-# E - exit         Job has exited, either successfully or unsuccessfully
-# Q - queue        Job has been submitted/queued
-# R - rerun        Attempt to rerun the job has been made
-# S - start        Attempt to start the job has been made
-# T - restart      Attempt to restart the job (from checkpoint) has been made
-
-# Accounting Variable Descriptions
-# ctime            Time job was created
-# etime            Time job became eligible to run
-# qtime            Time job was queued
-# start            Time job started to run
-
 
 stats_home = os.getenv('TACC_STATS_HOME', '/scratch/projects/tacc_stats')
 acct_path = os.getenv('TACC_STATS_ACCT', os.path.join(stats_home, 'accounting'))
 
+# rush.ccr.buffalo.edu
+# sacct --allusers --parsable2 --noheader --allocations --allclusters --format jobid,cluster,partition,account,group,user,submit,eligible,start,end,exitcode,nnodes,ncpus,nodelist,jobname --state COMPLETED,FAILED --starttime 2013-06-20T00:00:00 --endtime 2013-06-21T00:00:00 > out
+
 fields = (
     ('id',                          int, 'Job identifier'),
-    ('hostname',                    str, 'Hostname of the head execution node'),
-    ('user',                        str, 'User that is running the job'),
+    ('cluster',                     str, 'Cluster the job is running on'),
+    ('partition',                   str, 'Partition the job is running on'),
+    ('account',                     str, 'Account under which job is running'),
     ('group',                       str, 'Group name of the job owner'),
-    ('jobname',                     str, 'Job name'),
-    ('queue',                       str, 'Queue name the job is running on'),
-    ('ctime',                       int, 'Time job was created (unix time stamp)'),
-    ('qtime',                       int, 'Time job was queued (unix time stamp)'),
-    ('etime',                       int, 'Time job was eligible to run (unix time stamp)'),
+    ('user',                        str, 'User name of the job owner'),
+    ('submit',                      str, 'Time the job was submitted'),
+    ('eligible',                    str, 'Time the job was eligible to run'),
     ('start',                       int, 'Time job started to run (unix time stamp)'),
-    ('owner',                       str, 'Owner of the job at hostname'),
-    ('exec_host',                   str, 'List of nodes used'),
-    ('Resource_List.neednodes',     str, 'Requested nodes needed'),
-    ('Resource_List.nodect',        int, 'Requested number of nodes'),
-    ('Resource_List.nodes',         str, 'Requested nodes'),
-    ('Resource_List.walltime',      str, 'Requested walltime'),
-    ('session',                     int, 'Session id'),
     ('end',                         int, 'Time job ended (unix time stamp)'),
-    ('Exit_status',                 int, 'Exit status of job'),
-    ('resources_used.cput',         str, 'CPU time used'),
-    ('resources_used.mem',          str, 'Memory used'),
-    ('resources_used.vmem',         str, 'Virtual memory used'),
-    ('resources_used.walltime',     str, 'Walltime')
+    ('exit_code')                   int, 'Exit code of the job'),
+    ('nnodes',                      str, 'Number of nodes'),
+    ('ncpus',                       str, 'Number of cpus'),
+    ('nodelist',                    str, 'List of nodes used'),
+    ('jobname',                     str, 'Job name')
 )
 
 
@@ -68,6 +47,8 @@ fields = (
 #   Iterator for all jobs that finished between start_time and end_time, the
 #   iterator is returned with the yield command so it will use less memory.
 def reader(dir, start_time=0, end_time=9223372036854775807L):
+
+    
 
     # turn unix timestamp into date object
     start_date = datetime.date.fromtimestamp(start_time)
