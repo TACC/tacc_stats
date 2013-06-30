@@ -33,7 +33,7 @@ class LariatData:
         self.exc=self.ld[jobid][0]['exec']
         self.cwd=self.ld[jobid][0]['cwd']
       except KeyError:
-        print jobid + ' did not call ibrun' + \
+        print str(jobid) + ' did not call ibrun' + \
               ' or has no lariat data for some other reason'
         self.user='nobody'
         self.exc='unknown'
