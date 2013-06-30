@@ -25,6 +25,7 @@ class LariatData:
       self.ld=None
       self.user='nobody'
       self.exc='unknown'
+      self.cwd='unknown'
       print 'File for ' + jobid + ' not found in ' + directory
     else:
       self.ld=json.load(open(matches[0]))

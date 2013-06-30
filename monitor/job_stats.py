@@ -1,20 +1,11 @@
 #!/usr/bin/env python
 import datetime, errno, glob, gzip, numpy, os, sys, time
-import amd64_pmc, sge_acct
+import amd64_pmc, batch_acct
 
 verbose = os.getenv('TACC_STATS_VERBOSE')
 
 if not verbose:
     numpy.seterr(over='ignore')
-
-stats_home = os.getenv('TACC_STATS_HOME', '/scratch/projects/tacc_stats')
-
-# raw_stats_dir/HOST/TIMESTAMP: raw stats files.
-raw_stats_dir = os.getenv('TACC_STATS_RAW', os.path.join(stats_home, 'archive'))
-
-# prolog_host_lists/YYYY/MM/DD/prolog_hostfile.JOBID.*.
-# Symbolic link to /share/sge6.2/default/tacc/hostfile_logs.
-host_list_dir = os.getenv('TACC_STATS_HOSTFILES', os.path.join(stats_home, 'hostfiles'))
 
 prog = os.path.basename(sys.argv[0])
 if prog == "":
@@ -154,17 +145,17 @@ class Schema(dict):
         return self._value_list
 
 
-def get_host_list_path(acct):
-    """Return the path of the host list written during the prolog."""
-    # Example: /share/sge6.2/default/tacc/hostfile_logs/2011/05/19/prolog_hostfile.1957000.IV32627
-    start_date = datetime.date.fromtimestamp(acct['start_time'])
-    base_glob = 'prolog_hostfile.' + acct['id'] + '.*'
-    for days in (0, -1, 1):
-        yyyy_mm_dd = (start_date + datetime.timedelta(days)).strftime("%Y/%m/%d")
-        full_glob = os.path.join(host_list_dir, yyyy_mm_dd, base_glob)
-        for path in glob.iglob(full_glob):
-            return path
-    return None
+#def get_host_list_path(acct, host_list_dir):
+#    """Return the path of the host list written during the prolog."""
+#    # Example: /share/sge6.2/default/tacc/hostfile_logs/2011/05/19/prolog_hostfile.1957000.IV32627
+#    start_date = datetime.date.fromtimestamp(acct['start_time'])
+#    base_glob = 'prolog_hostfile.' + acct['id'] + '.*'
+#    for days in (0, -1, 1):
+#        yyyy_mm_dd = (start_date + datetime.timedelta(days)).strftime("%Y/%m/%d")
+#        full_glob = os.path.join(host_list_dir, yyyy_mm_dd, base_glob)
+#        for path in glob.iglob(full_glob):
+#            return path
+#    return None
 
 
 def stats_file_discard_record(file):
@@ -176,12 +167,14 @@ def stats_file_discard_record(file):
 class Host(object):
     # __slots__ = ('job', 'name', 'times', 'marks', 'raw_stats')
 
-    def __init__(self, job, name):
+    def __init__(self, job, name, raw_stats_dir, name_ext=''):
         self.job = job
         self.name = name
+        self.name_ext=name_ext
         self.times = []
         self.marks = {}
         self.raw_stats = {}
+        self.raw_stats_dir=raw_stats_dir
 
     def trace(self, fmt, *args):
         self.job.trace('%s: ' + fmt, self.name, *args)
@@ -190,7 +183,7 @@ class Host(object):
         self.job.error('%s: ' + fmt, self.name, *args)
 
     def get_stats_paths(self):
-        raw_host_stats_dir = os.path.join(raw_stats_dir, self.name)
+        raw_host_stats_dir = os.path.join(self.raw_stats_dir, self.name+self.name_ext)
         job_start = self.job.start_time - RAW_STATS_TIME_PAD
         job_end = self.job.end_time + RAW_STATS_TIME_PAD
         path_list = []
@@ -339,9 +332,10 @@ class Host(object):
 
 class Job(object):
     # TODO errors/comments
-    __slots__ = ('id', 'start_time', 'end_time', 'acct', 'schemas', 'hosts', 'times')
+    __slots__ = ('id', 'start_time', 'end_time', 'acct', 'schemas', 'hosts',
+    'times','stats_home', 'batch_acct')
 
-    def __init__(self, acct):
+    def __init__(self, acct, stats_home, batch_acct):
         self.id = acct['id']
         self.start_time = acct['start_time']
         self.end_time = acct['end_time']
@@ -349,6 +343,8 @@ class Job(object):
         self.schemas = {}
         self.hosts = {}
         self.times = []
+        self.stats_home=stats_home
+        self.batch_acct=batch_acct
 
     def trace(self, fmt, *args):
         trace('%s: ' + fmt, self.id, *args)
@@ -367,7 +363,7 @@ class Job(object):
         return schema
 
     def gather_stats(self):
-        path = get_host_list_path(self.acct)
+        path = self.batch_acct.get_host_list_path(self.acct, self.stats_home + '/hostfiles')
         if not path:
             self.error("no host list found\n")
             return False
@@ -382,7 +378,7 @@ class Job(object):
             return False
         for host_name in host_list:
             # TODO Keep bad_hosts.
-            host = Host(self, host_name)
+            host = Host(self, host_name, self.stats_home + '/archive',self.batch_acct.name_ext )
             if host.gather_stats():
                 self.hosts[host_name] = host
         if not self.hosts:
@@ -529,12 +525,12 @@ class Job(object):
         return host_stats
 
 
-def from_acct(acct):
-    """from_acct(acct)
-    Return a Job object constructed from the SGE accounting data acct, running
-    all required processing.
+def from_acct(acct, stats_home, batch_acct):
+    """from_acct(acct, stats_home)
+    Return a Job object constructed from the appropriate accounting data acct using
+    stats_home as the base directory, running all required processing.
     """
-    job = Job(acct)
+    job = Job(acct, stats_home, batch_acct)
     job.gather_stats() and job.munge_times() and job.process_stats()
     return job
 

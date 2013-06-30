@@ -13,16 +13,34 @@ class TSPLBase:
     self.f=open(file)
     self.j=pickle.load(self.f)
     self.f.close()
-    self.wayness=int(re.findall('\d+',self.j.acct['granted_pe'])[0])
+
+    try:
+      self.wayness=int(re.findall('\d+',self.j.acct['granted_pe'])[0])
+    except KeyError:
+      self.wayness=self.j.acct['cores']/self.j.acct['nodes']
+
+    try:
+      self.owner=self.j.acct['owner']
+    except KeyError:
+      self.owner=self.j.acct['uid']
+      
     self.numhosts=len(self.j.hosts.keys())
 
     if self.numhosts == 0:
       raise TSPLException('No hosts')
-    elif not 'amd64_core' in self.j.hosts.values()[0].stats:
+    elif 'amd64_core' in self.j.hosts.values()[0].stats:
+      self.pmc_type='amd64'
+    elif 'intel_pmc3' in self.j.hosts.values()[0].stats:
+      self.pmc_type='intel'
+    else:
       raise TSPLException('No PMC data for: ' + self.j.id)
-        
-    self.k1=k1
-    self.k2=k2
+
+    if self.pmc_type in k1:
+      self.k1=k1[self.pmc_type]
+      self.k2=k2[self.pmc_type]
+    else:
+      self.k1=k1
+      self.k2=k2
 
     self.t=(self.j.times-self.j.times[0])
 
@@ -39,7 +57,7 @@ class TSPLBase:
     self.end_date=d.strftime('%Y-%m-%d %H:%M:%S')
 
     self.title='ID: %(ID)s, u: %(u)s, N: %(name)s, D: %(date)s, NH: %(nh)d' % \
-           { 'ID' : self.j.id,'u': self.j.acct['owner'],
+           { 'ID' : self.j.id,'u': self.owner,
              'name': self.j.acct['name'], 'nh' : self.numhosts,
              'date': self.end_date }
 

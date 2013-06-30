@@ -209,7 +209,7 @@ def display_list(lis, **kwargs):
         else:
             acct = id_dict[str(arg)]
             if acct:
-                job = job_stats.from_acct(acct)
+                job = job_stats.from_acct(acct,os.getenv('TACC_STATS_HOME','/scratch/projects/tacc_stats'))
                 report = Report(job)
             else:
                 job_stats.error("no accounting data found for job `%s'\n", arg)
