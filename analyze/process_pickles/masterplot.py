@@ -111,12 +111,20 @@ def plot_mmm(ax, ts, index, xscale=1.0, yscale=1.0, xlabel='', ylabel=''):
 def master_plot(file,mode='lines',threshold=False,
                 output_dir='.',prefix='graph',mintime=3600,wayness=16,
                 header='Master'):
-  k1=['amd64_core','amd64_core','amd64_sock','lnet','lnet','ib_sw','ib_sw',
-      'cpu']
-  k2=['SSE_FLOPS','DCSF','DRAM','rx_bytes','tx_bytes','rx_bytes','tx_bytes',
-      'user']
+  k1={'amd64' :
+      ['amd64_core','amd64_core','amd64_sock','lnet','lnet',
+       'ib_sw','ib_sw','cpu'],
+      'intel' : ['intel_pmc3', 'intel_pmc3', 'intel_pmc3', 
+                 'lnet', 'lnet', 'ib_sw','ib_sw','cpu']
+      }
+  
+  k2={'amd64':
+      ['SSE_FLOPS','DCSF','DRAM','rx_bytes','tx_bytes',
+       'rx_bytes','tx_bytes','user'],
+      'intel' : ['PMC0', 'PMC1', 'PMC2',
+                 'rx_bytes','tx_bytes', 'rx_bytes','tx_bytes','user']
+      }
 
-  print 'aa'
   try:
     print file
     ts=tspl.TSPLSum(file,k1,k2)
@@ -128,7 +136,7 @@ def master_plot(file,mode='lines',threshold=False,
 
   fig,ax=plt.subplots(6,1,figsize=(8,12),dpi=80)
   ax=my_utils.flatten(ax)
-  print 'bb'
+
   if mode == 'hist':
     plot=plot_thist
   elif mode == 'percentile':
@@ -169,7 +177,7 @@ def master_plot(file,mode='lines',threshold=False,
   plt.suptitle(title)
   plt.subplots_adjust(hspace=0.35)
 
-  fname='_'.join([prefix,ts.j.id,ts.j.acct['owner'],'master'])
+  fname='_'.join([prefix,ts.j.id,ts.owner,'master'])
   if mode == 'hist':
     fname+='_hist'
   elif mode == 'percentile':
