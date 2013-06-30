@@ -3,9 +3,6 @@ import csv, os, subprocess
 # Fields in the sge accounting file.
 # From /opt/sge6.2/man/man5/accounting.5
 
-stats_home = os.getenv('TACC_STATS_HOME', '/scratch/projects/tacc_stats')
-acct_path = os.getenv('TACC_STATS_ACCT', os.path.join(stats_home, 'accounting'))
-
 fields = (
     ('queue',           str, 'Name of the cluster queue in which the job has run.'), # sge 'qname'
     ('hostname',        str, 'Name of the execution host.'),
