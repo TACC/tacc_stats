@@ -27,7 +27,7 @@ fields = (
     ('eligible',                    str, 'Time the job was eligible to run'),
     ('start',                       int, 'Time job started to run (unix time stamp)'),
     ('end',                         int, 'Time job ended (unix time stamp)'),
-    ('exit_code')                   int, 'Exit code of the job'),
+    ('exit_code'),                   int, 'Exit code of the job'),
     ('nnodes',                      str, 'Number of nodes'),
     ('ncpus',                       str, 'Number of cpus'),
     ('nodelist',                    str, 'List of nodes used'),
