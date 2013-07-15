@@ -160,7 +160,10 @@ def get_host_list_path(acct):
     """Return the path of the host list written during the prolog."""
     # Example: /share/sge6.2/default/tacc/hostfile_logs/2011/05/19/prolog_hostfile.1957000.IV32627
     start_date = datetime.date.fromtimestamp(acct['start_time'])
-    base_glob = 'prolog_hostfile.' + acct['id'] + '.*'
+    if scheduler == 'sge':
+        base_glob = 'prolog_hostfile.' + acct['id'] + '.*'
+    elif scheduler == 'slurm_stampede':
+        base_glob = 'hostlist.' + acct['id']
     for days in (0, -1, 1):
         yyyy_mm_dd = (start_date + datetime.timedelta(days)).strftime("%Y/%m/%d")
         full_glob = os.path.join(host_list_dir, yyyy_mm_dd, base_glob)
@@ -204,7 +207,14 @@ class Host(object):
                 if not base.isdigit():
                     continue
                 # Prune to files that might overlap with job.
-                ent_start = long(base)
+                # ent_start is looking for a timestamp, depending on how the files are saved in
+                # the archive/node directory, they may need to be changed.
+                if (scheduler == 'torque'):
+                    # tacc_stats raw data files saved as archive/node/YYYYMMDD, these need to
+                    # be converted to a unix timestamp
+                    ent_start = long(datetime.datetime.strptime(base, '%Y%m%d').strftime("%s"))
+                else:
+                    ent_start = long(base)
                 ent_end = ent_start + RAW_STATS_TIME_MAX
                 if max(job_start, ent_start) <= min(job_end, ent_end):
                     full_path = os.path.join(raw_host_stats_dir, ent)
@@ -270,8 +280,9 @@ class Host(object):
                 c = line[0]
                 if c.isdigit():
                     str_time, rec_jobid = line.split()
+                    rec_jobid = rec_jobid.split(',') #there can be multiple job id's
                     rec_time = long(str_time)
-                    if rec_jobid == self.job.id:
+                    if str(self.job.id) in rec_jobid:
                         self.trace("file `%s' rec_time %d, rec_jobid `%s'\n",
                                    file.name, rec_time, rec_jobid)
                         self.times.append(rec_time)
@@ -291,8 +302,9 @@ class Host(object):
                 c = line[0]
                 if c.isdigit():
                     str_time, rec_jobid = line.split()
+                    rec_jobid = rec_jobid.split(',') #there can be multiple job id's
                     rec_time = long(str_time)
-                    if rec_jobid != self.job.id:
+                    if str(self.job.id) not in rec_jobid:
                         return
                     self.trace("file `%s' rec_time %d, rec_jobid `%s'\n",
                                file.name, rec_time, rec_jobid)
@@ -320,8 +332,12 @@ class Host(object):
         # into lists of tuples in self.raw_stats.  The lists will be
         # converted into numpy arrays below.
         for path, start_time in path_list:
-            with gzip.open(path) as file: # XXX Gzip.
-                self.read_stats_file(start_time, file)
+            if path.endswith('.gz'):
+                with gzip.open(path) as file: # Gzip.
+                    self.read_stats_file(start_time, file)
+            else:
+                with open(path) as file:
+                    self.read_stats_file(start_time, file)
         # begin_mark = 'begin %s' % self.job.id # No '%'.
         # if not begin_mark in self.marks:
         #     self.error("no begin mark found\n")
@@ -417,7 +433,10 @@ class Job(object):
                 self.error("no good hosts\n")
                 return False
             return True
-
+            
+        elif scheduler == 'slurm_stampede':
+            pass
+            
         else:
             return False
 

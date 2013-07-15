@@ -79,6 +79,6 @@ for acct in scheduler_acct.reader(acct_path, start_time=start, end_time=end):
     if acct['end_time'] == 0:
         continue
     job = job_stats.from_acct(acct)
-    pickle_path = os.path.join(pickle_dir, job.id)
+    pickle_path = os.path.join(pickle_dir, str(job.id))
     pickle_file = open(pickle_path, 'w')
     pickle.dump(job, pickle_file, pickle_prot)

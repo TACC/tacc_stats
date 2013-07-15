@@ -83,7 +83,7 @@ def reader(dir, start_time=0, end_time=9223372036854775807L):
         for acct_record in acct_record_file:
 
             # check if record corresponds to a job ending
-            acct_data = acct_record.split(';')
+            acct_data = acct_record.split(';',3)
             if acct_data[1] == 'E':
 
                 # put record into associative array
