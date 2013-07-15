@@ -40,6 +40,8 @@ def reader(file, start_time=0, end_time=9223372036854775807L):
     for line in acct_file:
         line = line.strip()
         values = line.split(':')
+        if len(values) != 13:
+            continue
         del values[3] #ignore this field
         keys = ['id','user','account','queue_time','start_time','end_time','queue','requested_time','job_name','status','nnodes','ncpus']
         acct_dict = dict(zip(keys, values))
