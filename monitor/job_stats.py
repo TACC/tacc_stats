@@ -161,9 +161,9 @@ def get_host_list_path(acct):
     # Example: /share/sge6.2/default/tacc/hostfile_logs/2011/05/19/prolog_hostfile.1957000.IV32627
     start_date = datetime.date.fromtimestamp(acct['start_time'])
     if scheduler == 'sge':
-        base_glob = 'prolog_hostfile.' + acct['id'] + '.*'
+        base_glob = 'prolog_hostfile.' + str(acct['id']) + '.*'
     elif scheduler == 'slurm_stampede':
-        base_glob = 'hostlist.' + acct['id']
+        base_glob = 'hostlist.' + str(acct['id'])
     for days in (0, -1, 1):
         yyyy_mm_dd = (start_date + datetime.timedelta(days)).strftime("%Y/%m/%d")
         full_glob = os.path.join(host_list_dir, yyyy_mm_dd, base_glob)
