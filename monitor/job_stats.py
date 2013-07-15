@@ -435,7 +435,30 @@ class Job(object):
             return True
             
         elif scheduler == 'slurm_stampede':
-            pass
+            
+            path = get_host_list_path(self.acct)
+            if not path:
+                self.error("no host list found\n")
+                return False
+            try:
+                with open(path) as file:
+                    host_list = [host for line in file for host in line.split()]
+            except IOError as (err, str):
+                self.error("cannot open host list `%s': %s\n", path, str)
+                return False
+            if len(host_list) == 0:
+                self.error("empty host list\n")
+                return False
+            for host_name in host_list:
+                # TODO Keep bad_hosts.
+                host_name = hostname + '.stampede.tacc.utexas.edu'
+                host = Host(self, host_name)
+                if host.gather_stats():
+                    self.hosts[host_name] = host
+            if not self.hosts:
+                self.error("no good hosts\n")
+                return False
+            return True
             
         else:
             return False
