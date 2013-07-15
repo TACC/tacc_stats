@@ -38,6 +38,7 @@ def reader(file, start_time=0, end_time=9223372036854775807L):
     
     acct_file = open(file)
     for line in acct_file:
+        line = line.strip()
         values = line.split(':')
         del values[3] #ignore this field
         keys = ['id','user','account','queue_time','start_time','end_time','queue','requested_time','job_name','status','nnodes','ncpus']
