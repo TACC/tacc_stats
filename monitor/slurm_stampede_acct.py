@@ -7,9 +7,9 @@ fields = (
     ('id',                          int, 'Job identifier'),
     ('user',                        str, 'User name of the job owner'),
     ('account',                     str, 'Account under which job is running'),
-    ('queue_time',                  int, 'queue time'),
     ('start_time',                  int, 'start time'),
-    ('end_time',                    int, 'start time'),
+    ('end_time',                    int, 'end time'),
+    ('queue_time',                  int, 'queue time'),
     ('queue',                       str, 'Queue job was in'),
     ('requested_time',              int, 'Requested time for job to run'),
     ('job_name',                    str, 'Job name'),
@@ -43,7 +43,7 @@ def reader(file, start_time=0, end_time=9223372036854775807L):
         if len(values) != 13:
             continue
         del values[3] #ignore this field
-        keys = ['id','user','account','queue_time','start_time','end_time','queue','requested_time','job_name','status','nnodes','ncpus']
+        keys = ['id','user','account','start_time','end_time','queue_time','queue','requested_time','job_name','status','nnodes','ncpus']
         acct_dict = dict(zip(keys, values))
         acct_dict['id'] = int(acct_dict['id'])
         acct_dict['queue_time'] = int(acct_dict['queue_time'])
