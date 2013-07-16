@@ -162,13 +162,21 @@ def get_host_list_path(acct):
     start_date = datetime.date.fromtimestamp(acct['start_time'])
     if scheduler == 'sge':
         base_glob = 'prolog_hostfile.' + str(acct['id']) + '.*'
+        for days in (0, -1, 1):
+            yyyy_mm_dd = (start_date + datetime.timedelta(days)).strftime("%Y/%m/%d")
+            full_glob = os.path.join(host_list_dir, yyyy_mm_dd, base_glob)
+            for path in glob.iglob(full_glob):
+                return path
     elif scheduler == 'slurm_stampede':
         base_glob = 'hostlist.' + str(acct['id'])
-    for days in (0, -1, 1):
-        yyyy_mm_dd = (start_date + datetime.timedelta(days)).strftime("%Y/%m/%d")
-        full_glob = os.path.join(host_list_dir, yyyy_mm_dd, base_glob)
-        for path in glob.iglob(full_glob):
-            return path
+        for days in (0, -1, 1):
+            yyyy_mm_dd = (start_date + datetime.timedelta(days)).strftime("%Y/%m/%d")
+            full_glob = os.path.join(os.getenv('TACC_STATS_HOST_LIST_DIR'), yyyy_mm_dd, base_glob)
+            l = []
+            l.append(full_glob)
+            for path in iter(l):
+                return path
+    
     return None
 
 
@@ -451,7 +459,7 @@ class Job(object):
                 return False
             for host_name in host_list:
                 # TODO Keep bad_hosts.
-                host_name = hostname + '.stampede.tacc.utexas.edu'
+                host_name = host_name + '.stampede.tacc.utexas.edu'
                 host = Host(self, host_name)
                 if host.gather_stats():
                     self.hosts[host_name] = host
