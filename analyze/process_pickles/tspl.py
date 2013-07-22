@@ -17,7 +17,11 @@ class TSPLBase:
     try:
       self.wayness=int(re.findall('\d+',self.j.acct['granted_pe'])[0])
     except KeyError:
-      self.wayness=self.j.acct['cores']/self.j.acct['nodes']
+      try: 
+        self.wayness=self.j.acct['cores']/self.j.acct['nodes']
+      except ZeroDivisionError:
+        print "Read zero nodes, assuming 16 way job"
+        self.wayness=16
 
     try:
       self.owner=self.j.acct['owner']

@@ -6,7 +6,7 @@
 #include "collect.h"
 #include "trace.h"
 
-const char *perfquery = "/opt/ofed/bin/perfquery";
+const char *perfquery = "/opt/ofed/sbin/perfquery";
 
 #define KEYS \
   X(excessive_buffer_overrun_errors, "E", ""), \

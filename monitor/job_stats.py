@@ -194,12 +194,15 @@ class Host(object):
                     continue
                 # Prune to files that might overlap with job.
                 ent_start = long(base)
-                ent_end = ent_start + RAW_STATS_TIME_MAX
-                if max(job_start, ent_start) <= min(job_end, ent_end):
+                ent_end = ent_start + 2*RAW_STATS_TIME_MAX
+                self.trace("Bill: %d, %d, %d, %d, %d, %d \n", ent_start,job_start,ent_end, job_end,  max(job_start, ent_start) , min(job_end, ent_end))
+#                if max(job_start, ent_start) <= min(job_end, ent_end):
+                if ((ent_start <= job_start) and (job_start <= ent_end)) or ((ent_start <= job_end) and (job_end <= ent_end)) or (max(job_start, ent_start) <= min(job_end, ent_end)) :
                     full_path = os.path.join(raw_host_stats_dir, ent)
                     path_list.append((full_path, ent_start))
                     self.trace("path `%s', start %d\n", full_path, ent_start)
-        except:
+        except Exception as e:
+            print e
             pass
         path_list.sort(key=lambda tup: tup[1])
         return path_list
@@ -333,9 +336,9 @@ class Host(object):
 class Job(object):
     # TODO errors/comments
     __slots__ = ('id', 'start_time', 'end_time', 'acct', 'schemas', 'hosts',
-    'times','stats_home', 'batch_acct')
+    'times','stats_home', 'host_list_dir', 'batch_acct')
 
-    def __init__(self, acct, stats_home, batch_acct):
+    def __init__(self, acct, stats_home, host_list_dir, batch_acct):
         self.id = acct['id']
         self.start_time = acct['start_time']
         self.end_time = acct['end_time']
@@ -344,6 +347,7 @@ class Job(object):
         self.hosts = {}
         self.times = []
         self.stats_home=stats_home
+        self.host_list_dir=host_list_dir
         self.batch_acct=batch_acct
 
     def trace(self, fmt, *args):
@@ -363,7 +367,7 @@ class Job(object):
         return schema
 
     def gather_stats(self):
-        path = self.batch_acct.get_host_list_path(self.acct, self.stats_home + '/hostfiles')
+        path = self.batch_acct.get_host_list_path(self.acct, self.host_list_dir)
         if not path:
             self.error("no host list found\n")
             return False
@@ -525,12 +529,12 @@ class Job(object):
         return host_stats
 
 
-def from_acct(acct, stats_home, batch_acct):
+def from_acct(acct, stats_home, host_list_dir, batch_acct):
     """from_acct(acct, stats_home)
     Return a Job object constructed from the appropriate accounting data acct using
     stats_home as the base directory, running all required processing.
     """
-    job = Job(acct, stats_home, batch_acct)
+    job = Job(acct, stats_home, host_list_dir, batch_acct)
     job.gather_stats() and job.munge_times() and job.process_stats()
     return job
 

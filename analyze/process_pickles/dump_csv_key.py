@@ -27,7 +27,7 @@ def main():
     except tspl.TSPLException as e:
       continue
 
-    if not tspl_utils.checkjob(ts,3600,16):
+    if not tspl_utils.checkjob(ts,0,16):
       continue
     elif ts.numhosts < 2:
       print ts.j.id + ': 1 host'

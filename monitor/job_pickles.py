@@ -3,7 +3,15 @@ import datetime, glob, job_stats, os, batch_acct, subprocess, sys, time
 import cPickle as pickle
 import socket
 
-configfilename='pickles.'+socket.gethostname().split('.')[0]+'.conf'
+hn=socket.gethostname().split('.')
+
+if hn[0] == 'staff':
+    host=hn[1]
+else:
+    host=hn[0]
+    
+
+configfilename='pickles.'+host+'.conf'
 execfile(configfilename)
 
 prog_name = os.path.basename(sys.argv[0])
@@ -80,10 +88,16 @@ if not 'seek' in locals():
 a=batch_acct.factory(sys.argv[4],acct_path)
 
 
+
+##for one in [1]:
+##    acct=a.from_id_with_file_1("1155456",113240000)
+##    print acct
+
+
 for acct in a.reader(start_time=start,end_time=end,seek=seek):
     if acct['end_time'] == 0:
         continue
-    job = job_stats.from_acct(acct, tacc_stats_home,a)
+    job = job_stats.from_acct(acct, tacc_stats_home, host_list_dir, a)
     pickle_path = os.path.join(pickle_dir, job.id)
     pickle_file = open(pickle_path, 'w')
     pickle.dump(job, pickle_file, pickle_prot)

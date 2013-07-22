@@ -259,7 +259,7 @@ static int intel_pmc3_begin(struct stats_type *type)
 
     if (cpu_is_nehalem(cpu))
       if (intel_pmc3_begin_cpu(cpu, events, 4) == 0)
-        nr++; /* HARD */
+	nr++; /* HARD */
   }
 
   return nr > 0 ? 0 : -1;

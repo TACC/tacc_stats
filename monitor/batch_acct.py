@@ -36,8 +36,8 @@ class BatchAcct(object):
           yield d
 
 
-  def from_id_with_file_1(self, id):
-    for acct in self.reader():
+  def from_id_with_file_1(self, id, seek=0):
+    for acct in self.reader(seek=seek):
       if acct['id'] == id:
         return acct
     return None
@@ -125,9 +125,9 @@ class SLURMAcct(BatchAcct):
       ('uid', str, 'User UNIX ID'),
       ('project', str, 'SLURM account string'),
       ('yesno', str, 'Not sure yet, need to ask Karl'),
-      ('queue_time', int, 'Epoch time job entered queue'),
       ('start_time', int, 'Epoch time job started'),
       ('end_time', int, 'Epoch time job ended'),
+      ('queue_time', int, 'Epoch time job entered queue'),
       ('queue', str, 'Name of the SLURM partition'),
       ('unknown', int, 'minutes requested?'),
       ('name', str, 'Name given to job by user'),

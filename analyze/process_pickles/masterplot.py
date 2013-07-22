@@ -121,7 +121,7 @@ def master_plot(file,mode='lines',threshold=False,
   k2={'amd64':
       ['SSE_FLOPS','DCSF','DRAM','rx_bytes','tx_bytes',
        'rx_bytes','tx_bytes','user'],
-      'intel' : ['PMC0', 'PMC1', 'PMC2',
+      'intel' : ['PMC3', 'PMC2', 'FIXED_CTR0',
                  'rx_bytes','tx_bytes', 'rx_bytes','tx_bytes','user']
       }
 
