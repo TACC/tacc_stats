@@ -11,7 +11,7 @@ dst_dir=${dst_dir:-/scratch/projects/tacc_stats/pickles/}
 
 arg_start_date=${1:-}
 arg_end_date=${2:-}
-
+echo $arg_start_date
 start_date=$(date --date="$arg_start_date" +%F)
 end_date=$(date --date="$arg_end_date" +%F)
 

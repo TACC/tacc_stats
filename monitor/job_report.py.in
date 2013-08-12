@@ -1,5 +1,7 @@
 #!/usr/bin/env python
-import human, job_stats, numpy, signal, string, sys
+import sys
+sys.path.append('@CONFIG_PY_DIR@')
+import human, job_stats, numpy, signal, string
 
 if __name__ == '__main__':
     signal.signal(signal.SIGPIPE, signal.SIG_DFL)

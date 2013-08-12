@@ -1,9 +1,11 @@
 #!/usr/bin/env python
-import datetime, glob, os, sge_acct, subprocess, sys, time
+import sys
+sys.path.append('@CONFIG_PY_DIR@')
+import datetime, glob, os, sge_acct, subprocess, time
+
+execfile('pickles.conf')
 
 prog_name = os.path.basename(sys.argv[0])
-acct_path = '/share/sge6.2/default/common/accounting'
-host_list_dir = '/share/sge6.2/default/tacc/hostfile_logs'
 
 def FATAL(str):
     print >>sys.stderr, "%s: %s" % (prog_name, str)

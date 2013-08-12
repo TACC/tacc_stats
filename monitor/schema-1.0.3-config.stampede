@@ -1,0 +1,16 @@
+block rd_ios,E rd_merges,E rd_sectors,E,U=512B rd_ticks,E,U=ms wr_ios,E wr_merges,E wr_sectors,E,U=512B wr_ticks,E,U=ms in_flight, io_ticks,E,U=ms time_in_queue,E,U=ms
+cpu user,E,U=cs nice,E,U=cs system,E,U=cs idle,E,U=cs iowait,E,U=cs irq,E,U=cs softirq,E,U=cs
+ib_sw rx_bytes,E,U=4B rx_packets,E tx_bytes,E,U=4B tx_packets,E
+intel_pmc3 PMC0,E,W=48 PMC1,E,W=48 PMC2,E,W=48 PMC3,E,W=48 PERFEVTSEL0,C PERFEVTSEL1,C PERFEVTSEL2,C PERFEVTSEL3,C FIXED_CTR0,E,W=48 FIXED_CTR1,E,W=48 FIXED_CTR2,E,W=48 FIXED_CTR_CTRL,C PERF_GLOBAL_STATUS,C PERF_GLOBAL_CTRL,C PERF_GLOBAL_OVF_CTRL,C
+llite read_bytes,E,U=B write_bytes,E,U=B direct_read,E,U=B direct_write,E,U=B dirty_pages_hits,E dirty_pages_misses,E ioctl,E open,E close,E mmap,E seek,E fsync,E setattr,E truncate,E flock,E getattr,E statfs,E alloc_inode,E setxattr,E getxattr,E listxattr,E removexattr,E inode_permission,E readdir,E create,E lookup,E link,E unlink,E symlink,E mkdir,E rmdir,E mknod,E rename,E
+lnet tx_msgs,E rx_msgs,E rx_msgs_dropped,E tx_bytes,E,U=B rx_bytes,E,U=B rx_bytes_dropped,E
+mdc ldlm_cancel,E mds_close,E mds_getattr,E mds_getattr_lock,E mds_getxattr,E mds_readpage,E mds_statfs,E mds_sync,E reqs,E wait,E,U=us
+mem MemTotal,U=KB MemFree,U=KB MemUsed,U=KB Active,U=KB Inactive,U=KB Dirty,U=KB Writeback,U=KB FilePages,U=KB Mapped,U=KB AnonPages,U=KB PageTables,U=KB NFS_Unstable,U=KB Bounce,U=KB Slab,U=KB HugePages_Total, HugePages_Free,
+net collisions,E multicast,E rx_bytes,E,U=B rx_compressed,E rx_crc_errors,E rx_dropped,E rx_errors,E rx_fifo_errors,E rx_frame_errors,E rx_length_errors,E rx_missed_errors,E rx_over_errors,E rx_packets,E tx_aborted_errors,E tx_bytes,E,U=B tx_carrier_errors,E tx_compressed,E tx_dropped,E tx_errors,E tx_fifo_errors,E tx_heartbeat_errors,E tx_packets,E tx_window_errors,E
+numa numa_hit,E numa_miss,E numa_foreign,E interleave_hit,E local_node,E other_node,E
+osc read_bytes,E,U=B write_bytes,E,U=B ost_destroy,E ost_punch,E ost_read,E ost_setattr,E ost_statfs,E ost_write,E reqs,E wait,E,U=us
+ps ctxt,E processes,E load_1, load_5, load_15, nr_running, nr_threads,
+sysv_shm mem_used,U=B segs_used,
+tmpfs bytes_used,U=B files_used,
+vfs dentry_use, file_use, inode_use,
+vm pgpgin,E,U=KB pgpgout,E,U=KB pswpin,E pswpout,E pgalloc_normal,E pgfree,E pgactivate,E pgdeactivate,E pgfault,E pgmajfault,E pgrefill_normal,E pgsteal_normal,E pgscan_kswapd_normal,E pgscan_direct_normal,E pginodesteal,E slabs_scanned,E kswapd_steal,E kswapd_inodesteal,E pageoutrun,E allocstall,E pgrotated,E
