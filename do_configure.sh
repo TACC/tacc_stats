@@ -4,11 +4,11 @@
 
 ## Paths on compute hosts## \
 # directory of compute host's raw stats file \
-stats_dir=/var/log/tacc_stats/
+stats_dir=~/var/log/tacc_stats
 # compute host's lock file for tacc_stats process \
-stats_lock=/var/lock/tacc_stats/ 
+stats_lock=~/var/lock/tacc_stats
 # file containing jobid \
-jobid_file=/var/run/TACC_jobid 
+jobid_file=~/var/run/TACC_jobid 
 
 ## Paths for persistent log data and pickling
 # home directory for presistent stats data 
@@ -28,7 +28,7 @@ batch_system=SLURM
 ########################
 ## Chip types
 #TYPES += amd64_pmc
-TYPES+="intel_pmc3 "
+#TYPES+="intel_pmc3 "
 # TYPES += intel_uncore
 ########################
 ## Infiniband usage
@@ -63,8 +63,8 @@ TYPES+="vfs "
 TYPES+="vm "
 
 cmake \
--Dstatsdir=${statsdir} \
--Dstatslock=${statslock} \
+-Dstats_dir=${stats_dir} \
+-Dstats_lock=${stats_lock} \
 -Djobid_file=${jobid_file} \
 -Dtacc_stats_home=${tacc_stats_home} \
 -Dacct_path=${acct_path} \
