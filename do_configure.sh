@@ -27,39 +27,47 @@ batch_system=SLURM
 ## changed for different systems ## 
 ########################
 ## Chip types
-#TYPES += amd64_pmc
-#TYPES+="intel_pmc3 "
+# Each chip will need a difference counter file
+# TYPES += amd64_pmc
+# TYPES+="intel_pmc3 "
 # TYPES += intel_uncore
 ########################
 ## Infiniband usage
 TYPES+="ib "
+# These ib types appear to be specific to Ranger
 #TYPES+="ib_sw "
-## Block specific statistics
-TYPES+="block "
-## Scheduler accounting (per CPU)
-TYPES+="cpu "
+#TYPES+="ib_ext "
+########################
 ## Lustre filesystem usage (per mount)
+# Lustre network usage
 TYPES+="llite "
-## Lustre network usage
-TYPES+="lnet "
+TYPES+="lnet " 
+# Lustre stats
 TYPES+="mdc "
 TYPES+="osc "
-## Memory usage (per socket)
+#########################
+## The following should be linux generic 
+# Block specific statistics
+TYPES+="block "
+# Scheduler accounting (per CPU)
+TYPES+="cpu "
+# Memory usage (per socket)
 TYPES+="mem "
-## Network device usage (per device)
+# Network device usage (per device)
 TYPES+="net "
-# TYPES += nfs
-## NUMA statistics (per socket)
+# NFS stats
+TYPES+="nfs "
+# NUMA statistics (per socket)
 TYPES+="numa "
-## Process statistics
+# Thread stats?
 TYPES+="ps "
-## SysV shared memory segment usage
+# SysV shared memory segment usage
 TYPES+="sysv_shm "
-## Ram-backed filesystem usage (per mount)
+# Ram-backed filesystem usage (per mount)
 TYPES+="tmpfs "
-## Dentry/file/inode cache usage
+# Dentry/file/inode cache usage
 TYPES+="vfs "
-## Virtual memory statistics
+# Virtual memory statistics
 TYPES+="vm "
 
 cmake \

@@ -266,7 +266,7 @@ static void nfs_collect(struct stats_type *type)
       continue;
 
     ver = wsep(&rest);
-    if (strcmp(ver, "1.0") != 0) {
+    if (strcmp(ver, "1.0") != 0 && strcmp(ver, "1.1") != 0) {
       ERROR("NFS mount `%s', device `%s' has unknown statvers `%s'\n",
 	    mnt, dev, ver);
       continue;
