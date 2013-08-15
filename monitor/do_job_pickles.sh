@@ -13,9 +13,10 @@
 # ARGUMENTS
 # $1 - start date
 # $2 - end date
+# $3 - OPTIONAL the conf file path, default is pickle.conf
 
 # HOW TO RUN
-# ./do_job_pickles.sh 2013-01-01 2013-02-01
+# ./do_job_pickles.sh 2013-01-01 2013-02-01 {conf file path}
 
 
 set -eux
@@ -25,7 +26,12 @@ export PATH=$PATH:$prog_dir
 export PYTHONPATH=$prog_dir
 
 # read the configuration file
-source $prog_dir/pickle.conf
+if [ $# -eq 3 ] && [ -f $3 ]
+then
+        source $3
+else
+        source $prog_dir/pickle.conf
+fi
 
 # convert dates to format needed YYYY-MM-DD
 start_date=$(date --date="$1" +%F)
