@@ -1,5 +1,5 @@
 
-set(CMAKE_C_FLAGS  "-g -Wall -Werror -O3 -DDBUG")
+set(CMAKE_C_FLAGS  "-g -Wall -Werror -O3 -DDEBUG")
 set(TACC_STATS_OBJS main stats dict collect schema stats_file lustre_obd_to_mnt)
 
 separate_arguments(TYPES)
@@ -25,7 +25,7 @@ add_executable(tacc_stats ${TACC_STATS_OBJS} ${TYPE_OBJS})
 target_link_libraries(tacc_stats ibmad)
 
 set(PRINT_OBJS print-schema stats dict schema ${TYPE_OBJS})
-set(CMAKE_C_FLAGS "-Wl,--unresolved-symbols=ignore-all")
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wl,--unresolved-symbols=ignore-all")
 
 add_executable(print-schema ${PRINT_OBJS})
 
