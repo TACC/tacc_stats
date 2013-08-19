@@ -23,13 +23,14 @@ host_name_ext=stampede.tacc.utexas.edu
 batch_system=SLURM
 
 ## System specific Schema items. ##
+##!!!These types must be alphabetical !!!##
 ## Chips type and infiniband may need to be
 ## changed for different systems ## 
 ########################
 ## Chip types
 # Each chip will need a difference counter file
 # TYPES += amd64_pmc
-# TYPES+="intel_pmc3 "
+TYPES+="intel_pmc3 "
 # TYPES += intel_uncore
 ########################
 ## Infiniband usage
@@ -44,7 +45,7 @@ TYPES+="llite "
 TYPES+="lnet " 
 # Lustre stats
 TYPES+="mdc "
-TYPES+="osc "
+#TYPES+="osc "
 #########################
 ## The following should be linux generic 
 # Block specific statistics

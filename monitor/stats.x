@@ -1,1 +1,1 @@
-X(ib) X(llite) X(lnet) X(mdc) X(osc) X(block) X(cpu) X(mem) X(net) X(nfs) X(numa) X(ps) X(sysv_shm) X(tmpfs) X(vfs) X(vm) 
+X(block) X(cpu) X(ib) X(intel_pmc3) X(llite) X(lnet) X(mdc) X(mem) X(net) X(nfs) X(numa) X(ps) X(sysv_shm) X(tmpfs) X(vfs) X(vm) 

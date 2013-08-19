@@ -3,6 +3,7 @@ set(CMAKE_C_FLAGS  "-g -Wall -Werror -O3 -DDBUG")
 set(TACC_STATS_OBJS main stats dict collect schema stats_file lustre_obd_to_mnt)
 
 separate_arguments(TYPES)
+list(SORT TYPES)
 
 file(WRITE "stats.x")
 foreach(T ${TYPES})
