@@ -30,7 +30,7 @@ batch_system=SLURM
 ## Chip types
 # Each chip will need a difference counter file
 # TYPES += amd64_pmc
-TYPES+="intel_pmc3 "
+TYPES+="intel_snb "
 # TYPES += intel_uncore
 ########################
 ## Infiniband usage
