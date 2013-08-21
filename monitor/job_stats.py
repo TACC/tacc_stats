@@ -217,7 +217,7 @@ class Host(object):
                 # Prune to files that might overlap with job.
                 # ent_start is looking for a timestamp, depending on how the files are saved in
                 # the archive/node directory, they may need to be changed.
-                if (scheduler == 'torque'):
+                if (scheduler == 'torque' or scheduler == 'slurm_rush'):
                     # tacc_stats raw data files saved as archive/node/YYYYMMDD, these need to
                     # be converted to a unix timestamp
                     ent_start = long(datetime.datetime.strptime(base, '%Y%m%d').strftime("%s"))
