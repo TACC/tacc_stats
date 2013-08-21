@@ -28,10 +28,12 @@ batch_system=SLURM
 ## changed for different systems ## 
 ########################
 ## Chip types
-# Each chip will need a difference counter file
-# TYPES += amd64_pmc
+# Each chip will need a different counter file
+# for non-architectural events
+TYPES+="amd64_pmc "
 TYPES+="intel_snb "
-# TYPES += intel_uncore
+TYPES+="intel_uncore "
+TYPES+="intel_pmc3 "
 ########################
 ## Infiniband usage
 TYPES+="ib "
@@ -45,7 +47,7 @@ TYPES+="llite "
 TYPES+="lnet " 
 # Lustre stats
 TYPES+="mdc "
-#TYPES+="osc "
+TYPES+="osc "
 #########################
 ## The following should be linux generic 
 # Block specific statistics

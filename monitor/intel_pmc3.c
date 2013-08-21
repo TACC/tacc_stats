@@ -12,6 +12,9 @@
 #include "stats.h"
 #include "trace.h"
 
+// Nehalem microarchitectures have signature 06_1a,06_1e,06_1f,06_2e with non-architectural events
+// listed in Table 19-11.
+
 // $ ls -l /dev/cpu/0
 // total 0
 // crw-------  1 root root 203, 0 Oct 28 18:47 cpuid
@@ -120,10 +123,14 @@ static int cpu_is_nehalem(char *cpu)
     goto out;
   }
 
-  get_cpuid_signature(cpuid_fd,signature);
-  TRACE("cpu%s, CPUID Signature %s\n",cpu,signature);
-
   TRACE("cpu %s, buf %08x %08x %08x %08x\n", cpu, buf[0], buf[1], buf[2], buf[3]);
+
+  get_cpuid_signature(cpuid_fd,signature);
+  TRACE("cpu%s, CPUID Signature %s\n", cpu, signature);
+  if (strncmp(signature, "06_1a", 5) !=0 && strncmp(signature, "06_1e", 5) !=0  && strncmp(signature, "06_1f", 5) !=0 && strncmp(signature, "06_2e", 5) !=0)
+    goto out;
+
+
 
   int perf_ver = buf[0] & 0xff;
   TRACE("cpu %s, perf_ver %d\n", cpu, perf_ver);

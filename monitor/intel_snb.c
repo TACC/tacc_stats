@@ -12,6 +12,10 @@
 #include "stats.h"
 #include "trace.h"
 
+// Sandy Bridge microarchitectures have signatures 06_2a and 06_2d with non-architectural events
+// listed in Table 19-7, 19-8, and 19-9.  19-8 is 06_2a specific, 19-9 is 06_2d specific.  Stampede
+// is 06_2d but no 06_2d specific events are used here.
+
 // $ ls -l /dev/cpu/0
 // total 0
 // crw-------  1 root root 203, 0 Oct 28 18:47 cpuid
@@ -140,7 +144,7 @@ static int cpu_is_sandybridge(char *cpu)
 
   get_cpuid_signature(cpuid_fd,signature);
   TRACE("cpu%s, CPUID Signature %s\n", cpu, signature);
-  if (strncmp(signature, "06_2d", 5) !=0)
+  if (strncmp(signature, "06_2a", 5) !=0 && strncmp(signature, "06_2d", 5) !=0)
     goto out;
 
   int perf_ver = buf[0] & 0xff;
@@ -264,48 +268,42 @@ static int intel_snb_begin_cpu(char *cpu, uint64_t *events, size_t nr_events)
   | (1ULL << 22) /* Enable. */ \
   )
 
-#define MEM_UNCORE_RETIRED_REMOTE_DRAM PERF_EVENT(0x0F, 0x10) /* CHECKME */
-#define MEM_UNCORE_RETIRED_LOCAL_DRAM  PERF_EVENT(0x0F, 0x20) /* CHECKME */
-#define FP_COMP_OPS_EXE_X87            PERF_EVENT(0x10, 0x01)
-#define MEM_LOAD_RETIRED_L1D_HIT       PERF_EVENT(0xCB, 0x01)
-#define MEM_LOAD_RETIRED_L2_HIT        PERF_EVENT(0xCB, 0x02)
-#define MEM_LOAD_RETIRED_L3_HIT        PERF_EVENT(0xCB, 0x0C)
-#define MEM_LOAD_RETIRED_L3_MISS       PERF_EVENT(0xCB, 0x10) /* May be same as 0x0F/0x10 + 0x0F/0x20. */
-
+/* Non-architectural Perfomance Events */
+/* From Table 19-7 Sandy Bridge Microarchitecture 06_2A and 06_2D */
+/* Stampede has 06_2D and can also use Table 19-9 */
 #define DTLB_LOAD_MISSES_WALK_CYCLES   PERF_EVENT(0x08, 0x04)
 #define FP_COMP_OPS_EXE_SSE_FP_PACKED  PERF_EVENT(0x10, 0x10)
 #define FP_COMP_OPS_EXE_SSE_FP_SCALAR  PERF_EVENT(0x10, 0x20)
-
-/* Floating Point */
-#define SSE_DP_SCALAR_PACKED           PERF_EVENT(0x10, 0x90)
-#define FP_DP_256_PACKED               PERF_EVENT(0x11, 0x02)
+#define SSE_DOUBLE_SCALAR_PACKED       PERF_EVENT(0x10, 0x90)
+#define SIMD_FP_256_PACKED_DOUBLE      PERF_EVENT(0x11, 0x02)
 /* L1 CACHE */
-#define L1_MISSES                      PERF_EVENT(0x51, 0x01) 
+#define L1D_REPLACEMENT                PERF_EVENT(0x51, 0x01) 
 /* Stalls */
-#define STALLED_CORE_CYCLES            PERF_EVENT(0xA2, 0x01) 
+#define RESOURCE_STALLS_ANY            PERF_EVENT(0xA2, 0x01) 
+/* Floating Point */
 /* Load ops */
-#define RETIRED_LOAD_UOPS              PERF_EVENT(0xD0, 0x81) /* PMC0-3 only */
+#define MEM_UOPS_RETIRED_ALL_LOADS     PERF_EVENT(0xD0, 0x81) /* PMC0-3 only */
 /* Load hits */
-#define RETIRED_LOAD_OPS_L1_HIT        PERF_EVENT(0xD1, 0x01) /* PMC0-3 only */
-#define RETIRED_LOAD_OPS_L2_HIT        PERF_EVENT(0xD1, 0x02) /* PMC0-3 only */
-#define RETIRED_LOAD_OPS_L3_HIT        PERF_EVENT(0xD1, 0x04) /* PMC0-3 only */
+#define MEM_LOAD_UOPS_RETIRED_L1_HIT   PERF_EVENT(0xD1, 0x01) /* PMC0-3 only */
+#define MEM_LOAD_UOPS_RETIRED_L2_HIT   PERF_EVENT(0xD1, 0x02) /* PMC0-3 only */
+#define MEM_LOAD_UOPS_RETIRED_LLC_HIT  PERF_EVENT(0xD1, 0x04) /* PMC0-3 only */
 /* Other Misses */
-#define RETIRED_LOAD_OPS_L3_MISS       PERF_EVENT(0xD1, 0x20) /* PMC0-3 only */
-#define RETIRED_LOAD_OPS_L1_MISS_LFB_HIT PERF_EVENT(0xD1, 0x40) /* PMC0-3 only */
+#define MEM_LOAD_UOPS_RETIRED_LLC_MISS PERF_EVENT(0xD1, 0x20) /* PMC0-3 only */
+#define MEM_LOAD_UOPS_RETIRED_HIT_LFB  PERF_EVENT(0xD1, 0x40) /* PMC0-3 only */
 
 static int intel_snb_begin(struct stats_type *type)
 {
   int nr = 0;
 
   uint64_t events[] = {
-    RETIRED_LOAD_UOPS,
-    RETIRED_LOAD_OPS_L1_HIT,
-    RETIRED_LOAD_OPS_L2_HIT,
-    RETIRED_LOAD_OPS_L3_HIT,
-    SSE_DP_SCALAR_PACKED,
-    FP_DP_256_PACKED,
-    L1_MISSES,
-    STALLED_CORE_CYCLES,
+    MEM_UOPS_RETIRED_ALL_LOADS,
+    MEM_LOAD_UOPS_RETIRED_L1_HIT,
+    MEM_LOAD_UOPS_RETIRED_L2_HIT,
+    MEM_LOAD_UOPS_RETIRED_LLC_HIT,
+    SSE_DOUBLE_SCALAR_PACKED,
+    SIMD_FP_256_PACKED_DOUBLE,
+    L1D_REPLACEMENT,
+    RESOURCE_STALLS_ANY,
   };
 
   int i;
