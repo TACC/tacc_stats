@@ -69,7 +69,7 @@ def reader(dir, start_time=0, end_time=9223372036854775807L):
             except:
                 pass
 
-            if start_time <= d['end_time'] and d['end_time'] < end_time 
+            if start_time <= acct_data_dict['end_time'] and acct_data_dict['end_time'] < end_time 
                 yield acct_data_dict
 
         start_date += datetime.timedelta(days=1)
