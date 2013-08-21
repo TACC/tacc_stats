@@ -405,8 +405,8 @@ class Job(object):
             try:
                 with open(path) as file:
                     host_list = [host for line in file for host in line.split()]
-            except IOError as (err, str):
-                self.error("cannot open host list `%s': %s\n", path, str)
+            except IOError as (err, s):
+                self.error("cannot open host list `%s': %s\n", path, s)
                 return False
             if len(host_list) == 0:
                 self.error("empty host list\n")
@@ -451,8 +451,8 @@ class Job(object):
             try:
                 with open(path) as file:
                     host_list = [host for line in file for host in line.split()]
-            except IOError as (err, str):
-                self.error("cannot open host list `%s': %s\n", path, str)
+            except IOError as (err, s):
+                self.error("cannot open host list `%s': %s\n", path, s)
                 return False
             if len(host_list) == 0:
                 self.error("empty host list\n")
