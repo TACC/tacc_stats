@@ -1,54 +1,45 @@
-import csv, os, subprocess, datetime
+import csv, os, subprocess, datetime, time
 
-# TORQUE/PBS accounting file
-# docs.adaptivecomputing.com/torque/4-1-3/help.htm#topics/9-accounting/accountingRecords.htm
+# This file is for the SLRUM scheduler that is installed on Rush.ccr.buffalo.edu
+# The accounting files are updated nightly with COMPLETED jobs.
 
-# TORQUE maintains accounting records for batch jobs in the following directory:
-#  $TORQUEROOT/server_priv/accounting/<TIMESTAMP>
-#  $TORQUEROOT defaults to /usr/spool/PBS and <TIMESTAMP> is in the format: YYYYMMDD.
-# These records include events, time stamps, and information on resources requested and used.
-# Records for four different event types are produced and are described in the following table:
-
+# Accounting file header:
+# jobid,cluster,partition,account,group,user,submit,eligible,start,end,exitcode,nnodes,ncpus,nodelist,jobname
 
 stats_home = os.getenv('TACC_STATS_HOME', '/scratch/projects/tacc_stats')
 acct_path = os.getenv('TACC_STATS_ACCT', os.path.join(stats_home, 'accounting'))
 
-# rush.ccr.buffalo.edu
-# sacct --allusers --parsable2 --noheader --allocations --allclusters --format jobid,cluster,partition,account,group,user,submit,eligible,start,end,exitcode,nnodes,ncpus,nodelist,jobname --state COMPLETED,FAILED --starttime 2013-06-20T00:00:00 --endtime 2013-06-21T00:00:00 > out
-
 fields = (
     ('id',                          int, 'Job identifier'),
-    ('cluster',                     str, 'Cluster the job is running on'),
-    ('partition',                   str, 'Partition the job is running on'),
-    ('account',                     str, 'Account under which job is running'),
+    ('cluster',                     str, 'Job cluster'),
+    ('partition',                   str, 'Job partition'),
+    ('account',                     str, 'Job account'),
     ('group',                       str, 'Group name of the job owner'),
-    ('user',                        str, 'User name of the job owner'),
-    ('submit',                      str, 'Time the job was submitted'),
-    ('eligible',                    str, 'Time the job was eligible to run'),
-    ('start',                       int, 'Time job started to run (unix time stamp)'),
-    ('end',                         int, 'Time job ended (unix time stamp)'),
-    ('exit_code'),                   int, 'Exit code of the job'),
-    ('nnodes',                      str, 'Number of nodes'),
-    ('ncpus',                       str, 'Number of cpus'),
-    ('nodelist',                    str, 'List of nodes used'),
+    ('user',                        str, 'User that is running the job'),
+    ('submit',                      int, 'Time the job was submitted'),
+    ('eligible',                    int, 'Time job was eligible to run (unix time stamp)'),
+    ('start_time',                  int, 'Time job started to run (unix time stamp)'),
+    ('end_time',                    int, 'Time job ended (unix time stamp)'),
+    ('exit_code',                   str, 'Exit status of job'),
+    ('nnodes',                      int, 'Number of nodes'),
+    ('ncpus',                       int, 'Number of cpus'),
+    ('node_list',                   str, 'Nodes used in job'),
     ('jobname',                     str, 'Job name')
 )
 
 
 # reader(dir, start_time=0, end_time=9223372036854775807L):
 #  Info:
-#   Reads in TORQUE accounting files and searches for jobs that have ended
+#   Reads in SLURM accounting files and searches for jobs that have ended
 #   between the specified dates.
 #  Inputs:
-#   dir - directory where torque accounting files are located
+#   dir - directory where slurm accounting files are located
 #   start_time - look for jobs starting at this date
 #   end_time - look for jobs ending at this time
 #  Returns:
 #   Iterator for all jobs that finished between start_time and end_time, the
 #   iterator is returned with the yield command so it will use less memory.
 def reader(dir, start_time=0, end_time=9223372036854775807L):
-
-    
 
     # turn unix timestamp into date object
     start_date = datetime.date.fromtimestamp(start_time)
@@ -63,36 +54,23 @@ def reader(dir, start_time=0, end_time=9223372036854775807L):
         # loop through records in accounting file
         for acct_record in acct_record_file:
 
-            # check if record corresponds to a job ending
-            acct_data = acct_record.split(';')
-            if acct_data[1] == 'E':
+            acct_data = acct_record.split('|')
+            acct_data_dict = dict(zip([tup[0] for tup in fields],acct_data))
 
-                # put record into associative array
-                acct_data_arr = {}
-                acct_data_arr['id'] = acct_data[2][:acct_data[2].find('.')]
-                acct_data = acct_data[3].split(' ')
+            # convert time to unix timestamp
+            for t in ['start_time', 'end_time', 'eligible', 'submit']:
+                tmp = time.strptime(acct_data_dict[t],'%Y-%m-%dT%H:%M:%S')
+                acct_data_dict[t] = time.strftime("%s",tmp)
 
-                for stat in acct_data:
-                    acct_data_arr[ stat[:stat.find('=')] ] = stat[stat.find('=')+1:].strip()
+            # convert data types in array
+            try:
+                for stat_name, stat_type, stat_desc in fields:
+                    acct_data_dict[stat_name] = stat_type(acct_data_dict[stat_name])
+            except:
+                pass
 
-                acct_data_arr['hostname'] = acct_data_arr['exec_host'][:acct_data_arr['exec_host'].find('/')]
-
-                # convert data types in array
-                try:
-                    for stat_name, stat_type, stat_desc in fields:
-                        acct_data_arr[stat_name] = stat_type(acct_data_arr[stat_name])
-                except:
-                    pass
-
-                # change key names
-                acct_data_arr['start_time'] = acct_data_arr['start']
-                del acct_data_arr['start']
-                acct_data_arr['end_time'] = acct_data_arr['end']
-                del acct_data_arr['end']
-
-                # check start and end times then yield job array (yield returns a itterator)
-                if start_time <= acct_data_arr['end_time'] and acct_data_arr['end_time'] < end_time:
-                    yield acct_data_arr
+            if start_time <= d['end_time'] and d['end_time'] < end_time 
+                yield acct_data_dict
 
         start_date += datetime.timedelta(days=1)
 
