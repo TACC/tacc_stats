@@ -468,6 +468,51 @@ class Job(object):
                 return False
             return True
             
+        elif scheduler == 'slurm_rush':
+            
+            open_brace_flag = False
+            close_brace_flag = False
+            host_list = []
+            tmp_host = ""
+            # get a list of all the nodes and store them in host_host
+            for c in self.acct['node_list']:
+                if c == '[':
+                    open_brace_flag = True
+                elif c == ']':
+                    close_brace_flag = True
+                if ( c == ',' and not close_brace_flag and not open_brace_flag ) or (c == ',' and close_brace_flag):
+                    host_list.append(tmp_host)
+                    tmp_host = ""
+                    close_brace_flag = False
+                    open_brace_flag = False
+                else:
+                    tmp_host += c
+            if tmp_host:
+                host_list.append(tmp_host)
+            # parse through host_list and expand the hostnames
+            host_list_expanded = []
+            for h in host_list:
+                if '[' in h:
+                    node_head = h.split('[')[0]
+                    node_tail = h.split('[')[1][:-1].split(',')
+                    for n in node_tail:
+                        if '-' in n:
+                            num = n.split('-')
+                            for x in range(int(num[0]), int(num[1])+1):
+                                host_list_expanded.append(node_head + str("%02d" % x))
+                        else:
+                            host_list_expanded.append(node_head + n)
+                else:
+                    host_list_expanded.append(h)
+            for host_name in host_list_expanded:
+                host = Host(self, host_name)
+                if host.gather_stats():
+                    self.hosts[host_name] = host
+            if not self.hosts:
+                self.error("no good hosts\n")
+                return False
+            return True
+        
         else:
             return False
 

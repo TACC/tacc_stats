@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-import datetime, glob, job_stats, os, sge_acct, torque_acct, slurm_stampede_acct, subprocess, sys, time
+import datetime, glob, job_stats, os, sge_acct, torque_acct, slurm_stampede_acct, slurm_rush_acct, subprocess, sys, time
 import cPickle as pickle
 
 prog_name = os.path.basename(sys.argv[0])
