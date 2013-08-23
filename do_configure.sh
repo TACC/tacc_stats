@@ -31,9 +31,9 @@ batch_system=SLURM
 # Each chip will need a different counter file
 # for non-architectural events
 TYPES+="amd64_pmc "
-TYPES+="intel_snb "
+TYPES+="intel_nhm "
 TYPES+="intel_uncore "
-TYPES+="intel_pmc3 "
+TYPES+="intel_snb "
 ########################
 ## Infiniband usage
 TYPES+="ib "

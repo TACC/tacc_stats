@@ -29,23 +29,23 @@
 // of MSR address space. Each performance event select register is paired with a
 // corresponding performance counter in the 0C1H address block.
 
-#define IA32_PMC0 0xC1 /* CPUID.0AH: EAX[15:8] > 0 */
-#define IA32_PMC1 0xC2 /* CPUID.0AH: EAX[15:8] > 1 */
-#define IA32_PMC2 0xC3 /* CPUID.0AH: EAX[15:8] > 2 */
-#define IA32_PMC3 0xC4 /* CPUID.0AH: EAX[15:8] > 3 */
-#define IA32_PMC4 0xC5 /* CPUID.0AH: EAX[15:8] = 8 */
-#define IA32_PMC5 0xC6 /* CPUID.0AH: EAX[15:8] = 8 */
-#define IA32_PMC6 0xC7 /* CPUID.0AH: EAX[15:8] = 8 */
-#define IA32_PMC7 0xC8 /* CPUID.0AH: EAX[15:8] = 8 */
+#define IA32_CTR0 0xC1 /* CPUID.0AH: EAX[15:8] > 0 */
+#define IA32_CTR1 0xC2 /* CPUID.0AH: EAX[15:8] > 1 */
+#define IA32_CTR2 0xC3 /* CPUID.0AH: EAX[15:8] > 2 */
+#define IA32_CTR3 0xC4 /* CPUID.0AH: EAX[15:8] > 3 */
+#define IA32_CTR4 0xC5 /* CPUID.0AH: EAX[15:8] = 8 */
+#define IA32_CTR5 0xC6 /* CPUID.0AH: EAX[15:8] = 8 */
+#define IA32_CTR6 0xC7 /* CPUID.0AH: EAX[15:8] = 8 */
+#define IA32_CTR7 0xC8 /* CPUID.0AH: EAX[15:8] = 8 */
 
-#define IA32_PERFEVTSEL0 0x186 /* CPUID.0AH: EAX[15:8] > 0 */
-#define IA32_PERFEVTSEL1 0x187 /* CPUID.0AH: EAX[15:8] > 1 */
-#define IA32_PERFEVTSEL2 0x188 /* CPUID.0AH: EAX[15:8] > 2 */
-#define IA32_PERFEVTSEL3 0x189 /* CPUID.0AH: EAX[15:8] > 3 */
-#define IA32_PERFEVTSEL4 0x18A /* CPUID.0AH: EAX[15:8] = 8 */
-#define IA32_PERFEVTSEL5 0x18B /* CPUID.0AH: EAX[15:8] = 8 */
-#define IA32_PERFEVTSEL6 0x18C /* CPUID.0AH: EAX[15:8] = 8 */
-#define IA32_PERFEVTSEL7 0x18D /* CPUID.0AH: EAX[15:8] = 8 */
+#define IA32_CTL0 0x186 /* CPUID.0AH: EAX[15:8] > 0 */
+#define IA32_CTL1 0x187 /* CPUID.0AH: EAX[15:8] > 1 */
+#define IA32_CTL2 0x188 /* CPUID.0AH: EAX[15:8] > 2 */
+#define IA32_CTL3 0x189 /* CPUID.0AH: EAX[15:8] > 3 */
+#define IA32_CTL4 0x18A /* CPUID.0AH: EAX[15:8] = 8 */
+#define IA32_CTL5 0x18B /* CPUID.0AH: EAX[15:8] = 8 */
+#define IA32_CTL6 0x18C /* CPUID.0AH: EAX[15:8] = 8 */
+#define IA32_CTL7 0x18D /* CPUID.0AH: EAX[15:8] = 8 */
 
 // IA32_PERFEVTSELx MSR layout
 //   [0, 7] Event Select
@@ -65,34 +65,40 @@
 #define IA32_FIXED_CTR1 0x30A /* CPU_CLK_Unhalted.Core, CPUID.0AH: EDX[4:0] > 1 */
 #define IA32_FIXED_CTR2 0x30B /* CPU_CLK_Unhalted.Ref, CPUID.0AH: EDX[4:0] > 2 */
 #define IA32_FIXED_CTR_CTRL 0x38D /* CPUID.0AH: EAX[7:0] > 1 */
-#define IA32_PERF_GLOBAL_STATUS 0x38E
-#define IA32_PERF_GLOBAL_CTRL 0x38F
-#define IA32_PERF_GLOBAL_OVF_CTRL 0x390
+#define IA32_PERF_GLOBAL_STATUS 0x38E /* Not used, indicates counter ovf */
+#define IA32_PERF_GLOBAL_CTRL 0x38F /* Enables counters */
+#define IA32_PERF_GLOBAL_OVF_CTRL 0x390 /* Not used, controls counter ovf */
 
 #define KEYS \
-  X(PMC0, "E,W=48", ""), \
-  X(PMC1, "E,W=48", ""), \
-  X(PMC2, "E,W=48", ""), \
-  X(PMC3, "E,W=48", ""), \
-  X(PMC4, "E,W=48", ""), \
-  X(PMC5, "E,W=48", ""), \
-  X(PMC6, "E,W=48", ""), \
-  X(PMC7, "E,W=48", ""), \
-  X(PERFEVTSEL0, "C", ""), \
-  X(PERFEVTSEL1, "C", ""), \
-  X(PERFEVTSEL2, "C", ""), \
-  X(PERFEVTSEL3, "C", ""), \
-  X(PERFEVTSEL4, "C", ""), \
-  X(PERFEVTSEL5, "C", ""), \
-  X(PERFEVTSEL6, "C", ""), \
-  X(PERFEVTSEL7, "C", ""), \
-  X(FIXED_CTR0, "E,W=48", ""), \
-  X(FIXED_CTR1, "E,W=48", ""), \
-  X(FIXED_CTR2, "E,W=48", ""), \
-  X(FIXED_CTR_CTRL, "C", ""), \
+    X(FIXED_CTR0, "E,W=48", ""), \
+    X(FIXED_CTR1, "E,W=48", ""), \
+    X(FIXED_CTR2, "E,W=48", ""), \
+    X(CTL0, "C", ""), \
+    X(CTL1, "C", ""), \
+    X(CTL2, "C", ""), \
+    X(CTL3, "C", ""), \
+    X(CTL4, "C", ""), \
+    X(CTL5, "C", ""), \
+    X(CTL6, "C", ""), \
+    X(CTL7, "C", ""), \
+    X(CTR0, "E,W=48", ""), \
+    X(CTR1, "E,W=48", ""), \
+    X(CTR2, "E,W=48", ""), \
+    X(CTR3, "E,W=48", ""), \
+    X(CTR4, "E,W=48", ""), \
+    X(CTR5, "E,W=48", ""), \
+    X(CTR6, "E,W=48", ""), \
+    X(CTR7, "E,W=48", "")
+
+/* Shouldn't need these in stats file,
+all counters are always on, and ovf is handled 
+in post processing. fixed counters are fixed :)
+, \
+  X(FIXED_CTR_CTRL, FIXED_CTL, "C", ""), \
   X(PERF_GLOBAL_STATUS, "C", ""), \
   X(PERF_GLOBAL_CTRL, "C", ""), \
   X(PERF_GLOBAL_OVF_CTRL, "C", "")
+*/
 
 static void get_cpuid_signature(int cpuid_file, char* signature)
 {
@@ -141,12 +147,14 @@ static int cpu_is_sandybridge(char *cpu)
   }
 
   TRACE("cpu %s, buf %08x %08x %08x %08x\n", cpu, buf[0], buf[1], buf[2], buf[3]);
-
+  
   get_cpuid_signature(cpuid_fd,signature);
   TRACE("cpu%s, CPUID Signature %s\n", cpu, signature);
   if (strncmp(signature, "06_2a", 5) !=0 && strncmp(signature, "06_2d", 5) !=0)
     goto out;
 
+
+  // This check isn't really necessary since SNB is always perf vers 3
   int perf_ver = buf[0] & 0xff;
   TRACE("cpu %s, perf_ver %d\n", cpu, perf_ver);
   switch (perf_ver) {
@@ -230,12 +238,12 @@ static int intel_snb_begin_cpu(char *cpu, uint64_t *events, size_t nr_events)
 
   int i;
   for (i = 0; i < nr_events; i++) {
-    TRACE("MSR %08X, event %016llX\n", IA32_PERFEVTSEL0 + i, (unsigned long long) events[i]);
+    TRACE("MSR %08X, event %016llX\n", IA32_CTL0 + i, (unsigned long long) events[i]);
 
-    if (pwrite(msr_fd, &events[i], sizeof(events[i]), IA32_PERFEVTSEL0 + i) < 0) {
+    if (pwrite(msr_fd, &events[i], sizeof(events[i]), IA32_CTL0 + i) < 0) {
       ERROR("cannot write event %016llX to MSR %08X through `%s': %m\n",
             (unsigned long long) events[i],
-            (unsigned) IA32_PERFEVTSEL0 + i,
+            (unsigned) IA32_CTL0 + i,
             msr_path);
       goto out;
     }
