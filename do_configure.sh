@@ -34,6 +34,7 @@ TYPES+="amd64_pmc "
 TYPES+="intel_nhm "
 TYPES+="intel_uncore "
 TYPES+="intel_snb "
+TYPES+="intel_snb_uncore "
 ########################
 ## Infiniband usage
 TYPES+="ib "
