@@ -13,7 +13,7 @@
 #include "trace.h"
 #include "pscanf.h"
 
-// Uncore iMC (Memory Controller) events are counted in this file.  The events are accesses in PCI config space.
+// Uncore QPI Link Layer events are counted in this file.  The events are accesses in PCI config space.
 
 // Sandy Bridge microarchitectures have signatures 06_2a and 06_2d with non-architectural events
 // listed in Table 19-7, 19-8, and 19-9.  19-8 is 06_2a specific, 19-9 is 06_2d specific.  Stampede
@@ -24,45 +24,42 @@
 // crw-------  1 root root 203, 0 Oct 28 18:47 cpuid
 // crw-------  1 root root 202, 0 Oct 28 18:47 msr
 
-// $ lspci | grep "Memory Controller Channel"
+// $ lspci | grep "Interconnect Link"
 /*
-7f:10.0 System peripheral: Intel Corporation Xeon E5/Core i7 Integrated Memory Controller Channel 0-3 Thermal Control 0 (rev 07)
-7f:10.1 System peripheral: Intel Corporation Xeon E5/Core i7 Integrated Memory Controller Channel 0-3 Thermal Control 1 (rev 07)
-7f:10.4 System peripheral: Intel Corporation Xeon E5/Core i7 Integrated Memory Controller Channel 0-3 Thermal Control 2 (rev 07)
-7f:10.5 System peripheral: Intel Corporation Xeon E5/Core i7 Integrated Memory Controller Channel 0-3 Thermal Control 3 (rev 07)
-ff:10.0 System peripheral: Intel Corporation Xeon E5/Core i7 Integrated Memory Controller Channel 0-3 Thermal Control 0 (rev 07)
-ff:10.1 System peripheral: Intel Corporation Xeon E5/Core i7 Integrated Memory Controller Channel 0-3 Thermal Control 1 (rev 07)
-ff:10.4 System peripheral: Intel Corporation Xeon E5/Core i7 Integrated Memory Controller Channel 0-3 Thermal Control 2 (rev 07)
-ff:10.5 System peripheral: Intel Corporation Xeon E5/Core i7 Integrated Memory Controller Channel 0-3 Thermal Control 3 (rev 07)
+7f:13.5 Performance counters: Intel Corporation Xeon E5/Core i7 Ring to QuickPath Interconnect Link 0 Performance Monitor (rev 07)
+7f:13.6 System peripheral: Intel Corporation Xeon E5/Core i7 Ring to QuickPath Interconnect Link 1 Performance Monitor (rev 07)
+ff:13.5 Performance counters: Intel Corporation Xeon E5/Core i7 Ring to QuickPath Interconnect Link 0 Performance Monitor (rev 07)
+ff:13.6 System peripheral: Intel Corporation Xeon E5/Core i7 Ring to QuickPath Interconnect Link 1 Performance Monitor (rev 07)
 */
 
 // Info for this stuff is in: 
 //Intel Xeon Processor E5-2600 Product Family Uncore Performance Monitoring Guide
-// 4 MCs w/ 4 counters each per socket
+// 2 QPI units with four counters each
 // PCI Config Space Dev ID:
-// Socket 1: 7f:10.0, 7f:10.1, 7f:10.4, 7f:10.5 
-// Socket 0: ff:10.0, 7f:10.1, ff:10.4, ff:10.5 
+// Socket 1: 7f:13.5, 7f:13.6
+// Socket 0: ff:13.5, 7f:13.6
 // Supposedly all registers are 32 bit, but counter
 // registers A and B need to be added to get counter value
 
-// Defs in Table 2-59
-#define MC_BOX_CTL         0xF4
-#define MC_FIXED_CTL       0xF0
-#define MC_CTL0           0xD8
-#define MC_CTL1           0xDC
-#define MC_CTL2           0xE0
-#define MC_CTL3           0xE4
+// Defs in Table 2-84
+#define QPI_BOX_CTL         0xF4
+#define QPI_CTL0           0xD8
+#define QPI_CTL1           0xDC
+#define QPI_CTL2           0xE0
+#define QPI_CTL3           0xE4
+#define QPI_B_CTR0         0xA0
+#define QPI_A_CTR0         0xA4
+#define QPI_B_CTR1         0xA8
+#define QPI_A_CTR1         0xAC
+#define QPI_B_CTR2         0xB0
+#define QPI_A_CTR2         0xB4
+#define QPI_B_CTR3         0xB8
+#define QPI_A_CTR3         0xBC
 
-#define MC_B_CTR0         0xA0
-#define MC_A_CTR0         0xA4
-#define MC_B_CTR1         0xA8
-#define MC_A_CTR1         0xAC
-#define MC_B_CTR2         0xB0
-#define MC_A_CTR2         0xB4
-#define MC_B_CTR3         0xB8
-#define MC_A_CTR3         0xBC
-#define MC_B_FIXED_CTR     0xD0
-#define MC_A_FIXED_CTR     0xD4
+#define QPI_MASK0  0x238
+#define QPI_MASK1  0x23C
+#define QPI_MATCH0 0x228
+#define QPI_MATCH1 0x22C
 
 // Width of 44 for C-Boxes
 #define CTL_KEYS \
@@ -75,11 +72,9 @@ ff:10.5 System peripheral: Intel Corporation Xeon E5/Core i7 Integrated Memory C
     X(CTR0, "E,W=48", ""), \
     X(CTR1, "E,W=48", ""), \
     X(CTR2, "E,W=48", ""), \
-    X(CTR3, "E,W=48", ""), \
-    X(FIXED_CTR,"E,W=48","")
+    X(CTR3, "E,W=48", "")
 
 #define KEYS CTL_KEYS, CTR_KEYS
-
 static void get_cpuid_signature(int cpuid_file, char* signature)
 {
   int ebx = 0, ecx = 0, edx = 0, eax = 1;
@@ -135,17 +130,19 @@ static int cpu_is_sandybridge(char *cpu)
   return rc;
 }
 
-/* Events in Memory Controller
+/* Events in QPI
 threshhold        [31:24]
 invert threshold  [23]
 enable            [22]
+event ext         [21]
 edge detect       [18]
+reset             [17]
 umask             [15:8]
 event select      [7:0]
 */
 
 /* Defs in Table 2-61 */
-#define MBOX_PERF_EVENT(event, umask) \
+#define QPI_PERF_EVENT(event, umask) \
   ( (event) \
   | (umask << 8) \
   | (0ULL << 18) /* Edge Detection. */ \
@@ -154,13 +151,14 @@ event select      [7:0]
   | (0x01ULL << 24) /* Threshold */ \
   )
 
-/* Definitions in Table 2-14 */
-#define CAS_READS           MBOX_PERF_EVENT(0x04, 0x01)
-#define CAS_WRITES          MBOX_PERF_EVENT(0x04, 0x0C)
-#define ACT_COUNT           MBOX_PERF_EVENT(0x01, 0x00)
-#define PRE_COUNT_ALL       MBOX_PERF_EVENT(0x02, 0x03)
+/* Definitions in Table 2-94 */
+#define G0_IDLE QPI_PERF_EVENT(0x00,0x01)
+#define G0_NON_DATA QPI_PERF_EVENT(0x00,0x04)
+#define G1_DRS_DATA QPI_PERF_EVENT(0x02,0x08)
+#define G2_NCB_DATA QPI_PERF_EVENT(0x03,0x04) 
 
-static int intel_snb_imc_begin_dev(char *bus_dev, uint32_t *events, size_t nr_events)
+
+static int intel_snb_qpi_begin_dev(char *bus_dev, uint32_t *events, size_t nr_events)
 {
   int rc = -1;
   char pci_path[80];
@@ -174,53 +172,28 @@ static int intel_snb_imc_begin_dev(char *bus_dev, uint32_t *events, size_t nr_ev
     goto out;
   }
 
-  ctl = 0x10100UL; // enable freeze (bit 16), freeze (bit 8)
-  if (pwrite(pci_fd, &ctl, sizeof(ctl), MC_BOX_CTL) < 0) {
-    ERROR("cannot enable freeze of MC counters: %m\n");
-    goto out;
-  }
-
-  ctl = 0x480000UL; // enable fixed counter and reset fixed counter
-  if (pwrite(pci_fd, &ctl, sizeof(ctl), MC_FIXED_CTL) < 0) {
-    ERROR("cannot enable freeze of MC counter: %m\n");
-    goto out;
-  }
-
-  ctl = 0x400000UL; // remove reset flag from fixed counter
-  if (pwrite(pci_fd, &ctl, sizeof(ctl), MC_FIXED_CTL) < 0) {
-    ERROR("cannot undo reset of MC Fixed counter: %m\n");
+  ctl = 0x10102UL; // enable freeze (bit 16), freeze (bit 8), reset counters
+  if (pwrite(pci_fd, &ctl, sizeof(ctl), QPI_BOX_CTL) < 0) {
+    ERROR("cannot enable freeze of QPI counters: %m\n");
     goto out;
   }
   
-  /* Select Events for MC counters, MC_CTLx registers are 4 bits apart */
+  /* Select Events for QPI counters, QPI_CTLx registers are 4 bits apart */
   int i;
   for (i = 0; i < nr_events; i++) {
-    TRACE("PCI Address %08X, event %016lX\n", MC_CTL0 + 4*i, (unsigned long) events[i]);
-    if (pwrite(pci_fd, &events[i], sizeof(events[i]), MC_CTL0 + 4*i) < 0) { 
+    TRACE("PCI Address %08X, event %016lX\n", QPI_CTL0 + 4*i, (unsigned long) events[i]);
+    if (pwrite(pci_fd, &events[i], sizeof(events[i]), QPI_CTL0 + 4*i) < 0) { 
       ERROR("cannot write event %016lX to PCI Address %08X through `%s': %m\n", 
             (unsigned long) events[i],
-            (unsigned) MC_CTL0 + 4*i,
+            (unsigned) QPI_CTL0 + 4*i,
             pci_path);
       goto out;
     }
   }
 
-  /* Manually reset programmable MC counters. They are 4 apart, but each counter register 
-     is split into 2 32-bit registers, A and B */
-  int zero = 0x0UL;
-  for (i = 0; i < nr_events; i++) {
-    if (pwrite(pci_fd, &zero, sizeof(zero), MC_A_CTR0 + 8*i) < 0 || 
-	pwrite(pci_fd, &zero, sizeof(zero), MC_B_CTR0 + 8*i) < 0) { 
-      ERROR("cannot reset counter %08X,%08X through `%s': %m\n", 
-	    (unsigned) MC_A_CTR0 + 8*i, (unsigned) MC_B_CTR0 + 8*i,
-            pci_path);
-      goto out;
-    }
-  }
-
-  ctl = 0x10000ULL; // unfreeze counters
-  if (pwrite(pci_fd, &ctl, sizeof(ctl), MC_BOX_CTL) < 0) {
-    ERROR("cannot unfreeze MC counters: %m\n");
+  ctl = 0x10000ULL; // unfreeze counter
+  if (pwrite(pci_fd, &ctl, sizeof(ctl), QPI_BOX_CTL) < 0) {
+    ERROR("cannot unfreeze QPI counters: %m\n");
     goto out;
   }
 
@@ -233,32 +206,30 @@ static int intel_snb_imc_begin_dev(char *bus_dev, uint32_t *events, size_t nr_ev
   return rc;
 }
 
-static int intel_snb_imc_begin(struct stats_type *type)
+static int intel_snb_qpi_begin(struct stats_type *type)
 {
   int nr = 0;
   
-  uint32_t imc_events[4][4] = {
-    { CAS_READS, CAS_WRITES, ACT_COUNT, PRE_COUNT_ALL,},
-    { CAS_READS, CAS_WRITES, ACT_COUNT, PRE_COUNT_ALL,},
-    { CAS_READS, CAS_WRITES, ACT_COUNT, PRE_COUNT_ALL,},
-    { CAS_READS, CAS_WRITES, ACT_COUNT, PRE_COUNT_ALL,},
+  uint32_t imc_events[2][4] = {
+    { G0_IDLE, G0_NON_DATA, G1_DRS_DATA, G2_NCB_DATA},
+    { G0_IDLE, G0_NON_DATA, G1_DRS_DATA, G2_NCB_DATA},
   };
 
   /* 2 buses and 4 devices per bus */
   char *bus[2] = {"7f", "ff"};
-  char *dev[4] = {"10.0", "10.1", "10.4", "10.5"};
+  char *dev[2] = {"13.5", "13.6"};
 
 
   int i, j;
   for (i = 0; i < 2; i++) {
-    for (j = 0; j < 4; j++) {
+    for (j = 0; j < 2; j++) {
       char cpu[80];
       char bus_dev[80];
       snprintf(cpu, sizeof(cpu), "%d", i*8);
       snprintf(bus_dev, sizeof(bus_dev), "%s/%s", bus[i], dev[j]);
       
       if (cpu_is_sandybridge(cpu)) // check that cpu 0 and 8 (sockets 0 and 1) are SNB      
-	if (intel_snb_imc_begin_dev(bus_dev, imc_events[j], 4) == 0)
+	if (intel_snb_qpi_begin_dev(bus_dev, imc_events[j], 4) == 0)
 	  nr++; /* HARD */
     
     }
@@ -267,7 +238,7 @@ static int intel_snb_imc_begin(struct stats_type *type)
   return nr > 0 ? 0 : -1;
 }
 
-static void intel_snb_imc_collect_box(struct stats_type *type, char *bus_dev)
+static void intel_snb_qpi_collect_dev(struct stats_type *type, char *bus_dev)
 {
   struct stats *stats = NULL;
   char pci_path[80];
@@ -285,11 +256,13 @@ static void intel_snb_imc_collect_box(struct stats_type *type, char *bus_dev)
     ERROR("cannot open `%s': %m\n", pci_path);
     goto out;
   }
+
+
 #define X(k,r...) \
   ({ \
     uint32_t val; \
-    if ( pread(pci_fd, &val, sizeof(val), MC_##k) < 0 ) \
-      ERROR("cannot read `%s' (%08X) through `%s': %m\n", #k, MC_##k, pci_path); \
+    if ( pread(pci_fd, &val, sizeof(val), QPI_##k) < 0) \
+      ERROR("cannot read `%s' (%08X) through `%s': %m\n", #k, QPI_##k, pci_path); \
     else \
       stats_set(stats, #k, val);	\
   })
@@ -300,8 +273,8 @@ static void intel_snb_imc_collect_box(struct stats_type *type, char *bus_dev)
   ({ \
     uint32_t val_a, val_b; \
     uint64_t val = 0x0ULL; \
-    if ( pread(pci_fd, &val_a, sizeof(val_a), MC_A_##k) < 0 || pread(pci_fd, &val_b, sizeof(val_b), MC_B_##k) < 0 ) \
-      ERROR("cannot read `%s' (%08X,%08X) through `%s': %m\n", #k, MC_A_##k, MC_B_##k, pci_path); \
+    if ( pread(pci_fd, &val_a, sizeof(val_a), QPI_A_##k) < 0 || pread(pci_fd, &val_b, sizeof(val_b), QPI_B_##k) < 0 ) \
+      ERROR("cannot read `%s' (%08X,%08X) through `%s': %m\n", #k, QPI_A_##k, QPI_B_##k, pci_path); \
     else \
       val = val_a; stats_set(stats, #k, (val<<32) + val_b);	\
   })
@@ -313,30 +286,30 @@ static void intel_snb_imc_collect_box(struct stats_type *type, char *bus_dev)
     close(pci_fd);
 }
 
-static void intel_snb_imc_collect(struct stats_type *type)
+static void intel_snb_qpi_collect(struct stats_type *type)
 {
   /* 2 buses and 4 devices per bus */
   char *bus[2] = {"7f", "ff"};
-  char *dev[4] = {"10.0", "10.1", "10.4", "10.5"};
+  char *dev[2] = {"13.5", "13.6"};
   
   int i, j;
   for (i = 0; i < 2; i++) {
-    for (j = 0; j < 4; j++) {
+    for (j = 0; j < 2; j++) {
       char cpu[80];    
       char bus_dev[80];                                        
       snprintf(cpu, sizeof(cpu), "%d", i*8);
       snprintf(bus_dev, sizeof(bus_dev), "%s/%s", bus[i], dev[j]);
       
       if (cpu_is_sandybridge(cpu)) // check that cpu 0 and 8 (sockets 0 and 1) are SNB      
-	intel_snb_imc_collect_box(type, bus_dev);
+	intel_snb_qpi_collect_dev(type, bus_dev);
     }
   }
 }
 
-struct stats_type intel_snb_imc_stats_type = {
-  .st_name = "intel_snb_imc",
-  .st_begin = &intel_snb_imc_begin,
-  .st_collect = &intel_snb_imc_collect,
+struct stats_type intel_snb_qpi_stats_type = {
+  .st_name = "intel_snb_qpi",
+  .st_begin = &intel_snb_qpi_begin,
+  .st_collect = &intel_snb_qpi_collect,
 #define X SCHEMA_DEF
   .st_schema_def = JOIN(KEYS),
 #undef X
