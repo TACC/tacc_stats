@@ -31,23 +31,23 @@
 // C-Box control and counter registers 
 // 8 C-Boxes, 4 counters each.  Each counter has a different restriction on what it counts. Addresses in Table 2-8.
 /* Box Control - Cn_MSR_PMON_BOX_CTL - Defs in Table 2-9 */
-#define C_CTL0 0xD04
-#define C_CTL1 0xD24
-#define C_CTL2 0xD44
-#define C_CTL3 0xD64
-#define C_CTL4 0xD84
-#define C_CTL5 0xDA4
-#define C_CTL6 0xDC4
-#define C_CTL7 0xDE4
+#define CBOX_CTL0 0xD04
+#define CBOX_CTL1 0xD24
+#define CBOX_CTL2 0xD44
+#define CBOX_CTL3 0xD64
+#define CBOX_CTL4 0xD84
+#define CBOX_CTL5 0xDA4
+#define CBOX_CTL6 0xDC4
+#define CBOX_CTL7 0xDE4
 /* Counter Filters - Cn_MSR_PMON_BOX_FILTER - Defs in 2-12, 2-13 */
-#define C_FILTER0 0xD14
-#define C_FILTER1 0xD34
-#define C_FILTER2 0xD54
-#define C_FILTER3 0xD74
-#define C_FILTER4 0xD94
-#define C_FILTER5 0xDB4
-#define C_FILTER6 0xDD4
-#define C_FILTER7 0xDF4
+#define CBOX_FILTER0 0xD14
+#define CBOX_FILTER1 0xD34
+#define CBOX_FILTER2 0xD54
+#define CBOX_FILTER3 0xD74
+#define CBOX_FILTER4 0xD94
+#define CBOX_FILTER5 0xDB4
+#define CBOX_FILTER6 0xDD4
+#define CBOX_FILTER7 0xDF4
 /* Counter Control - Cn_MSR_PMON_CTL{0-3} - Defs in 2-10 */
 /* Box CTL and CTR increments by 1  intra box */ 
 /* Box CTL and CTR increments by 32 inter box */ 
@@ -61,25 +61,6 @@
 #define CTR1 0xD17 /* Base to count from */
 #define CTR2 0xD18 /* Base to count from */
 #define CTR3 0xD19 /* Base to count from */
-
-// Power Control Unit (PCU) 
-/* Fixed Counters */
-#define PCU_FIXED_CTR0 0x3FC
-#define PCU_FIXED_CTR1 0x3FD
-/* Counter Config Registers */
-#define PCU_CTL0 0xC30
-#define PCU_CTL1 0xC31
-#define PCU_CTL2 0xC32
-#define PCU_CTL3 0xC33
-/* Counter Filters */
-#define PCU_FILTER0 0xC34
-/* Box Control */
-#define PCU_BOX_CTL0 0xC24
-/* Counter Registers */
-#define PCU_CTR0 0xC36
-#define PCU_CTR1 0xC37
-#define PCU_CTR2 0xC38
-#define PCU_CTR3 0xC39
 
 // Width of 44 for C-Boxes
 #define KEYS \
@@ -195,14 +176,13 @@ event select      [7:0]
 #define COUNTER0_OCCUPANCY  CBOX_PERF_EVENT(0x1F, 0x00) /* Ctrs 1-3 */
 #define LLC_LOOKUP          CBOX_PERF_EVENT(0x34, 0x03) /* Ctrs 0-1 */
 
-
-static int intel_snb_uncore_begin_cpu(char *cpu, int box, uint64_t *events, size_t nr_events)
+static int intel_snb_cbo_begin_box(char *cpu, int box, uint64_t *events, size_t nr_events)
 {
   int rc = -1;
   char msr_path[80];
   int msr_fd = -1;
-  uint64_t c_ctl;
-  //uint64_t c_filter;
+  uint64_t ctl;
+  //uint64_t filter;
   int offset = box*32;
 
   snprintf(msr_path, sizeof(msr_path), "/dev/cpu/%s/msr", cpu);
@@ -212,9 +192,9 @@ static int intel_snb_uncore_begin_cpu(char *cpu, int box, uint64_t *events, size
     goto out;
   }
 
-  c_ctl = 0x10100ULL; // enable freeze (bit 16), freeze (bit 8)
+  ctl = 0x10100ULL; // enable freeze (bit 16), freeze (bit 8)
   /* C-box ctrl registers are 32-bits apart */
-  if (pwrite(msr_fd, &c_ctl, sizeof(c_ctl), C_CTL0 + offset) < 0) {
+  if (pwrite(msr_fd, &ctl, sizeof(ctl), CBOX_CTL0 + offset) < 0) {
     ERROR("cannot enable freeze of C-box counter: %m\n");
     goto out;
   }
@@ -222,8 +202,8 @@ static int intel_snb_uncore_begin_cpu(char *cpu, int box, uint64_t *events, size
   /* Ignore C-Box filter for now */
   /* The filters are part of event selection */
   /*
-  c_filter = CBOX_FILTER();
-  if (pwrite(msr_fd, &c_filter, sizeof(c_filter), C_FILTER0 + offset) < 0) {
+  filter = CBOX_FILTER();
+  if (pwrite(msr_fd, &filter, sizeof(filter), CBOX_FILTER0 + offset) < 0) {
     ERROR("cannot modify C-box filters: %m\n");
     goto out;
   }
@@ -242,16 +222,16 @@ static int intel_snb_uncore_begin_cpu(char *cpu, int box, uint64_t *events, size
     }
   }
 
-  c_ctl |= 1ULL << 1; // reset counter
+  ctl |= 1ULL << 1; // reset counter
   /* C-box ctrl registers are 32-bits apart */
-  if (pwrite(msr_fd, &c_ctl, sizeof(c_ctl), C_CTL0 + offset) < 0) {
+  if (pwrite(msr_fd, &ctl, sizeof(ctl), CBOX_CTL0 + offset) < 0) {
     ERROR("cannot reset C-box counter: %m\n");
     goto out;
   }
   
   /* Unfreeze C-box counter (64-bit) */
-  c_ctl = 0x10000ULL; // unfreeze counter
-  if (pwrite(msr_fd, &c_ctl, sizeof(c_ctl), C_CTL0 + offset) < 0) {
+  ctl = 0x10000ULL; // unfreeze counter
+  if (pwrite(msr_fd, &ctl, sizeof(ctl), CBOX_CTL0 + offset) < 0) {
     ERROR("cannot unfreeze C-box counters: %m\n");
     goto out;
   }
@@ -265,11 +245,11 @@ static int intel_snb_uncore_begin_cpu(char *cpu, int box, uint64_t *events, size
   return rc;
 }
 
-static int intel_snb_uncore_begin(struct stats_type *type)
+static int intel_snb_cbo_begin(struct stats_type *type)
 {
   int nr = 0;
 
-  uint64_t events[8][4] = {
+  uint64_t cbo_events[8][4] = {
     { RxR_OCCUPANCY, LLC_LOOKUP, COUNTER0_OCCUPANCY, CLOCK_TICKS, },
     { RxR_OCCUPANCY, LLC_LOOKUP, COUNTER0_OCCUPANCY, CLOCK_TICKS, },
     { RxR_OCCUPANCY, LLC_LOOKUP, COUNTER0_OCCUPANCY, CLOCK_TICKS, },
@@ -300,15 +280,17 @@ static int intel_snb_uncore_begin(struct stats_type *type)
     snprintf(cpu, sizeof(cpu), "%d", i);
     
     if (cpu_is_sandybridge(cpu))      
-      for (box = 0; box < 8; box++)
-	if (intel_snb_uncore_begin_cpu(cpu, box, events[box], 4) == 0)
-	  nr++; /* HARD */
+      {
+	for (box = 0; box < 8; box++)
+	  if (intel_snb_cbo_begin_box(cpu, box, cbo_events[box], 4) == 0)
+	    nr++; /* HARD */
+      }
   }
 
   return nr > 0 ? 0 : -1;
 }
 
-static void intel_snb_uncore_collect_cpu(struct stats_type *type, char *cpu, char* cpu_box, int box)
+static void intel_snb_cbo_collect_box(struct stats_type *type, char *cpu, char* cpu_box, int box)
 {
   struct stats *stats = NULL;
   char msr_path[80];
@@ -333,7 +315,6 @@ static void intel_snb_uncore_collect_cpu(struct stats_type *type, char *cpu, cha
 #define X(k,r...) \
   ({ \
     uint64_t val = 0; \
-    TRACE("address to read, %08X",k + offset);	   \
     if (pread(msr_fd, &val, sizeof(val), k + offset) < 0) \
       ERROR("cannot read `%s' (%08X) through `%s': %m\n", #k, k + offset, msr_path); \
     else \
@@ -347,7 +328,7 @@ static void intel_snb_uncore_collect_cpu(struct stats_type *type, char *cpu, cha
     close(msr_fd);
 }
 
-static void intel_snb_uncore_collect(struct stats_type *type)
+static void intel_snb_cbo_collect(struct stats_type *type)
 {
   // CPUs 0 and 8 have core_id 0 on Stampede at least
 
@@ -358,6 +339,7 @@ static void intel_snb_uncore_collect(struct stats_type *type)
     char core_id_path[80];
     int core_id = -1;
     int box;
+
     /* Only collect uncore counters on core 0 of a socket. */
     snprintf(core_id_path, sizeof(core_id_path), "/sys/devices/system/cpu/cpu%d/topology/core_id", i);
     if (pscanf(core_id_path, "%d", &core_id) != 1) {
@@ -371,18 +353,20 @@ static void intel_snb_uncore_collect(struct stats_type *type)
     snprintf(cpu, sizeof(cpu), "%d", i);
 
     if (cpu_is_sandybridge(cpu))
-      for (box = 0; box < 8; box++)
-	{
-	  snprintf(cpu_box, sizeof(cpu_box), "%d/%d", i, box);
-	  intel_snb_uncore_collect_cpu(type, cpu, cpu_box, box);
-	}
+      {
+	for (box = 0; box < 8; box++)
+	  {
+	    snprintf(cpu_box, sizeof(cpu_box), "CPU/CBo(%d/%d)", i, box);
+	    intel_snb_cbo_collect_box(type, cpu, cpu_box, box);
+	  }
+      }
   }
 }
 
-struct stats_type intel_snb_uncore_stats_type = {
-  .st_name = "intel_snb_uncore",
-  .st_begin = &intel_snb_uncore_begin,
-  .st_collect = &intel_snb_uncore_collect,
+struct stats_type intel_snb_cbo_stats_type = {
+  .st_name = "intel_snb_cbo",
+  .st_begin = &intel_snb_cbo_begin,
+  .st_collect = &intel_snb_cbo_collect,
 #define X SCHEMA_DEF
   .st_schema_def = JOIN(KEYS),
 #undef X
