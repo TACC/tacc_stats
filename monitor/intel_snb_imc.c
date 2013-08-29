@@ -148,10 +148,10 @@ event select      [7:0]
 #define MBOX_PERF_EVENT(event, umask) \
   ( (event) \
   | (umask << 8) \
-  | (0ULL << 18) /* Edge Detection. */ \
-  | (1ULL << 22) /* Enable. */ \
-  | (0ULL << 23) /* Invert */ \
-  | (0x01ULL << 24) /* Threshold */ \
+  | (0UL << 18) /* Edge Detection. */ \
+  | (1UL << 22) /* Enable. */ \
+  | (0UL << 23) /* Invert */ \
+  | (0x01UL << 24) /* Threshold */ \
   )
 
 /* Definitions in Table 2-14 */
@@ -180,18 +180,18 @@ static int intel_snb_imc_begin_dev(char *bus_dev, uint32_t *events, size_t nr_ev
     goto out;
   }
 
-  ctl = 0x480000UL; // enable fixed counter and reset fixed counter
-  if (pwrite(pci_fd, &ctl, sizeof(ctl), MC_FIXED_CTL) < 0) {
-    ERROR("cannot enable freeze of MC counter: %m\n");
-    goto out;
-  }
+  int zero = 0x0UL; // Manually Reset Fixed Counter
+   if (pwrite(pci_fd, &(zero), sizeof(zero), MC_A_FIXED_CTR) < 0 || pwrite(pci_fd, &(zero), sizeof(zero), MC_B_FIXED_CTR) < 0) {
+     ERROR("cannot enable freeze of MC counter: %m\n");
+     goto out;
+   }
 
-  ctl = 0x400000UL; // remove reset flag from fixed counter
+  ctl = 0x400000UL; // Enable Fixed Counter
   if (pwrite(pci_fd, &ctl, sizeof(ctl), MC_FIXED_CTL) < 0) {
     ERROR("cannot undo reset of MC Fixed counter: %m\n");
     goto out;
   }
-  
+
   /* Select Events for MC counters, MC_CTLx registers are 4 bits apart */
   int i;
   for (i = 0; i < nr_events; i++) {
@@ -206,7 +206,6 @@ static int intel_snb_imc_begin_dev(char *bus_dev, uint32_t *events, size_t nr_ev
   }
 
   /* Manually reset programmable MC counters. They are 4 apart, but each counter register is split into 2 32-bit registers, A and B */
-  int zero = 0x0UL;
   for (i = 0; i < nr_events; i++) {
     if (pwrite(pci_fd, &zero, sizeof(zero), MC_A_CTR0 + 8*i) < 0 || 
 	pwrite(pci_fd, &zero, sizeof(zero), MC_B_CTR0 + 8*i) < 0) { 
@@ -217,7 +216,7 @@ static int intel_snb_imc_begin_dev(char *bus_dev, uint32_t *events, size_t nr_ev
     }
   }
 
-  ctl = 0x10000ULL; // unfreeze counters
+  ctl = 0x10000UL; // unfreeze counters
   if (pwrite(pci_fd, &ctl, sizeof(ctl), MC_BOX_CTL) < 0) {
     ERROR("cannot unfreeze MC counters: %m\n");
     goto out;
