@@ -145,10 +145,10 @@ event select      [7:0]
 #define QPI_PERF_EVENT(event, umask) \
   ( (event) \
   | (umask << 8) \
-  | (0ULL << 18) /* Edge Detection. */ \
-  | (1ULL << 22) /* Enable. */ \
-  | (0ULL << 23) /* Invert */ \
-  | (0x01ULL << 24) /* Threshold */ \
+  | (0UL << 18) /* Edge Detection. */ \
+  | (1UL << 22) /* Enable. */ \
+  | (0UL << 23) /* Invert */ \
+  | (0x01UL << 24) /* Threshold */ \
   )
 
 /* Definitions in Table 2-94 */
@@ -191,7 +191,7 @@ static int intel_snb_qpi_begin_dev(char *bus_dev, uint32_t *events, size_t nr_ev
     }
   }
 
-  ctl = 0x10000ULL; // unfreeze counter
+  ctl = 0x10000UL; // unfreeze counter
   if (pwrite(pci_fd, &ctl, sizeof(ctl), QPI_BOX_CTL) < 0) {
     ERROR("cannot unfreeze QPI counters: %m\n");
     goto out;

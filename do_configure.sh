@@ -38,6 +38,7 @@ TYPES+="intel_snb_cbo "
 TYPES+="intel_snb_pcu "
 TYPES+="intel_snb_imc "
 TYPES+="intel_snb_qpi "
+TYPES+="intel_snb_hau "
 ########################
 ## Infiniband usage
 TYPES+="ib "
