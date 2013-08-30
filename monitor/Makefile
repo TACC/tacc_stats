@@ -6,7 +6,7 @@ jobid_file = /var/run/TACC_jobid
 config = config.generic
 
 CC = gcc
-CFLAGS = -g -Wall -Werror -O3 # -DDEBUG
+CFLAGS = -Wall -Werror -O3 # -DDEBUG
 CPPFLAGS = -D_GNU_SOURCE \
  -DSTATS_PROGRAM=\"$(name)\" \
  -DSTATS_VERSION=\"$(version)\" \
@@ -14,15 +14,18 @@ CPPFLAGS = -D_GNU_SOURCE \
  -DSTATS_LOCK_PATH=\"$(stats_lock)\" \
  -DJOBID_FILE_PATH=\"$(jobid_file)\"
 
+#NCPUS = 64
+
 -include $(config)
 
-OBJS = main.o stats.o dict.o collect.o schema.o stats_file.o lustre_obd_to_mnt.o
+#OBJS = main.o stats.o dict.o collect.o schema.o stats_file.o lustre_obd_to_mnt.o
+OBJS = main.o stats.o dict.o collect.o schema.o stats_file.o
 OBJS += $(patsubst %,%.o,$(TYPES))
 
 all: $(name) schema-$(version)-$(config)
 
 $(name): $(OBJS)
-	$(CC) $(LDFLAGS) $(OBJS) -o $@
+	$(CC) $(OBJS) $(LDFLAGS) -o $@
 
 schema-$(version)-$(config): print-schema
 	./print-schema $@
@@ -34,6 +37,9 @@ stats.o: stats.x
 
 stats.x: $(config)
 	echo '$(patsubst %,X(%),$(sort $(TYPES)))' > stats.x
+
+irq.o: irq.c
+	m4 -DNCPUS=$(NCPUS) $*.c | $(CC) -c $(CFLAGS) $(CPPFLAGS) -o $*.o -x c -
 
 -include $(OBJS:%.o=.%.d)
 

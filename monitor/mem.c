@@ -57,7 +57,7 @@
   X(HugePages_Total, "", ""), \
   X(HugePages_Free, "", "")
 
-static void mem_collect_node(struct stats *stats, const char *node)
+static void collect_meminfo_node(struct stats *stats, const char *node)
 {
   char path[80];
   FILE *file = NULL;
@@ -93,7 +93,7 @@ static void mem_collect_node(struct stats *stats, const char *node)
     fclose(file);
 }
 
-static void mem_collect(struct stats_type *type)
+static void collect_mem(struct stats_type *type)
 {
   const char *dir_path = "/sys/devices/system/node";
   DIR *dir = NULL;
@@ -117,7 +117,7 @@ static void mem_collect(struct stats_type *type)
     if (stats == NULL)
       continue;
 
-    mem_collect_node(stats, node);
+    collect_meminfo_node(stats, node);
   }
 
  out:
@@ -127,7 +127,7 @@ static void mem_collect(struct stats_type *type)
 
 struct stats_type mem_stats_type = {
   .st_name = "mem",
-  .st_collect = &mem_collect,
+  .st_collect = &collect_mem,
 #define X SCHEMA_DEF
   .st_schema_def = JOIN(KEYS),
 #undef X

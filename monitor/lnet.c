@@ -30,7 +30,7 @@
   X(rx_bytes, "E,U=B", ""), \
   X(rx_bytes_dropped, "E", "")
 
-static void lnet_collect(struct stats_type *type)
+static void collect_lnet(struct stats_type *type)
 {
   const char *path = "/proc/sys/lnet/stats";
   struct stats *stats = get_current_stats(type, NULL);
@@ -38,16 +38,15 @@ static void lnet_collect(struct stats_type *type)
   if (stats == NULL)
     return;
 
-  path_collect_key_list(path, stats,
-			"msgs_alloc", "msgs_alloc_max", "errors", "tx_msgs",
-			"rx_msgs", "route_msgs", "rx_msgs_dropped", "tx_bytes",
-			"rx_bytes", "route_bytes", "rx_bytes_dropped",
-			NULL);
+  collect_key_list(stats, path, "msgs_alloc", "msgs_alloc_max", "errors",
+                   "tx_msgs", "rx_msgs", "route_msgs", "rx_msgs_dropped",
+                   "tx_bytes", "rx_bytes", "route_bytes", "rx_bytes_dropped",
+                   NULL);
 }
 
 struct stats_type lnet_stats_type = {
   .st_name = "lnet",
-  .st_collect = &lnet_collect,
+  .st_collect = &collect_lnet,
 #define X SCHEMA_DEF
   .st_schema_def = JOIN(KEYS),
 #undef X

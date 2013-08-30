@@ -1,0 +1,9 @@
+#! /bin/sh
+
+echo Make sure you build this file on Myrinet nodes, e.g. f12n37
+rm *.o
+gmake clean
+cp -f config.mx_intel config
+gmake NCPUS=2 -j 4
+mv -f tacc_stats tacc_stats.mx_intel
+rm -f config

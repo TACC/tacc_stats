@@ -20,6 +20,17 @@
 // are monitored.  All of the events are specified in section 3.14
 // [Performance Counter Events].
 
+// CAVEAT: Linux kernel will grab one of the performance monitor counters
+// for CPU lockup detection. This is documented in
+// Documentation/nmi_watchdog.txt in Linux kernel source tree and the
+// implementation is arch/x86/kernel/cpu/perfctr-watchdog.c
+// A quick way to see if Linux kernel is using one of the performance
+// monitor counters, look for messages like
+//
+//   "NMI watchdog enabled, takes one hw-pmu counter."
+//
+// during the boot (e.g. dmesg or /var/log/messages)
+//
 #define MSR_PERF_CTL0 0xC0010000
 #define MSR_PERF_CTL1 0xC0010001
 #define MSR_PERF_CTL2 0xC0010002
@@ -94,7 +105,7 @@ static int cpu_is_amd64_10h(char *cpu)
   return rc;
 }
 
-static int amd64_pmc_begin_cpu(char *cpu, uint64_t events[], size_t nr_events)
+static int begin_pmc_cpu(char *cpu, uint64_t events[], size_t nr_events)
 {
   int rc = -1;
   char msr_path[80];
@@ -158,12 +169,12 @@ static int amd64_pmc_begin_cpu(char *cpu, uint64_t events[], size_t nr_events)
 #define DCacheSysFills PERF_EVENT(0x42, 0x01) /* Counts DCache fills from beyond the L2 cache. */
 #define SSEFLOPS       PERF_EVENT(0x03, 0x7F) /* Counts single & double, add, multiply, divide & sqrt FLOPs. */
 
-static int amd64_pmc_begin(struct stats_type *type)
+static int begin_pmc(struct stats_type *type)
 {
   int nr = 0;
 
   uint64_t events[4][4] = {
-    { DRAMaccesses, UserCycles,     DCacheSysFills, SSEFLOPS, },
+    { UserCycles,   DRAMaccesses,   DCacheSysFills, SSEFLOPS, },
     { UserCycles,   HTlink0Use,     DCacheSysFills, SSEFLOPS, },
     { UserCycles,   DCacheSysFills, HTlink1Use,     SSEFLOPS, },
     { UserCycles,   DCacheSysFills, SSEFLOPS,       HTlink2Use, },
@@ -175,14 +186,14 @@ static int amd64_pmc_begin(struct stats_type *type)
     snprintf(cpu, sizeof(cpu), "%d", i);
 
     if (cpu_is_amd64_10h(cpu))
-      if (amd64_pmc_begin_cpu(cpu, events[i % 4], 4) == 0) /* HARD */
+      if (begin_pmc_cpu(cpu, events[i % 4], 4) == 0) /* HARD */
         nr++;
   }
 
   return nr > 0 ? 0 : -1;
 }
 
-static void amd64_pmc_collect_cpu(struct stats_type *type, char *cpu)
+static void collect_pmc_cpu(struct stats_type *type, char *cpu)
 {
   char msr_path[80];
   int msr_fd = -1;
@@ -216,7 +227,7 @@ static void amd64_pmc_collect_cpu(struct stats_type *type, char *cpu)
     close(msr_fd);
 }
 
-static void amd64_pmc_collect(struct stats_type *type)
+static void collect_pmc(struct stats_type *type)
 {
   int i;
   for (i = 0; i < nr_cpus; i++) {
@@ -224,14 +235,14 @@ static void amd64_pmc_collect(struct stats_type *type)
     snprintf(cpu, sizeof(cpu), "%d", i);
 
     if (cpu_is_amd64_10h(cpu))
-      amd64_pmc_collect_cpu(type, cpu);
+      collect_pmc_cpu(type, cpu);
   }
 }
 
 struct stats_type amd64_pmc_stats_type = {
   .st_name = "amd64_pmc",
-  .st_begin = &amd64_pmc_begin,
-  .st_collect = &amd64_pmc_collect,
+  .st_begin = &begin_pmc,
+  .st_collect = &collect_pmc,
 #define X SCHEMA_DEF
   .st_schema_def = JOIN(KEYS),
 #undef X

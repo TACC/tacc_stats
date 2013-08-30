@@ -6,7 +6,10 @@
 #include "collect.h"
 #include "trace.h"
 
-const char *perfquery = "/opt/ofed/bin/perfquery";
+//const char *perfquery = "/opt/ofed/bin/perfquery";
+
+// modified by charngda, for CCR system
+const char *perfquery = "/usr/sbin/perfquery";
 
 #define KEYS \
   X(excessive_buffer_overrun_errors, "E", ""), \
@@ -27,7 +30,7 @@ const char *perfquery = "/opt/ofed/bin/perfquery";
   X(symbol_error, "E", "minor link errors"), \
   X(VL15_dropped, "E", "")
 
-static void ib_collect_dev(struct stats_type *type, const char *dev)
+static void collect_ib_dev(struct stats_type *type, const char *dev)
 {
   int port;
   for (port = 1; port <= 2; port++) {
@@ -61,7 +64,7 @@ static void ib_collect_dev(struct stats_type *type, const char *dev)
       goto next;
 
     snprintf(path, sizeof(path), "/sys/class/infiniband/%s/ports/%i/counters", dev, port);
-    path_collect_key_value_dir(path, stats);
+    collect_key_value_dir(stats, path);
 
     /* Get the LID for perfquery. */
     snprintf(path, sizeof(path), "/sys/class/infiniband/%s/ports/%i/lid", dev, port);
@@ -89,7 +92,7 @@ static void ib_collect_dev(struct stats_type *type, const char *dev)
   }
 }
 
-static void ib_collect(struct stats_type *type)
+static void collect_ib(struct stats_type *type)
 {
   const char *path = "/sys/class/infiniband";
   DIR *dir = NULL;
@@ -104,7 +107,7 @@ static void ib_collect(struct stats_type *type)
   while ((ent = readdir(dir)) != NULL) {
     if (ent->d_name[0] == '.')
       continue;
-    ib_collect_dev(type, ent->d_name);
+    collect_ib_dev(type, ent->d_name);
   }
 
  out:
@@ -114,7 +117,7 @@ static void ib_collect(struct stats_type *type)
 
 struct stats_type ib_stats_type = {
   .st_name = "ib",
-  .st_collect = &ib_collect,
+  .st_collect = &collect_ib,
 #define X SCHEMA_DEF
   .st_schema_def = JOIN(KEYS),
 #undef X

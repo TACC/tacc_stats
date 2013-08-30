@@ -39,7 +39,7 @@
   X(tx_packets, "E", ""), \
   X(tx_window_errors, "E", "")
 
-static void net_collect_dev(struct stats_type *type, const char *dev)
+static void collect_net_dev(struct stats_type *type, const char *dev)
 {
   struct stats *stats = NULL;
   char path[80];
@@ -49,10 +49,10 @@ static void net_collect_dev(struct stats_type *type, const char *dev)
     return;
 
   snprintf(path, sizeof(path), "/sys/class/net/%s/statistics", dev);
-  path_collect_key_value_dir(path, stats);
+  collect_key_value_dir(stats, path);
 }
 
-static void net_collect(struct stats_type *type)
+static void collect_net(struct stats_type *type)
 {
   const char *dir_path = "/sys/class/net";
   DIR *dir = NULL;
@@ -103,7 +103,7 @@ static void net_collect(struct stats_type *type)
 #undef X
 
     if (flags & IFF_UP)
-      net_collect_dev(type, ent->d_name);
+      collect_net_dev(type, ent->d_name);
   }
 
  out:
@@ -113,7 +113,7 @@ static void net_collect(struct stats_type *type)
 
 struct stats_type net_stats_type = {
   .st_name = "net",
-  .st_collect = &net_collect,
+  .st_collect = &collect_net,
 #define X SCHEMA_DEF
   .st_schema_def = JOIN(KEYS),
 #undef X
