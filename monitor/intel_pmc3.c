@@ -74,6 +74,20 @@
   X(PERF_GLOBAL_CTRL, "C", ""), \
   X(PERF_GLOBAL_OVF_CTRL, "C", "")
 
+/* Intel processor model number information from:
+ * http://software.intel.com/en-us/articles/intel-architecture-and-processor-identification-with-cpuid-model-and-family-numbers
+ */
+#define M_ID_IVYBRIDGE      0x3A
+#define M_ID_SANDYBRIDGE    0x2A
+#define M_ID_SANDYBRIDGE_EP 0x2D
+#define M_ID_WESTMERE       0x25
+#define M_ID_WESTMERE_EP    0x2C
+#define M_ID_WESTMERE_EX    0x2F
+#define M_ID_NEHALEM        0x1E
+#define M_ID_NEHALEM_1      0x1F
+#define M_ID_NEHALEM_EP     0x1A
+#define M_ID_NEHALEM_EX     0x2E
+
 static int cpu_is_nehalem(char *cpu)
 {
   char cpuid_path[80];
@@ -101,6 +115,13 @@ static int cpu_is_nehalem(char *cpu)
   if (strncmp((char*) buf + 4, "GenuineIntel", 12) != 0)
     goto out; /* CentaurHauls? */
 
+  if (pread(cpuid_fd, buf, sizeof(buf), 0x01) < 0) {
+    ERROR("cannot read `%s': %m\n", cpuid_path);
+    goto out;
+  }
+
+  unsigned int model = ((buf[0] & 0xf0) >> 4) | ((buf[0] & 0xf0000) >> 12);
+
   if (pread(cpuid_fd, buf, sizeof(buf), 0x0A) < 0) {
     ERROR("cannot read `%s': %m\n", cpuid_path);
     goto out;
@@ -126,6 +147,23 @@ static int cpu_is_nehalem(char *cpu)
     /* Close enough. */
     rc = 1;
     break;
+  }
+
+  /* The events that are programmed are specific to the Nehalem/Westmere
+   * architecture. [Ivy|Sandy]bridge processors are not supported in this
+   * release.
+   */
+  switch(model)
+  {
+      case M_ID_IVYBRIDGE:
+      case M_ID_SANDYBRIDGE:
+      case M_ID_SANDYBRIDGE_EP:
+          /* not supported */
+          rc = 0;
+          break;
+      default:
+          /* continue */
+          break;
   }
 
   /*
