@@ -12,6 +12,7 @@
 #include "stats.h"
 #include "trace.h"
 #include "pscanf.h"
+#include "cpu_is_snb.h"
 
 // Uncore QPI Link Layer events are counted in this file.  The events are accesses in PCI config space.
 
@@ -42,26 +43,27 @@ ff:13.6 System peripheral: Intel Corporation Xeon E5/Core i7 Ring to QuickPath I
 // registers A and B need to be added to get counter value
 
 // Defs in Table 2-84
-#define QPI_BOX_CTL         0xF4
-#define QPI_CTL0           0xD8
-#define QPI_CTL1           0xDC
-#define QPI_CTL2           0xE0
-#define QPI_CTL3           0xE4
-#define QPI_B_CTR0         0xA0
-#define QPI_A_CTR0         0xA4
-#define QPI_B_CTR1         0xA8
-#define QPI_A_CTR1         0xAC
-#define QPI_B_CTR2         0xB0
-#define QPI_A_CTR2         0xB4
-#define QPI_B_CTR3         0xB8
-#define QPI_A_CTR3         0xBC
+#define QPI_BOX_CTL  0xF4
+#define QPI_CTL0     0xD8
+#define QPI_CTL1     0xDC
+#define QPI_CTL2     0xE0
+#define QPI_CTL3     0xE4
 
-#define QPI_MASK0  0x238
-#define QPI_MASK1  0x23C
-#define QPI_MATCH0 0x228
-#define QPI_MATCH1 0x22C
+#define QPI_B_CTR0   0xA0
+#define QPI_A_CTR0   0xA4
+#define QPI_B_CTR1   0xA8
+#define QPI_A_CTR1   0xAC
+#define QPI_B_CTR2   0xB0
+#define QPI_A_CTR2   0xB4
+#define QPI_B_CTR3   0xB8
+#define QPI_A_CTR3   0xBC
 
-// Width of 44 for C-Boxes
+#define QPI_MASK0    0x238
+#define QPI_MASK1    0x23C
+#define QPI_MATCH0   0x228
+#define QPI_MATCH1   0x22C
+
+// Width of 44 for QPI Counters
 #define CTL_KEYS \
     X(CTL0, "C", ""), \
     X(CTL1, "C", ""), \
@@ -69,66 +71,12 @@ ff:13.6 System peripheral: Intel Corporation Xeon E5/Core i7 Ring to QuickPath I
     X(CTL3, "C", "")
 
 #define CTR_KEYS \
-    X(CTR0, "E,W=48", ""), \
-    X(CTR1, "E,W=48", ""), \
-    X(CTR2, "E,W=48", ""), \
-    X(CTR3, "E,W=48", "")
+    X(CTR0, "E,W=48,U=flt", ""), \
+    X(CTR1, "E,W=48,U=flt", ""), \
+    X(CTR2, "E,W=48,U=flt", ""), \
+    X(CTR3, "E,W=48,U=flt", "")
 
 #define KEYS CTL_KEYS, CTR_KEYS
-static void get_cpuid_signature(int cpuid_file, char* signature)
-{
-  int ebx = 0, ecx = 0, edx = 0, eax = 1;
-  __asm__ ("cpuid": "=b" (ebx), "=c" (ecx), "=d" (edx), "=a" (eax):"a" (eax));
-
-  int model = (eax & 0x0FF) >> 4;
-  int extended_model = (eax & 0xF0000) >> 12;
-  int family_code = (eax & 0xF00) >> 8;
-  int extended_family_code = (eax & 0xFF00000) >> 16;
-
-  snprintf(signature,sizeof(signature),"%02x_%x", extended_family_code | family_code, extended_model | model);
-
-}
-static int cpu_is_sandybridge(char *cpu)
-{
-  char cpuid_path[80];
-  int cpuid_fd = -1;
-  uint32_t buf[4];
-  int rc = 0;
-  char signature[5];
-
-  /* Open /dev/cpuid/cpu/cpuid. */
-  snprintf(cpuid_path, sizeof(cpuid_path), "/dev/cpu/%s/cpuid", cpu);
-  cpuid_fd = open(cpuid_path, O_RDONLY);
-  if (cpuid_fd < 0) {
-    ERROR("cannot open `%s': %m\n", cpuid_path);
-    goto out;
-  }
-  
-  /* Get cpu vendor. */
-  if (pread(cpuid_fd, buf, sizeof(buf), 0x0) < 0) {
-    ERROR("cannot read cpu vendor through `%s': %m\n", cpuid_path);
-    goto out;
-  }
-
-  buf[0] = buf[2], buf[2] = buf[3], buf[3] = buf[0];
-  TRACE("cpu %s, vendor `%.12s'\n", cpu, (char*) buf + 4);
-
-  if (strncmp((char*) buf + 4, "GenuineIntel", 12) != 0)
-    goto out; /* CentaurHauls? */
-
-  get_cpuid_signature(cpuid_fd,signature);
-  TRACE("cpu%s, CPUID Signature %s\n", cpu, signature);
-  if (strncmp(signature, "06_2a", 5) !=0 && strncmp(signature, "06_2d", 5) !=0)
-    goto out;
-
-  rc = 1;
-
- out:
-  if (cpuid_fd >= 0)
-    close(cpuid_fd);
-
-  return rc;
-}
 
 /* Events in QPI
 threshhold        [31:24]
@@ -152,10 +100,10 @@ event select      [7:0]
   )
 
 /* Definitions in Table 2-94 */
-#define G0_IDLE QPI_PERF_EVENT(0x00,0x01)
-#define G0_NON_DATA QPI_PERF_EVENT(0x00,0x04)
-#define G1_DRS_DATA QPI_PERF_EVENT(0x02,0x08)
-#define G2_NCB_DATA QPI_PERF_EVENT(0x03,0x04) 
+#define G0_IDLE     QPI_PERF_EVENT(0x00,0x01) /* all null packets */
+#define G0_NON_DATA QPI_PERF_EVENT(0x00,0x04) /* protocol overhead */
+#define G1_DRS_DATA QPI_PERF_EVENT(0x02,0x08) /* for data bandwidth, flits x 8B/time */
+#define G2_NCB_DATA QPI_PERF_EVENT(0x03,0x04) /* for data bandwidth, flits x 8B/time */
 
 
 static int intel_snb_qpi_begin_dev(char *bus_dev, uint32_t *events, size_t nr_events)

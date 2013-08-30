@@ -12,6 +12,7 @@
 #include "stats.h"
 #include "trace.h"
 #include "pscanf.h"
+#include "cpu_is_snb.h"
 
 // Uncore iMC (Memory Controller) events are counted in this file.  The events are accesses in PCI config space.
 
@@ -46,12 +47,13 @@ ff:10.5 System peripheral: Intel Corporation Xeon E5/Core i7 Integrated Memory C
 // registers A and B need to be added to get counter value
 
 // Defs in Table 2-59
-#define MC_BOX_CTL         0xF4
-#define MC_FIXED_CTL       0xF0
+#define MC_BOX_CTL        0xF4
+
 #define MC_CTL0           0xD8
 #define MC_CTL1           0xDC
 #define MC_CTL2           0xE0
 #define MC_CTL3           0xE4
+#define MC_FIXED_CTL      0xF0
 
 #define MC_B_CTR0         0xA0
 #define MC_A_CTR0         0xA4
@@ -61,10 +63,11 @@ ff:10.5 System peripheral: Intel Corporation Xeon E5/Core i7 Integrated Memory C
 #define MC_A_CTR2         0xB4
 #define MC_B_CTR3         0xB8
 #define MC_A_CTR3         0xBC
-#define MC_B_FIXED_CTR     0xD0
-#define MC_A_FIXED_CTR     0xD4
 
-// Width of 44 for C-Boxes
+#define MC_B_FIXED_CTR    0xD0
+#define MC_A_FIXED_CTR    0xD4
+
+// Width of 48 for iMC Counters
 #define CTL_KEYS \
     X(CTL0, "C", ""), \
     X(CTL1, "C", ""), \
@@ -79,61 +82,6 @@ ff:10.5 System peripheral: Intel Corporation Xeon E5/Core i7 Integrated Memory C
     X(FIXED_CTR,"E,W=48","")
 
 #define KEYS CTL_KEYS, CTR_KEYS
-
-static void get_cpuid_signature(int cpuid_file, char* signature)
-{
-  int ebx = 0, ecx = 0, edx = 0, eax = 1;
-  __asm__ ("cpuid": "=b" (ebx), "=c" (ecx), "=d" (edx), "=a" (eax):"a" (eax));
-
-  int model = (eax & 0x0FF) >> 4;
-  int extended_model = (eax & 0xF0000) >> 12;
-  int family_code = (eax & 0xF00) >> 8;
-  int extended_family_code = (eax & 0xFF00000) >> 16;
-
-  snprintf(signature,sizeof(signature),"%02x_%x", extended_family_code | family_code, extended_model | model);
-
-}
-static int cpu_is_sandybridge(char *cpu)
-{
-  char cpuid_path[80];
-  int cpuid_fd = -1;
-  uint32_t buf[4];
-  int rc = 0;
-  char signature[5];
-
-  /* Open /dev/cpuid/cpu/cpuid. */
-  snprintf(cpuid_path, sizeof(cpuid_path), "/dev/cpu/%s/cpuid", cpu);
-  cpuid_fd = open(cpuid_path, O_RDONLY);
-  if (cpuid_fd < 0) {
-    ERROR("cannot open `%s': %m\n", cpuid_path);
-    goto out;
-  }
-  
-  /* Get cpu vendor. */
-  if (pread(cpuid_fd, buf, sizeof(buf), 0x0) < 0) {
-    ERROR("cannot read cpu vendor through `%s': %m\n", cpuid_path);
-    goto out;
-  }
-
-  buf[0] = buf[2], buf[2] = buf[3], buf[3] = buf[0];
-  TRACE("cpu %s, vendor `%.12s'\n", cpu, (char*) buf + 4);
-
-  if (strncmp((char*) buf + 4, "GenuineIntel", 12) != 0)
-    goto out; /* CentaurHauls? */
-
-  get_cpuid_signature(cpuid_fd,signature);
-  TRACE("cpu%s, CPUID Signature %s\n", cpu, signature);
-  if (strncmp(signature, "06_2a", 5) !=0 && strncmp(signature, "06_2d", 5) !=0)
-    goto out;
-
-  rc = 1;
-
- out:
-  if (cpuid_fd >= 0)
-    close(cpuid_fd);
-
-  return rc;
-}
 
 /* Events in Memory Controller
 threshhold        [31:24]
@@ -155,7 +103,7 @@ event select      [7:0]
   )
 
 /* Definitions in Table 2-14 */
-#define CAS_READS           MBOX_PERF_EVENT(0x04, 0x01)
+#define CAS_READS           MBOX_PERF_EVENT(0x04, 0x03)
 #define CAS_WRITES          MBOX_PERF_EVENT(0x04, 0x0C)
 #define ACT_COUNT           MBOX_PERF_EVENT(0x01, 0x00)
 #define PRE_COUNT_ALL       MBOX_PERF_EVENT(0x02, 0x03)
@@ -179,19 +127,13 @@ static int intel_snb_imc_begin_dev(char *bus_dev, uint32_t *events, size_t nr_ev
     ERROR("cannot enable freeze of MC counters: %m\n");
     goto out;
   }
-
-  int zero = 0x0UL; // Manually Reset Fixed Counter
-   if (pwrite(pci_fd, &(zero), sizeof(zero), MC_A_FIXED_CTR) < 0 || pwrite(pci_fd, &(zero), sizeof(zero), MC_B_FIXED_CTR) < 0) {
-     ERROR("cannot enable freeze of MC counter: %m\n");
-     goto out;
-   }
-
-  ctl = 0x400000UL; // Enable Fixed Counter
+  
+  ctl = 0x80000UL; // Reset Fixed Counter
   if (pwrite(pci_fd, &ctl, sizeof(ctl), MC_FIXED_CTL) < 0) {
     ERROR("cannot undo reset of MC Fixed counter: %m\n");
     goto out;
   }
-
+ 
   /* Select Events for MC counters, MC_CTLx registers are 4 bits apart */
   int i;
   for (i = 0; i < nr_events; i++) {
@@ -206,6 +148,7 @@ static int intel_snb_imc_begin_dev(char *bus_dev, uint32_t *events, size_t nr_ev
   }
 
   /* Manually reset programmable MC counters. They are 4 apart, but each counter register is split into 2 32-bit registers, A and B */
+  uint32_t zero = 0x0UL;
   for (i = 0; i < nr_events; i++) {
     if (pwrite(pci_fd, &zero, sizeof(zero), MC_A_CTR0 + 8*i) < 0 || 
 	pwrite(pci_fd, &zero, sizeof(zero), MC_B_CTR0 + 8*i) < 0) { 
@@ -216,6 +159,12 @@ static int intel_snb_imc_begin_dev(char *bus_dev, uint32_t *events, size_t nr_ev
     }
   }
 
+  ctl = 0x400000UL; // Enable Fixed Counter
+  if (pwrite(pci_fd, &ctl, sizeof(ctl), MC_FIXED_CTL) < 0) {
+    ERROR("cannot undo reset of MC Fixed counter: %m\n");
+    goto out;
+  }
+  
   ctl = 0x10000UL; // unfreeze counters
   if (pwrite(pci_fd, &ctl, sizeof(ctl), MC_BOX_CTL) < 0) {
     ERROR("cannot unfreeze MC counters: %m\n");

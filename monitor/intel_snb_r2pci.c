@@ -12,6 +12,7 @@
 #include "stats.h"
 #include "trace.h"
 #include "pscanf.h"
+#include "cpu_is_snb.h"
 
 // Uncore R2PCIe Unit events are counted in this file.  The events are accesses in PCI config space.
 
@@ -31,11 +32,13 @@ ff:13.1 Performance counters: Intel Corporation Xeon E5/Core i7 Ring to PCI Expr
 */
 
 // Info for this stuff is in: 
-//Intel Xeon Processor E5-2600 Product Family Uncore Performance Monitoring Guide
+// Intel Xeon Processor E5-2600 Product Family Uncore Performance Monitoring Guide
+
 // 1 Home Agent Units with four counters
 // PCI Config Space Dev ID:
 // Socket 1: 7f:13.1
 // Socket 0: ff:13.1
+
 // Supposedly all registers are 32 bit, but counter
 // registers A and B need to be added to get counter value
 
@@ -56,8 +59,7 @@ ff:13.1 Performance counters: Intel Corporation Xeon E5/Core i7 Ring to PCI Expr
 #define R2PCI_B_CTR3         0xB8
 #define R2PCI_A_CTR3         0xBC
 
-
-// Width of 44 for C-Boxes
+// Width of 44 for R2PCI Counter Registers
 #define CTL_KEYS \
     X(CTL0, "C", ""), \
     X(CTL1, "C", ""), \
@@ -71,61 +73,6 @@ ff:13.1 Performance counters: Intel Corporation Xeon E5/Core i7 Ring to PCI Expr
     X(CTR3, "E,W=44", "")
 
 #define KEYS CTL_KEYS, CTR_KEYS
-
-static void get_cpuid_signature(int cpuid_file, char* signature)
-{
-  int ebx = 0, ecx = 0, edx = 0, eax = 1;
-  __asm__ ("cpuid": "=b" (ebx), "=c" (ecx), "=d" (edx), "=a" (eax):"a" (eax));
-
-  int model = (eax & 0x0FF) >> 4;
-  int extended_model = (eax & 0xF0000) >> 12;
-  int family_code = (eax & 0xF00) >> 8;
-  int extended_family_code = (eax & 0xFF00000) >> 16;
-
-  snprintf(signature,sizeof(signature),"%02x_%x", extended_family_code | family_code, extended_model | model);
-
-}
-static int cpu_is_sandybridge(char *cpu)
-{
-  char cpuid_path[80];
-  int cpuid_fd = -1;
-  uint32_t buf[4];
-  int rc = 0;
-  char signature[5];
-
-  /* Open /dev/cpuid/cpu/cpuid. */
-  snprintf(cpuid_path, sizeof(cpuid_path), "/dev/cpu/%s/cpuid", cpu);
-  cpuid_fd = open(cpuid_path, O_RDONLY);
-  if (cpuid_fd < 0) {
-    ERROR("cannot open `%s': %m\n", cpuid_path);
-    goto out;
-  }
-  
-  /* Get cpu vendor. */
-  if (pread(cpuid_fd, buf, sizeof(buf), 0x0) < 0) {
-    ERROR("cannot read cpu vendor through `%s': %m\n", cpuid_path);
-    goto out;
-  }
-
-  buf[0] = buf[2], buf[2] = buf[3], buf[3] = buf[0];
-  TRACE("cpu %s, vendor `%.12s'\n", cpu, (char*) buf + 4);
-
-  if (strncmp((char*) buf + 4, "GenuineIntel", 12) != 0)
-    goto out; /* CentaurHauls? */
-
-  get_cpuid_signature(cpuid_fd,signature);
-  TRACE("cpu%s, CPUID Signature %s\n", cpu, signature);
-  if (strncmp(signature, "06_2a", 5) !=0 && strncmp(signature, "06_2d", 5) !=0)
-    goto out;
-
-  rc = 1;
-
- out:
-  if (cpuid_fd >= 0)
-    close(cpuid_fd);
-
-  return rc;
-}
 
 /* Event Selection in R2PCI
 threshhold        [31:24]
@@ -148,10 +95,11 @@ event select      [7:0]
   )
 
 /* Definitions in Table 2-108 */
-#define TxR_INSERTS     R2PCI_PERF_EVENT(0x24,0x08)  /* Ctr 0 only, multiply by 32 to get bytes */
-#define CLOCKTICKS      R2PCI_PERF_EVENT(0x01,0x00)
-#define RING_AD_USED    R2PCI_PERF_EVENT(0x07,0x01)
-#define RING_AK_USED    R2PCI_PERF_EVENT(0x08,0x01) 
+#define TxR_INSERTS      R2PCI_PERF_EVENT(0x24,0x04)  /* Ctr 0 only */
+#define CLOCKTICKS       R2PCI_PERF_EVENT(0x01,0x00)
+#define RING_AD_USED_ALL R2PCI_PERF_EVENT(0x07,0x0F)
+#define RING_AK_USED_ALL R2PCI_PERF_EVENT(0x08,0x0F) 
+#define RING_BL_USED_ALL R2PCI_PERF_EVENT(0x09,0x0F) 
 
 static int intel_snb_r2pci_begin_dev(char *bus_dev, uint32_t *events, size_t nr_events)
 {
@@ -206,7 +154,7 @@ static int intel_snb_r2pci_begin(struct stats_type *type)
   int nr = 0;
   
   uint32_t imc_events[1][4] = {
-    { TxR_INSERTS, CLOCKTICKS, RING_AD_USED, RING_AK_USED},
+    { TxR_INSERTS, RING_BL_USED_ALL, RING_AD_USED_ALL, RING_AK_USED_ALL},
   };
 
   /* 2 buses and 1 device per bus */
@@ -250,6 +198,7 @@ static void intel_snb_r2pci_collect_dev(struct stats_type *type, char *bus_dev)
     goto out;
   }
 
+  /* Read Control Register - 32 bit */
 #define X(k,r...) \
   ({ \
     uint32_t val; \
@@ -261,6 +210,7 @@ static void intel_snb_r2pci_collect_dev(struct stats_type *type, char *bus_dev)
   CTL_KEYS;
 #undef X
 
+  /* Read Counter Registers - 2x32 bit registers */
 #define X(k,r...) \
   ({ \
     uint32_t val_a, val_b; \

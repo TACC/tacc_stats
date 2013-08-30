@@ -12,6 +12,7 @@
 #include "stats.h"
 #include "trace.h"
 #include "pscanf.h"
+#include "cpu_is_snb.h"
 
 // Sandy Bridge microarchitectures have signatures 06_2a and 06_2d with non-architectural events
 // listed in Table 19-7, 19-8, and 19-9.  19-8 is 06_2a specific, 19-9 is 06_2d specific.  Stampede
@@ -49,8 +50,6 @@
 
 // Width of 48 for PCU 
 #define KEYS \
-    X(FIXED_CTR0,"E,W=48",""), \
-    X(FIXED_CTR1,"E,W=48",""), \
     X(CTL0,"C",""),	\
     X(CTL1,"C",""),	\
     X(CTL2,"C",""),	\
@@ -58,62 +57,9 @@
     X(CTR0,"E,W=48",""), \
     X(CTR1,"E,W=48",""), \
     X(CTR2,"E,W=48",""), \
-    X(CTR3,"E,W=48","")
-
-static void get_cpuid_signature(int cpuid_file, char* signature)
-{
-  int ebx = 0, ecx = 0, edx = 0, eax = 1;
-  __asm__ ("cpuid": "=b" (ebx), "=c" (ecx), "=d" (edx), "=a" (eax):"a" (eax));
-
-  int model = (eax & 0x0FF) >> 4;
-  int extended_model = (eax & 0xF0000) >> 12;
-  int family_code = (eax & 0xF00) >> 8;
-  int extended_family_code = (eax & 0xFF00000) >> 16;
-
-  snprintf(signature,sizeof(signature),"%02x_%x", extended_family_code | family_code, extended_model | model);
-
-}
-static int cpu_is_sandybridge(char *cpu)
-{
-  char cpuid_path[80];
-  int cpuid_fd = -1;
-  uint32_t buf[4];
-  int rc = 0;
-  char signature[5];
-
-  /* Open /dev/cpuid/cpu/cpuid. */
-  snprintf(cpuid_path, sizeof(cpuid_path), "/dev/cpu/%s/cpuid", cpu);
-  cpuid_fd = open(cpuid_path, O_RDONLY);
-  if (cpuid_fd < 0) {
-    ERROR("cannot open `%s': %m\n", cpuid_path);
-    goto out;
-  }
-  
-  /* Get cpu vendor. */
-  if (pread(cpuid_fd, buf, sizeof(buf), 0x0) < 0) {
-    ERROR("cannot read cpu vendor through `%s': %m\n", cpuid_path);
-    goto out;
-  }
-
-  buf[0] = buf[2], buf[2] = buf[3], buf[3] = buf[0];
-  TRACE("cpu %s, vendor `%.12s'\n", cpu, (char*) buf + 4);
-
-  if (strncmp((char*) buf + 4, "GenuineIntel", 12) != 0)
-    goto out; /* CentaurHauls? */
-
-  get_cpuid_signature(cpuid_fd,signature);
-  TRACE("cpu%s, CPUID Signature %s\n", cpu, signature);
-  if (strncmp(signature, "06_2a", 5) !=0 && strncmp(signature, "06_2d", 5) !=0)
-    goto out;
-
-  rc = 1;
-
- out:
-  if (cpuid_fd >= 0)
-    close(cpuid_fd);
-
-  return rc;
-}
+    X(CTR3,"E,W=48",""), \
+    X(FIXED_CTR0,"E,W=48",""), \
+    X(FIXED_CTR1,"E,W=48","")
 
 /* Defs in Table 2-77 */
 /* Event filters in PCU
@@ -144,24 +90,25 @@ event select      [7:0]
 */
 
 /* Defs in Table 2-75 */
-#define PCU_PERF_EVENT(event,threshold)			\
+#define PCU_PERF_EVENT(event)	\
   ( (event) \
-  | (1ULL << 7) /* Use occupancy subcounter */\ 
-  | (1ULL << 14) /* Select which occupancy counter to use - C0: 01 C3: 10 C6: 11 */ \
+  | (0ULL << 14) /* Select which occupancy counter to use - C0: 01 C3: 10 C6: 11 */ \
   | (0ULL << 17) /* Reset Counters. */ \
   | (0ULL << 18) /* Edge Detection. */ \
   | (1ULL << 22) /* Enable. */ \
   | (0ULL << 23) /* Invert */ \
-  | (threshold << 24) /* Threshold */ \
+  | (1ULL << 24) /* Threshold */ \
   | (0ULL << 31) /* Enables edges foc occupancy */ \
   )
 
 /* Definitions in Table 2-14 */
 /* Advice in Table 2-80 */
-#define CYCLES_CORES_C0                 PCU_PERF_EVENT(0x00,0x0) /* Ctrs 0-3 */ 
-#define CYCLES_4PLUSCORES_C0            PCU_PERF_EVENT(0x00,0x5) /* Ctrs 0-3 */
-#define TRANS_CYCLES_4PLUSCORES_C0      PCU_PERF_EVENT(0x03,0x5) /* Ctrs 0-3 */
-#define FREQ_MAX_OS_CYCLES              PCU_PERF_EVENT(0x06,0x0) /* Ctrs 0-3 */
+#define FREQ_MAX_OS_CYCLES      PCU_PERF_EVENT(0x06)
+#define FREQ_MAX_CURRENT_CYCLES PCU_PERF_EVENT(0x07)
+#define FREQ_MAX_TEMP_CYCLES    PCU_PERF_EVENT(0x04)
+#define FREQ_MAX_POWER_CYCLES   PCU_PERF_EVENT(0x05)
+#define FREQ_MIN_IO_CYCLES      PCU_PERF_EVENT(0x81) /* Extra select bit */
+#define FREQ_MIN_SNOOP_CYCLES   PCU_PERF_EVENT(0x82) /* Extra select bit */
 
 static int intel_snb_pcu_begin_socket(char *cpu, uint64_t *events, size_t nr_events)
 {
@@ -179,13 +126,12 @@ static int intel_snb_pcu_begin_socket(char *cpu, uint64_t *events, size_t nr_eve
     goto out;
   }
 
-  ctl = 0x10100ULL; // enable freeze (bit 16), freeze (bit 8)
-  /* PCU ctrl registers are 32-bits apart */
+  ctl = 0x10102ULL; // enable freeze (bit 16), freeze (bit 8)
   if (pwrite(msr_fd, &ctl, sizeof(ctl), CTL) < 0) {
     ERROR("cannot enable freeze of PCU counters: %m\n");
     goto out;
   }
-  
+
   /* Ignore PCU filter for now */
   /* The filters are part of event selection */
   /*
@@ -208,15 +154,7 @@ static int intel_snb_pcu_begin_socket(char *cpu, uint64_t *events, size_t nr_eve
       goto out;
     }
   }
-
-  ctl |= 1ULL << 1; // reset counter
-  /* PCU ctrl registers are 32-bits apart */
-  if (pwrite(msr_fd, &ctl, sizeof(ctl), CTL) < 0) {
-    ERROR("cannot reset PCU counters: %m\n");
-    goto out;
-  }
   
-  /* Unfreeze PCU counter (64-bit) */
   ctl = 0x10000ULL; // unfreeze counter
   if (pwrite(msr_fd, &ctl, sizeof(ctl), CTL) < 0) {
     ERROR("cannot unfreeze PCU counters: %m\n");
@@ -236,8 +174,11 @@ static int intel_snb_pcu_begin(struct stats_type *type)
 {
   int nr = 0;
 
-  uint64_t pcu_events[4] = {CYCLES_CORES_C0, CYCLES_4PLUSCORES_C0, 
-			    TRANS_CYCLES_4PLUSCORES_C0, FREQ_MAX_OS_CYCLES};
+  uint64_t pcu_events[4] = {FREQ_MAX_TEMP_CYCLES,
+			    FREQ_MAX_POWER_CYCLES,
+			    FREQ_MIN_IO_CYCLES,
+			    FREQ_MIN_SNOOP_CYCLES};
+
 
   int i;
   for (i = 0; i < nr_cpus; i++) {
@@ -278,7 +219,7 @@ static void intel_snb_pcu_collect_socket(struct stats_type *type, char *cpu, cha
     goto out;
 
   TRACE("cpu %s\n", cpu);
-  TRACE("cpu/PCU %s\n", pcu);
+  TRACE("cpu %s\n", pcu);
 
   snprintf(msr_path, sizeof(msr_path), "/dev/cpu/%s/msr", cpu);
   msr_fd = open(msr_path, O_RDONLY);
@@ -328,7 +269,7 @@ static void intel_snb_pcu_collect(struct stats_type *type)
 
     if (cpu_is_sandybridge(cpu))
       {
-	snprintf(pcu, sizeof(pcu), "%d/PCU", i);
+	snprintf(pcu, sizeof(pcu), "%d", i);
 	intel_snb_pcu_collect_socket(type, cpu, pcu);
       }
   }

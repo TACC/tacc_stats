@@ -30,9 +30,9 @@ batch_system=SLURM
 ## Chip types
 # Each chip will need a different counter file
 # for non-architectural events
-#TYPES+="amd64_pmc "
-#TYPES+="intel_nhm "
-#TYPES+="intel_uncore "
+TYPES+="amd64_pmc "
+TYPES+="intel_nhm "
+TYPES+="intel_uncore "
 TYPES+="intel_snb "
 TYPES+="intel_snb_cbo "
 TYPES+="intel_snb_pcu "
