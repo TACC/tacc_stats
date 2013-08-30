@@ -3,10 +3,10 @@ version = 1.0.3
 stats_dir = /var/log/tacc_stats
 stats_lock = /var/lock/tacc_stats
 jobid_file = /var/run/TACC_jobid
-config = config.generic
+config = config
 
 CC = gcc
-CFLAGS = -Wall -Werror -O3 # -DDEBUG
+CFLAGS = -Wall -O3 # -DDEBUG
 CPPFLAGS = -D_GNU_SOURCE \
  -DSTATS_PROGRAM=\"$(name)\" \
  -DSTATS_VERSION=\"$(version)\" \
