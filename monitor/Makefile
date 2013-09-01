@@ -2,7 +2,7 @@ name = tacc_stats
 version = 1.0.3
 stats_dir = /var/log/tacc_stats
 stats_lock = /var/lock/tacc_stats
-jobid_file = /var/run/TACC_jobid
+jobid_file = /var/spool/slurmd
 config = config
 
 CC = gcc

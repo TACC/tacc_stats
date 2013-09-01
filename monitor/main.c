@@ -9,6 +9,7 @@
 #include <time.h>
 #include <sys/stat.h>
 #include <sys/types.h>
+#include <sys/unistd.h>
 #include "string1.h"
 #include "stats.h"
 #include "stats_file.h"
@@ -16,6 +17,7 @@
 #include "pscanf.h"
 #include <dirent.h>
 #include <ctype.h>
+#include <string.h>
 
 #define MAX_PROCDUMP_SIZE (16*1024)
 /* LOG_RETENTION_DAYS should be less than 28 (for February) */
@@ -231,11 +233,12 @@ int main( int argc, char *argv[] ) {
 
     current_time = time( NULL );
     /* pscanf( JOBID_FILE_PATH, "%79s", current_jobid ); */
-    /* modified for CCR environment by charngda
+    /* modified for CCR TORQUE environment by charngda
        At CCR we have job files under JOBID_FILE_PATH directory,
        e.g.
          1737472.d15n41.ccr.buffalo.edu
-     */
+		*/
+		/*
     {
         struct dirent *ent;
         DIR *dir = opendir( JOBID_FILE_PATH );
@@ -253,11 +256,58 @@ int main( int argc, char *argv[] ) {
             if ( 0 == current_jobid[0] )
                 strcpy( current_jobid, "0" );
             else {
-                /* remove the last comma */
+                // remove the last comma
                 current_jobid[strlen( current_jobid ) - 1] = 0;
             }
         }
     }
+		*/
+
+		/* modified for CCR SLURM environment */
+		{
+
+				// setup directory structs
+				struct dirent *ent;
+				DIR *dir = opendir( JOBID_FILE_PATH );
+
+				// get the hostname
+				char formatStr[64];
+				gethostname( formatStr, sizeof formatStr );
+
+				// setup format string
+				strcat( formatStr, "_%d.%*d" );
+
+				// tmp vars
+				int tmpId = 0;
+				char tmpStr[16];
+
+				// zero the jobid string
+				current_jobid[0] = 0;
+
+				if ( dir ) {
+
+						// read all files in the directory
+						while ( ( ent = readdir( dir ) ) != NULL ) {
+
+								// check if filename matches the format, store id
+								if ( sscanf( ent->d_name, formatStr, &tmpId ) ) {
+
+								    sprintf( tmpStr, "%d", tmpId );
+								    strcat( current_jobid, tmpStr );
+								    strcat( current_jobid, "," );
+
+								}
+
+						}
+
+				}
+
+				if ( 0 == current_jobid[0] )
+						strcpy( current_jobid, "0" );
+				else
+						current_jobid[strlen( current_jobid ) - 1] = 0;
+
+		}
 
     nr_cpus = sysconf( _SC_NPROCESSORS_ONLN );
 
