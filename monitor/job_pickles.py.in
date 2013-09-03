@@ -76,7 +76,6 @@ end = getdate(sys.argv[3])
 #  seek = 800 << 20 # XXX
 
 # Run though all jobs that ended after start and before end + 3 days.
-
 a=batch_acct.factory(batch_system,acct_path)
 
 for acct in a.reader(start_time=start,end_time=end,seek=seek):

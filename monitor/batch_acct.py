@@ -20,13 +20,14 @@ class BatchAcct(object):
     file = open(self.acct_file)
     if seek:
       file.seek(seek, os.SEEK_SET)
-    print seek
+
     for d in csv.DictReader(file, delimiter=':', fieldnames=self.field_names):
       try:
         for n, t, x in self.fields:
           d[n] = t(d[n])
       except:
         pass
+
       # Accounting records with pe_taskid != NONE are generated for
       # sub_tasks of a tightly integrated job and should be ignored.
       if start_time <= d['end_time'] and d['end_time'] < end_time:
@@ -147,7 +148,7 @@ class SLURMAcct(BatchAcct):
     for days in (0, -1, 1):
       yyyy_mm_dd = (start_date + datetime.timedelta(days)).strftime("%Y/%m/%d")
       full_glob = os.path.join(host_list_dir, yyyy_mm_dd, base_glob)
-      print full_glob
+      print 'host list paths', full_glob
       for path in glob.iglob(full_glob):
         return path
     return None
