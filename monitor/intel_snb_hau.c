@@ -12,7 +12,7 @@
 #include "stats.h"
 #include "trace.h"
 #include "pscanf.h"
-#include "cpu_is_snb.h"
+#include "check_pci_id.h"
 
 // Uncore Home Agent Unit events are counted in this file.  The events are accesses in PCI config space.
 
@@ -170,39 +170,36 @@ static int intel_snb_hau_begin(struct stats_type *type)
 {
   int nr = 0;
   
-  uint32_t imc_events[1][4] = {
+  uint32_t hau_events[1][4] = {
     { REQUESTS_READS, REQUESTS_WRITES, CLOCKTICKS, IMC_WRITES},
   };
 
   /* 2 buses and 1 device per bus */
   char *bus[2] = {"7f", "ff"};
   char *dev[1] = {"0e.1"};
+  int   ids[1] = {0x3c46};
+  char bus_dev[80];
 
   int i, j;
   for (i = 0; i < 2; i++) {
     for (j = 0; j < 1; j++) {
-      char cpu[80];
-      char bus_dev[80];
-      snprintf(cpu, sizeof(cpu), "%d", i*8);
-      snprintf(bus_dev, sizeof(bus_dev), "%s/%s", bus[i], dev[j]);
-      
-      if (cpu_is_sandybridge(cpu)) // check that cpu 0 and 8 (sockets 0 and 1) are SNB      
-	if (intel_snb_hau_begin_dev(bus_dev, imc_events[j], 4) == 0)
-	  nr++; /* HARD */
-    
+      snprintf(bus_dev, sizeof(bus_dev), "%s/%s", bus[i], dev[j]);      
+      if (check_pci_id(bus_dev,ids[j]))
+	if (intel_snb_hau_begin_dev(bus_dev, hau_events[j], 4) == 0)
+	  nr++; /* HARD */    
     }
   }
 
   return nr > 0 ? 0 : -1;
 }
 
-static void intel_snb_hau_collect_dev(struct stats_type *type, char *bus_dev)
+static void intel_snb_hau_collect_dev(struct stats_type *type, char *bus_dev, char *socket_dev)
 {
   struct stats *stats = NULL;
   char pci_path[80];
   int pci_fd = -1;
 
-  stats = get_current_stats(type, bus_dev);
+  stats = get_current_stats(type, socket_dev);
   if (stats == NULL)
     goto out;
 
@@ -248,17 +245,18 @@ static void intel_snb_hau_collect(struct stats_type *type)
   /* 2 buses and 1 device per bus */
   char *bus[2] = {"7f", "ff"};
   char *dev[1] = {"0e.1"};
-  
+  int   ids[1] = {0x3c46};
+  char bus_dev[80];       
+  char socket_dev[80];
+
   int i, j;
   for (i = 0; i < 2; i++) {
     for (j = 0; j < 1; j++) {
-      char cpu[80];    
-      char bus_dev[80];                                        
-      snprintf(cpu, sizeof(cpu), "%d", i*8);
+
       snprintf(bus_dev, sizeof(bus_dev), "%s/%s", bus[i], dev[j]);
-      
-      if (cpu_is_sandybridge(cpu)) // check that cpu 0 and 8 (sockets 0 and 1) are SNB      
-	intel_snb_hau_collect_dev(type, bus_dev);
+      snprintf(socket_dev, sizeof(socket_dev), "%d/%d", i, j);
+      if (check_pci_id(bus_dev,ids[j]))
+	intel_snb_hau_collect_dev(type, bus_dev, socket_dev);
     }
   }
 }

@@ -249,7 +249,7 @@ static void intel_snb_cbo_collect_box(struct stats_type *type, char *cpu, char* 
     goto out;
 
   TRACE("cpu %s\n", cpu);
-  TRACE("cpu/box %s\n", cpu_box);
+  TRACE("socket/box %s\n", cpu_box);
 
   snprintf(msr_path, sizeof(msr_path), "/dev/cpu/%s/msr", cpu);
   msr_fd = open(msr_path, O_RDONLY);
@@ -276,33 +276,47 @@ static void intel_snb_cbo_collect_box(struct stats_type *type, char *cpu, char* 
 
 static void intel_snb_cbo_collect(struct stats_type *type)
 {
-  // CPUs 0 and 8 have core_id 0 on Stampede at least
 
   int i;
   for (i = 0; i < nr_cpus; i++) {
     char cpu[80];
-    char cpu_box[80];
     char core_id_path[80];
+
+    char socket[80];
+    char socket_id_path[80];
+
+    char cpu_box[80];
+
+    int socket_id = -1;
     int core_id = -1;
     int box;
 
     /* Only collect uncore counters on core 0 of a socket. */
-    snprintf(core_id_path, sizeof(core_id_path), "/sys/devices/system/cpu/cpu%d/topology/core_id", i);
+    snprintf(core_id_path, sizeof(core_id_path), 
+	     "/sys/devices/system/cpu/cpu%d/topology/core_id", i);
     if (pscanf(core_id_path, "%d", &core_id) != 1) {
-      ERROR("cannot read core id file `%s': %m\n", core_id_path); /* errno */
+      ERROR("cannot read core id file `%s': %m\n", core_id_path);
       continue;
     }
-
     if (core_id != 0)
       continue;
 
+    /* Get socket number. */
+    snprintf(socket_id_path, sizeof(socket_id_path), 
+	     "/sys/devices/system/cpu/cpu%d/topology/physical_package_id", i);
+    if (pscanf(socket_id_path, "%d", &socket_id) != 1) {
+      ERROR("cannot read socket id file `%s': %m\n", socket_id_path);
+      continue;
+    }
+
     snprintf(cpu, sizeof(cpu), "%d", i);
+    snprintf(socket, sizeof(socket), "%d", socket_id);
 
     if (cpu_is_sandybridge(cpu))
       {
 	for (box = 0; box < 8; box++)
 	  {
-	    snprintf(cpu_box, sizeof(cpu_box), "CPU/CBo(%d/%d)", i, box);
+	    snprintf(cpu_box, sizeof(cpu_box), "%d/%d", socket_id, box);
 	    intel_snb_cbo_collect_box(type, cpu, cpu_box, box);
 	  }
       }

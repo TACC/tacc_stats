@@ -253,23 +253,36 @@ static void intel_snb_pcu_collect(struct stats_type *type)
     char cpu[80];
     char core_id_path[80];
     int core_id = -1;
+
+    char socket[80];
+    char socket_id_path[80];
+    int socket_id = -1;
+
     char pcu[80];
 
     /* Only collect uncore counters on core 0 of a socket. */
-    snprintf(core_id_path, sizeof(core_id_path), "/sys/devices/system/cpu/cpu%d/topology/core_id", i);
+    snprintf(core_id_path, sizeof(core_id_path), 
+	     "/sys/devices/system/cpu/cpu%d/topology/core_id", i);
     if (pscanf(core_id_path, "%d", &core_id) != 1) {
       ERROR("cannot read core id file `%s': %m\n", core_id_path); /* errno */
       continue;
     }
-
     if (core_id != 0)
       continue;
 
-    snprintf(cpu, sizeof(cpu), "%d", i);
+    /* Get socket number. */
+    snprintf(socket_id_path, sizeof(socket_id_path), 
+	     "/sys/devices/system/cpu/cpu%d/topology/physical_package_id", i);
+    if (pscanf(socket_id_path, "%d", &socket_id) != 1) {
+      ERROR("cannot read socket id file `%s': %m\n", socket_id_path);
+      continue;
+    }
 
+    snprintf(cpu, sizeof(cpu), "%d", i);
+    snprintf(socket, sizeof(socket), "%d", socket_id);
     if (cpu_is_sandybridge(cpu))
       {
-	snprintf(pcu, sizeof(pcu), "%d", i);
+	snprintf(pcu, sizeof(pcu), "%d", socket_id);
 	intel_snb_pcu_collect_socket(type, cpu, pcu);
       }
   }

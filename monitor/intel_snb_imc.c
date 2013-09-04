@@ -12,7 +12,7 @@
 #include "stats.h"
 #include "trace.h"
 #include "pscanf.h"
-#include "cpu_is_snb.h"
+#include "check_pci_id.h"
 
 // Uncore iMC (Memory Controller) events are counted in this file.  The events are accesses in PCI config space.
 
@@ -194,33 +194,30 @@ static int intel_snb_imc_begin(struct stats_type *type)
   /* 2 buses and 4 devices per bus */
   char *bus[2] = {"7f", "ff"};
   char *dev[4] = {"10.0", "10.1", "10.4", "10.5"};
-
+  int  ids[4] = {0x3cb0, 0x3bc1, 0x3cb4, 0x3cb5}; 
+  char bus_dev[80];
 
   int i, j;
   for (i = 0; i < 2; i++) {
     for (j = 0; j < 4; j++) {
-      char cpu[80];
-      char bus_dev[80];
-      snprintf(cpu, sizeof(cpu), "%d", i*8);
+      // bus and device name
       snprintf(bus_dev, sizeof(bus_dev), "%s/%s", bus[i], dev[j]);
-      
-      if (cpu_is_sandybridge(cpu)) // check that cpu 0 and 8 (sockets 0 and 1) are SNB      
+      if (check_pci_id(bus_dev, ids[j]))
 	if (intel_snb_imc_begin_dev(bus_dev, imc_events[j], 4) == 0)
-	  nr++; /* HARD */
-    
+	  nr++; /* HARD */    
     }
   }
 
   return nr > 0 ? 0 : -1;
 }
 
-static void intel_snb_imc_collect_box(struct stats_type *type, char *bus_dev)
+static void intel_snb_imc_collect_dev(struct stats_type *type, char *bus_dev, char *socket_dev)
 {
   struct stats *stats = NULL;
   char pci_path[80];
   int pci_fd = -1;
 
-  stats = get_current_stats(type, bus_dev);
+  stats = get_current_stats(type, socket_dev);
   if (stats == NULL)
     goto out;
 
@@ -265,17 +262,17 @@ static void intel_snb_imc_collect(struct stats_type *type)
   /* 2 buses and 4 devices per bus */
   char *bus[2] = {"7f", "ff"};
   char *dev[4] = {"10.0", "10.1", "10.4", "10.5"};
-  
+  int   ids[4] = {0x3cb0, 0x3cb1, 0x3cb4, 0x3cb5}; 
+  char bus_dev[80];                                        
+  char socket_dev[80];
+
   int i, j;
   for (i = 0; i < 2; i++) {
     for (j = 0; j < 4; j++) {
-      char cpu[80];    
-      char bus_dev[80];                                        
-      snprintf(cpu, sizeof(cpu), "%d", i*8);
       snprintf(bus_dev, sizeof(bus_dev), "%s/%s", bus[i], dev[j]);
-      
-      if (cpu_is_sandybridge(cpu)) // check that cpu 0 and 8 (sockets 0 and 1) are SNB      
-	intel_snb_imc_collect_box(type, bus_dev);
+      snprintf(socket_dev, sizeof(socket_dev), "%d/%d", i, j);
+      if (check_pci_id(bus_dev,ids[j]))
+	intel_snb_imc_collect_dev(type, bus_dev, socket_dev);
     }
   }
 }

@@ -52,3 +52,4 @@ static int cpu_is_sandybridge(char *cpu)
 
   return rc;
 }
+
