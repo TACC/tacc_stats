@@ -8,7 +8,7 @@ Group: System Environment/Base
 Packager: CCR
 Source: %{name}.tar.gz
 #Source: %{name}-%{Version}.tar.gz
-BuildRoot: %{_tmppath}/%{name}-%{Version}-%{release}-root
+BuildRoot: %{_tmppath}/%{name}-%{version}-%{release}-root
 %define _bindir /opt/%{name}
 %define crontab_file /etc/cron.d/%{name}
 %define stats_dir /var/log/tacc_stats
@@ -30,14 +30,14 @@ to trigger collection and archiving.
 # Build both intel and amd, symlink to correct one in %post
 make clean
 cp -f config.%{intel} config
-make config=config NCPUS=64 name=%{name} version=%{Version} -j 4
+make config=config NCPUS=64 name=%{name} version=%{version} -j 4
 mv -f %{name} %{name}.%{intel}
-mv -f schema-%{Version}-config schema-%{Version}-config-%{intel}
+mv -f schema-%{version}-config schema-%{version}-config-%{intel}
 make clean
 cp -f config.%{amd} config
-make config=config NCPUS=32 name=%{name} version=%{Version} -j 4
+make config=config NCPUS=32 name=%{name} version=%{version} -j 4
 mv -f %{name} %{name}.%{amd}
-mv -f schema-%{Version}-config schema-%{Version}-config-%{amd}
+mv -f schema-%{version}-config schema-%{version}-config-%{amd}
 
 %install
 
@@ -53,10 +53,10 @@ install -m 0755 archive.sh %{buildroot}/%{_bindir}/%{name}_archive
 cpuvendor=$(awk '/^vendor_id/{print $3; exit}' /proc/cpuinfo)
 case ${cpuvendor} in
   "GenuineIntel")
-    ln -s %{_bindir}/%{name}.%{intel} %{_bindir}/%{name}
+    ln -sf %{_bindir}/%{name}.%{intel} %{_bindir}/%{name}
     ;;
   "AuthenticAMD")
-    ln -s %{_bindir}/%{name}.%{amd} %{_bindir}/%{name}
+    ln -sf %{_bindir}/%{name}.%{amd} %{_bindir}/%{name}
     ;;
   *)
     # Unsupported CPU
@@ -79,9 +79,8 @@ esac
 
 %preun
 
-rm -f rm %{_bindir}/%{name}
-
 if [ $1 == 0 ]; then
+  rm -f %{_bindir}/%{name}
   rm %{crontab_file} || :
 fi
 
