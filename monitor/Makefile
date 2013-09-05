@@ -1,9 +1,16 @@
-name = tacc_stats
-version = 1.0.3
+# The makefile will create a tacc_stats exe, this file should
+# be used with rmpbuild to create a rpm to install on intel
+# and amd nodes.
+#  $rpmbuild -ba tacc_stats.spec
+# There are a few vars you need to define in tacc_stats.spec:
+#  name = tacc_stats
+#  version = 1.0.3
+#  config = config
+#  NCPUS = 64
+
 stats_dir = /var/log/tacc_stats
 stats_lock = /var/lock/tacc_stats
 jobid_file = /var/spool/slurmd
-config = config
 
 CC = gcc
 CFLAGS = -Wall -O3 # -DDEBUG
@@ -14,11 +21,8 @@ CPPFLAGS = -D_GNU_SOURCE \
  -DSTATS_LOCK_PATH=\"$(stats_lock)\" \
  -DJOBID_FILE_PATH=\"$(jobid_file)\"
 
-#NCPUS = 64
-
 -include $(config)
 
-#OBJS = main.o stats.o dict.o collect.o schema.o stats_file.o lustre_obd_to_mnt.o
 OBJS = main.o stats.o dict.o collect.o schema.o stats_file.o
 OBJS += $(patsubst %,%.o,$(TYPES))
 
