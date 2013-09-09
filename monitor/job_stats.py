@@ -209,6 +209,7 @@ class Host(object):
 
     def read_stats_file_header(self, start_time, file):
         file_schemas = {}
+#        print "DEBUG ", file
         for line in file:
             try:
                 c = line[0]
