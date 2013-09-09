@@ -1,3 +1,7 @@
 *.pyc
 .project
 .pydevproject
+*.x
+bin/
+include/
+build/

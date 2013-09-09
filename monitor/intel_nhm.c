@@ -12,6 +12,9 @@
 #include "stats.h"
 #include "trace.h"
 
+// Nehalem microarchitectures have signature 06_1a,06_1e,06_1f,06_2e with non-architectural events
+// listed in Table 19-11.
+
 // $ ls -l /dev/cpu/0
 // total 0
 // crw-------  1 root root 203, 0 Oct 28 18:47 cpuid
@@ -25,15 +28,15 @@
 // of MSR address space. Each performance event select register is paired with a
 // corresponding performance counter in the 0C1H address block.
 
-#define IA32_PMC0 0xC1 /* CPUID.0AH: EAX[15:8] > 0 */
-#define IA32_PMC1 0xC2 /* CPUID.0AH: EAX[15:8] > 1 */
-#define IA32_PMC2 0xC3 /* CPUID.0AH: EAX[15:8] > 2 */
-#define IA32_PMC3 0xC4 /* CPUID.0AH: EAX[15:8] > 3 */
+#define IA32_CTR0 0xC1 /* CPUID.0AH: EAX[15:8] > 0 */
+#define IA32_CTR1 0xC2 /* CPUID.0AH: EAX[15:8] > 1 */
+#define IA32_CTR2 0xC3 /* CPUID.0AH: EAX[15:8] > 2 */
+#define IA32_CTR3 0xC4 /* CPUID.0AH: EAX[15:8] > 3 */
 
-#define IA32_PERFEVTSEL0 0x186 /* CPUID.0AH: EAX[15:8] > 0 */
-#define IA32_PERFEVTSEL1 0x187 /* CPUID.0AH: EAX[15:8] > 1 */
-#define IA32_PERFEVTSEL2 0x188 /* CPUID.0AH: EAX[15:8] > 2 */
-#define IA32_PERFEVTSEL3 0x189 /* CPUID.0AH: EAX[15:8] > 3 */
+#define IA32_CTL0 0x186 /* CPUID.0AH: EAX[15:8] > 0 */
+#define IA32_CTL1 0x187 /* CPUID.0AH: EAX[15:8] > 1 */
+#define IA32_CTL2 0x188 /* CPUID.0AH: EAX[15:8] > 2 */
+#define IA32_CTL3 0x189 /* CPUID.0AH: EAX[15:8] > 3 */
 
 // IA32_PERFEVTSELx MSR layout
 //   [0, 7] Event Select
@@ -58,28 +61,48 @@
 #define IA32_PERF_GLOBAL_OVF_CTRL 0x390
 
 #define KEYS \
-  X(PMC0, "E,W=48", ""), \
-  X(PMC1, "E,W=48", ""), \
-  X(PMC2, "E,W=48", ""), \
-  X(PMC3, "E,W=48", ""), \
-  X(PERFEVTSEL0, "C", ""), \
-  X(PERFEVTSEL1, "C", ""), \
-  X(PERFEVTSEL2, "C", ""), \
-  X(PERFEVTSEL3, "C", ""), \
   X(FIXED_CTR0, "E,W=48", ""), \
   X(FIXED_CTR1, "E,W=48", ""), \
   X(FIXED_CTR2, "E,W=48", ""), \
+  X(CTL0, "C", ""), \
+  X(CTL1, "C", ""), \
+  X(CTL2, "C", ""), \
+  X(CTL3, "C", ""), \
+  X(CTR0, "E,W=48", ""), \
+  X(CTR1, "E,W=48", ""), \
+  X(CTR2, "E,W=48", ""), \
+  X(CTR3, "E,W=48", "")
+
+ /* Shouldn't need these in stats file,                                        
+all counters are always on, and ovf is handled                                 
+in post processing                                                             
+  , \        
   X(FIXED_CTR_CTRL, "C", ""), \
   X(PERF_GLOBAL_STATUS, "C", ""), \
   X(PERF_GLOBAL_CTRL, "C", ""), \
   X(PERF_GLOBAL_OVF_CTRL, "C", "")
+*/
 
+static void get_cpuid_signature(int cpuid_file, char* signature)
+{
+  int ebx = 0, ecx = 0, edx = 0, eax = 1;
+  __asm__ ("cpuid": "=b" (ebx), "=c" (ecx), "=d" (edx), "=a" (eax):"a" (eax));
+
+  int model = (eax & 0x0FF) >> 4;
+  int extended_model = (eax & 0xF0000) >> 12;
+  int family_code = (eax & 0xF00) >> 8;
+  int extended_family_code = (eax & 0xFF00000) >> 16;
+
+  snprintf(signature,sizeof(signature),"%02x_%x", extended_family_code | family_code, extended_model | model);
+
+}
 static int cpu_is_nehalem(char *cpu)
 {
   char cpuid_path[80];
   int cpuid_fd = -1;
   uint32_t buf[4];
   int rc = 0;
+  char signature[5];
 
   /* Open /dev/cpuid/cpu/cpuid. */
   snprintf(cpuid_path, sizeof(cpuid_path), "/dev/cpu/%s/cpuid", cpu);
@@ -88,7 +111,7 @@ static int cpu_is_nehalem(char *cpu)
     ERROR("cannot open `%s': %m\n", cpuid_path);
     goto out;
   }
-
+  
   /* Get cpu vendor. */
   if (pread(cpuid_fd, buf, sizeof(buf), 0x0) < 0) {
     ERROR("cannot read cpu vendor through `%s': %m\n", cpuid_path);
@@ -107,6 +130,13 @@ static int cpu_is_nehalem(char *cpu)
   }
 
   TRACE("cpu %s, buf %08x %08x %08x %08x\n", cpu, buf[0], buf[1], buf[2], buf[3]);
+
+  get_cpuid_signature(cpuid_fd,signature);
+  TRACE("cpu%s, CPUID Signature %s\n", cpu, signature);
+  if (strncmp(signature, "06_1a", 5) !=0 && strncmp(signature, "06_1e", 5) !=0  && strncmp(signature, "06_1f", 5) !=0 && strncmp(signature, "06_2e", 5) !=0)
+    goto out;
+
+
 
   int perf_ver = buf[0] & 0xff;
   TRACE("cpu %s, perf_ver %d\n", cpu, perf_ver);
@@ -168,7 +198,7 @@ static int cpu_is_nehalem(char *cpu)
   return rc;
 }
 
-static int intel_pmc3_begin_cpu(char *cpu, uint64_t *events, size_t nr_events)
+static int intel_nhm_begin_cpu(char *cpu, uint64_t *events, size_t nr_events)
 {
   int rc = -1;
   char msr_path[80];
@@ -191,12 +221,12 @@ static int intel_pmc3_begin_cpu(char *cpu, uint64_t *events, size_t nr_events)
 
   int i;
   for (i = 0; i < nr_events; i++) {
-    TRACE("MSR %08X, event %016llX\n", IA32_PERFEVTSEL0 + i, (unsigned long long) events[i]);
+    TRACE("MSR %08X, event %016llX\n", IA32_CTL0 + i, (unsigned long long) events[i]);
 
-    if (pwrite(msr_fd, &events[i], sizeof(events[i]), IA32_PERFEVTSEL0 + i) < 0) {
+    if (pwrite(msr_fd, &events[i], sizeof(events[i]), IA32_CTL0 + i) < 0) {
       ERROR("cannot write event %016llX to MSR %08X through `%s': %m\n",
             (unsigned long long) events[i],
-            (unsigned) IA32_PERFEVTSEL0 + i,
+            (unsigned) IA32_CTL0 + i,
             msr_path);
       goto out;
     }
@@ -241,7 +271,7 @@ static int intel_pmc3_begin_cpu(char *cpu, uint64_t *events, size_t nr_events)
 #define FP_COMP_OPS_EXE_SSE_FP_PACKED  PERF_EVENT(0x10, 0x10)
 #define FP_COMP_OPS_EXE_SSE_FP_SCALAR  PERF_EVENT(0x10, 0x20)
 
-static int intel_pmc3_begin(struct stats_type *type)
+static int intel_nhm_begin(struct stats_type *type)
 {
   int nr = 0;
 
@@ -258,14 +288,14 @@ static int intel_pmc3_begin(struct stats_type *type)
     snprintf(cpu, sizeof(cpu), "%d", i);
 
     if (cpu_is_nehalem(cpu))
-      if (intel_pmc3_begin_cpu(cpu, events, 4) == 0)
+      if (intel_nhm_begin_cpu(cpu, events, 4) == 0)
 	nr++; /* HARD */
   }
 
   return nr > 0 ? 0 : -1;
 }
 
-static void intel_pmc3_collect_cpu(struct stats_type *type, char *cpu)
+static void intel_nhm_collect_cpu(struct stats_type *type, char *cpu)
 {
   struct stats *stats = NULL;
   char msr_path[80];
@@ -300,7 +330,7 @@ static void intel_pmc3_collect_cpu(struct stats_type *type, char *cpu)
     close(msr_fd);
 }
 
-static void intel_pmc3_collect(struct stats_type *type)
+static void intel_nhm_collect(struct stats_type *type)
 {
   int i;
   for (i = 0; i < nr_cpus; i++) {
@@ -308,15 +338,18 @@ static void intel_pmc3_collect(struct stats_type *type)
     snprintf(cpu, sizeof(cpu), "%d", i);
 
     if (cpu_is_nehalem(cpu))
-      intel_pmc3_collect_cpu(type, cpu);
+      intel_nhm_collect_cpu(type, cpu);
   }
 }
 
-struct stats_type intel_pmc3_stats_type = {
-  .st_name = "intel_pmc3",
-  .st_begin = &intel_pmc3_begin,
-  .st_collect = &intel_pmc3_collect,
+struct stats_type intel_nhm_stats_type = {
+  .st_name = "intel_nhm",
+  .st_begin = &intel_nhm_begin,
+  .st_collect = &intel_nhm_collect,
 #define X SCHEMA_DEF
   .st_schema_def = JOIN(KEYS),
 #undef X
 };
+
+/*  LocalWords:  EAX
+ */

@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 import datetime, errno, glob, gzip, numpy, os, sys, time
-import amd64_pmc, batch_acct
+import amd64_pmc, intel_snb, batch_acct
 
 verbose = os.getenv('TACC_STATS_VERBOSE')
 
@@ -207,7 +207,7 @@ class Host(object):
         path_list.sort(key=lambda tup: tup[1])
         return path_list
 
-    def read_stats_file_header(self, start_time, file):
+    def read_stats_file_header(self, file):
         file_schemas = {}
 #        print "DEBUG ", file
         for line in file:
@@ -251,13 +251,12 @@ class Host(object):
         dev_stats = type_stats.setdefault(dev_name, [])
         dev_stats.append((rec_time, vals))
 
-    def read_stats_file(self, start_time, file):
-        file_schemas = self.read_stats_file_header(start_time, file)
+    def read_stats_file(self, file):
+        file_schemas = self.read_stats_file_header(file)
         if not file_schemas:
             self.trace("file `%s' bad header\n", file.name)
             return
         # Scan file for records belonging to JOBID.
-        rec_time = start_time
         for line in file:
             try:
                 c = line[0]
@@ -314,7 +313,7 @@ class Host(object):
         # converted into numpy arrays below.
         for path, start_time in path_list:
             with gzip.open(path) as file: # XXX Gzip.
-                self.read_stats_file(start_time, file)
+                self.read_stats_file(file)
         # begin_mark = 'begin %s' % self.job.id # No '%'.
         # if not begin_mark in self.marks:
         #     self.error("no begin mark found\n")
@@ -482,6 +481,7 @@ class Job(object):
                                                              dev_name, raw_dev_stats)
             del host.raw_stats
         amd64_pmc.process_job(self)
+        intel_snb.process_job(self)
         # Clear mult, width from schemas. XXX
         for schema in self.schemas.itervalues():
             for e in schema.itervalues():
