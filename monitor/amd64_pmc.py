@@ -58,7 +58,10 @@ def core_to_sock(c):
     return c / (nr_cores / nr_socks)
 
 def process_host(host, times):
-    pmc_stats = host.stats['amd64_pmc']
+    if 'amd64_pmc' in host.stats:
+        pmc_stats = host.stats['amd64_pmc']
+    else:
+        return
     core_stats = dict((str(i), numpy.zeros((len(times), nr_core_ctrs), numpy.uint64)) \
                       for i in range(0, nr_cores))
     sock_stats = dict((str(i), numpy.zeros((len(times), nr_sock_ctrs), numpy.uint64)) \

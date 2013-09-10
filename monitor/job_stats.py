@@ -320,8 +320,9 @@ class Host(object):
                 elif c.isalpha():
                     self.parse_stats(rec_time, line, file_schemas, file)
                 elif c == SF_MARK_CHAR:
-                    mark = line[1:].strip()
-                    self.marks[mark] = True
+                    if not line.startswith("% procdump"): #do not add procdump data to pickle
+                        mark = line[1:].strip()
+                        self.marks[mark] = True
                 elif c == SF_COMMENT_CHAR:
                     pass
                 else:
@@ -504,6 +505,7 @@ class Job(object):
                             host_list_expanded.append(node_head + n)
                 else:
                     host_list_expanded.append(h)
+            self.acct['hostname'] = host_list_expanded[0] # add hostname
             for host_name in host_list_expanded:
                 host = Host(self, host_name)
                 if host.gather_stats():
