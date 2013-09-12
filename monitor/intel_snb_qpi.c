@@ -100,10 +100,10 @@ event select      [7:0]
   )
 
 /* Definitions in Table 2-94 */
-#define G0_IDLE     QPI_PERF_EVENT(0x00,0x01) /* all null packets */
-#define G0_NON_DATA QPI_PERF_EVENT(0x00,0x04) /* protocol overhead */
-#define G1_DRS_DATA QPI_PERF_EVENT(0x02,0x08) /* for data bandwidth, flits x 8B/time */
-#define G2_NCB_DATA QPI_PERF_EVENT(0x03,0x04) /* for data bandwidth, flits x 8B/time */
+#define G0_IDLE     QPI_PERF_EVENT(0x00,0x81) /* all null packets */
+#define G0_NON_DATA QPI_PERF_EVENT(0x00,0x84) /* protocol overhead */
+#define G1_DRS_DATA QPI_PERF_EVENT(0x02,0x88) /* for data bandwidth, flits x 8B/time */
+#define G2_NCB_DATA QPI_PERF_EVENT(0x03,0x84) /* for data bandwidth, flits x 8B/time */
 
 static int intel_snb_qpi_begin_dev(char *bus_dev, uint32_t *events, size_t nr_events)
 {
@@ -119,7 +119,7 @@ static int intel_snb_qpi_begin_dev(char *bus_dev, uint32_t *events, size_t nr_ev
     goto out;
   }
 
-  ctl = 0x10102UL; // enable freeze (bit 16), freeze (bit 8), reset counters
+  ctl = 0x10103UL; // enable freeze (bit 16), freeze (bit 8), reset counters
   if (pwrite(pci_fd, &ctl, sizeof(ctl), QPI_BOX_CTL) < 0) {
     ERROR("cannot enable freeze of QPI counters: %m\n");
     goto out;
