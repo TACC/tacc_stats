@@ -194,7 +194,7 @@ static int intel_snb_imc_begin(struct stats_type *type)
   /* 2 buses and 4 devices per bus */
   char *bus[2] = {"7f", "ff"};
   char *dev[4] = {"10.0", "10.1", "10.4", "10.5"};
-  int  ids[4] = {0x3cb0, 0x3bc1, 0x3cb4, 0x3cb5}; 
+  int  ids[4] = {0x3cb0, 0x3cb1, 0x3cb4, 0x3cb5}; 
   char bus_dev[80];
 
   int i, j;
