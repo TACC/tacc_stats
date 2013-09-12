@@ -26,13 +26,14 @@ host_name_ext=stampede.tacc.utexas.edu
 batch_system=SLURM
 
 ## System specific Schema items. ##
-##!!!These types must be alphabetical !!!##
 ## Chips type and infiniband may need to be
 ## changed for different systems ## 
 ########################
 ## Chip types
-# Each chip will need a different counter file
-# for non-architectural events
+# Each chip will need a different counter routine
+# for non-architectural events.
+# If chip or device is absent it will be skipped
+# at run time.
 TYPES+="amd64_pmc "
 TYPES+="intel_nhm "
 TYPES+="intel_uncore "
