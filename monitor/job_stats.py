@@ -290,10 +290,18 @@ class Host(object):
                     str_time, rec_jobid = line.split()
                     rec_jobid = rec_jobid.split(',') #there can be multiple job id's
                     rec_time = long(str_time)
+                    # check for a begin statement, in Rush the begin jobid is
+                    # not included with the time stamp
+                    pos=file.tell()
+                    begin = file.next().strip()
+                    if begin.startswith('% begin'):
+                        rec_jobid.append(begin[8:]) #add the begin jobid to the array
+                    # check if jobid exists
                     if str(self.job.id) in rec_jobid:
                         self.trace("file `%s' rec_time %d, rec_jobid `%s'\n",
                                    file.name, rec_time, rec_jobid)
                         self.times.append(rec_time)
+                        file.seek(pos) #seek back to last position to begin with %begin
                         break
             except Exception as exc:
                 self.trace("file `%s', caught `%s', discarding `%s'\n",
@@ -312,6 +320,13 @@ class Host(object):
                     str_time, rec_jobid = line.split()
                     rec_jobid = rec_jobid.split(',') #there can be multiple job id's
                     rec_time = long(str_time)
+                    # need to look for end in rush because it might not be part
+                    # of the jobid with the timestamp
+                    pos=file.tell()
+                    end = file.next().strip()
+                    if end.startswith('% end'):
+                        rec_jobid.append(end[6:])
+                    file.seek(pos)
                     if str(self.job.id) not in rec_jobid:
                         return
                     self.trace("file `%s' rec_time %d, rec_jobid `%s'\n",
