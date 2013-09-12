@@ -53,6 +53,11 @@ configure_file(find_jobs_between.py.in ${CMAKE_CURRENT_BINARY_DIR}/find_jobs_bet
 configure_file(job_pickles.py.in ${CMAKE_CURRENT_BINARY_DIR}/job_pickles.py @ONLY)
 configure_file(job_report.py.in ${CMAKE_CURRENT_BINARY_DIR}/job_report.py @ONLY)
 
+# Setup cron script for pickler
+set (PICKLES_DIR ${pickles_dir})
+set (PYTHON_PATH ${python_path})
+configure_file(do_job_pickles_cron.sh.in ${CMAKE_CURRENT_BINARY_DIR}/do_job_pickles_cron.sh @ONLY)
+
 file(GLOB PY_INC_FILES ${CMAKE_CURRENT_SOURCE_DIR}/*.py) 
 install(PROGRAMS ${PY_INC_FILES}  DESTINATION 
   ${CMAKE_SOURCE_DIR}/include)
@@ -61,6 +66,7 @@ install(PROGRAMS
   ${CMAKE_CURRENT_BINARY_DIR}/find_jobs_between.py 
   ${CMAKE_CURRENT_BINARY_DIR}/job_pickles.py
   ${CMAKE_CURRENT_BINARY_DIR}/job_report.py  
+  ${CMAKE_CURRENT_BINARY_DIR}/do_job_pickles_cron.sh  
   DESTINATION ${CMAKE_SOURCE_DIR}/bin)
 
 file(GLOB BASH_FILES ${CMAKE_CURRENT_SOURCE_DIR}/*.sh) 

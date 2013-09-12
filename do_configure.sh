@@ -4,23 +4,24 @@
 
 ## Paths on compute hosts## \
 # directory of compute host's raw stats file \
-stats_dir=~/var/log/tacc_stats
+stats_dir=/var/log/tacc_stats
 # compute host's lock file for tacc_stats process \
-stats_lock=~/var/lock/tacc_stats
+stats_lock=/var/lock/tacc_stats
 # file containing jobid \
-jobid_file=~/var/run/TACC_jobid 
+jobid_file=/var/run/TACC_jobid 
 
 ## Paths for persistent log data and pickling
 # home directory for presistent stats data 
-#tacc_stats_home=/scratch/projects/tacc_stats/
-tacc_stats_home=~/
+tacc_stats_home=/scratch/projects/tacc_stats/
 # file that contains characterizes all logged jobs
-#acct_path=/scratch/projects/tacc_stats/accounting/tacc_jobs_completed
-acct_path=~/tacc_jobs_completed
+acct_path=/scratch/projects/tacc_stats/accounting/tacc_jobs_completed
 # location of host files, labeled by jobid and containing hosts
 # used for jobid
-#host_list_dir=/scratch/projects/tacc/hostfile_logs/
-host_list_dir=~/
+host_list_dir=/scratch/projects/tacc/hostfile_logs/
+# location to store pickles
+#pickles_dir=/scratch/projects/tacc_stats/pickles/
+pickles_dir=~/pickles/
+python_path=/opt/apps/python/epd/7.3.2/bin/
 ## Host Name Extension and Batch System (Currently SGE or SLURM)##
 host_name_ext=stampede.tacc.utexas.edu
 batch_system=SLURM
@@ -90,6 +91,8 @@ cmake \
 -Dtacc_stats_home=${tacc_stats_home} \
 -Dacct_path=${acct_path} \
 -Dhost_list_dir=${host_list_dir} \
+-Dpickles_dir=${pickles_dir} \
+-Dpython_path=${python_path} \
 -Dhost_name_ext=${host_name_ext} \
 -Dbatch_system=${batch_system} \
 -DTYPES="${TYPES}" \
