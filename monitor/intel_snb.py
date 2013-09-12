@@ -7,6 +7,7 @@ import numpy
 # 1) CTL registers
 # 2) Programmable CTR registers
 # 3) Fixed CTR registers
+# 4) If CTL register programming failed it (QPI) it seems to be 0, so this is added to event maps
 
 # Core events
 def CORE_PERF_EVENT(event_select, unit_mask):
@@ -22,7 +23,8 @@ cpu_event_map = {
     CORE_PERF_EVENT(0x51,0x01) : 'LOAD_L1D_ALL,E',
     'FIXED0'                   : 'INSTRUCTIONS_RETIRED,E',
     'FIXED1'                   : 'CLOCKS_UNHALTED_CORE,E',
-    'FIXED2'                   : 'CLOCKS_UNHALTED_REF,E'
+    'FIXED2'                   : 'CLOCKS_UNHALTED_REF,E',
+    0                          : 'NA'
 }
 # CBo events
 def CBOX_PERF_EVENT(event, umask):
@@ -31,7 +33,8 @@ cbo_event_map = {
     CBOX_PERF_EVENT(0x00, 0x00) : 'CLOCK_TICKS,E',
     CBOX_PERF_EVENT(0x11, 0x01) : 'RxR_OCCUPANCY,E',
     CBOX_PERF_EVENT(0x1F, 0x00) : 'COUNTER0_OCCUPANCY,E',
-    CBOX_PERF_EVENT(0x34, 0x03) : 'LLC_LOOKUP,E'
+    CBOX_PERF_EVENT(0x34, 0x03) : 'LLC_LOOKUP,E',
+    0                           : 'NA'
     }
 # Home Agent Unit events
 def HAU_PERF_EVENT(event, umask):
@@ -40,7 +43,8 @@ hau_event_map = {
     HAU_PERF_EVENT(0x01, 0x03) : 'READ_REQUESTS,E',
     HAU_PERF_EVENT(0x01, 0x0C) : 'WRITE_REQUESTS,E',
     HAU_PERF_EVENT(0x00, 0x00) : 'CLOCKTICKS,E',
-    HAU_PERF_EVENT(0x1A, 0x0F) : 'IMC_WRITES,E'
+    HAU_PERF_EVENT(0x1A, 0x0F) : 'IMC_WRITES,E',
+    0                          : 'NA'
     }
 #iMC events
 def IMC_PERF_EVENT(event, umask):
@@ -50,7 +54,8 @@ imc_event_map = {
     IMC_PERF_EVENT(0x04, 0x0C) : 'CAS_WRITES,E',
     IMC_PERF_EVENT(0x01, 0x00) : 'ACT_COUNT,E',
     IMC_PERF_EVENT(0x02, 0x03) : 'PRE_COUNT_ALL,E',              
-    'FIXED0'                   : 'CYCLES,E'
+    'FIXED0'                   : 'CYCLES,E',
+    0                          : 'NA'
     }
 #Power Control Unit events
 def PCU_PERF_EVENT(event):
@@ -63,7 +68,8 @@ pcu_event_map = {
     PCU_PERF_EVENT(0x81) : 'MIN_IO_CYCLES,E',              
     PCU_PERF_EVENT(0x82) : 'MIN_SNOOP_CYCLES,E',              
     'FIXED0'             : 'C3_CYCLES,E',
-    'FIXED1'             : 'C6_CYCLES,E'
+    'FIXED1'             : 'C6_CYCLES,E',
+    0                    : 'NA'
     }
 #QPI Unit events
 def QPI_PERF_EVENT(event, umask):
@@ -73,6 +79,7 @@ qpi_event_map = {
     QPI_PERF_EVENT(0x00, 0x04) : 'G0_NON_DATA,E',
     QPI_PERF_EVENT(0x02, 0x08) : 'G1_DRS_DATA,E',
     QPI_PERF_EVENT(0x03, 0x04) : 'G2_NCB_DATA,E',              
+    0                          : 'NA'
     }
 #R2PCI Unit events
 def R2PCI_PERF_EVENT(event, umask):
@@ -83,66 +90,95 @@ r2pci_event_map = {
     R2PCI_PERF_EVENT(0x07, 0x0F) : 'ADDRESS_USED,E',
     R2PCI_PERF_EVENT(0x08, 0x0F) : 'ACKNOWLEDGED_USED,E',              
     R2PCI_PERF_EVENT(0x09, 0x0F) : 'DATA_USED,E',              
+    0                            : 'NA'
     }
 
-def register(job, host, name, event_map):
-    schema_desc = job.schemas.get(name).desc
-    
-    stats = host.stats[name]
-    registers = schema_desc.split()
+class reformat_counters:
 
-    ctl_registers =[]
-    ctr_registers =[]
+    def __init__(self, job, name, event_map):
+        self.job = job
+        self.name = name
+        self.ctl_registers = []
+        self.ctr_registers = []
 
-    for reg in registers:    
-        if reg.split(',')[1] != 'C': ctr_registers.append(registers.index(reg))
-        else: ctl_registers.append(registers.index(reg))
+        # Just need the first hosts schema
+        for host in job.hosts.itervalues():
+            stats = host.stats[name]
+            break
 
-    # Build Schema from ctl registers and event maps
-    dev_schema = []
-    for dev, array in stats.iteritems():
-        for j in ctl_registers:
-            dev_schema.append(event_map[array[0,j]])
-        break
+        schema_desc = job.schemas.get(self.name).desc
+        registers = schema_desc.split()
 
-    # Schema appended for fixed ctrs 
-    nr_fixed = len(ctr_registers) - len(ctl_registers)
-    for i in range(0,nr_fixed):
-        dev_schema.append(event_map['FIXED'+str(i)])
+        for reg in registers:    
+            if reg.split(',')[1] != 'C': self.ctr_registers.append(registers.index(reg))
+            else: self.ctl_registers.append(registers.index(reg))
 
-    dev_schema_desc = ' '.join(dev_schema) + '\n'
+        # Build Schema from ctl registers and event maps
+        dev_schema = []
+        for dev, array in stats.iteritems():
+            for j in self.ctl_registers:
+                dev_schema.append(event_map[array[0,j]])
+            break
 
-    # Build stats without ctl registers
-    dev_stats = dict((str(i), numpy.zeros((len(job.times),len(ctr_registers)),numpy.uint64)) for i in stats.keys())
 
-    for dev, array in stats.iteritems():
-        data = dev_stats[dev]
-        for j in ctr_registers:                
-            data[:,j - len(ctl_registers)] = numpy.array(array[:,j], numpy.uint64)
 
-    del job.schemas[name], host.stats[name]
+        # Schema appended for fixed ctrs 
+        nr_fixed = len(self.ctr_registers) - len(self.ctl_registers)
+        for i in range(0,nr_fixed):
+            dev_schema.append(event_map['FIXED'+str(i)])
 
-    job.get_schema(name, dev_schema_desc)
-    host.stats[name] = dev_stats
+        dev_schema_desc = ' '.join(dev_schema) + '\n'
+
+        del self.job.schemas[self.name]
+        self.job.get_schema(self.name, dev_schema_desc)
+
+
+    def register(self,host):
+        # Build stats without ctl registers
+        stats = host.stats[self.name]
+        dev_stats = dict((str(i), numpy.zeros((len(self.job.times),len(self.ctr_registers)),numpy.uint64)) for i in stats.keys())
+
+        for dev, array in stats.iteritems():
+            data = dev_stats[dev]
+            for j in self.ctr_registers:                
+                data[:,j - len(self.ctl_registers)] = numpy.array(array[:,j], numpy.uint64)
+
+        host.stats[self.name] = dev_stats
 
 
 def process_job(job):
 
-    for host in job.hosts.itervalues():
-        if 'intel_snb' in job.schemas:
-            register(job, host,'intel_snb',cpu_event_map)
-        if 'intel_snb_cbo' in job.schemas:
-            register(job, host, 'intel_snb_cbo',cbo_event_map)
-        if 'intel_snb_hau' in job.schemas:
-            register(job, host, 'intel_snb_hau',hau_event_map)
-        if 'intel_snb_imc' in job.schemas:
-            register(job, host, 'intel_snb_imc',imc_event_map)
-        if 'intel_snb_pcu' in job.schemas:
-            register(job, host, 'intel_snb_pcu',pcu_event_map)
-        #if 'intel_snb_qpi' in job.schemas:
-        #    register(job, host, 'intel_snb_qpi',qpi_event_map)
-        if 'intel_snb_r2pci' in job.schemas:
-            register(job, host, 'intel_snb_r2pci',r2pci_event_map)
+    if 'intel_snb' in job.schemas:
+        snb = reformat_counters(job, 'intel_snb', cpu_event_map)
+        for host in job.hosts.itervalues():
+            snb.register(host)
 
-        #for dev, data in hosts.stats['intel_snb_r2pci']:
-        #    print dev
+    if 'intel_snb_cbo' in job.schemas:
+        cbo = reformat_counters(job, 'intel_snb_cbo',cbo_event_map)
+        for host in job.hosts.itervalues():
+            cbo.register(host)
+
+    if 'intel_snb_hau' in job.schemas:
+        hau = reformat_counters(job, 'intel_snb_hau',hau_event_map)
+        for host in job.hosts.itervalues():
+            hau.register(host)
+    
+    if 'intel_snb_imc' in job.schemas:
+        imc = reformat_counters(job, 'intel_snb_imc',imc_event_map)
+        for host in job.hosts.itervalues():
+            imc.register(host)
+
+    if 'intel_snb_qpi' in job.schemas:
+        qpi = reformat_counters(job, 'intel_snb_qpi',qpi_event_map)
+        for host in job.hosts.itervalues():
+            qpi.register(host)  
+
+    if 'intel_snb_pcu' in job.schemas:
+        pcu = reformat_counters(job, 'intel_snb_pcu',pcu_event_map)
+        for host in job.hosts.itervalues():
+            pcu.register(host)
+
+    if 'intel_snb_r2pci' in job.schemas:
+        r2pci = reformat_counters(job, 'intel_snb_r2pci',r2pci_event_map)
+        for host in job.hosts.itervalues():
+            r2pci.register(host)
