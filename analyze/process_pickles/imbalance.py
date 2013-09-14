@@ -48,7 +48,7 @@ def plot_ratios(ts,tmid,ratio,ratio2,rate,var,fig,ax,full):
   ax[0].set_ylim(bottom=ymin,top=ymax)
   ax[1].set_ylim(bottom=ymin1,top=ymax1)
 
-  fname='_'.join(['graph',ts.j.id,ts.j.acct['owner'],
+  fname='_'.join(['graph',ts.j.id,ts.owner,
                   ts.k1[0],ts.k2[0],'imbalance'+full])
   fig.savefig(fname)
   plt.close()
@@ -104,7 +104,7 @@ def compute_imbalance(file,k1,k2,threshold,plot_flag,full_flag,ratios):
   var=scipy.stats.tmean(ratio) # mean of ratios is the threshold statistic
 
   # Save away a list of ratios per user
-  ratios[ts.j.id]=[var,ts.j.acct['owner']] 
+  ratios[ts.j.id]=[var,ts.owner] 
   print ts.j.id + ': ' + str(var)
   # If over the threshold, plot this job (This should be factored out)
   if plot_flag and abs(var) > threshold:
