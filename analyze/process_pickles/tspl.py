@@ -22,6 +22,10 @@ class TSPLBase:
       except ZeroDivisionError:
         print "Read zero nodes, assuming 16 way job"
         self.wayness=16
+      except TypeError:
+        raise TSPLException('Something is funny with job ' +str(self.j.id) +
+                            ' ' + self.j.acct['cores'] + ' ' +
+                            self.j.acct['nodes'])
 
     try:
       self.owner=self.j.acct['owner']
@@ -36,16 +40,20 @@ class TSPLBase:
       self.pmc_type='amd64'
     elif 'intel_pmc3' in self.j.hosts.values()[0].stats:
       self.pmc_type='intel'
-    else:
-      raise TSPLException('No PMC data for: ' + self.j.id)
+    elif 'intel_snb' in self.j.hosts.values()[0].stats:
+      self.pmc_type='intel_snb'
 
-    if self.pmc_type in k1:
+    if isinstance(k1,dict) and self.pmc_type in k1:
       self.k1=k1[self.pmc_type]
       self.k2=k2[self.pmc_type]
     else:
       self.k1=k1
       self.k2=k2
 
+    if self.j.get_schema(self.k1[0]) is None:
+      raise TSPLException(self.k1[0]+' not supported for job '+str(self.j.id))
+      
+      
     self.t=(self.j.times-self.j.times[0])
 
     if len(k1) != len(k2):
