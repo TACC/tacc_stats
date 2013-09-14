@@ -25,20 +25,20 @@
 // crw-------  1 root root 203, 0 Oct 28 18:47 cpuid
 // crw-------  1 root root 202, 0 Oct 28 18:47 msr
 
-// $ lspci | grep "Interconnect Link"
+// $ lspci -nn | grep "Performance counters"
 /*
-7f:13.5 Performance counters: Intel Corporation Xeon E5/Core i7 Ring to QuickPath Interconnect Link 0 Performance Monitor (rev 07)
-7f:13.6 System peripheral: Intel Corporation Xeon E5/Core i7 Ring to QuickPath Interconnect Link 1 Performance Monitor (rev 07)
-ff:13.5 Performance counters: Intel Corporation Xeon E5/Core i7 Ring to QuickPath Interconnect Link 0 Performance Monitor (rev 07)
-ff:13.6 System peripheral: Intel Corporation Xeon E5/Core i7 Ring to QuickPath Interconnect Link 1 Performance Monitor (rev 07)
+7f:08.2 Performance counters [1101]: Intel Corporation Device [8086:3c41] (rev 07)
+7f:09.2 Performance counters [1101]: Intel Corporation Device [8086:3c42] (rev 07)
+ff:08.2 Performance counters [1101]: Intel Corporation Device [8086:3c41] (rev 07)
+ff:09.2 Performance counters [1101]: Intel Corporation Device [8086:3c42] (rev 07)
 */
 
 // Info for this stuff is in: 
 //Intel Xeon Processor E5-2600 Product Family Uncore Performance Monitoring Guide
 // 2 QPI units with four counters each
 // PCI Config Space Dev ID:
-// Socket 1: 7f:13.5, 7f:13.6
-// Socket 0: ff:13.5, 7f:13.6
+// Socket 1: 7f:08.2, 7f:09.2
+// Socket 0: ff:08.5, 7f:09.2
 // Supposedly all registers are 32 bit, but counter
 // registers A and B need to be added to get counter value
 
@@ -63,7 +63,7 @@ ff:13.6 System peripheral: Intel Corporation Xeon E5/Core i7 Ring to QuickPath I
 #define QPI_MATCH0   0x228
 #define QPI_MATCH1   0x22C
 
-// Width of 44 for QPI Counters
+// Width of 48 for QPI Counters
 #define CTL_KEYS \
     X(CTL0, "C", ""), \
     X(CTL1, "C", ""), \
@@ -93,7 +93,9 @@ event select      [7:0]
 #define QPI_PERF_EVENT(event, umask) \
   ( (event) \
   | (umask << 8) \
+  | (1UL << 15) /* Extra bit. */ \
   | (0UL << 18) /* Edge Detection. */ \
+  | (1UL << 21) /* Enable extra bit. */ \
   | (1UL << 22) /* Enable. */ \
   | (0UL << 23) /* Invert */ \
   | (0x01UL << 24) /* Threshold */ \
@@ -119,7 +121,7 @@ static int intel_snb_qpi_begin_dev(char *bus_dev, uint32_t *events, size_t nr_ev
     goto out;
   }
 
-  ctl = 0x10102UL; // enable freeze (bit 16), freeze (bit 8), reset counters
+  ctl = 0x10103UL; // enable freeze (bit 16), freeze (bit 8), reset counters
   if (pwrite(pci_fd, &ctl, sizeof(ctl), QPI_BOX_CTL) < 0) {
     ERROR("cannot enable freeze of QPI counters: %m\n");
     goto out;
@@ -156,7 +158,7 @@ static int intel_snb_qpi_begin_dev(char *bus_dev, uint32_t *events, size_t nr_ev
 static int intel_snb_qpi_begin(struct stats_type *type)
 {
   int nr = 0;
-  
+
   uint32_t qpi_events[2][4] = {
     { G0_IDLE, G0_NON_DATA, G1_DRS_DATA, G2_NCB_DATA},
     { G0_IDLE, G0_NON_DATA, G1_DRS_DATA, G2_NCB_DATA},
@@ -164,8 +166,8 @@ static int intel_snb_qpi_begin(struct stats_type *type)
 
   /* 2 buses and 4 devices per bus */
   char *bus[2] = {"7f", "ff"};
-  char *dev[2] = {"13.5", "13.6"};
-  int   ids[2] = {0x3c44, 0x3c45};
+  char *dev[2] = {"08.2", "09.2"};
+  int   ids[2] = {0x3c41, 0x3c42};
   char bus_dev[80];
 
   int i, j;
@@ -236,8 +238,8 @@ static void intel_snb_qpi_collect(struct stats_type *type)
 {
   /* 2 buses and 4 devices per bus */
   char *bus[2] = {"7f", "ff"};
-  char *dev[2] = {"13.5", "13.6"};
-  int   ids[2] = {0x3c44, 0x3c45};
+  char *dev[2] = {"08.2", "09.2"};
+  int   ids[2] = {0x3c41, 0x3c42};
   char bus_dev[80];                                        
   char socket_dev[80];
 
