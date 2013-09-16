@@ -73,7 +73,7 @@ pcu_event_map = {
     }
 #QPI Unit events
 def QPI_PERF_EVENT(event, umask):
-    return (event) | (umask << 8) | (0L << 18) | (1L << 22) | (0L <<23) | (1L << 24)
+    return (event) | (umask << 8) | (1L << 15) | (0L << 18) | (1L << 21) | (1L << 22) | (0L <<23) | (1L << 24)
 qpi_event_map = {
     QPI_PERF_EVENT(0x00, 0x01) : 'G0_IDLE,E',
     QPI_PERF_EVENT(0x00, 0x04) : 'G0_NON_DATA,E',

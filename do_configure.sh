@@ -20,7 +20,6 @@ acct_path=/scratch/projects/tacc_stats/accounting/tacc_jobs_completed
 host_list_dir=/scratch/projects/tacc/hostfile_logs/
 # location to store pickles
 pickles_dir=/scratch/projects/tacc_stats/pickles/
-#pickles_dir=~/pickles/
 python_path=/opt/apps/python/epd/7.3.2/bin/
 ## Host Name Extension and Batch System (Currently SGE or SLURM)##
 host_name_ext=stampede.tacc.utexas.edu
@@ -48,9 +47,8 @@ TYPES+="intel_snb_r2pci "
 ########################
 ## Infiniband usage
 TYPES+="ib "
-# These ib types appear to be specific to Ranger
-#TYPES+="ib_sw "
-#TYPES+="ib_ext "
+TYPES+="ib_sw "
+TYPES+="ib_ext "
 ########################
 ## Lustre filesystem usage (per mount)
 # Lustre network usage
