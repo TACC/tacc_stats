@@ -1,6 +1,3 @@
-set(CMAKE_PROJECT_NAME "tacc_stats")
-set(PROJECT_VERSION "1.0.3")
-
 set(CMAKE_C_FLAGS  "-g -Wall -Werror -O3 -DDEBUG")
 set(TACC_STATS_OBJS main stats dict collect schema stats_file lustre_obd_to_mnt)
 
