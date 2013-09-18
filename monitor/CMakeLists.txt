@@ -1,4 +1,3 @@
-
 set(CMAKE_C_FLAGS  "-g -Wall -Werror -O3 -DDEBUG")
 set(TACC_STATS_OBJS main stats dict collect schema stats_file lustre_obd_to_mnt)
 
@@ -71,3 +70,10 @@ install(PROGRAMS
 
 file(GLOB BASH_FILES ${CMAKE_CURRENT_SOURCE_DIR}/*.sh) 
 install(PROGRAMS ${BASH_FILES} DESTINATION ${CMAKE_SOURCE_DIR}/bin)
+
+
+set(ARCHIVE_NAME ${CMAKE_PROJECT_NAME}-${PROJECT_VERSION})
+add_custom_target(dist
+    COMMAND git archive --prefix=${ARCHIVE_NAME}/ HEAD
+        | gzip > ${CMAKE_BINARY_DIR}/${ARCHIVE_NAME}.tar.gz
+    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
