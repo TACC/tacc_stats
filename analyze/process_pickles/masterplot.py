@@ -115,14 +115,18 @@ def master_plot(file,mode='lines',threshold=False,
       ['amd64_core','amd64_core','amd64_sock','lnet','lnet',
        'ib_sw','ib_sw','cpu'],
       'intel' : ['intel_pmc3', 'intel_pmc3', 'intel_pmc3', 
-                 'lnet', 'lnet', 'ib_sw','ib_sw','cpu']
+                 'lnet', 'lnet', 'ib_sw','ib_sw','cpu'],
+      'intel_snb' : ['intel_snb', 'intel_snb', 'intel_snb', 
+                     'lnet', 'lnet', 'ib_sw','ib_sw','cpu'],
       }
   
   k2={'amd64':
       ['SSE_FLOPS','DCSF','DRAM','rx_bytes','tx_bytes',
        'rx_bytes','tx_bytes','user'],
       'intel' : ['PMC3', 'PMC2', 'FIXED_CTR0',
-                 'rx_bytes','tx_bytes', 'rx_bytes','tx_bytes','user']
+                 'rx_bytes','tx_bytes', 'rx_bytes','tx_bytes','user'],
+      'intel_snb' : ['STALLS', 'CLOCKS_UNHALTED_CORE', 'LOAD_L1D_ALL',
+                     'rx_bytes','tx_bytes', 'rx_bytes','tx_bytes','user'],
       }
 
   try:

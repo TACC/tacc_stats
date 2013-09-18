@@ -5,8 +5,13 @@ sys.path.append('../../monitor')
 import datetime, glob, job_stats, os, subprocess, time
 import itertools, argparse, functools, multiprocessing
 import matplotlib
+# Set the matplotlib output mode from config if it exists
 if not 'matplotlib.pyplot' in sys.modules:
-  matplotlib.use('pdf')
+  try:
+    matplotlib.use(matplotlib_output_mode)
+  except NameError:
+    matplotlib.use('pdf')
+
 import matplotlib.pyplot as plt
 import numpy
 import math
@@ -81,8 +86,11 @@ def main():
   
   filelist=tspl_utils.getfilelist(n.filearg)
 
-  k1=['amd64_sock']
-  k2=['DRAM']
+  # Hash value must be a list
+  k1={'amd64' : ['amd64_sock'],
+      'intel_snb': ['intel_snb']}
+  k2={'amd64' : ['DRAM'],
+      'intel_snb': ['LOAD_L1D_ALL']}
 
   pool   = multiprocessing.Pool(processes=n.p[0])
   m      = multiprocessing.Manager()

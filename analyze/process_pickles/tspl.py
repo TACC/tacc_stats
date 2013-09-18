@@ -30,30 +30,48 @@ class TSPLBase:
     try:
       self.owner=self.j.acct['owner']
     except KeyError:
-      self.owner=self.j.acct['uid']
+      try:
+        import pwd
+        self.owner=pwd.getpwuid(int(self.j.acct['uid']))[0]
+      except Exception as e:
+        self.owner=self.j.acct['uid']
       
     self.numhosts=len(self.j.hosts.keys())
 
     if self.numhosts == 0:
       raise TSPLException('No hosts')
-    elif 'amd64_core' in self.j.hosts.values()[0].stats:
-      self.pmc_type='amd64'
-    elif 'intel_pmc3' in self.j.hosts.values()[0].stats:
-      self.pmc_type='intel'
-    elif 'intel_snb' in self.j.hosts.values()[0].stats:
-      self.pmc_type='intel_snb'
 
-    if isinstance(k1,dict) and self.pmc_type in k1:
-      self.k1=k1[self.pmc_type]
-      self.k2=k2[self.pmc_type]
-    else:
+    if isinstance(k1,dict) and isinstance(k2,dict):
+      if 'amd64_core' in self.j.hosts.values()[0].stats:
+        self.pmc_type='amd64'
+      elif 'intel_pmc3' in self.j.hosts.values()[0].stats:
+        self.pmc_type='intel'
+      elif 'intel_snb' in self.j.hosts.values()[0].stats:
+        self.pmc_type='intel_snb'
+        
+      if self.pmc_type in k1:
+        self.k1=k1[self.pmc_type]
+        self.k2=k2[self.pmc_type]
+      else:
+        raise TSPLException(self.pmc_type+
+                            ' not supported for job'+str(self.j.id))
+      
+      
+      if not self.k1[0] in self.j.schemas:
+        raise TSPLException(self.k1[0]+' not supported for job '+str(self.j.id))
+
+    elif isinstance(k1,list) and isinstance(k2,list):
       self.k1=k1
       self.k2=k2
+      
+      if not self.k1[0] in self.j.schemas:
+        raise TSPLException(self.k1[0]+' not supported for job '+str(self.j.id))
+      
+    else:
+      raise TSPLException('Input types must match and be lists or dicts: ' +
+                          str(type(k1)) + ' ' + str(type(k2)))
 
-    if self.j.get_schema(self.k1[0]) is None:
-      raise TSPLException(self.k1[0]+' not supported for job '+str(self.j.id))
-      
-      
+
     self.t=(self.j.times-self.j.times[0])
 
     if len(k1) != len(k2):
@@ -76,15 +94,25 @@ class TSPLBase:
     # Create an array of dictionaries of lists initialized and constructed using
     # derived class methods for the keys of interest.
     # self.index embedds the location of self.k2 in the sechma
-    self.data=[]
-    for i in range(len(self.k1)):
-      self.data.append({})
-      for k in self.j.hosts.keys():
-        h=self.j.hosts[k]
-        self.data[i][k]=self.data_init()
-        for s in h.stats[self.k1[i]].values():
-          self.data_assign(self.data[i][k],s[:,self.index[i]])
-
+    try:
+      self.data=[]
+      for i in range(len(self.k1)):
+        self.data.append({})
+        for k in self.j.hosts.keys():
+          h=self.j.hosts[k]
+          self.data[i][k]=self.data_init()
+          try:
+            for s in h.stats[self.k1[i]].values():
+              self.data_assign(self.data[i][k],s[:,self.index[i]])
+          except KeyError:
+            continue
+            
+    except Exception as e:
+      import sys
+      exc_type, exc_obj, exc_tb = sys.exc_info()
+      fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
+      print(exc_type, fname, exc_tb.tb_lineno)
+      
   # Initialize to an empty array and accumulate with appending
   def data_init(self):
     return []
