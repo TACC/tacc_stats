@@ -24,7 +24,6 @@ cpu_event_map = {
     'FIXED0'                   : 'INSTRUCTIONS_RETIRED,E',
     'FIXED1'                   : 'CLOCKS_UNHALTED_CORE,E',
     'FIXED2'                   : 'CLOCKS_UNHALTED_REF,E',
-    0                          : 'NA'
 }
 # CBo events
 def CBOX_PERF_EVENT(event, umask):
@@ -34,7 +33,6 @@ cbo_event_map = {
     CBOX_PERF_EVENT(0x11, 0x01) : 'RxR_OCCUPANCY,E',
     CBOX_PERF_EVENT(0x1F, 0x00) : 'COUNTER0_OCCUPANCY,E',
     CBOX_PERF_EVENT(0x34, 0x03) : 'LLC_LOOKUP,E',
-    0                           : 'NA'
     }
 # Home Agent Unit events
 def HAU_PERF_EVENT(event, umask):
@@ -44,7 +42,6 @@ hau_event_map = {
     HAU_PERF_EVENT(0x01, 0x0C) : 'WRITE_REQUESTS,E',
     HAU_PERF_EVENT(0x00, 0x00) : 'CLOCKTICKS,E',
     HAU_PERF_EVENT(0x1A, 0x0F) : 'IMC_WRITES,E',
-    0                          : 'NA'
     }
 #iMC events
 def IMC_PERF_EVENT(event, umask):
@@ -55,7 +52,6 @@ imc_event_map = {
     IMC_PERF_EVENT(0x01, 0x00) : 'ACT_COUNT,E',
     IMC_PERF_EVENT(0x02, 0x03) : 'PRE_COUNT_ALL,E',              
     'FIXED0'                   : 'CYCLES,E',
-    0                          : 'NA'
     }
 #Power Control Unit events
 def PCU_PERF_EVENT(event):
@@ -69,7 +65,6 @@ pcu_event_map = {
     PCU_PERF_EVENT(0x82) : 'MIN_SNOOP_CYCLES,E',              
     'FIXED0'             : 'C3_CYCLES,E',
     'FIXED1'             : 'C6_CYCLES,E',
-    0                    : 'NA'
     }
 #QPI Unit events
 def QPI_PERF_EVENT(event, umask):
@@ -79,7 +74,6 @@ qpi_event_map = {
     QPI_PERF_EVENT(0x00, 0x04) : 'G0_NON_DATA,E',
     QPI_PERF_EVENT(0x02, 0x08) : 'G1_DRS_DATA,E',
     QPI_PERF_EVENT(0x03, 0x04) : 'G2_NCB_DATA,E',              
-    0                          : 'NA'
     }
 #R2PCI Unit events
 def R2PCI_PERF_EVENT(event, umask):
@@ -90,7 +84,6 @@ r2pci_event_map = {
     R2PCI_PERF_EVENT(0x07, 0x0F) : 'ADDRESS_USED,E',
     R2PCI_PERF_EVENT(0x08, 0x0F) : 'ACKNOWLEDGED_USED,E',              
     R2PCI_PERF_EVENT(0x09, 0x0F) : 'DATA_USED,E',              
-    0                            : 'NA'
     }
 
 class reformat_counters:
@@ -117,7 +110,7 @@ class reformat_counters:
         dev_schema = []
         for dev, array in stats.iteritems():
             for j in self.ctl_registers:
-                dev_schema.append(event_map[array[0,j]])
+                dev_schema.append(event_map.get(array[0,j],'NA'))
             break
 
 
