@@ -24,6 +24,39 @@ int stats_type_init(struct stats_type *st)
 {
   TRACE("type %s, schema_def `%s'\n", st->st_name, st->st_schema_def);
 
+  // enable/disable performance counters
+  if ( ( strcmp(st->st_name,"amd64_pmc") == 0 ) ||
+       ( strcmp(st->st_name,"intel_pmc3") == 0 ) ||
+       ( strcmp(st->st_name,"intel_uncore") == 0 ) ) { 
+
+    // determine if running on intel or amd
+    char line[256];
+    FILE *cpuinfo;
+    cpuinfo = fopen("/proc/cpuinfo", "r");
+    char * is_intel = 0;
+    if ( cpuinfo != NULL ) {
+
+      while( fgets( line, sizeof line, cpuinfo) != NULL ) { 
+        is_intel = strstr( line, "GenuineIntel" );
+        if (is_intel) break;  // intel
+      }   
+      fclose(cpuinfo);
+    
+      // set correct performance counters based on architecture
+      if ( is_intel && ( strcmp(st->st_name,"amd64_pmc") == 0 ) ) 
+        return -1; // found intel so turn off amd pmc
+      if ( (!is_intel) && ( ( strcmp(st->st_name,"intel_pmc3") == 0 ) ||  
+                            ( strcmp(st->st_name,"intel_uncore") == 0 ) ) ) 
+        return -1; // found amd so turn off intel pmc
+
+    } else {
+
+      TRACE("Could not open /proc/cpuinfo to determine intel or amd\n");
+
+    }
+
+  }
+
   if (schema_init(&st->st_schema, st->st_schema_def) < 0)
     return -1;
 
