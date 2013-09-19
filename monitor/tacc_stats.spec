@@ -13,8 +13,6 @@ BuildRoot: %{_tmppath}/%{name}-%{version}-%{release}-root
 %define crontab_file /etc/cron.d/%{name}
 %define stats_dir /var/log/tacc_stats
 %define archive_dir /scratch/projects/%{name}/archive
-%define intel ib_intel
-%define amd ib_amd
 
 %description
 
@@ -27,41 +25,17 @@ to trigger collection and archiving.
 
 %build
 
-# Build both intel and amd, symlink to correct one in %post
 make clean
-cp -f config.%{intel} config
-make config=config NCPUS=64 name=%{name} version=%{version} -j 4
-mv -f %{name} %{name}.%{intel}
-mv -f schema-%{version}-config schema-%{version}-config-%{intel}
-make clean
-cp -f config.%{amd} config
 make config=config NCPUS=32 name=%{name} version=%{version} -j 4
-mv -f %{name} %{name}.%{amd}
-mv -f schema-%{version}-config schema-%{version}-config-%{amd}
 
 %install
 
 rm -rf %{buildroot}
 install -m 0755 -d %{buildroot}/%{_bindir}
-install -m 6755 %{name}.%{intel} %{buildroot}/%{_bindir}/%{name}.%{intel}
-install -m 6755 %{name}.%{amd} %{buildroot}/%{_bindir}/%{name}.%{amd}
+install -m 6755 %{name} %{buildroot}/%{_bindir}/%{name}
 install -m 0755 archive.sh %{buildroot}/%{_bindir}/%{name}_archive
 
 %post
-
-# Symlink to correct tacc_stats bin based on arch
-cpuvendor=$(awk '/^vendor_id/{print $3; exit}' /proc/cpuinfo)
-case ${cpuvendor} in
-  "GenuineIntel")
-    ln -sf %{_bindir}/%{name}.%{intel} %{_bindir}/%{name}
-    ;;
-  "AuthenticAMD")
-    ln -sf %{_bindir}/%{name}.%{amd} %{_bindir}/%{name}
-    ;;
-  *)
-    # Unsupported CPU
-    ;;
-esac
 
 (
   archive_min=$(( ((RANDOM * 60) / 32768) %% 60 ))
@@ -80,7 +54,6 @@ esac
 %preun
 
 if [ $1 == 0 ]; then
-  rm -f %{_bindir}/%{name}
   rm %{crontab_file} || :
 fi
 
@@ -92,6 +65,5 @@ rm -rf %{buildroot}
 
 %defattr(-,root,root,-)
 %dir %{_bindir}/
-%attr(6755,root,root) %{_bindir}/%{name}.%{intel}
-%attr(6755,root,root) %{_bindir}/%{name}.%{amd}
+%attr(6755,root,root) %{_bindir}/%{name}
 %attr(0755,root,root) %{_bindir}/%{name}_archive
