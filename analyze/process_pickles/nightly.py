@@ -21,8 +21,12 @@ def do_mp(arg):
 
 def do_un(arg):
   file,output_dir=arg
+  k1={'amd64' : ['amd64_core','cpu'],
+      'intel_snb' : [ 'intel_snb', 'cpu'],}
+  k2={'amd64' : ['SSE_FLOPS', 'user'],
+      'intel_snb' : ['LOAD_L1D_ALL','user'],}
   try:
-    ts=tspl.TSPLSum(file,['amd64_core','cpu'],['SSE_FLOPS','user'])
+    ts=tspl.TSPLSum(file,k1,k2)
   except tspl.TSPLException as e:
     return
   uncorrelated.plot_correlation(ts,uncorrelated.pearson(ts),'',output_dir)
@@ -45,9 +49,13 @@ def main():
   pool   = multiprocessing.Pool(processes=n.p[0])
   m      = multiprocessing.Manager()
   ratios = m.dict()
+  k1={'amd64' : ['amd64_core'],
+      'intel_snb' : [ 'intel_snb'],}
+  k2={'amd64' : ['DRAM'],
+      'intel_snb' : ['LOAD_L1D_ALL'],}
   partial_imbal=functools.partial(imbalance.compute_imbalance,
-                                  k1=['amd64_sock'],
-                                  k2=['DRAM'],
+                                  k1=k1,
+                                  k2=k2,
                                   threshold=float(n.threshold),
                                   plot_flag=False,full_flag=False,
                                   ratios=ratios)

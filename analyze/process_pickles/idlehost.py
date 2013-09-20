@@ -1,4 +1,7 @@
 #!/usr/bin/env python
+
+execfile('./analyze.conf') # configuration parameters are stored here
+
 import sys
 sys.path.append('../../monitor')
 import datetime, glob, job_stats, os, subprocess, time
@@ -14,8 +17,10 @@ def do_isidle(file,thresh,idleness):
   idleness[file]=isidle(file,thresh)
 
 def isidle(file,thresh):
-  k1=['amd64_core','amd64_sock','cpu']
-  k2=['SSE_FLOPS', 'DRAM',      'user']
+  k1={'amd64' : ['amd64_core','amd64_sock','cpu'],
+      'intel_snb' : [ 'intel_snb', 'intel_snb', 'cpu'],}
+  k2={'amd64' : ['SSE_FLOPS', 'DRAM',      'user'],
+      'intel_snb' : ['SIMD_D_256','LOAD_L1D_ALL','user'],}
   try:
     ts=tspl.TSPLSum(file,k1,k2)
   except tspl.TSPLException as e:

@@ -1,6 +1,6 @@
 import cPickle as pickle
 import numpy
-import glob, os, stat, time, datetime
+import glob, os, stat, time, datetime, sys
 import re
 
 class TSPLException(Exception):
@@ -77,8 +77,17 @@ class TSPLBase:
     if len(k1) != len(k2):
       raise TSPLException('Lengths don\'t match')
 
-    self.index=[ self.j.get_schema(self.k1[i])[self.k2[i]].index
-                 for i in range(len(self.k1))]
+    self.index=[]
+
+    for i in range(len(self.k1)):
+      if self.k1[i] in self.j.schemas and \
+      self.k2[i] in self.j.schemas[self.k1[i]]:
+        self.index +=  [self.j.get_schema(self.k1[i])[self.k2[i]].index]
+      else:
+        self.index += [-1]
+
+###    self.index=[ self.j.get_schema(self.k1[i])[self.k2[i]].index
+###                 for i in range(len(self.k1))]
 
     g=self.j.hosts[self.j.hosts.keys()[0]]
     self.size=len(g.stats[self.k1[0]].values()[0])
@@ -128,15 +137,17 @@ class TSPLBase:
       u='M'
 
     l=k1 + ' ' + k2
-    s=self.j.get_schema(k1)[k2]
-    if not s.unit is None:
-      l+=' ' + u + s.unit
-
-    if len(l) > 10:
-      l=k1 + '\n' + k2
+    if k2 in self.j.get_schema(k1):
       s=self.j.get_schema(k1)[k2]
       if not s.unit is None:
         l+=' ' + u + s.unit
+
+    if len(l) > 10:
+      l=k1 + '\n' + k2
+      if k2 in self.j.get_schema(k1):
+        s=self.j.get_schema(k1)[k2]
+        if not s.unit is None:
+          l+=' ' + u + s.unit
       
     return l
       

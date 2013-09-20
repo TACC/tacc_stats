@@ -116,7 +116,7 @@ def master_plot(file,mode='lines',threshold=False,
        'ib_sw','ib_sw','cpu'],
       'intel' : ['intel_pmc3', 'intel_pmc3', 'intel_pmc3', 
                  'lnet', 'lnet', 'ib_sw','ib_sw','cpu'],
-      'intel_snb' : ['intel_snb', 'intel_snb', 'intel_snb', 
+      'intel_snb' : ['intel_snb_imc', 'intel_snb_imc', 'intel_snb', 
                      'lnet', 'lnet', 'ib_sw','ib_sw','cpu'],
       }
   
@@ -125,7 +125,7 @@ def master_plot(file,mode='lines',threshold=False,
        'rx_bytes','tx_bytes','user'],
       'intel' : ['PMC3', 'PMC2', 'FIXED_CTR0',
                  'rx_bytes','tx_bytes', 'rx_bytes','tx_bytes','user'],
-      'intel_snb' : ['STALLS', 'CLOCKS_UNHALTED_CORE', 'LOAD_L1D_ALL',
+      'intel_snb' : ['CAS_READS', 'CAS_WRITES', 'LOAD_L1D_ALL',
                      'rx_bytes','tx_bytes', 'rx_bytes','tx_bytes','user'],
       }
 
@@ -148,13 +148,13 @@ def master_plot(file,mode='lines',threshold=False,
   else:
     plot=plot_lines
   
-  # Plot SSE FLOPS
-  plot(ax[0],ts,[0],3600.)
+  # Plot key 1
+  plot(ax[0],ts,[0,-1],3600.,1e9)
     
-  # Plot DCSF rate
+  # Plot key 2
   plot(ax[1],ts,[1],3600.,1e9)
 
-  #Plot DRAM rate
+  #Plot key 3
   plot(ax[2],ts,[2],3600.,1e9)
   
   # Plot lnet sum rate

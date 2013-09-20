@@ -1,4 +1,6 @@
 #!/usr/bin/env python
+execfile('./analyze.conf') # configuration parameters are stored here
+
 import sys
 sys.path.append('../../monitor')
 import datetime, glob, job_stats, os, subprocess, time
@@ -21,9 +23,13 @@ def do_floppy(file,thresh,floppy):
   floppy[file]=is_unfloppy(file,thresh)
 
 def is_unfloppy(file,thresh):
-  k1=['amd64_core','amd64_sock','cpu']
-  k2=['SSE_FLOPS', 'DRAM',      'user']
-  peak=[ 2.3e9*16*2, 24e9, 1.]
+  k1={'amd64' : ['amd64_core','amd64_sock','cpu'],
+      'intel_snb' : [ 'intel_snb', 'intel_snb', 'cpu'],}
+  k2={'amd64' : ['SSE_FLOPS', 'DRAM',      'user'],
+      'intel_snb' : ['SIMD_D_256','LOAD_L1D_ALL','user'],}
+
+  peak={'amd64' : [2.3e9*16*2, 24e9, 1.],
+        'intel_snb' : [ 16*2.7e9*2, 16*8e9, 1.],}
   
   try:
     ts=tspl.TSPLSum(file,k1,k2)
@@ -50,8 +56,8 @@ def is_unfloppy(file,thresh):
 
   #print [ts.j.id,mfr/peak[0],mdr/peak[1],mcr/peak[2]]
 
-  if ( (mcr/peak[2] > 0.5 ) and
-       (mfr/peak[0])/(mdr/peak[1]) < thresh ):
+  if ( (mcr/peak[ts.pmc_type][2] > 0.5 ) and
+       (mfr/peak[ts.pmc_type][0])/(mdr/peak[ts.pmc_type][1]) < thresh ):
     return True
   else:
     return False
