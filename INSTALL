@@ -1,9 +1,75 @@
-# Instructions
-# Install Steps:
-#1) modify do-configure.sh for system/directory structure
-#2) mkdir build
-#3) cd build
-#4) ../do-configure
-#5) make install
+Build Instructions for tacc_stats 1.0.5
+---------------------------------------
+* NOTE This has been tested using GCC 4.4.7 only *
+* NOTE This code is applicable to Linux only *
 
-# All executables are placed in the bin directory
+### Quickstart
+Type these commands from the top of the tacc_stats
+source directory to quickly build and install.  The
+executables will be placed in bin/.
+
+$ mkdir build
+$ cd build
+$ ../do_configure.sh
+$ make install
+
+### Detailed Install
+
+# Outline
+1) Introduction
+2) Configure
+3) Build
+
+# 1) Introduction
+tacc_stats has two components.  The first component is a light-weight C 
+code initially called to configure Performance Monitoring Counter registers 
+for specific events before a job is begun.  As the job is running the code is 
+repeatedly called to collect the counter registers values at regular time 
+intervals (specified for example in a cron_tab file).  This counter data is 
+stored in "raw stats" files.  The second component is based on Python and 
+performed off line.  The Python codes processes the raw stats files into 
+python dictionaries meant to ease analysis of the stats data.
+
+The build system is based on CMake.  It configures the C and Python
+routines for a particular computing platform.  The configure process 
+specifies both desired directories to store and read tacc_stats
+generated data from, and a list of device types from which to monitor.
+
+# 2) Configure
+All configuring should be specified in the do_configure.sh 
+script. The meaning of every field is specified in this script.
+
+The first part of the script specifies paths to locations where
+tacc_stats data is read and stored from.  These will be system
+specific.  The location of the python version to use, host name, and
+batch system should also be specified here.
+
+The second part of the script specifies which devices to monitor by 
+building up a list labeled TYPES.  TYPES that are commented out will
+be ignored.  If the system is missing any TYPES under the Chip types
+section, that type will automatically be skipped during the monitoring.
+
+After this paths and types are specified one make a directory to build
+the code.  This directory should be made in the top-level source
+directory.  From this directory do_configure.sh should then be called, e.g.
+
+$mkdir build
+$cd build
+$../do_configure.sh
+
+At this point the necessary files will be configured for the system.
+
+# 3) Build
+From with the build directory type make install.  This will compile
+tacc_stats, then place tacc_stats and all useful scripts into the 
+bin/ directory in the top level source directory.  The python
+modules which support the executable scripts will be placed in the
+include/ directory in the top level source directory.
+
+The executables typically used are tacc_stats, job_pickles.py, and 
+do_job_pickles_cron.sh.  tacc_stats is typically invoked in the
+prologue of the batch system and cron_tab file on each node.
+do_job_pickles.sh is typically invoked from a cron_tab file and pickles
+jobs over the previous 24 hr period, storing the pickled data into
+the pickles_dir specified in do_configure.sh.   
+

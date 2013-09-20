@@ -13,54 +13,113 @@
 #include "trace.h"
 #include "cpu_is_snb.h"
 
-// Sandy Bridge microarchitectures have signatures 06_2a and 06_2d with non-architectural events
-// listed in Table 19-7, 19-8, and 19-9.  19-8 is 06_2a specific, 19-9 is 06_2d specific.  Stampede
-// is 06_2d but no 06_2d specific events are used here.
+/*! \brief Routines to configure and monitor Intel Sandy Bridge
 
-// $ ls -l /dev/cpu/0
-// total 0
-// crw-------  1 root root 203, 0 Oct 28 18:47 cpuid
-// crw-------  1 root root 202, 0 Oct 28 18:47 msr
+  Details such as Tables and Figures can be found in: 
+  "Intel® 64 and IA-32 Architectures Software Developer’s Manual
+  Volume 3B: System Programming Guide, Part 2".
 
-/* Info about this stuff can be found in 
-Intel® 64 and IA-32 Architectures Software Developer’s Manual
-Volume 3B: System Programming Guide, Part 2
+  Sandy Bridge microarchitectures have signatures 06_2a and 06_2d. 
+  Stampede is 06_2d.
+
+  Non-architectural events are listed in Table 19-7, 19-8, and 19-9.  
+  Table 19-8 is 06_2a specific, Table 19-9 is 06_2d specific.  
+  No 06_2d specific events are currently monitored.
+*/
+
+/*! \brief OS files to configure and read registers.
+
+  ex) Display cpuid and msr file for cpu 0:
+
+  $ ls -l /dev/cpu/0
+  total 0
+  crw-------  1 root root 203, 0 Oct 28 18:47 cpuid
+  crw-------  1 root root 202, 0 Oct 28 18:47 msr
+*/
+
+/*! \brief MSR addresses of registers
+
+  IA32_PMCx MSRs start at address 0C1H and occupy a contiguous block of MSR
+  address space; the number of MSRs per logical processor is reported using
+  CPUID.0AH:EAX[15:8].  
+
+  Sandy Bridge has 8 MSRs per logical processor.
+
+  IA32_PERFEVTSELx MSRs start at address 186H and occupy a contiguous block
+  of MSR address space. Each performance event select register is paired with a
+  corresponding performance counter in the 0C1H address block.
+*/
+
+/*! Configurable Counters
+
+  Layout shown in Fig 18-6.  Described on Pg 18-3.
+
+  [0, 7] Event Select       : Choose Event
+  [8, 15] Unit Mask (UMASK) : Choose Subevent
+  16 USR                    : Count when in user mode
+  17 OS                     : Count when in root mode
+  18 E Edge_detect          : Can measure time spent in state
+  19 PC Pin control         : Ovrflow control
+  20 INT APIC               : Ovrflow control
+  21 ANY                    : Counts events from any thread on core 
+  22 EN                     : Enables counters
+  23 INV                    : Inverts Counter Mask 
+  [24, 31] Counter Mask     : Counts in a cycle must exceed CMASK if set
+  [32, 63] Reserved
  */
+#define IA32_CTL0 0x186
+#define IA32_CTL1 0x187
+#define IA32_CTL2 0x188
+#define IA32_CTL3 0x189
+#define IA32_CTL4 0x18A
+#define IA32_CTL5 0x18B
+#define IA32_CTL6 0x18C
+#define IA32_CTL7 0x18D
 
-// IA32_PMCx MSRs start at address 0C1H and occupy a contiguous block of MSR
-// address space; the number of MSRs per logical processor is reported using
-// CPUID.0AH:EAX[15:8].
+#define IA32_CTR0 0xC1
+#define IA32_CTR1 0xC2
+#define IA32_CTR2 0xC3
+#define IA32_CTR3 0xC4
+#define IA32_CTR4 0xC5
+#define IA32_CTR5 0xC6
+#define IA32_CTR6 0xC7
+#define IA32_CTR7 0xC8
 
-// IA32_PERFEVTSELx MSRs start at address 186H and occupy a contiguous block
-// of MSR address space. Each performance event select register is paired with a
-// corresponding performance counter in the 0C1H address block.
+/*! \brief Fixed Counters
 
-#define IA32_CTR0 0xC1 /* CPUID.0AH: EAX[15:8] > 0 */
-#define IA32_CTR1 0xC2 /* CPUID.0AH: EAX[15:8] > 1 */
-#define IA32_CTR2 0xC3 /* CPUID.0AH: EAX[15:8] > 2 */
-#define IA32_CTR3 0xC4 /* CPUID.0AH: EAX[15:8] > 3 */
-#define IA32_CTR4 0xC5 /* CPUID.0AH: EAX[15:8] = 8 */
-#define IA32_CTR5 0xC6 /* CPUID.0AH: EAX[15:8] = 8 */
-#define IA32_CTR6 0xC7 /* CPUID.0AH: EAX[15:8] = 8 */
-#define IA32_CTR7 0xC8 /* CPUID.0AH: EAX[15:8] = 8 */
+  These counters always count the same events.  Fig 18-7 describes
+  how to enable these registers.  Events are described on page 18-10.
 
-#define IA32_CTL0 0x186 /* CPUID.0AH: EAX[15:8] > 0 */
-#define IA32_CTL1 0x187 /* CPUID.0AH: EAX[15:8] > 1 */
-#define IA32_CTL2 0x188 /* CPUID.0AH: EAX[15:8] > 2 */
-#define IA32_CTL3 0x189 /* CPUID.0AH: EAX[15:8] > 3 */
-#define IA32_CTL4 0x18A /* CPUID.0AH: EAX[15:8] = 8 */
-#define IA32_CTL5 0x18B /* CPUID.0AH: EAX[15:8] = 8 */
-#define IA32_CTL6 0x18C /* CPUID.0AH: EAX[15:8] = 8 */
-#define IA32_CTL7 0x18D /* CPUID.0AH: EAX[15:8] = 8 */
+  Events counted are:
+  CTR0 Instructions Retired
+  CTR1 Core Clock Cycles
+  CTR2 Reference Clock Cycles
+ */
+#define IA32_FIXED_CTR_CTRL       0x38D
+#define IA32_FIXED_CTR0           0x309
+#define IA32_FIXED_CTR1           0x30A
+#define IA32_FIXED_CTR2           0x30B
 
-#define IA32_FIXED_CTR0           0x309 /* Instr_Retired.Any, CPUID.0AH: EDX[4:0] > 0 */
-#define IA32_FIXED_CTR1           0x30A /* CPU_CLK_Unhalted.Core, CPUID.0AH: EDX[4:0] > 1 */
-#define IA32_FIXED_CTR2           0x30B /* CPU_CLK_Unhalted.Ref, CPUID.0AH: EDX[4:0] > 2 */
-#define IA32_FIXED_CTR_CTRL       0x38D /* CPUID.0AH: EAX[7:0] > 1 Fig 18-7 */
-#define IA32_PERF_GLOBAL_STATUS   0x38E /* Indicates counter ovf Fig 18-9 */
-#define IA32_PERF_GLOBAL_CTRL     0x38F /* Enables counters Fig 18-8 */
-#define IA32_PERF_GLOBAL_OVF_CTRL 0x390 /* Controls counter ovf Fig 18-9 */
+/*! Global Control Registers
+  
+  Layout in Fig 18-8 and 18-9.  
+  GLOBAL_CTRL enables all fixed and configurable counters  
+  GLOBAL_STATUS indicates overflow 
+  GLOBAL_OVF_CTRL clears overflow indicators in GLOBAL_STATUS.
+ */
+#define IA32_PERF_GLOBAL_STATUS   0x38E
+#define IA32_PERF_GLOBAL_CTRL     0x38F
+#define IA32_PERF_GLOBAL_OVF_CTRL 0x390
 
+/*! \brief KEYS will define the raw schema for this type
+
+  The required order of registers is:
+  1) Control registers in order
+  2) Counter registers in order
+  3) Fixed registers in order
+
+  All registers are 48 bits wide.
+ */
 #define KEYS \
     X(CTL0, "C", ""), \
     X(CTL1, "C", ""), \
@@ -82,34 +141,24 @@ Volume 3B: System Programming Guide, Part 2
     X(FIXED_CTR1, "E,W=48", ""), \
     X(FIXED_CTR2, "E,W=48", "")
 
+/*! \brief Event select 
 
-/* Fig 18-6 */
-// IA32_PERFEVTSELx MSR layout
-//   [0, 7] Event Select
-//   [8, 15] Unit Mask (UMASK)
-//   16 USR
-//   17 OS
-//   18 E Edge_detect
-//   19 PC Pin control
-//   20 INT APIC interrupt enable
-//   21 ANY Any thread (version 3)
-//   22 EN Enable counters
-//   23 INV Invert counter mask
-//   [24, 31] Counter Mask (CMASK)
-//   [32, 63] Reserved
+  Non-architectural events are listed and defined in 
+  Table 19-7, 19-8, and 19-9.  Table 19-8 is 06_2a specific, 
+  Table 19-9 is 06_2d specific.  
 
+  To change events to count:
+  1) Define event below
+  2) Modify events array in intel_snb_begin()
+*/
 #define PERF_EVENT(event, umask) \
   ( (event) \
   | (umask << 8) \
-  | (1ULL << 16) /* Count in user mode (CPL == 0). */ \
-  | (1ULL << 17) /* Count in OS mode (CPL > 0). */ \
-  | (1ULL << 21) /* Any thread. */ \
-  | (1ULL << 22) /* Enable. */ \
+  | (1ULL << 16) \
+  | (1ULL << 17) \
+  | (1ULL << 21) \
+  | (1ULL << 22) \
   )
-
-/* Non-architectural Perfomance Events */
-/* From Table 19-7 Sandy Bridge Microarchitecture 06_2A and 06_2D */
-/* Stampede has 06_2D and can also use Table 19-9 */
 
 #define DTLB_LOAD_MISSES_WALK_CYCLES   PERF_EVENT(0x08, 0x04)
 #define FP_COMP_OPS_EXE_SSE_FP_PACKED  PERF_EVENT(0x10, 0x10)
@@ -118,13 +167,14 @@ Volume 3B: System Programming Guide, Part 2
 #define SIMD_FP_256_PACKED_DOUBLE      PERF_EVENT(0x11, 0x02)
 #define L1D_REPLACEMENT                PERF_EVENT(0x51, 0x01) 
 #define RESOURCE_STALLS_ANY            PERF_EVENT(0xA2, 0x01) 
-#define MEM_UOPS_RETIRED_ALL_LOADS     PERF_EVENT(0xD0, 0x81) /* PMC0-3 only */
-#define MEM_LOAD_UOPS_RETIRED_L1_HIT   PERF_EVENT(0xD1, 0x01) /* PMC0-3 only */
-#define MEM_LOAD_UOPS_RETIRED_L2_HIT   PERF_EVENT(0xD1, 0x02) /* PMC0-3 only */
-#define MEM_LOAD_UOPS_RETIRED_LLC_HIT  PERF_EVENT(0xD1, 0x04) /* PMC0-3 only */
-#define MEM_LOAD_UOPS_RETIRED_LLC_MISS PERF_EVENT(0xD1, 0x20) /* PMC0-3 only */
-#define MEM_LOAD_UOPS_RETIRED_HIT_LFB  PERF_EVENT(0xD1, 0x40) /* PMC0-3 only */
+#define MEM_UOPS_RETIRED_ALL_LOADS     PERF_EVENT(0xD0, 0x81) // CTR0-3
+#define MEM_LOAD_UOPS_RETIRED_L1_HIT   PERF_EVENT(0xD1, 0x01) // CTR0-3
+#define MEM_LOAD_UOPS_RETIRED_L2_HIT   PERF_EVENT(0xD1, 0x02) // CTR0-3
+#define MEM_LOAD_UOPS_RETIRED_LLC_HIT  PERF_EVENT(0xD1, 0x04) // CTR0-3
+#define MEM_LOAD_UOPS_RETIRED_LLC_MISS PERF_EVENT(0xD1, 0x20) // CTR0-3
+#define MEM_LOAD_UOPS_RETIRED_HIT_LFB  PERF_EVENT(0xD1, 0x40) // CTR0-3
 
+//! Configure and start counters for a cpu
 static int intel_snb_begin_cpu(char *cpu, uint64_t *events, size_t nr_events)
 {
   int rc = -1;
@@ -200,6 +250,7 @@ static int intel_snb_begin_cpu(char *cpu, uint64_t *events, size_t nr_events)
   return rc;
 }
 
+//! Configure and start counters
 static int intel_snb_begin(struct stats_type *type)
 {
   int nr = 0;
@@ -222,12 +273,13 @@ static int intel_snb_begin(struct stats_type *type)
 
     if (cpu_is_sandybridge(cpu))
       if (intel_snb_begin_cpu(cpu, events, 8) == 0)
-	nr++; /* HARD */
+	nr++;
   }
 
   return nr > 0 ? 0 : -1;
 }
 
+//! Collect values in counters for cpu
 static void intel_snb_collect_cpu(struct stats_type *type, char *cpu)
 {
   struct stats *stats = NULL;
@@ -263,6 +315,7 @@ static void intel_snb_collect_cpu(struct stats_type *type, char *cpu)
     close(msr_fd);
 }
 
+//! Collect values in counters
 static void intel_snb_collect(struct stats_type *type)
 {
   int i;
@@ -275,6 +328,7 @@ static void intel_snb_collect(struct stats_type *type)
   }
 }
 
+//! Definition of stats for this type
 struct stats_type intel_snb_stats_type = {
   .st_name = "intel_snb",
   .st_begin = &intel_snb_begin,

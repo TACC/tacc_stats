@@ -1,14 +1,15 @@
-tacc_stats
+tacc_stats 
 ==========
 
 A job-oriented system monitor, analyzation, and visualization tool.
 
-
 Authors
 -------
 
-John Hammond (jhammond@tacc.utexas.edu) - system monitors
-Andy R. Terrel (aterrel@tacc.utexas.edu) - analysis and visualization
+John Hammond   (jhammond@tacc.utexas.edu) - system monitors
+Andy R. Terrel (aterrel@tacc.utexas.edu)  - analysis and visualization
+Todd Evans     (rtevans@tacc.utexas.edu)  - system monitors, data processing
+Bill Barth     (bbarth@tacc.utexas.edu)   - data processings, analysis and visualization 
 
 Copyright
 ---------
