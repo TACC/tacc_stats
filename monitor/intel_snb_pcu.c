@@ -1,3 +1,42 @@
+/*! 
+ \file intel_snb_pcu.c
+ \author Todd Evans 
+ \brief Performance Monitoring Counters for Intel Sandy Bridge Power Control Unit (PCU)
+
+
+  \par Details such as Tables and Figures can be found in:
+  "Intel® Xeon® Processor E5-2600 Product Family Uncore 
+  Performance Monitoring Guide" 
+  Reference Number: 327043-001 March 2012 \n
+  PCU monitoring is described in Section 2.6.
+
+  \note
+  Sandy Bridge microarchitectures have signatures 06_2a and 06_2d. 
+  Stampede is 06_2d.
+
+
+  \par Location of cpu info and monitoring register files:
+
+  ex) Display cpuid and msr file for cpu 0:
+
+      $ ls -l /dev/cpu/0
+      total 0
+      crw-------  1 root root 203, 0 Oct 28 18:47 cpuid
+      crw-------  1 root root 202, 0 Oct 28 18:47 msr
+
+
+   \par MSR address layout of registers:
+
+   Layout in Table 2-73.
+   There is 1 PCU per socket, and currently 2 sockets on Stampede.
+   There are 4 configurable and 2 fixed counter registers per PCU.  
+   These routines only collect data on core_id 0 on each socket.
+
+   There are 4 configure, 4 counter, 1 PCU global control, 
+   and 2 fixed counter registers per PCU.
+
+*/
+
 #include <stddef.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -14,41 +53,86 @@
 #include "pscanf.h"
 #include "cpu_is_snb.h"
 
-// Sandy Bridge microarchitectures have signatures 06_2a and 06_2d with non-architectural events
-// listed in Table 19-7, 19-8, and 19-9.  19-8 is 06_2a specific, 19-9 is 06_2d specific.  Stampede
-// is 06_2d but no 06_2d specific events are used here.
+/*! \name PCU global control register
 
-// $ ls -l /dev/cpu/0
-// total 0
-// crw-------  1 root root 203, 0 Oct 28 18:47 cpuid
-// crw-------  1 root root 202, 0 Oct 28 18:47 msr
+   Layout in Table 2-74.  This register controls every
+   non-fixed counter within a PCU.   It can freeze and reset 
+   a PCU's control and counter registers.
 
-// Uncore events are in this file.  Uncore events are found in the MSR and PCI config space.
-// C-Box, PCU, and U-box counters are all in the MSR file
-// This stuff is all in: 
-//Intel Xeon Processor E5-2600 Product Family Uncore Performance Monitoring Guide
+   \note
+   Documentation says they are 32 bit but only 64 bit
+   works.
+ */
+#define CTL 0xC24
 
-// Uncore MSR addresses
-// Power Control Unit (PCU) 
-/* Fixed Counters */
-#define FIXED_CTR0 0x3FC
-#define FIXED_CTR1 0x3FD
-/* Counter Config Registers */
+/*! \name PCU filter register
+
+  Layout in Table 2-77.  Can filter events by
+  Voltage/Frequency.
+  
+  ~~~
+  Band 3             [31:24]
+  Band 2             [23:16]
+  Band 1             [15:8]
+  Band 0             [7:9] 
+  ~~~
+
+ */
+#define FILTER 0xC34
+
+/*! \name PCU Performance Monitoring Registers
+  
+  Control register layout in 2-75.  These are used to select events.  There are
+  4 per socket.
+  ~~~
+  occ_edge_det      [31]
+  occ_invert        [30]
+  threshhold        [28:24]
+  invert threshold  [23]
+  enable            [22]
+  tid filter enable [19]
+  edge detect       [18]
+  clear counter     [17]
+  occ_sel           [15:14]
+  event select      [7:0]
+  ~~~
+
+  \note
+  Documentation says they are 32 bit but only 64 bit
+  works.
+
+  Counter register layout in 2-76.  These are 64 bit but counters
+  are only 48 bits wide.
+  @{
+*/
 #define CTL0 0xC30
 #define CTL1 0xC31
 #define CTL2 0xC32
 #define CTL3 0xC33
-/* Counter Filters */
-#define FILTER 0xC34
-/* Box Control */
-#define CTL 0xC24
-/* Counter Registers */
+
 #define CTR0 0xC36
 #define CTR1 0xC37
 #define CTR2 0xC38
 #define CTR3 0xC39
+//@}
 
-// Width of 48 for PCU 
+/*! \name Fixed registers
+
+  Layout in Table 2-78 and 2-79.
+  64 bits each.  Trace cycles in C6 or C3 state.
+  @{
+ */
+#define FIXED_CTR0 0x3FC
+#define FIXED_CTR1 0x3FD
+//@}
+
+/*! \brief KEYS will define the raw schema for this type. 
+  
+  The required order of registers is:
+  -# Control registers in order
+  -# Counter registers in order
+  -# Fixed registers in order
+*/
 #define KEYS \
     X(CTL0,"C",""),	\
     X(CTL1,"C",""),	\
@@ -61,14 +145,10 @@
     X(FIXED_CTR0,"E,W=48",""), \
     X(FIXED_CTR1,"E,W=48","")
 
-/* Defs in Table 2-77 */
-/* Event filters in PCU
-Band 3             [31:24]
-Band 2             [23:16]
-Band 1             [15:8]
-Band 0             [7:0]
-*/
-
+/*! \brief Filter 
+  
+  Can filter by frequency/voltage
+ */
 #define PCU_FILTER(...)	\
   ( (0x00ULL << 0) \
   | (0x00ULL << 8) \
@@ -76,40 +156,42 @@ Band 0             [7:0]
   | (0x00ULL << 24) \
   )
 
-/* Events in PCU
-occ_edge_det      [31]
-occ_invert        [30]
-threshhold        [28:24]
-invert threshold  [23]
-enable            [22]
-tid filter enable [19]
-edge detect       [18]
-clear counter     [17]
-occ_sel           [15:14]
-event select      [7:0]
+/*! \brief Event select
+  
+  Events are listed in Table 2-81.  They are defined in detail
+  in Section 2.6.7.
+  
+  To change events to count:
+  -# Define event below
+  -# Modify events array in intel_snb_cbo_begin()
 */
-
-/* Defs in Table 2-75 */
 #define PCU_PERF_EVENT(event)	\
   ( (event) \
-  | (0ULL << 14) /* Select which occupancy counter to use - C0: 01 C3: 10 C6: 11 */ \
-  | (0ULL << 17) /* Reset Counters. */ \
-  | (0ULL << 18) /* Edge Detection. */ \
-  | (1ULL << 22) /* Enable. */ \
-  | (0ULL << 23) /* Invert */ \
-  | (1ULL << 24) /* Threshold */ \
-  | (0ULL << 31) /* Enables edges foc occupancy */ \
+  | (0ULL << 14) \
+  | (0ULL << 17) \
+  | (0ULL << 18) \
+  | (1ULL << 22) \
+  | (0ULL << 23) \
+  | (1ULL << 24) \
+  | (0ULL << 31) \
   )
 
-/* Definitions in Table 2-14 */
-/* Advice in Table 2-80 */
+/*! \name Events
+
+  Events are listed in Table 2-81.  They are defined in detail
+  in Section 2.6.7.
+
+@{
+ */
 #define FREQ_MAX_OS_CYCLES      PCU_PERF_EVENT(0x06)
 #define FREQ_MAX_CURRENT_CYCLES PCU_PERF_EVENT(0x07)
 #define FREQ_MAX_TEMP_CYCLES    PCU_PERF_EVENT(0x04)
 #define FREQ_MAX_POWER_CYCLES   PCU_PERF_EVENT(0x05)
-#define FREQ_MIN_IO_CYCLES      PCU_PERF_EVENT(0x81) /* Extra select bit */
-#define FREQ_MIN_SNOOP_CYCLES   PCU_PERF_EVENT(0x82) /* Extra select bit */
+#define FREQ_MIN_IO_CYCLES      PCU_PERF_EVENT(0x81)
+#define FREQ_MIN_SNOOP_CYCLES   PCU_PERF_EVENT(0x82)
+//@}
 
+//! Configure and start counters for PCU
 static int intel_snb_pcu_begin_socket(char *cpu, uint64_t *events, size_t nr_events)
 {
   int rc = -1;
@@ -170,6 +252,7 @@ static int intel_snb_pcu_begin_socket(char *cpu, uint64_t *events, size_t nr_eve
   return rc;
 }
 
+//! Configure and start counters
 static int intel_snb_pcu_begin(struct stats_type *type)
 {
   int nr = 0;
@@ -208,6 +291,7 @@ static int intel_snb_pcu_begin(struct stats_type *type)
   return nr > 0 ? 0 : -1;
 }
 
+//! Collect values of counters for PCU
 static void intel_snb_pcu_collect_socket(struct stats_type *type, char *cpu, char* pcu)
 {
   struct stats *stats = NULL;
@@ -244,6 +328,7 @@ static void intel_snb_pcu_collect_socket(struct stats_type *type, char *cpu, cha
     close(msr_fd);
 }
 
+//! Collect values of counters
 static void intel_snb_pcu_collect(struct stats_type *type)
 {
   // CPUs 0 and 8 have core_id 0 on Stampede at least
@@ -288,6 +373,7 @@ static void intel_snb_pcu_collect(struct stats_type *type)
   }
 }
 
+//! Definition of stats for this type
 struct stats_type intel_snb_pcu_stats_type = {
   .st_name = "intel_snb_pcu",
   .st_begin = &intel_snb_pcu_begin,

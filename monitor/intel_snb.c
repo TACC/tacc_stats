@@ -1,3 +1,45 @@
+/*! 
+ \file intel_snb.c
+ \author Todd Evans 
+ \brief Performance Monitoring Counters for Intel Sandy Bridge Processors
+
+
+  \par Details such as Tables and Figures can be found in:
+  "Intel® 64 and IA-32 Architectures Software Developer’s Manual
+  Volume 3B: System Programming Guide, Part 2" 
+  Order Number: 253669-047US June 2013 \n
+
+  \note
+  Sandy Bridge microarchitectures have signatures 06_2a and 06_2d. 
+  Stampede is 06_2d.
+  Non-architectural events are listed in Table 19-7, 19-8, and 19-9.  
+  Table 19-8 is 06_2a specific, Table 19-9 is 06_2d specific.  
+
+
+  \par Location of cpu info and monitoring register files:
+
+  ex) Display cpuid and msr file for cpu 0:
+
+      $ ls -l /dev/cpu/0
+      total 0
+      crw-------  1 root root 203, 0 Oct 28 18:47 cpuid
+      crw-------  1 root root 202, 0 Oct 28 18:47 msr
+
+
+   \par MSR address layout of registers:
+
+  There are 16 logical processors on Stampede with Hyperthreading disabled.
+  There are 8 configurable and 3 fixed counter registers per processor.
+
+  IA32_PMCx (CTRx) MSRs start at address 0C1H and occupy a contiguous block of MSR
+  address space; the number of MSRs per logical processor is reported using
+  CPUID.0AH:EAX[15:8].  
+
+  IA32_PERFEVTSELx (CTLx) MSRs start at address 186H and occupy a contiguous block
+  of MSR address space. Each performance event select register is paired with a
+  corresponding performance counter in the 0C1H address block.
+*/
+
 #include <stddef.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -13,47 +55,11 @@
 #include "trace.h"
 #include "cpu_is_snb.h"
 
-/*! \brief Routines to configure and monitor Intel Sandy Bridge
+/*! \name Configurable Performance Monitoring Registers
 
-  Details such as Tables and Figures can be found in: 
-  "Intel® 64 and IA-32 Architectures Software Developer’s Manual
-  Volume 3B: System Programming Guide, Part 2".
-
-  Sandy Bridge microarchitectures have signatures 06_2a and 06_2d. 
-  Stampede is 06_2d.
-
-  Non-architectural events are listed in Table 19-7, 19-8, and 19-9.  
-  Table 19-8 is 06_2a specific, Table 19-9 is 06_2d specific.  
-  No 06_2d specific events are currently monitored.
-*/
-
-/*! \brief OS files to configure and read registers.
-
-  ex) Display cpuid and msr file for cpu 0:
-
-  $ ls -l /dev/cpu/0
-  total 0
-  crw-------  1 root root 203, 0 Oct 28 18:47 cpuid
-  crw-------  1 root root 202, 0 Oct 28 18:47 msr
-*/
-
-/*! \brief MSR addresses of registers
-
-  IA32_PMCx MSRs start at address 0C1H and occupy a contiguous block of MSR
-  address space; the number of MSRs per logical processor is reported using
-  CPUID.0AH:EAX[15:8].  
-
-  Sandy Bridge has 8 MSRs per logical processor.
-
-  IA32_PERFEVTSELx MSRs start at address 186H and occupy a contiguous block
-  of MSR address space. Each performance event select register is paired with a
-  corresponding performance counter in the 0C1H address block.
-*/
-
-/*! Configurable Counters
-
-  Layout shown in Fig 18-6.  Described on Pg 18-3.
-
+  Control register layout shown in Fig 18-6.  Described on Pg 18-3.
+  These are used to select events and ways to count events.
+  ~~~
   [0, 7] Event Select       : Choose Event
   [8, 15] Unit Mask (UMASK) : Choose Subevent
   16 USR                    : Count when in user mode
@@ -61,12 +67,20 @@
   18 E Edge_detect          : Can measure time spent in state
   19 PC Pin control         : Ovrflow control
   20 INT APIC               : Ovrflow control
-  21 ANY                    : Counts events from any thread on core 
+  21 ANY                    : Counts events from any thread on core
   22 EN                     : Enables counters
-  23 INV                    : Inverts Counter Mask 
+  23 INV                    : Inverts Counter Mask
   [24, 31] Counter Mask     : Counts in a cycle must exceed CMASK if set
   [32, 63] Reserved
+  ~~~  
+
+  Counter registers are 64 bit but 48 bits wide.  These
+  are configured by the control registers and 
+  hold the counter values.
+
+  @{
  */
+
 #define IA32_CTL0 0x186
 #define IA32_CTL1 0x187
 #define IA32_CTL2 0x188
@@ -84,41 +98,39 @@
 #define IA32_CTR5 0xC6
 #define IA32_CTR6 0xC7
 #define IA32_CTR7 0xC8
+//@}
 
-/*! \brief Fixed Counters
+/*! \name Fixed Counter Registers
 
   These counters always count the same events.  Fig 18-7 describes
   how to enable these registers.  Events are described on page 18-10.
+  @{
+*/
+#define IA32_FIXED_CTR_CTRL 0x38D //!< Fixed Counter Control Register
+#define IA32_FIXED_CTR0     0x309 //!< Fixed Counter 0: Instructions Retired
+#define IA32_FIXED_CTR1     0x30A //!< Fixed Counter 1: Core Clock Cycles
+#define IA32_FIXED_CTR2     0x30B //!< Fixed Counter 2: Reference Clock Cycles
+//@}
 
-  Events counted are:
-  CTR0 Instructions Retired
-  CTR1 Core Clock Cycles
-  CTR2 Reference Clock Cycles
- */
-#define IA32_FIXED_CTR_CTRL       0x38D
-#define IA32_FIXED_CTR0           0x309
-#define IA32_FIXED_CTR1           0x30A
-#define IA32_FIXED_CTR2           0x30B
-
-/*! Global Control Registers
+/*! \name Global Control Registers
   
-  Layout in Fig 18-8 and 18-9.  
-  GLOBAL_CTRL enables all fixed and configurable counters  
-  GLOBAL_STATUS indicates overflow 
-  GLOBAL_OVF_CTRL clears overflow indicators in GLOBAL_STATUS.
- */
-#define IA32_PERF_GLOBAL_STATUS   0x38E
-#define IA32_PERF_GLOBAL_CTRL     0x38F
-#define IA32_PERF_GLOBAL_OVF_CTRL 0x390
+  Layout in Fig 18-8 and 18-9.  Controls for all
+  registers.
+  @{
+*/
+#define IA32_PERF_GLOBAL_STATUS   0x38E //!< indicates overflow 
+#define IA32_PERF_GLOBAL_CTRL     0x38F //!< enables all fixed and configurable counters  
+#define IA32_PERF_GLOBAL_OVF_CTRL 0x390 //!< clears overflow indicators in GLOBAL_STATUS.
+//@}
 
 /*! \brief KEYS will define the raw schema for this type
 
   The required order of registers is:
-  1) Control registers in order
-  2) Counter registers in order
-  3) Fixed registers in order
+  -# Control registers in order
+  -# Counter registers in order
+  -# Fixed registers in order
 
-  All registers are 48 bits wide.
+  All counter registers are 48 bits wide.
  */
 #define KEYS \
     X(CTL0, "C", ""), \
@@ -148,8 +160,8 @@
   Table 19-9 is 06_2d specific.  
 
   To change events to count:
-  1) Define event below
-  2) Modify events array in intel_snb_begin()
+  -# Define event below
+  -# Modify events array in intel_snb_begin()
 */
 #define PERF_EVENT(event, umask) \
   ( (event) \
@@ -160,6 +172,13 @@
   | (1ULL << 22) \
   )
 
+/*! \name Events 
+
+  Non-architectural events are listed in Table 19-7, 19-8, and 19-9. 
+  Table 19-8 is 06_2a specific, Table 19-9 is 06_2d specific.
+
+  @{
+ */
 #define DTLB_LOAD_MISSES_WALK_CYCLES   PERF_EVENT(0x08, 0x04)
 #define FP_COMP_OPS_EXE_SSE_FP_PACKED  PERF_EVENT(0x10, 0x10)
 #define FP_COMP_OPS_EXE_SSE_FP_SCALAR  PERF_EVENT(0x10, 0x20)
@@ -167,12 +186,14 @@
 #define SIMD_FP_256_PACKED_DOUBLE      PERF_EVENT(0x11, 0x02)
 #define L1D_REPLACEMENT                PERF_EVENT(0x51, 0x01) 
 #define RESOURCE_STALLS_ANY            PERF_EVENT(0xA2, 0x01) 
-#define MEM_UOPS_RETIRED_ALL_LOADS     PERF_EVENT(0xD0, 0x81) // CTR0-3
-#define MEM_LOAD_UOPS_RETIRED_L1_HIT   PERF_EVENT(0xD1, 0x01) // CTR0-3
-#define MEM_LOAD_UOPS_RETIRED_L2_HIT   PERF_EVENT(0xD1, 0x02) // CTR0-3
-#define MEM_LOAD_UOPS_RETIRED_LLC_HIT  PERF_EVENT(0xD1, 0x04) // CTR0-3
-#define MEM_LOAD_UOPS_RETIRED_LLC_MISS PERF_EVENT(0xD1, 0x20) // CTR0-3
-#define MEM_LOAD_UOPS_RETIRED_HIT_LFB  PERF_EVENT(0xD1, 0x40) // CTR0-3
+#define MEM_UOPS_RETIRED_ALL_LOADS     PERF_EVENT(0xD0, 0x81) // CTR0-3 Only
+#define MEM_LOAD_UOPS_RETIRED_L1_HIT   PERF_EVENT(0xD1, 0x01) // CTR0-3 Only
+#define MEM_LOAD_UOPS_RETIRED_L2_HIT   PERF_EVENT(0xD1, 0x02) // CTR0-3 Only
+#define MEM_LOAD_UOPS_RETIRED_LLC_HIT  PERF_EVENT(0xD1, 0x04) // CTR0-3 Only
+#define MEM_LOAD_UOPS_RETIRED_LLC_MISS PERF_EVENT(0xD1, 0x20) // CTR0-3 Only
+#define MEM_LOAD_UOPS_RETIRED_HIT_LFB  PERF_EVENT(0xD1, 0x40) // CTR0-3 Only
+//@}
+
 
 //! Configure and start counters for a cpu
 static int intel_snb_begin_cpu(char *cpu, uint64_t *events, size_t nr_events)
@@ -328,7 +349,7 @@ static void intel_snb_collect(struct stats_type *type)
   }
 }
 
-//! Definition of stats for this type
+//! Definition of stats entry for this type
 struct stats_type intel_snb_stats_type = {
   .st_name = "intel_snb",
   .st_begin = &intel_snb_begin,

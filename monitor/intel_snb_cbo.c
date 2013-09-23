@@ -1,3 +1,41 @@
+/*! 
+ \file intel_snb_cbo.c
+ \author Todd Evans 
+ \brief Performance Monitoring Counters for Intel Sandy Bridge Caching Agents (CBos)
+
+
+  \par Details such as Tables and Figures can be found in:
+  "Intel® Xeon® Processor E5-2600 Product Family Uncore 
+  Performance Monitoring Guide" 
+  Reference Number: 327043-001 March 2012 \n
+  CBo monitoring is described in Section 2.3.
+
+  \note
+  Sandy Bridge microarchitectures have signatures 06_2a and 06_2d. 
+  Stampede is 06_2d.
+
+
+  \par Location of cpu info and monitoring register files:
+
+  ex) Display cpuid and msr file for cpu 0:
+
+      $ ls -l /dev/cpu/0
+      total 0
+      crw-------  1 root root 203, 0 Oct 28 18:47 cpuid
+      crw-------  1 root root 202, 0 Oct 28 18:47 msr
+
+
+   \par MSR address layout of registers:
+
+   Layout shown in Table 2-8.
+   There are 8 CBos per socket, and currently 2 sockets on Stampede.
+   There are 4 configurable counter registers per CBo.  These routines
+   only collect data on core_id 0 on each socket.
+   
+   There are 4 configure, 4 counter, 1  CBo global control, 
+   and 1 CBo filter registers per CBo
+*/
+
 #include <stddef.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -14,24 +52,18 @@
 #include "pscanf.h"
 #include "cpu_is_snb.h"
 
-// Sandy Bridge microarchitectures have signatures 06_2a and 06_2d with non-architectural events
-// listed in Table 19-7, 19-8, and 19-9.  19-8 is 06_2a specific, 19-9 is 06_2d specific.  Stampede
-// is 06_2d but no 06_2d specific events are used here.
+/*! \name CBo Performance Monitoring Global Control Registers
 
-// $ ls -l /dev/cpu/0
-// total 0
-// crw-------  1 root root 203, 0 Oct 28 18:47 cpuid
-// crw-------  1 root root 202, 0 Oct 28 18:47 msr
+   Configure register layout shown in Table 2-9.  These registers control every
+   counter within a CBo.  They can freeze and reset 
+   individual CBos control and counter registers.
 
-// Uncore events are in this file.  Uncore events are found in the MSR and PCI config space.
-// C-Box, PCU, and U-box counters are all in the MSR file
-// This stuff is all in: 
-//Intel Xeon Processor E5-2600 Product Family Uncore Performance Monitoring Guide
+   \note
+   Documentation says they are 32 bit but only 64 bit
+   works.
 
-// Uncore MSR addresses
-// C-Box control and counter registers 
-// 8 C-Boxes, 4 counters each.  Each counter has a different restriction on what it counts. Addresses in Table 2-8.
-/* Box Control - Cn_MSR_PMON_BOX_CTL - Defs in Table 2-9 */
+   @{
+*/
 #define CBOX_CTL0 0xD04
 #define CBOX_CTL1 0xD24
 #define CBOX_CTL2 0xD44
@@ -40,7 +72,29 @@
 #define CBOX_CTL5 0xDA4
 #define CBOX_CTL6 0xDC4
 #define CBOX_CTL7 0xDE4
-/* Counter Filters - Cn_MSR_PMON_BOX_FILTER - Defs in 2-12, 2-13 */
+//@}
+
+/*! \name CBo filter registers
+
+  Layout in Table 2-12. Can filter CBo counters' recorded events by 
+  Opcode, MESIF state, core, and/or Hyperthread.
+  
+  ~~~
+  opcode             [31:23]
+  state              [22:18]
+  node               [17:10]
+  core               [3:1] 
+  thread             [0] 
+  ~~~  
+
+  Opcodes are listed in Table 2-13 and defined in
+  Table 2-144.
+
+  \note
+  Documentation says they are 32 bit but only 64 bit
+  works.
+  @{
+ */
 #define CBOX_FILTER0 0xD14
 #define CBOX_FILTER1 0xD34
 #define CBOX_FILTER2 0xD54
@@ -49,21 +103,50 @@
 #define CBOX_FILTER5 0xDB4
 #define CBOX_FILTER6 0xDD4
 #define CBOX_FILTER7 0xDF4
-/* Counter Control - Cn_MSR_PMON_CTL{0-3} - Defs in 2-10 */
-/* Box CTL and CTR increments by 1  intra box */ 
-/* Box CTL and CTR increments by 32 inter box */ 
-#define CTL0 0xD10 /* Base to start from */
-#define CTL1 0xD11 /* Base to start from */
-#define CTL2 0xD12 /* Base to start from */
-#define CTL3 0xD13 /* Base to start from */
+//@}
 
-/* Counter Registers 64 bit but only 44 bit for counting */
-#define CTR0 0xD16 /* Base to count from */
-#define CTR1 0xD17 /* Base to count from */
-#define CTR2 0xD18 /* Base to count from */
-#define CTR3 0xD19 /* Base to count from */
+/*! \name CBo Performance Monitoring Registers
+  
+  Control register layout in 2-10.  These are used to select events.  There are
+  32 total per socket, 4 per CBo.  We specify base address and increment by 
+  1 intra-CBo and 32 inter-CBo.
+  ~~~
+  threshhold        [31:24]
+  invert threshold  [23]
+  enable            [22]
+  tid filter enable [19]
+  edge detect       [18]
+  clear counter     [17]
+  umask             [15:8]
+  event select      [7:0]
+  ~~~ 
 
-// Width of 44 for C-Boxes
+  \note
+  Documentation says they are 32 bit but only 64 bit
+  works.
+
+  Counter register layout in 2-11.  These are 64 bit but counters
+  are only 44 bits wide.
+
+  @{
+ */
+#define CTL0 0xD10
+#define CTL1 0xD11
+#define CTL2 0xD12
+#define CTL3 0xD13
+
+#define CTR0 0xD16
+#define CTR1 0xD17
+#define CTR2 0xD18
+#define CTR3 0xD19
+//@}
+
+/*! \brief KEYS will define the raw schema for this type. 
+  
+  The required order of registers is:
+  -# Control registers in order
+  -# Counter registers in order
+*/
 #define KEYS \
     X(CTL0, "C", ""), \
     X(CTL1, "C", ""), \
@@ -73,62 +156,60 @@
     X(CTR1, "E,W=44", ""), \
     X(CTR2, "E,W=44", ""), \
     X(CTR3, "E,W=44", "")
+
+/*! \brief Filter 
   
-/* Defs in Table 2-12 */
-/* Event filters in C-Box
-opcode             [31:23]
-state filter       [22:18]
-node filter        [17:10]
-tid: core filter   [3:1] 
-     thread filter [0]
-*/
-#define CBOX_FILTER(...)			\
-  ( (0x0ULL << 0)   /* Count all events */	\
-  | (0x00ULL << 10) /* Don't filter on node */  \
-  | (1ULL << 18)  /* Track I state. */ \
-  | (1ULL << 19)  /* Track S state. */ \
-  | (1ULL << 20)  /* Track E state. */ \
-  | (1ULL << 21)  /* Track M state. */ \
-  | (1ULL << 22)  /* Track F state. */ \
-  | (0x000ULL << 23) /* Opcode */ \
+  Can filter by opcode, MESIF state, node, core, thread
+ */
+#define CBOX_FILTER(...)  \
+  ( (0x0ULL << 0)  \
+  | (0x00ULL << 10) \
+  | (0x1FULL << 18)  \
+  | (0x000ULL << 23) \
   )
 
-/* Events in C-Box
-threshhold        [31:24]
-invert threshold  [23]
-enable            [22]
-tid filter enable [19]
-edge detect       [18]
-clear counter     [17]
-umask             [15:8]
-event select      [7:0]
+/*! \brief Event select
+  
+  Events are listed in Table 2-14.  They are defined in detail
+  in Section 2.3.7.
+  
+  To change events to count:
+  -# Define event below
+  -# Modify events array in intel_snb_cbo_begin()
 */
-
-/* Defs in Table 2-10 */
 #define CBOX_PERF_EVENT(event, umask) \
   ( (event) \
   | (umask << 8) \
-  | (0ULL << 17) /* Reset Counters. */ \
-  | (0ULL << 18) /* Edge Detection. */ \
-  | (0ULL << 19) /* TID Filter. */ \
-  | (1ULL << 22) /* Enable. */ \
-  | (0ULL << 23) /* Invert */ \
-  | (0x01ULL << 24) /* Threshold */ \
+  | (0ULL << 17) \
+  | (0ULL << 18) \
+  | (0ULL << 19) \
+  | (1ULL << 22) \
+  | (0ULL << 23) \
+  | (0x01ULL << 24) \
   )
 
-/* Definitions in Table 2-14 */
-#define CLOCK_TICKS         CBOX_PERF_EVENT(0x00, 0x00) /* Ctrs 0-3 */
-#define RxR_OCCUPANCY       CBOX_PERF_EVENT(0x11, 0x01)  /* Ctrs 0   */
-#define COUNTER0_OCCUPANCY  CBOX_PERF_EVENT(0x1F, 0x00) /* Ctrs 1-3 */
-#define LLC_LOOKUP          CBOX_PERF_EVENT(0x34, 0x03) /* Ctrs 0-1 */
+/*! \name Events
 
+  Events are listed in Table 2-14.  They are defined in detail
+  in Section 2.3.7.  Some events can only be counted on
+  specific registers.
+
+@{
+ */
+#define CLOCK_TICKS         CBOX_PERF_EVENT(0x00, 0x00) //!< CTR0-3
+#define RxR_OCCUPANCY       CBOX_PERF_EVENT(0x11, 0x01) //!< CTR0
+#define COUNTER0_OCCUPANCY  CBOX_PERF_EVENT(0x1F, 0x00) //!< CTR1-3
+#define LLC_LOOKUP          CBOX_PERF_EVENT(0x34, 0x03) //!< CTR0-1
+//@}
+
+//! Configure and start counters for CBo
 static int intel_snb_cbo_begin_box(char *cpu, int box, uint64_t *events, size_t nr_events)
 {
   int rc = -1;
   char msr_path[80];
   int msr_fd = -1;
   uint64_t ctl;
-  //uint64_t filter;
+  uint64_t filter;
   int offset = box*32;
 
   snprintf(msr_path, sizeof(msr_path), "/dev/cpu/%s/msr", cpu);
@@ -139,21 +220,18 @@ static int intel_snb_cbo_begin_box(char *cpu, int box, uint64_t *events, size_t 
   }
 
   ctl = 0x10100ULL; // enable freeze (bit 16), freeze (bit 8)
-  /* C-box ctrl registers are 32-bits apart */
+  /* CBo ctrl registers are 32-bits apart */
   if (pwrite(msr_fd, &ctl, sizeof(ctl), CBOX_CTL0 + offset) < 0) {
-    ERROR("cannot enable freeze of C-box counter: %m\n");
+    ERROR("cannot enable freeze of CBo counter: %m\n");
     goto out;
   }
-  
-  /* Ignore C-Box filter for now */
-  /* The filters are part of event selection */
-  /*
+
+  /* Filtering by opcode, MESIF state, node, core and thread possible */
   filter = CBOX_FILTER();
   if (pwrite(msr_fd, &filter, sizeof(filter), CBOX_FILTER0 + offset) < 0) {
-    ERROR("cannot modify C-box filters: %m\n");
+    ERROR("cannot modify CBo filters: %m\n");
     goto out;
   }
-  */
 
   /* Select Events for this C-Box */
   int i;
@@ -169,16 +247,16 @@ static int intel_snb_cbo_begin_box(char *cpu, int box, uint64_t *events, size_t 
   }
 
   ctl |= 1ULL << 1; // reset counter
-  /* C-box ctrl registers are 32-bits apart */
+  /* CBo ctrl registers are 32-bits apart */
   if (pwrite(msr_fd, &ctl, sizeof(ctl), CBOX_CTL0 + offset) < 0) {
-    ERROR("cannot reset C-box counter: %m\n");
+    ERROR("cannot reset CBo counter: %m\n");
     goto out;
   }
   
-  /* Unfreeze C-box counter (64-bit) */
+  /* Unfreeze CBo counter (64-bit) */
   ctl = 0x10000ULL; // unfreeze counter
   if (pwrite(msr_fd, &ctl, sizeof(ctl), CBOX_CTL0 + offset) < 0) {
-    ERROR("cannot unfreeze C-box counters: %m\n");
+    ERROR("cannot unfreeze CBo counters: %m\n");
     goto out;
   }
 
@@ -191,6 +269,8 @@ static int intel_snb_cbo_begin_box(char *cpu, int box, uint64_t *events, size_t 
   return rc;
 }
 
+
+//! Configure and start counters
 static int intel_snb_cbo_begin(struct stats_type *type)
 {
   int nr = 0;
@@ -229,13 +309,14 @@ static int intel_snb_cbo_begin(struct stats_type *type)
       {
 	for (box = 0; box < 8; box++)
 	  if (intel_snb_cbo_begin_box(cpu, box, cbo_events[box], 4) == 0)
-	    nr++; /* HARD */
+	    nr++;
       }
   }
 
   return nr > 0 ? 0 : -1;
 }
 
+//! Collect values in counters for a CBo
 static void intel_snb_cbo_collect_box(struct stats_type *type, char *cpu, char* cpu_box, int box)
 {
   struct stats *stats = NULL;
@@ -274,6 +355,7 @@ static void intel_snb_cbo_collect_box(struct stats_type *type, char *cpu, char* 
     close(msr_fd);
 }
 
+//! Collect values in counters
 static void intel_snb_cbo_collect(struct stats_type *type)
 {
 
@@ -323,6 +405,7 @@ static void intel_snb_cbo_collect(struct stats_type *type)
   }
 }
 
+//! Definition of stats for this type
 struct stats_type intel_snb_cbo_stats_type = {
   .st_name = "intel_snb_cbo",
   .st_begin = &intel_snb_cbo_begin,
