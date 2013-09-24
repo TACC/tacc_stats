@@ -1,29 +1,37 @@
-tacc_stats documentation               {#mainpage}
+tacc_stats Documentation               {#mainpage}
 ========================
 
-## Authors
-Bill Barth     (<mailto:bbarth@tacc.utexas.edu>)
-R. Todd Evans  (<mailto:rtevans@tacc.utexas.edu>)   
+Authors
+-------
+Bill Barth     (<mailto:bbarth@tacc.utexas.edu>)    
+R. Todd Evans  (<mailto:rtevans@tacc.utexas.edu>)  
 John Hammond   (<mailto:jhammond@tacc.utexas.edu>)  
-Andy R. Terrel (<mailto:aterrel@tacc.utexas.edu>)
+Andy R. Terrel (<mailto:aterrel@tacc.utexas.edu>)  
 
-## Executive Summary
+
+Executive Summary
+-----------------
 The tacc_stats repository consists of two complemetary components:
 
-1. tacc_stats is a C based job-oriented and logically structured version of the
+1. `tacc_stats` is a C based job-oriented and logically structured version of the
 conventional sysstat system monitor.  
 
-2. job_pickles.py is a Python based code that collects the raw stats 
+2. `job_pickles.py` is a Python based code that collects the raw stats 
 data in a specified time range into a 
 job-based pickled Python dictionary.
 
-## Code Access
+
+Code Access
+-----------
 To get access to the tacc_stats source code 
 
     git clone https://github.com/billbarth/tacc_stats.git
 
-## Building
 
+----------------------------------------------------------------------------
+
+Building
+--------
 ### Quickstart
 Type these commands from the top of the tacc_stats
 source directory to quickly build and install.  The
@@ -37,84 +45,92 @@ executables will be placed in bin/.
 ### Detailed Install
 
 1. *Introduction:*
-tacc_stats has two components.  The first component is a light-weight C 
-code initially called to configure Performance Monitoring Counter registers 
-for specific events before a job is begun.  As the job is running the code is 
-repeatedly called to collect the counter registers values at regular time 
-intervals (specified for example in a cron_tab file).  This counter data is 
-stored in "raw stats" files.  The second component is based on Python and 
-performed off line.  The Python codes processes the raw stats files into 
-python dictionaries meant to ease analysis of the stats data.
 The build system is based on CMake.  It configures the C and Python
 routines for a particular computing platform.  The configure process 
 specifies both desired directories to store and read tacc_stats
 generated data from, and a list of device types from which to monitor.
 
 2. *Configure:*
-All configuring should be specified in the do_configure.sh 
+All configuring should be specified in the `do_configure.sh` 
 script. The meaning of every field is specified in this script.
 The first part of the script specifies paths to locations where
 tacc_stats data is read and stored from.  These will be system
 specific.  The location of the python version to use, host name, and
 batch system should also be specified here.
 The second part of the script specifies which devices to monitor by 
-building up a list labeled TYPES.  TYPES that are commented out will
-be ignored.  If the system is missing any TYPES under the Chip types
+building up a list labeled `TYPES`.  `TYPES` that are commented out will
+be ignored.  If the system is missing any `TYPES` under the Chip types
 section, that type will automatically be skipped during the monitoring.
 All paths and types are set in the do_configure.sh.  Once this script is set,
  make a directory to build the code.  
 This directory should be made in the top-level source
-directory, e.g. tacc_stats.  From this directory do_configure.sh should then 
+directory, e.g. `tacc_stats/`.  From this directory `do_configure.sh` should then 
 be called:
 
     $mkdir build
     $cd build
     $../do_configure.sh
-
 At this point the code will be configured for the system.
 
 3. *Build:*
-From with the build directory type make install.  This will compile
-tacc_stats, then place tacc_stats and all useful scripts into the 
-bin/ directory in the top level source directory.  The python
+From with the build directory type `make install`.  This will compile
+tacc_stats, then place the executable `tacc_stats` and all useful scripts into the 
+`bin/` directory in the top level source directory.  The python
 modules which support the executable scripts will be placed in the
-include/ directory in the top level source directory.
-The executables typically used are tacc_stats, job_pickles.py, and 
-do_job_pickles_cron.sh.  tacc_stats is typically invoked in the
-prologue of the batch system and cron_tab file on each node.
-do_job_pickles.sh is typically invoked from a cron_tab file and pickles
+`include/` directory in the top level source directory.
+The executables typically used are `tacc_stats`, `job_pickles.py`, and 
+`do_job_pickles_cron.sh`.  `tacc_stats` is typically invoked in the
+prologue of the batch system and `cron_tab` file on each node.
+`do_job_pickles.sh` is typically invoked from a `cron_tab` file and pickles
 jobs over the previous 24 hr period, storing the pickled data into
-the pickles_dir specified in do_configure.sh.   
+the `pickles_dir` specified in `do_configure.sh`.   
 
-## Running tacc_stats
-tacc_stats can be run manually by:
+
+----------------------------------------------------------------------------
+
+Running
+-------
+tacc_stats has two complemetary components.  The first component is a light-weight C 
+code called `tacc_stats`, initially called to configure Performance Monitoring Counter registers 
+for specific events before a job is begun.  As the job is running the code is 
+repeatedly called to collect the counter registers values at regular time 
+intervals (specified for example in a `cron_tab` file).  This counter data is 
+stored in "raw stats" files.  
+
+The second component is based the Python code `job_pickles.py`, 
+performed off line.  The Python codes processes the raw stats files into 
+python dictionaries meant to ease analysis of the stats data.
+
+### Running `tacc_stats`
+
+`tacc_stats` can be run manually by:
 
     $tacc_stats begin jobid
     $tacc_stats collect
 
-It is typically used by setting up cron scripts and prolog/epilog files as
+However, it is typically invoked by setting up cron scripts and prolog/epilog files as
 described in the example below, which corresponds to its usage on Stampede.
 
-### Example
+#### Example
 
 - Invocation:
-tacc_stats runs every 10-minutes (through
+`tacc_stats` runs every 10-minutes (through
 cron), and at the beginning and end of every job (through SLURM
-prolog/epilog).  In addition, tacc_stats may be directly invoked by
+prolog/epilog).  In addition, `tacc_stats` may be directly invoked by
 the user (or application) although we have not advertised this.
 
 - Data Handling:
-On each invocation, tacc_stats collects and records system statistics
+On each invocation, `tacc_stats` collects and records system statistics
 to a structured text file on ram backed storage local to the node.
 Stats files are rotated at every night at 23:55 localtime, and
 archived at sometime between 02:00--04:00 localtime to Stampede's
-/scratch filesystem.  A stats file created at epoch time EPOCH, on
-node HOSTNAME, will be stored locally as /var/log/tacc_stats/EPOCH,
+`/scratch` filesystem.  A stats file created at epoch time `EPOCH`, on
+node `HOSTNAME`, will be stored locally as `/var/log/tacc_stats/EPOCH`,
 and archived at
-/scratch/projects/tacc_stats/archive/HOSTNAME/EPOCH.gz.  For example
+`/scratch/projects/tacc_stats/archive/HOSTNAME/EPOCH.gz`.  For example
 stats collected on Jun 14 2011 on c101-101, might correspond to files
-/var/log/tacc_stats/1308027601 and
-/scratch/projects/tacc_stats/archive/c101-101.stampede.tacc.utexas.edu/1308027601.gz.
+`/var/log/tacc_stats/1308027601` and
+`/scratch/projects/tacc_stats/archive/c101-101.stampede.tacc.utexas.edu/1308027601.gz`.
 
 \warning Do not expect all stats files to be created at midnight
 exactly, or even approximately.  As nodes are rebooted, new
@@ -127,10 +143,32 @@ runs.
 crash before they can be archived.  Since we use ram backed storage
 these files do not survive a reboot.
 
+### Running `job_pickles.py`
+`job_pickles.py` can be run manually by:
 
-## Raw Stats Data
+    $ ./job_pickles.py path_to_pickles/ date_start date_end
 
-A stats file consists of a multiline header, followed my one or more
+where the 3 required arguments have the following meaning
+
+  - `path_to_pickles/`: the directory to store pickled dictionaries
+  - `date_start`      : the start of the date range, e.g. `"2013-09-25 04:00:00"`
+  - `date_end`        : the end of the date range, e.g. `"2013-09-26   05:00:00"`
+
+One could also run
+
+    $ ./do_job_pickles_cron.sh
+
+to pickle all raw stats data in the 24 hour period `yesterday` to `today`.  On Stampede
+this script is invoked every 24 hours using a `crontab` file.
+
+----------------------------------------------------------------------------
+
+Stats Data
+----------
+
+### Raw stats data: generated by `tacc_stats`
+
+A raw stats file consists of a multiline header, followed my one or more
 record groups.  The first few lines of the header identify the version
 of tacc_stats, the FQDN of the host, it's uname, it's uptime in seconds, and
 other properties to be specified.
@@ -227,16 +265,15 @@ The types that can be collected are:
 
 For the keys associated with each type, see the appropriate schema.
 For the source and meanings of the counters, see the tacc_stats source
-https://github.com/bbarth/tacc_stats, the CentOS 5.6 kernel source,
-especially Documentation/*, and the manpages, especially proc(5).
+`https://github.com/bbarth/tacc_stats`, the CentOS 5.6 kernel source,
+especially `Documentation/*`, and the manpages, especially proc(5).
 
 I have not tracked down the meanings of all counters.  However, if I
 did (and it wasn't obvious from the counter name) then I put that
-information in the source (see for example block.c).
+information in the source (see for example `block.c`).
 
 All intel Sandy Bridge core and uncore counters are documented in detail
-in their corresponding source code, e.g. intel_snb.c.  In addition,
-documentation on these counters can be found in the Doxygen documenation.
+in their corresponding source code and via Doxygen, e.g. `intel_snb.c`.
 
 \note All chip architecture related types are checked for existence at 
 run time.  Therefore, it is unnecessary for the user to filter for
@@ -259,16 +296,42 @@ begin from end.
 
 \warning Due to a quirk in the Opteron performance counter
 architecture, we do not assign the same set of events to each core,
-see amd64_pmc.c in the tacc_stats source for details.
+see `amd64_pmc.c` in the tacc_stats source for details.
 
-## Running job_pickles.py
+### Pickled stats data: generated `job_pickles.sh`
 
+Pickled stats data will be placed in the directory specified by 
+`pickles_dir`.  The pickled data is contained in a nested python
+dictionary with the following key layers:
 
+    job       : 1st key Job ID
+     host     : 2nd key Host node used by Job ID
+      type    : 3rd key TYPE specified in tacc_stats
+       device : 4th key device belonging to type
+  
+For example, to access Job ID `101`'s stats data on host `c560-901` for 
+`TYPE` `intel_snb` for device cpu number `0` from within a python script:
 
-\par Copyright
+    pickle_file = open('101','r')
+    jobid = pickle.load(pickle_file)
+    pickle_file.close()
+    jobid['c560-901']['intel_snb']['0']
+    
+The value accessed by this key is a 2D array, with rows corresponding to record times and
+columns to specific counters for the device.  To view the names for each counter add
+
+    jobid.get_schema('intel_snb')
+
+or for a short version
+
+    jobid.get_schema('intel_snb').desc
+
+----------------------------------------------------------------------------
+
+## Copyright
 (C) 2011 University of Texas at Austin
 
-\par License
+## License
 
 This library is free software; you can redistribute it and/or
 modify it under the terms of the GNU Lesser General Public
@@ -283,4 +346,4 @@ Lesser General Public License for more details.
 You should have received a copy of the GNU Lesser General Public
 License along with this library; if not, write to the Free Software
 Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
-*/
+
