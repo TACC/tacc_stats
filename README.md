@@ -67,9 +67,9 @@ This directory should be made in the top-level source
 directory, e.g. `tacc_stats/`.  From this directory `do_configure.sh` should then 
 be called:
 
-    $mkdir build
-    $cd build
-    $../do_configure.sh
+    $ mkdir build
+    $ cd build
+    $ ../do_configure.sh
 At this point the code will be configured for the system.
 
 3. *Build:*
@@ -105,8 +105,8 @@ python dictionaries meant to ease analysis of the stats data.
 
 `tacc_stats` can be run manually by:
 
-    $tacc_stats begin jobid
-    $tacc_stats collect
+    $ tacc_stats begin jobid
+    $ tacc_stats collect
 
 However, it is typically invoked by setting up cron scripts and prolog/epilog files as
 described in the example below, which corresponds to its usage on Stampede.
