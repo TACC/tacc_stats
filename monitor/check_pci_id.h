@@ -1,6 +1,9 @@
-// check PCI device vendors and ids
+/*! \file check_pci_id.h
+  \brief Check PCI device vendors and ids.
 
-// must be intel
+  If device ID is incorrect it will be skipped.
+*/
+
 static int check_pci_id(char * bus_dev, int id) {
 
   char pci_path[80];
