@@ -71,3 +71,9 @@ def adjust_yaxis_range(ax,factor=0.1,zero_set=0.):
   ymin=min(ymin,zero_set)
   ymin,ymax=expand_range(ymin,ymax,factor)
   ax.set_ylim(ymin,ymax)
+
+def string_shorten(s,l):
+  if l < 5 or len(s) <= l:
+    return s
+  else:
+    return s[:l-3]+'...'

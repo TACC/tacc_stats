@@ -1,10 +1,18 @@
 import json
 import time, os, fnmatch
+import re
 
 def make_date_string(t):
   lt=time.localtime(t)
   return '%(y)04d-%(m)02d-%(d)02d' % { 'y' : lt.tm_year, 'm' : lt.tm_mon,
                                        'd' : lt.tm_mday }
+def replace_path_bits(path,user,maxlen):
+  res=re.sub('/work/[0-9]+/'+user,r'\$WORK',path)
+  res=re.sub('/scratch/[0-9]+/'+user,r'\$SCRATCH',res)
+  res=re.sub('.*?/home.*?/[0-9]+/'+user,'~'+user,res)
+  if len(res) > maxlen:
+    res=re.sub(r'/[^/][^/]*/..*/(..*/)',r'/.../\1',res)
+  return res
 
 class LariatDataException(Exception):
   def __init__(self,arg):
@@ -31,8 +39,8 @@ class LariatData:
       self.ld=json.load(open(matches[0]))
       try:
         self.user=self.ld[jobid][0]['user']
-        self.exc=self.ld[jobid][0]['exec']
-        self.cwd=self.ld[jobid][0]['cwd']
+        self.exc=replace_path_bits(self.ld[jobid][0]['exec'],self.user,60)
+        self.cwd=replace_path_bits(self.ld[jobid][0]['cwd'], self.user,60)
       except KeyError:
         print str(jobid) + ' did not call ibrun' + \
               ' or has no lariat data for some other reason'

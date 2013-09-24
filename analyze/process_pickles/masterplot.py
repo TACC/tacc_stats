@@ -117,7 +117,8 @@ def master_plot(file,mode='lines',threshold=False,
       'intel' : ['intel_pmc3', 'intel_pmc3', 'intel_pmc3', 
                  'lnet', 'lnet', 'ib_sw','ib_sw','cpu'],
       'intel_snb' : ['intel_snb_imc', 'intel_snb_imc', 'intel_snb', 
-                     'lnet', 'lnet', 'ib_sw','ib_sw','cpu'],
+                     'lnet', 'lnet', 'ib_sw','ib_sw','cpu',
+                     'intel_snb', 'intel_snb', 'mem'],
       }
   
   k2={'amd64':
@@ -126,7 +127,8 @@ def master_plot(file,mode='lines',threshold=False,
       'intel' : ['PMC3', 'PMC2', 'FIXED_CTR0',
                  'rx_bytes','tx_bytes', 'rx_bytes','tx_bytes','user'],
       'intel_snb' : ['CAS_READS', 'CAS_WRITES', 'LOAD_L1D_ALL',
-                     'rx_bytes','tx_bytes', 'rx_bytes','tx_bytes','user'],
+                     'rx_bytes','tx_bytes', 'rx_bytes','tx_bytes','user',
+                     'SSE_D_ALL', 'SIMD_D_256', 'MemUsed'],
       }
 
   try:
@@ -148,14 +150,21 @@ def master_plot(file,mode='lines',threshold=False,
   else:
     plot=plot_lines
   
-  # Plot key 1
-  plot(ax[0],ts,[0,-1],3600.,1e9)
+  if ts.pmc_type == 'intel_snb' :
+    # Plot key 1
+    plot(ax[0],ts,[8,9],3600.,1e9*float(ts.wayness),
+         ylabel='Total AVX +\nSSE Ginst/s')
     
-  # Plot key 2
-  plot(ax[1],ts,[1],3600.,1e9)
+    # Plot key 2
+    plot(ax[1],ts,[0,1],3600.,1.0/64.0*1024.*1024.*1024.,
+         ylabel='Total Memory GB/s')
 
-  #Plot key 3
-  plot(ax[2],ts,[2],3600.,1e9)
+    #Plot key 3
+    #plot(ax[2],ts,[2],3600.,1.0/64.0*1e9, ylabel='L1 BW GB/s')
+    plot(ax[2],ts,[8],3600.,1024.0*1024.0*1024.0, ylabel='Memory Usage GB')
+  else: #Fix this to support the old amd plots
+    print ts.pmc_type + ' not supported'
+    return 
   
   # Plot lnet sum rate
   plot(ax[3],ts,[3,4],3600.,1024.**2,ylabel='Total lnet MB/s')

@@ -2,6 +2,7 @@ import cPickle as pickle
 import numpy
 import glob, os, stat, time, datetime, sys
 import re
+import tspl_utils
 
 class TSPLException(Exception):
   def __init__(self,arg):
@@ -97,7 +98,8 @@ class TSPLBase:
 
     self.title='ID: %(ID)s, u: %(u)s, N: %(name)s, D: %(date)s, NH: %(nh)d' % \
            { 'ID' : self.j.id,'u': self.owner,
-             'name': self.j.acct['name'], 'nh' : self.numhosts,
+             'name': tspl_utils.string_shorten(self.j.acct['name'],15),
+             'nh' : self.numhosts,
              'date': self.end_date }
 
     # Create an array of dictionaries of lists initialized and constructed using
@@ -168,6 +170,10 @@ class TSPLBase:
     inds=numpy.unravel_index(self.ind,(self.a,self.b,self.c))
     k=self.data[inds[0]].keys()[inds[1]]
     return self.data[inds[0]][k][inds[2]]
+
+#  units_correction={
+#    ('intel_snb_imc','CAS_READS') : 
+#    }
 
 # Load a job file and sum a socket-based or core-based counter into
 # time-dependent arrays for each key pair. Takes a tacc stats pickle file and
