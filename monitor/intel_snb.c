@@ -26,7 +26,7 @@
       crw-------  1 root root 202, 0 Oct 28 18:47 msr
 
 
-   \par MSR address layout of registers:
+  \par MSR address layout of registers:
 
   There are 16 logical processors on Stampede with Hyperthreading disabled.
   There are 8 configurable and 3 fixed counter registers per processor.
@@ -55,6 +55,7 @@
 #include "trace.h"
 #include "cpu_is_snb.h"
 
+//@{
 /*! \name Configurable Performance Monitoring Registers
 
   Control register layout shown in Fig 18-6.  Described on Pg 18-3.
@@ -77,10 +78,7 @@
   Counter registers are 64 bit but 48 bits wide.  These
   are configured by the control registers and 
   hold the counter values.
-
-  @{
- */
-
+*/
 #define IA32_CTL0 0x186
 #define IA32_CTL1 0x187
 #define IA32_CTL2 0x188
@@ -178,7 +176,7 @@
   Table 19-8 is 06_2a specific, Table 19-9 is 06_2d specific.
 
   @{
- */
+*/
 #define DTLB_LOAD_MISSES_WALK_CYCLES   PERF_EVENT(0x08, 0x04)
 #define FP_COMP_OPS_EXE_SSE_FP_PACKED  PERF_EVENT(0x10, 0x10)
 #define FP_COMP_OPS_EXE_SSE_FP_SCALAR  PERF_EVENT(0x10, 0x20)

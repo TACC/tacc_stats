@@ -1,21 +1,21 @@
-/*! \mainpage tacc_stats documentation
+tacc_stats documentation               {#mainpage}
+========================
 
-\par Authors
-<a href="mailto:bbarth@tacc.utexas.edu">Bill Barth</a>,
-<a href="mailto:rtevans@tacc.utexas.edu">R. Todd Evans</a>,
-<a href="mailto:jhammond@tacc.utexas.edu">John Hammond</a>,
-<a href="mailto:aterrel@tacc.utexas.edu">Andy R. Terrel</a>
+## Authors
+Bill Barth     (<mailto:bbarth@tacc.utexas.edu>)
+R. Todd Evans  (<mailto:rtevans@tacc.utexas.edu>)   
+John Hammond   (<mailto:jhammond@tacc.utexas.edu>)  
+Andy R. Terrel (<mailto:aterrel@tacc.utexas.edu>)
 
 ## Executive Summary
 The tacc_stats repository consists of two complemetary components:
 
-- tacc_stats is a C based job-oriented and logically structured version of the
+1. tacc_stats is a C based job-oriented and logically structured version of the
 conventional sysstat system monitor.  
 
-- job_pickles.py is a Python based code that collects the raw stats 
+2. job_pickles.py is a Python based code that collects the raw stats 
 data in a specified time range into a 
 job-based pickled Python dictionary.
-
 
 ## Code Access
 To get access to the tacc_stats source code 
@@ -24,7 +24,7 @@ To get access to the tacc_stats source code
 
 ## Building
 
-\par Quickstart
+### Quickstart
 Type these commands from the top of the tacc_stats
 source directory to quickly build and install.  The
 executables will be placed in bin/.
@@ -34,9 +34,9 @@ executables will be placed in bin/.
     $ ../do_configure.sh
     $ make install
 
-\par Detailed Install
+### Detailed Install
 
--# Introduction:
+1. *Introduction:*
 tacc_stats has two components.  The first component is a light-weight C 
 code initially called to configure Performance Monitoring Counter registers 
 for specific events before a job is begun.  As the job is running the code is 
@@ -49,7 +49,8 @@ The build system is based on CMake.  It configures the C and Python
 routines for a particular computing platform.  The configure process 
 specifies both desired directories to store and read tacc_stats
 generated data from, and a list of device types from which to monitor.
--# Configure:
+
+2. *Configure:*
 All configuring should be specified in the do_configure.sh 
 script. The meaning of every field is specified in this script.
 The first part of the script specifies paths to locations where
@@ -69,8 +70,10 @@ be called:
     $mkdir build
     $cd build
     $../do_configure.sh
+
 At this point the code will be configured for the system.
--# Build:
+
+3. *Build:*
 From with the build directory type make install.  This will compile
 tacc_stats, then place tacc_stats and all useful scripts into the 
 bin/ directory in the top level source directory.  The python
@@ -92,7 +95,7 @@ tacc_stats can be run manually by:
 It is typically used by setting up cron scripts and prolog/epilog files as
 described in the example below, which corresponds to its usage on Stampede.
 
-\par Example
+### Example
 
 - Invocation:
 tacc_stats runs every 10-minutes (through
@@ -145,15 +148,14 @@ These are followed by schema descriptors for each of the types collected:
     !ps ctxt,E processes,E load_1 load_5 load_15 nr_running nr_threads
     ...
 
-
 A schema descriptor consists of the character '!' followed by the
 type, followed by a space separated list of elements.  Each element
 consists of a key name, followed by a comma-separated list of options;
 the options currently used are:
-  E meaning that the counter is an event counter,
-  W=<BITS> meaning that the counter is <BITS> wide (as opposed to 64),
-  C meaning that the value is a control register, not a counter,
-  U=<STR> meaning that the value is in units specified by <STR>.
+  - E meaning that the counter is an event counter,
+  - W=<BITS> meaning that the counter is <BITS> wide (as opposed to 64),
+  - C meaning that the value is a control register, not a counter,
+  - U=<STR> meaning that the value is in units specified by <STR>.
 
 Note especially the event and width options.  Certain counters, such
 as the performance counters are subject to rollover, and as such their
@@ -165,7 +167,6 @@ task is left for postprocessing.
 A record group consists of a blank line, a line containing the epoch
 time of the record and the current jobid, zero of more lines of marks
 (each starting with the % character), and several lines of statistics.
-
 
     1307509201 1981063
     %begin 1981063
@@ -189,7 +190,7 @@ cannot meaningfully attach statistics to a device, we use '-' as the
 device name.
 
 
-\par Types
+### Types
 
 The types that can be collected are:
 
@@ -259,7 +260,6 @@ begin from end.
 \warning Due to a quirk in the Opteron performance counter
 architecture, we do not assign the same set of events to each core,
 see amd64_pmc.c in the tacc_stats source for details.
-
 
 ## Running job_pickles.py
 
