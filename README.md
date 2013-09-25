@@ -35,7 +35,7 @@ Building
 ### Quickstart
 Type these commands from the top of the tacc_stats
 source directory to quickly build and install.  The
-executables will be placed in bin/.
+executables will be placed in `bin/`.
 
     $ mkdir build
     $ cd build
@@ -161,6 +161,12 @@ One could also run
 to pickle all raw stats data in the 24 hour period `yesterday` to `today`.  On Stampede
 this script is invoked every 24 hours using a `crontab` file.
 
+For pickling data with Intel Sandy Bridge core and uncore counters it is useful to
+modify the event_map dictionaries in `intel_snb.py` to include whatever events you are counting.  The dictionaries map a control register value to a Schema name.  
+You can have events in the event_map dictionaries that you are not counting,
+but if missing an event it will be labeled in the Schema with it's control register
+value.
+
 ----------------------------------------------------------------------------
 
 Stats Data
@@ -228,9 +234,9 @@ cannot meaningfully attach statistics to a device, we use '-' as the
 device name.
 
 
-### Types
+### `TYPES`
 
-The types that can be collected are:
+The `TYPES` that can be collected are:
 
   ~~~
   amd64_pmc         AMD Opteron performance counters (per core)
@@ -263,7 +269,12 @@ The types that can be collected are:
   vm                virtual memory statistics.
   ~~~
 
-For the keys associated with each type, see the appropriate schema.
+The `TYPES` to include in a build of tacc_stats are specified in 
+the `do_configure.sh` list `TYPES`.  To add a new `TYPE` to tacc_stats,
+write the appropriate `TYPENAME.c` file and place it in the monitor directory.
+Then add the `TYPENAME` to the `TYPES` list.
+ 
+For the keys associated with each `TYPE`, see the appropriate schema.
 For the source and meanings of the counters, see the tacc_stats source
 `https://github.com/bbarth/tacc_stats`, the CentOS 5.6 kernel source,
 especially `Documentation/*`, and the manpages, especially proc(5).
@@ -274,6 +285,9 @@ information in the source (see for example `block.c`).
 
 All intel Sandy Bridge core and uncore counters are documented in detail
 in their corresponding source code and via Doxygen, e.g. `intel_snb.c`.
+Many processor-related performance counters are configurable using their 
+corresponding control registers.  The use of these registers is described
+in the source code and Doxygen.  
 
 \note All chip architecture related types are checked for existence at 
 run time.  Therefore, it is unnecessary for the user to filter for
