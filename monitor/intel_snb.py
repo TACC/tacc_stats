@@ -124,7 +124,7 @@ class reformat_counters:
         dev_schema = []
         for dev, array in stats.iteritems():
             for j in self.ctl_registers:
-                dev_schema.append(event_map.get(array[0,j],str(j)))
+                dev_schema.append(event_map.get(array[0,j],str(array[0,j])))
             break
 
 
