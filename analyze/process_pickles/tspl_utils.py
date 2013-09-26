@@ -4,7 +4,7 @@ import numpy, scipy, scipy.interpolate
 
 # Check a TSPickleLoader object to see if its job has a minimum run time and has
 # its wayness in a list
-def checkjob(ts, minlen, way):
+def checkjob(ts, minlen, way, skip_queues=[]):
   if ts.t[len(ts.t)-1] < minlen:
     print ts.j.id + ': %(time)8.3f' % {'time' : ts.t[len(ts.t)-1]/3600} \
           + ' hours'
@@ -15,6 +15,9 @@ def checkjob(ts, minlen, way):
       return False
   elif ts.wayness != way:
     print ts.j.id + ': skipping ' + str(ts.wayness) + '-way'
+    return False
+  elif (len(skip_queues) > 0) and (ts.queue in skip_queues):
+    print ts.j.id + ' skipping queue: ' + ts.queue
     return False
   return True
 

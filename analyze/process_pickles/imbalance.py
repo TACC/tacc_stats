@@ -74,7 +74,8 @@ def compute_imbalance(file,k1,k2,threshold,plot_flag,full_flag,ratios):
     print 'End of file found reading: ' + file
     return
 
-  if not tspl_utils.checkjob(ts,3600,16): # 1 hour, 16way only
+  ignore_qs=['gpu','gpudev','vis','visdev']
+  if not tspl_utils.checkjob(ts,3600,16,ignore_qs): # 1 hour, 16way only
     return
   elif ts.numhosts < 2: # At least 2 hosts
     print ts.j.id + ': 1 host'

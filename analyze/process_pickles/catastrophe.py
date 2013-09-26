@@ -42,7 +42,8 @@ def fit_step(fn,k1,k2,genplot=False,res={}):
   except tspl.TSPLException as e:
     return
   
-  if not tspl_utils.checkjob(ts,3600,[x+1 for x in range(16)]): # 1 hour
+  ignore_qs=['gpu','gpudev','vis','visdev']
+  if not tspl_utils.checkjob(ts,3600,[x+1 for x in range(16)],ignore_qs):
     return
   elif ts.numhosts < 2: # At least 2 hosts
     print ts.j.id + ': 1 host'

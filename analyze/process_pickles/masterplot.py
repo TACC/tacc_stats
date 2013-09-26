@@ -137,7 +137,8 @@ def master_plot(file,mode='lines',threshold=False,
   except tspl.TSPLException as e:
     return
 
-  if not tspl_utils.checkjob(ts,mintime,wayness):
+  ignore_qs=['gpu','gpudev','vis','visdev']
+  if not tspl_utils.checkjob(ts,mintime,wayness,ignore_qs):
     return
 
   fig,ax=plt.subplots(6,1,figsize=(8,12),dpi=80)
@@ -157,7 +158,7 @@ def master_plot(file,mode='lines',threshold=False,
     
     # Plot key 2
     plot(ax[1],ts,[0,1],3600.,1.0/64.0*1024.*1024.*1024.,
-         ylabel='Total Memory GB/s')
+         ylabel='Total Mem BW GB/s')
 
     #Plot key 3
     #plot(ax[2],ts,[2],3600.,1.0/64.0*1e9, ylabel='L1 BW GB/s')
@@ -182,7 +183,7 @@ def master_plot(file,mode='lines',threshold=False,
   
   title=header+'\n'+ts.title
   if threshold:
-    title+=', V: %(v)-8.3f' % {'v': threshold}
+    title+=', V: %(v)-6.1f' % {'v': threshold}
   ld=lariat_utils.LariatData(ts.j.id,ts.j.end_time,'/scratch/projects/lariatData')
   title += '\n' + ld.title()
   print 'dd'

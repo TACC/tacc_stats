@@ -34,6 +34,7 @@ class LariatData:
       self.user='nobody'
       self.exc='unknown'
       self.cwd='unknown'
+      self.threads=1
       print 'File for ' + jobid + ' not found in ' + directory
     else:
       self.ld=json.load(open(matches[0]))
@@ -41,12 +42,14 @@ class LariatData:
         self.user=self.ld[jobid][0]['user']
         self.exc=replace_path_bits(self.ld[jobid][0]['exec'],self.user,60)
         self.cwd=replace_path_bits(self.ld[jobid][0]['cwd'], self.user,60)
+        self.threads=self.ld[jobid][0]['numThreads']
       except KeyError:
         print str(jobid) + ' did not call ibrun' + \
               ' or has no lariat data for some other reason'
         self.user='nobody'
         self.exc='unknown'
         self.cwd='unknown'
+        self.threads=1
 
   def title(self):
     title='E: ' + self.exc

@@ -29,6 +29,12 @@ class TSPLBase:
                             self.j.acct['nodes'])
 
     try:
+      self.queue=self.j.acct['queue']
+    except KeyError:
+      print 'No queue found'
+      self.queue = None
+
+    try:
       self.owner=self.j.acct['owner']
     except KeyError:
       try:
@@ -96,8 +102,9 @@ class TSPLBase:
     d=datetime.datetime.fromtimestamp(self.j.acct['end_time'])
     self.end_date=d.strftime('%Y-%m-%d %H:%M:%S')
 
-    self.title='ID: %(ID)s, u: %(u)s, N: %(name)s, D: %(date)s, NH: %(nh)d' % \
-           { 'ID' : self.j.id,'u': self.owner,
+    self.title='ID: %(ID)s, u: %(u)s, q: %(queue)s, N: %(name)s, '\
+                'D: %(date)s, NH: %(nh)d' % \
+           { 'ID' : self.j.id,'u': self.owner, 'queue': self.queue,
              'name': tspl_utils.string_shorten(self.j.acct['name'],15),
              'nh' : self.numhosts,
              'date': self.end_date }
