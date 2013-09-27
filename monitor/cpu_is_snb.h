@@ -1,3 +1,9 @@
+/*! \file cpu_is_snb.h
+
+  \brief Check CPUID vendor and signature.  
+ */
+
+//! Get CPU signature
 static void get_cpuid_signature(int cpuid_file, char* signature)
 {
   int ebx = 0, ecx = 0, edx = 0, eax = 1;
@@ -11,6 +17,8 @@ static void get_cpuid_signature(int cpuid_file, char* signature)
   snprintf(signature,sizeof(signature),"%02x_%x", extended_family_code | family_code, extended_model | model);
 
 }
+
+//! Test if signature is Sandy Bridge
 static int cpu_is_sandybridge(char *cpu)
 {
   char cpuid_path[80];

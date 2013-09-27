@@ -1,3 +1,49 @@
+/*! 
+ \file intel_snb_imc.c
+ \author Todd Evans 
+ \brief Performance Monitoring Counters for Intel Sandy Bridge Integrated Memory Controller (iMC)
+
+
+  \par Details such as Tables and Figures can be found in:
+  "Intel® Xeon® Processor E5-2600 Product Family Uncore 
+  Performance Monitoring Guide" 
+  Reference Number: 327043-001 March 2012 \n
+  iMC monitoring is described in Section 2.5.
+
+  \note
+  Sandy Bridge microarchitectures have signatures 06_2a and 06_2d. 
+  Stampede is 06_2d.
+
+
+  \par Location of monitoring register files
+
+  ex) Display PCI Config Space addresses:
+
+      $ lspci | grep "Memory Controller Channel"
+      7f:10.0 System peripheral: Intel Corporation Xeon E5/Core i7 Integrated Memory Controller Channel 0-3 Thermal Control 0 (rev 07)
+      7f:10.1 System peripheral: Intel Corporation Xeon E5/Core i7 Integrated Memory Controller Channel 0-3 Thermal Control 1 (rev 07)
+      7f:10.4 System peripheral: Intel Corporation Xeon E5/Core i7 Integrated Memory Controller Channel 0-3 Thermal Control 2 (rev 07)
+      7f:10.5 System peripheral: Intel Corporation Xeon E5/Core i7 Integrated Memory Controller Channel 0-3 Thermal Control 3 (rev 07)
+      ff:10.0 System peripheral: Intel Corporation Xeon E5/Core i7 Integrated Memory Controller Channel 0-3 Thermal Control 0 (rev 07)
+      ff:10.1 System peripheral: Intel Corporation Xeon E5/Core i7 Integrated Memory Controller Channel 0-3 Thermal Control 1 (rev 07)
+      ff:10.4 System peripheral: Intel Corporation Xeon E5/Core i7 Integrated Memory Controller Channel 0-3 Thermal Control 2 (rev 07)
+      ff:10.5 System peripheral: Intel Corporation Xeon E5/Core i7 Integrated Memory Controller Channel 0-3 Thermal Control 3 (rev 07)
+
+
+   \par PCI address layout of registers:
+
+   ~~~
+   PCI Config Space Dev ID:
+   Socket 1: 7f:10.0, 7f:10.1, 7f:10.4, 7f:10.5 
+   Socket 0: ff:10.0, 7f:10.1, ff:10.4, ff:10.5 
+   ~~~
+   
+   Layout shown in Table 2-59.
+   4 iMCs w/ 4 counters each per socket
+   
+   There are 4 configure, 4 counter, 1  iMC global control, 
+   and 1 fixed register per iMC
+*/
 #include <stddef.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -14,46 +60,36 @@
 #include "pscanf.h"
 #include "check_pci_id.h"
 
-// Uncore iMC (Memory Controller) events are counted in this file.  The events are accesses in PCI config space.
+/*! \name iMC Global Control Register
 
-// Sandy Bridge microarchitectures have signatures 06_2a and 06_2d with non-architectural events
-// listed in Table 19-7, 19-8, and 19-9.  19-8 is 06_2a specific, 19-9 is 06_2d specific.  Stampede
-// is 06_2d but no 06_2d specific events are used here.
-
-// $ ls -l /dev/cpu/0
-// total 0
-// crw-------  1 root root 203, 0 Oct 28 18:47 cpuid
-// crw-------  1 root root 202, 0 Oct 28 18:47 msr
-
-// $ lspci | grep "Memory Controller Channel"
-/*
-7f:10.0 System peripheral: Intel Corporation Xeon E5/Core i7 Integrated Memory Controller Channel 0-3 Thermal Control 0 (rev 07)
-7f:10.1 System peripheral: Intel Corporation Xeon E5/Core i7 Integrated Memory Controller Channel 0-3 Thermal Control 1 (rev 07)
-7f:10.4 System peripheral: Intel Corporation Xeon E5/Core i7 Integrated Memory Controller Channel 0-3 Thermal Control 2 (rev 07)
-7f:10.5 System peripheral: Intel Corporation Xeon E5/Core i7 Integrated Memory Controller Channel 0-3 Thermal Control 3 (rev 07)
-ff:10.0 System peripheral: Intel Corporation Xeon E5/Core i7 Integrated Memory Controller Channel 0-3 Thermal Control 0 (rev 07)
-ff:10.1 System peripheral: Intel Corporation Xeon E5/Core i7 Integrated Memory Controller Channel 0-3 Thermal Control 1 (rev 07)
-ff:10.4 System peripheral: Intel Corporation Xeon E5/Core i7 Integrated Memory Controller Channel 0-3 Thermal Control 2 (rev 07)
-ff:10.5 System peripheral: Intel Corporation Xeon E5/Core i7 Integrated Memory Controller Channel 0-3 Thermal Control 3 (rev 07)
+Layout in Table 2-60.  This register controls every iMC performance counter.  It can
+reset and freeze the counters.
 */
-
-// Info for this stuff is in: 
-//Intel Xeon Processor E5-2600 Product Family Uncore Performance Monitoring Guide
-// 4 MCs w/ 4 counters each per socket
-// PCI Config Space Dev ID:
-// Socket 1: 7f:10.0, 7f:10.1, 7f:10.4, 7f:10.5 
-// Socket 0: ff:10.0, 7f:10.1, ff:10.4, ff:10.5 
-// Supposedly all registers are 32 bit, but counter
-// registers A and B need to be added to get counter value
-
-// Defs in Table 2-59
 #define MC_BOX_CTL        0xF4
 
+/*! \name iMC Configurable Performance Monitoring Registers
+
+  Control register layout in Table 2-61.  These are used to select events.  There are 16 per 
+  socket, 4 per iMC.
+
+  ~~~
+  threshhold        [31:24]
+  invert threshold  [23]
+  enable            [22]
+  edge detect       [18]
+  umask             [15:8]
+  event select      [7:0]
+  ~~~
+
+  \note
+  Counter registers are 64 bits with 48 used for counting.  They actually must be read from 
+  2 32 bit registers, with the first 32 (B) bits least and last 32 (A) bits most  significant.
+  @{
+*/
 #define MC_CTL0           0xD8
 #define MC_CTL1           0xDC
 #define MC_CTL2           0xE0
 #define MC_CTL3           0xE4
-#define MC_FIXED_CTL      0xF0
 
 #define MC_B_CTR0         0xA0
 #define MC_A_CTR0         0xA4
@@ -63,11 +99,32 @@ ff:10.5 System peripheral: Intel Corporation Xeon E5/Core i7 Integrated Memory C
 #define MC_A_CTR2         0xB4
 #define MC_B_CTR3         0xB8
 #define MC_A_CTR3         0xBC
+//@}
 
+/*! \name iMC Fixed Counter
+
+  Fixed control register layout in Table 2-62.  Enable and resets fixed counter.
+
+  \note
+  Counter registers are 64 bits with 48 used for counting.  They actually must be read from 
+  2 32 bit registers, with the first 32 (B) bits least and last 32 (A) bits most  significant.
+  
+  Counts DRAM clock cycles.
+  @{
+ */
+#define MC_FIXED_CTL      0xF0
 #define MC_B_FIXED_CTR    0xD0
 #define MC_A_FIXED_CTR    0xD4
+//@}
 
-// Width of 48 for iMC Counters
+/*! \name KEYS will define the raw schema for this type. 
+  
+  The required order of registers is:
+  -# Control registers in order
+  -# Counter registers in order
+  -# Fixed counter register
+  @{
+*/
 #define CTL_KEYS \
     X(CTL0, "C", ""), \
     X(CTL1, "C", ""), \
@@ -82,31 +139,39 @@ ff:10.5 System peripheral: Intel Corporation Xeon E5/Core i7 Integrated Memory C
     X(FIXED_CTR,"E,W=48","")
 
 #define KEYS CTL_KEYS, CTR_KEYS
+//@}
 
-/* Events in Memory Controller
-threshhold        [31:24]
-invert threshold  [23]
-enable            [22]
-edge detect       [18]
-umask             [15:8]
-event select      [7:0]
+
+/*! \brief Event select
+  
+  Events are listed in Table 2-61.  They are defined in detail
+  in Section 2.5.8.
+  
+  To change events to count:
+  -# Define event below
+  -# Modify events array in intel_snb_imc_begin()
 */
-
-/* Defs in Table 2-61 */
 #define MBOX_PERF_EVENT(event, umask) \
   ( (event) \
   | (umask << 8) \
-  | (0UL << 18) /* Edge Detection. */ \
-  | (1UL << 22) /* Enable. */ \
-  | (0UL << 23) /* Invert */ \
-  | (0x01UL << 24) /* Threshold */ \
+  | (0UL << 18) \
+  | (1UL << 22) \
+  | (0UL << 23) \
+  | (0x01UL << 24) \
   )
 
-/* Definitions in Table 2-14 */
+/*! \name Events
+
+  Events are listed in Table 2-61.  They are defined in detail
+  in Section 2.5.8.
+
+@{
+ */
 #define CAS_READS           MBOX_PERF_EVENT(0x04, 0x03)
 #define CAS_WRITES          MBOX_PERF_EVENT(0x04, 0x0C)
 #define ACT_COUNT           MBOX_PERF_EVENT(0x01, 0x00)
 #define PRE_COUNT_ALL       MBOX_PERF_EVENT(0x02, 0x03)
+//@}
 
 static int intel_snb_imc_begin_dev(char *bus_dev, uint32_t *events, size_t nr_events)
 {

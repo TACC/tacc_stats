@@ -1,3 +1,43 @@
+/*! 
+ \file intel_snb_r2pci.c
+ \author Todd Evans 
+ \brief Performance Monitoring Counters for Intel Sandy Bridge Ring to PCIe Interface (R2PCI)
+
+
+  \par Details such as Tables and Figures can be found in:
+  "Intel® Xeon® Processor E5-2600 Product Family Uncore 
+  Performance Monitoring Guide" 
+  Reference Number: 327043-001 March 2012 \n
+  R2PCI monitoring is described in Section 2.8.
+
+  \note
+  Sandy Bridge microarchitectures have signatures 06_2a and 06_2d. 
+  Stampede is 06_2d.
+
+
+  \par Location of monitoring register files
+
+  ex) Display PCI Config Space addresses:
+
+      $ lspci | grep "Ring to PCI"
+      7f:13.1 Performance counters: Intel Corporation Xeon E5/Core i7 Ring to PCI Express Performance Monitor (rev 07)
+      ff:13.1 Performance counters: Intel Corporation Xeon E5/Core i7 Ring to PCI Express Performance Monitor (rev 07)
+
+
+   \par PCI address layout of registers:
+
+   ~~~
+   PCI Config Space Dev ID:
+   Socket 1: 7f:13.1
+   Socket 0: ff:13.1
+   ~~~
+   
+   Layout shown in Table 2-104.
+   1 R2PCI w/ 4 counters each per socket
+   
+   There are 4 configure and 4 counter registers per R2PCI
+*/
+
 #include <stddef.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -14,37 +54,33 @@
 #include "pscanf.h"
 #include "check_pci_id.h"
 
-// Uncore R2PCIe Unit events are counted in this file.  The events are accesses in PCI config space.
 
-// Sandy Bridge microarchitectures have signatures 06_2a and 06_2d with non-architectural events
-// listed in Table 19-7, 19-8, and 19-9.  19-8 is 06_2a specific, 19-9 is 06_2d specific.  Stampede
-// is 06_2d but no 06_2d specific events are used here.
+/*! \name R2PCI Global Control Register
 
-// $ ls -l /dev/cpu/0
-// total 0
-// crw-------  1 root root 203, 0 Oct 28 18:47 cpuid
-// crw-------  1 root root 202, 0 Oct 28 18:47 msr
-
-// $ lspci | grep "Ring to PCI"
-/*
-7f:13.1 Performance counters: Intel Corporation Xeon E5/Core i7 Ring to PCI Express Performance Monitor (rev 07)
-ff:13.1 Performance counters: Intel Corporation Xeon E5/Core i7 Ring to PCI Express Performance Monitor (rev 07)
+  Layout in Table 2-105.  This register controls every R2PCI performance counter.  It can
+  reset and freeze the counters.
 */
-
-// Info for this stuff is in: 
-// Intel Xeon Processor E5-2600 Product Family Uncore Performance Monitoring Guide
-
-// 1 Home Agent Units with four counters
-// PCI Config Space Dev ID:
-// Socket 1: 7f:13.1
-// Socket 0: ff:13.1
-
-// Supposedly all registers are 32 bit, but counter
-// registers A and B need to be added to get counter value
-
-// Defs in Table 2-104
 #define R2PCI_BOX_CTL        0xF4
 
+/*! \name R2PCI Configurable Performance Monitoring Registers
+
+  Control register layout in Table 2-106.  These are used to select events.  There are 4 per 
+  socket, 4 per R2PCI.
+
+  ~~~
+  threshhold        [31:24]
+  invert threshold  [23]
+  enable            [22]
+  edge detect       [18]
+  umask             [15:8]
+  event select      [7:0]
+  ~~~
+
+  \note
+  Counter registers are 64 bits with 44 used for counting.  They actually must be read from 
+  2 32 bit registers, with the first 32 (B) bits least and last 32 (A) bits most  significant.
+  @{
+*/
 #define R2PCI_CTL0           0xD8
 #define R2PCI_CTL1           0xDC
 #define R2PCI_CTL2           0xE0
@@ -58,8 +94,15 @@ ff:13.1 Performance counters: Intel Corporation Xeon E5/Core i7 Ring to PCI Expr
 #define R2PCI_A_CTR2         0xB4
 #define R2PCI_B_CTR3         0xB8
 #define R2PCI_A_CTR3         0xBC
+//@}
 
-// Width of 44 for R2PCI Counter Registers
+/*! \name KEYS will define the raw schema for this type. 
+  
+  The required order of registers is:
+  -# Control registers in order
+  -# Counter registers in order
+  @{
+*/
 #define CTL_KEYS \
     X(CTL0, "C", ""), \
     X(CTL1, "C", ""), \
@@ -73,17 +116,17 @@ ff:13.1 Performance counters: Intel Corporation Xeon E5/Core i7 Ring to PCI Expr
     X(CTR3, "E,W=44", "")
 
 #define KEYS CTL_KEYS, CTR_KEYS
+//@}
 
-/* Event Selection in R2PCI
-threshhold        [31:24]
-invert threshold  [23]
-enable            [22]
-edge detect       [18]
-umask             [15:8]
-event select      [7:0]
+/*! \brief Event select
+  
+  Events are listed in Table 2-108.  They are defined in detail
+  in Section 2.8.7.
+  
+  To change events to count:
+  -# Define event below
+  -# Modify events array in intel_snb_r2pci_begin()
 */
-
-/* Defs in Table 2-106 */
 #define R2PCI_PERF_EVENT(event, umask) \
   ( (event) \
   | (umask << 8) \
@@ -94,12 +137,19 @@ event select      [7:0]
   | (0x01UL << 24) /* Threshold */ \
   )
 
-/* Definitions in Table 2-108 */
-#define TxR_INSERTS      R2PCI_PERF_EVENT(0x24,0x04)  /* Ctr 0 only */
+/*! \name Events
+
+  Events are listed in Table 2-108.  They are defined in detail
+  in Section 2.8.7.
+
+@{
+ */
+#define TxR_INSERTS      R2PCI_PERF_EVENT(0x24,0x04)  //!< CTR0 only
 #define CLOCKTICKS       R2PCI_PERF_EVENT(0x01,0x00)
 #define RING_AD_USED_ALL R2PCI_PERF_EVENT(0x07,0x0F)
 #define RING_AK_USED_ALL R2PCI_PERF_EVENT(0x08,0x0F) 
 #define RING_BL_USED_ALL R2PCI_PERF_EVENT(0x09,0x0F) 
+//@}
 
 static int intel_snb_r2pci_begin_dev(char *bus_dev, uint32_t *events, size_t nr_events)
 {

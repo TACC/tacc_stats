@@ -1,17 +1,19 @@
-import numpy
-
+## @file intel_snb.py
 # Post-processing for core and uncore SNB events are performed in this file
 # for the pickler. 
-
+#
 # The registers must be reported in the following order in the stats file:
-# 1) CTL registers
-# 2) Programmable CTR registers
-# 3) Fixed CTR registers
-# 4) If CTL register programming failed it (QPI) it seems to be 0, so this is added to event maps
+# -# CTL registers
+# -# Programmable CTR registers
+# -# Fixed CTR registers
+# -# If CTL register programming failed it (QPI) it seems to be 0, so this is added to event maps
 
-# Core events
+import numpy
+
+## Processor events
 def CORE_PERF_EVENT(event_select, unit_mask):
     return event_select | (unit_mask << 8) | (1L << 16) | (1L << 17) | (1L << 21) | (1L << 22)
+## Processor event map
 cpu_event_map = {
     CORE_PERF_EVENT(0xD0,0x81) : 'LOAD_OPS_ALL,E',
     CORE_PERF_EVENT(0xD1,0x01) : 'LOAD_OPS_L1_HIT,E', 
@@ -25,27 +27,30 @@ cpu_event_map = {
     'FIXED1'                   : 'CLOCKS_UNHALTED_CORE,E',
     'FIXED2'                   : 'CLOCKS_UNHALTED_REF,E',
 }
-# CBo events
+## CBo events
 def CBOX_PERF_EVENT(event, umask):
     return (event) | (umask << 8) | (0L << 17) | (0L << 18) | (0L << 19) | (1L << 22) | (0L << 23) | (1L << 24)
+## CBo event map
 cbo_event_map = {
     CBOX_PERF_EVENT(0x00, 0x00) : 'CLOCK_TICKS,E',
     CBOX_PERF_EVENT(0x11, 0x01) : 'RxR_OCCUPANCY,E',
     CBOX_PERF_EVENT(0x1F, 0x00) : 'COUNTER0_OCCUPANCY,E',
     CBOX_PERF_EVENT(0x34, 0x03) : 'LLC_LOOKUP,E',
     }
-# Home Agent Unit events
+## Home Agent Unit events
 def HAU_PERF_EVENT(event, umask):
     return (event) | (umask << 8) | (0L << 18) | (1L << 22) | (0L << 23) | (1L << 24)
+## Home Agent map
 hau_event_map = {
     HAU_PERF_EVENT(0x01, 0x03) : 'READ_REQUESTS,E',
     HAU_PERF_EVENT(0x01, 0x0C) : 'WRITE_REQUESTS,E',
     HAU_PERF_EVENT(0x00, 0x00) : 'CLOCKTICKS,E',
     HAU_PERF_EVENT(0x1A, 0x0F) : 'IMC_WRITES,E',
     }
-#iMC events
+## Integrated Memory events
 def IMC_PERF_EVENT(event, umask):
     return (event) | (umask << 8) | (0L << 18) | (1L << 22) | (0L <<23) | (1L << 24)
+## Integrated Memory Controller map
 imc_event_map = {
     IMC_PERF_EVENT(0x04, 0x03) : 'CAS_READS,E',
     IMC_PERF_EVENT(0x04, 0x0C) : 'CAS_WRITES,E',
@@ -53,9 +58,10 @@ imc_event_map = {
     IMC_PERF_EVENT(0x02, 0x03) : 'PRE_COUNT_ALL,E',              
     'FIXED0'                   : 'CYCLES,E',
     }
-#Power Control Unit events
+## Power Control Unit events
 def PCU_PERF_EVENT(event):
     return (event) | (0L << 14) | (0L << 17) | (0L << 18) | (1L << 22) | (0L <<23) | (1L << 24) | (0L << 31)
+## Power Control map
 pcu_event_map = {
     PCU_PERF_EVENT(0x06) : 'MAX_OS_CYCLES,E',
     PCU_PERF_EVENT(0x07) : 'MAX_CURRENT_CYCLES,E',
@@ -66,18 +72,20 @@ pcu_event_map = {
     'FIXED0'             : 'C3_CYCLES,E',
     'FIXED1'             : 'C6_CYCLES,E',
     }
-#QPI Unit events
+## QPI Unit events
 def QPI_PERF_EVENT(event, umask):
     return (event) | (umask << 8) | (1L << 15) | (0L << 18) | (1L << 21) | (1L << 22) | (0L <<23) | (1L << 24)
+## QPI map
 qpi_event_map = {
     QPI_PERF_EVENT(0x00, 0x01) : 'G0_IDLE,E',
     QPI_PERF_EVENT(0x00, 0x04) : 'G0_NON_DATA,E',
     QPI_PERF_EVENT(0x02, 0x08) : 'G1_DRS_DATA,E',
     QPI_PERF_EVENT(0x03, 0x04) : 'G2_NCB_DATA,E',              
     }
-#R2PCI Unit events
+## R2PCI Unit events
 def R2PCI_PERF_EVENT(event, umask):
     return (event) | (umask << 8) | (0L << 18) | (1L << 22) | (0L <<23) | (1L << 24)
+## R2PCI map
 r2pci_event_map = {
     R2PCI_PERF_EVENT(0x24, 0x04) : 'TRANSMITS,E',
     R2PCI_PERF_EVENT(0x01, 0x00) : 'CLOCKTICKS,E',
@@ -86,16 +94,23 @@ r2pci_event_map = {
     R2PCI_PERF_EVENT(0x09, 0x0F) : 'DATA_USED,E',              
     }
 
+## Reformats the counter arrays with configurable events
 class reformat_counters:
 
+    ## Constructor
     def __init__(self, job, name, event_map):
+        ## Job Object
         self.job = job
+        ## Name of device
         self.name = name
+        ## List of CTL registers
         self.ctl_registers = []
+        ## List of CTR registers
         self.ctr_registers = []
 
         # Just need the first hosts schema
         for host in job.hosts.itervalues():
+            if name not in host.stats: return
             stats = host.stats[name]
             break
 
@@ -110,7 +125,7 @@ class reformat_counters:
         dev_schema = []
         for dev, array in stats.iteritems():
             for j in self.ctl_registers:
-                dev_schema.append(event_map.get(array[0,j],'NA'))
+                dev_schema.append(event_map.get(array[0,j],str(array[0,j])))
             break
 
 
@@ -125,9 +140,10 @@ class reformat_counters:
         del self.job.schemas[self.name]
         self.job.get_schema(self.name, dev_schema_desc)
 
-
+    ## Remap data to human readable schema
     def register(self,host):
         # Build stats without ctl registers
+        if self.name not in host.stats: return
         stats = host.stats[self.name]
         dev_stats = dict((str(i), numpy.zeros((len(self.job.times),len(self.ctr_registers)),numpy.uint64)) for i in stats.keys())
 
