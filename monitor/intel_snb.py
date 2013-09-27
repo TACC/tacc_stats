@@ -110,6 +110,7 @@ class reformat_counters:
 
         # Just need the first hosts schema
         for host in job.hosts.itervalues():
+            if name not in host.stats: return
             stats = host.stats[name]
             break
 
@@ -142,6 +143,7 @@ class reformat_counters:
     ## Remap data to human readable schema
     def register(self,host):
         # Build stats without ctl registers
+        if self.name not in host.stats: return
         stats = host.stats[self.name]
         dev_stats = dict((str(i), numpy.zeros((len(self.job.times),len(self.ctr_registers)),numpy.uint64)) for i in stats.keys())
 
