@@ -81,6 +81,10 @@ def string_shorten(s,l):
   else:
     return s[:l-3]+'...'
 
+
+### find hosts with all keys having the last 3 data points indentical
+### indicates that the TS data went funny on that host
+  
 def lost_data(ts):
   bad_hosts=[]
   if len(ts.t) < 3:
