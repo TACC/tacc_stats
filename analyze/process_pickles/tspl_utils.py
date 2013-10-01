@@ -80,3 +80,23 @@ def string_shorten(s,l):
     return s
   else:
     return s[:l-3]+'...'
+
+def lost_data(ts):
+  bad_hosts=[]
+  if len(ts.t) < 3:
+    return bad_hosts
+  
+  for v in ts.data:
+    for host in v:
+      flag=True
+      for vals in v[host]:
+        t=vals[-3:-2][0]
+        tarr=numpy.array([t,t,t])
+        if (vals[-3:] == tarr).all():
+          pass
+        else:
+          flag=False
+      if flag:
+        bad_hosts.append(host)
+
+  return bad_hosts

@@ -47,6 +47,11 @@ def fit_step(fn,k1,k2,genplot=False,res={}):
     return
   elif ts.numhosts < 2: # At least 2 hosts
     print ts.j.id + ': 1 host'
+
+  bad_hosts=tspl_utils.lost_data(ts)
+  if len(bad_hosts) > 0:
+    print ts.j.id, ': Detected hosts with bad data: ', bad_hosts
+    return
     
   vals=[]
   for i in [x + 2 for x in range(ts.size-4)]:

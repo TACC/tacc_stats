@@ -50,7 +50,7 @@ def plot_lines(ax, ts, index, xscale=1.0, yscale=1.0, xlabel='', ylabel=''):
     rate=numpy.divide(numpy.diff(v),numpy.diff(ts.t))
     ax.plot(tmid/xscale,rate/yscale)
   tspl_utils.adjust_yaxis_range(ax,0.1)
-  ax.yaxis.set_major_locator( matplotlib.ticker.MaxNLocator(nbins=6))
+  ax.yaxis.set_major_locator(  matplotlib.ticker.MaxNLocator(nbins=6))
   setlabels(ax,ts,index,xlabel,ylabel,yscale)
 
 # Plots "time histograms" for every host

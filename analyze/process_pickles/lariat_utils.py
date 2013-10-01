@@ -28,6 +28,24 @@ class LariatData:
         matches.append(os.path.join(root,fn))
 
     self.jobid=jobid
+    self.equiv_patterns = {
+      r'^charmrun' : 'Charm++*',
+      r'^wrf' : 'WRF*',
+      r'^vasp' : 'VASP*',
+      r'^run\.cctm' : 'CMAQ CCTM*',
+      r'^lmp_' : 'LAMMPS*',
+      r'^mdrun' : 'Gromacs*',
+      r'^enzo' : 'ENZO*',
+      r'^dlpoly' : 'DL_POLY*',
+      r'^su3_' : 'MILC*',
+      r'^qcprog' : 'QCHEM*',
+      r'^namd2' : 'NAMD*',
+      r'^cactus' : 'Cactus*',
+      r'^pw.x' : 'Q. Esp*',
+      r'^pmemd' : 'Amber*',
+      r'^sander' : 'Amber*',
+      }
+
 
     if len(matches) == 0:
       self.ld=None
@@ -61,5 +79,12 @@ class LariatData:
       title += sep + 'CWD: ' + self.cwd
     return title
   
-      
+  def comp_name(self,name,patterns):
+    for i in patterns.keys():
+      if re.search(i,name):
+        return patterns[i]
+    return name
+
+  
+
 
