@@ -81,6 +81,10 @@ a=batch_acct.factory(batch_system,acct_path)
 for acct in a.reader(start_time=start,end_time=end,seek=seek):
     if acct['end_time'] == 0:
         continue
+    if os.path.exists(os.path.join(pickle_dir, acct['id'])): 
+        print acct['id'] + " exists, don't reprocess"
+        continue
+
     job = job_stats.from_acct(acct, tacc_stats_home, host_list_dir, a)
     pickle_path = os.path.join(pickle_dir, job.id)
     pickle_file = open(pickle_path, 'w')
