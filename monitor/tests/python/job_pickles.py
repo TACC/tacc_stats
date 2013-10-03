@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 import sys
-sys.path.append('@CONFIG_PY_DIR@')
+sys.path.append('/home1/02561/rtevans/tmp/tacc_stats/include')
 import datetime, glob, job_stats, os, batch_acct, subprocess, time
 import cPickle as pickle
 

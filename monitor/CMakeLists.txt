@@ -53,9 +53,10 @@ configure_file(job_pickles.py.in ${CMAKE_CURRENT_BINARY_DIR}/job_pickles.py @ONL
 configure_file(job_report.py.in ${CMAKE_CURRENT_BINARY_DIR}/job_report.py @ONLY)
 
 # Setup cron script for pickler
-set (PICKLES_DIR ${pickles_dir})
-set (PYTHON_PATH ${python_path})
+set(PICKLES_DIR ${pickles_dir})
+set(PYTHON_PATH ${python_path})
 configure_file(do_job_pickles_cron.sh.in ${CMAKE_CURRENT_BINARY_DIR}/do_job_pickles_cron.sh @ONLY)
+
 
 file(GLOB PY_INC_FILES ${CMAKE_CURRENT_SOURCE_DIR}/*.py) 
 install(PROGRAMS ${PY_INC_FILES}  DESTINATION 
