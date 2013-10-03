@@ -72,3 +72,4 @@ install(PROGRAMS
 file(GLOB BASH_FILES ${CMAKE_CURRENT_SOURCE_DIR}/*.sh) 
 install(PROGRAMS ${BASH_FILES} DESTINATION ${CMAKE_SOURCE_DIR}/bin)
 
+add_subdirectory(tests)
