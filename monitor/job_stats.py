@@ -255,6 +255,17 @@ class Host(object):
         if not file_schemas:
             self.trace("file `%s' bad header\n", file.name)
             return
+        """
+        records = (file.read()).split('\n\n')
+        for record in records:
+            str_time,rec_jobid = (record.split('\n')[0]).split()
+            rec_time = long(str_time)
+            if rec_jobid == self.job.id:
+                self.times.append(rec_time)
+                for data in record.split('\n')[1:]:
+                    if data[0].isalpha(): self.parse_stats(rec_time, data, file_schemas, file)
+        """
+        
         # Scan file for records belonging to JOBID.
         for line in file:
             try:
@@ -290,11 +301,12 @@ class Host(object):
                     self.times.append(rec_time)
                 elif c.isalpha():
                     self.parse_stats(rec_time, line, file_schemas, file)
+            
                 elif c == SF_MARK_CHAR:
                     mark = line[1:].strip()
                     self.marks[mark] = True
                 elif c == SF_COMMENT_CHAR:
-                    pass
+                    pass        
                 else:
                     pass #...
             except Exception as exc:
@@ -535,7 +547,9 @@ def from_acct(acct, stats_home, host_list_dir, batch_acct):
     stats_home as the base directory, running all required processing.
     """
     job = Job(acct, stats_home, host_list_dir, batch_acct)
+    #start = time.clock()
     job.gather_stats() and job.munge_times() and job.process_stats()
+    #print 'parse stats',time.clock() - start
     return job
 
 

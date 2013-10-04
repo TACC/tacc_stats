@@ -9,6 +9,7 @@ foreach(T ${TYPES})
 	  set(TYPE_OBJS ${TYPE_OBJS} ${T})
 	  file(APPEND "stats.x" "X(${T}) ")
 endforeach(T)
+file(APPEND "stats.x" "\n")
 
 add_definitions(-D_GNU_SOURCE)
 add_definitions(-DSTATS_PROGRAM=\"${CMAKE_PROJECT_NAME}\")
