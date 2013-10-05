@@ -21,16 +21,6 @@ import argparse
 import multiprocessing, functools
 import tspl, tspl_utils, lariat_utils, my_utils
 
-# Reduce data from ts object
-# add and subtract arrays from data based on sign of index variable in
-# accumulator, v
-def assemble(data,index,key,jndex):
-  v=numpy.zeros_like(data[0][key][jndex])
-  for i in index:
-    i2=abs(i)
-    v+=math.copysign(1,i)*data[i2][key][jndex]
-  return v
-
 def setlabels(ax,ts,index,xlabel,ylabel,yscale):
   if xlabel != '':
     ax.set_xlabel(xlabel)
@@ -46,7 +36,7 @@ def plot_lines(ax, ts, index, xscale=1.0, yscale=1.0, xlabel='', ylabel=''):
   tmid=(ts.t[:-1]+ts.t[1:])/2.0
   ax.hold=True
   for k in ts.j.hosts.keys():
-    v=assemble(ts.data,index,k,0)
+    v=ts.assemble(index,k,0)
     rate=numpy.divide(numpy.diff(v),numpy.diff(ts.t))
     ax.plot(tmid/xscale,rate/yscale)
   tspl_utils.adjust_yaxis_range(ax,0.1)
@@ -58,7 +48,7 @@ def plot_lines(ax, ts, index, xscale=1.0, yscale=1.0, xlabel='', ylabel=''):
 def plot_thist(ax, ts, index, xscale=1.0, yscale=1.0, xlabel='', ylabel=''):
   d=[]
   for k in ts.j.hosts.keys():
-    v=assemble(ts.data,index,k,0)
+    v=ts.assemble(index,k,0)
     d.append(numpy.divide(numpy.diff(v),numpy.diff(ts.t)))
   a=numpy.array(d)
 

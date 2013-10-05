@@ -44,6 +44,8 @@ class LariatData:
       r'^pw.x' : 'Q. Esp*',
       r'^pmemd' : 'Amber*',
       r'^sander' : 'Amber*',
+      r'^charmm' : 'CHARMM*',
+      r'^c37b1'  : 'CHARMM*',
       }
 
 

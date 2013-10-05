@@ -3,6 +3,7 @@ import numpy
 import glob, os, stat, time, datetime, sys
 import re
 import tspl_utils
+import math
 
 class TSPLException(Exception):
   def __init__(self,arg):
@@ -177,6 +178,21 @@ class TSPLBase:
     inds=numpy.unravel_index(self.ind,(self.a,self.b,self.c))
     k=self.data[inds[0]].keys()[inds[1]]
     return self.data[inds[0]][k][inds[2]]
+
+
+  # Return a numpy array that accumulates from data using the indices of the
+  # loaded keys. Negative indices subtract.
+  # jndex should always be 0 for TSPLSum objects, but allows selecting over
+  # device indices when a TSPLBase object is used (refactor to default this?)
+  
+  def assemble(self,index,host,jndex):
+    data=self.data
+    v=numpy.zeros_like(data[0][host][jndex])
+    for i in index:
+      i2=abs(i)
+      v+=math.copysign(1,i)*data[i2][host][jndex]
+    return v
+
 
 #  units_correction={
 #    ('intel_snb_imc','CAS_READS') : 

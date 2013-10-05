@@ -21,13 +21,6 @@ import argparse
 import tspl, tspl_utils, lariat_utils
 import math
 
-def assemble(data,index,key,jndex):
-  v=numpy.zeros_like(data[0][key][jndex])
-  for i in index:
-    i2=abs(i)
-    v+=math.copysign(1,i)*data[i2][key][jndex]
-  return v
-
 def getlimits(vals):
     ymin=0.
     ymax=0.
@@ -75,12 +68,12 @@ def main():
     sse_rate = numpy.zeros_like(tmid)
 
     for k in ts.j.hosts.keys():
-      read_rate +=numpy.diff(assemble(ts.data,[0],k,0))/numpy.diff(ts.t)
-      write_rate+=numpy.diff(assemble(ts.data,[1],k,0))/numpy.diff(ts.t)
-      stall_rate+=numpy.diff(assemble(ts.data,[2],k,0))/numpy.diff(ts.t)
-      clock_rate+=numpy.diff(assemble(ts.data,[3],k,0))/numpy.diff(ts.t)
-      avx_rate  +=numpy.diff(assemble(ts.data,[5],k,0))/numpy.diff(ts.t)
-      sse_rate  +=numpy.diff(assemble(ts.data,[4],k,0))/numpy.diff(ts.t)
+      read_rate +=numpy.diff(ts.assemble([0],k,0))/numpy.diff(ts.t)
+      write_rate+=numpy.diff(ts.assemble([1],k,0))/numpy.diff(ts.t)
+      stall_rate+=numpy.diff(ts.assemble([2],k,0))/numpy.diff(ts.t)
+      clock_rate+=numpy.diff(ts.assemble([3],k,0))/numpy.diff(ts.t)
+      avx_rate  +=numpy.diff(ts.assemble([5],k,0))/numpy.diff(ts.t)
+      sse_rate  +=numpy.diff(ts.assemble([4],k,0))/numpy.diff(ts.t)
       
 
     read_frac=read_rate/(read_rate+write_rate+1)

@@ -7,6 +7,7 @@ sys.path.append('../../monitor')
 import datetime, glob, job_stats, os, subprocess, time
 import numpy
 import scipy, scipy.stats
+import math
 import argparse
 import re
 import multiprocessing
@@ -42,11 +43,14 @@ def isidle(file,thresh):
       maxrate=numpy.maximum(rate,maxrate)
     mr.append(maxrate)
 
+
   sums=[]
   for i in range(len(k1)):
     for h in ts.j.hosts.keys():
       rate=numpy.divide(numpy.diff(ts.data[i][h]),numpy.diff(ts.t))
       sums.append(numpy.sum(numpy.divide(mr[i]-rate,mr[i]))/(len(ts.t)-1))
+
+  sums = [0. if math.isnan(x) else x for x in sums]
 
   if max(sums) > thresh:
     return True

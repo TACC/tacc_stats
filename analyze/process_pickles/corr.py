@@ -22,13 +22,6 @@ import multiprocessing, functools
 import collections, itertools
 import tspl, tspl_utils, lariat_utils, my_utils
 
-def assemble(data,index,key,jndex):
-  v=numpy.zeros_like(data[0][key][jndex])
-  for i in index:
-    i2=abs(i)
-    v+=math.copysign(1,i)*data[i2][key][jndex]
-  return v
-
 def compute_ratio(file):
   try:
     ts=tspl.TSPLSum(file,['intel_snb_imc', 'intel_snb_imc',
@@ -62,13 +55,13 @@ def compute_ratio(file):
 
 
   for host in ts.j.hosts.keys():
-    read_rate  += numpy.diff(assemble(ts.data,[0],host,0))/numpy.diff(ts.t)
-    write_rate += numpy.diff(assemble(ts.data,[1],host,0))/numpy.diff(ts.t)
-    l1_rate    += numpy.diff(assemble(ts.data,[2],host,0))/numpy.diff(ts.t)
-    avx_rate   += numpy.diff(assemble(ts.data,[3],host,0))/numpy.diff(ts.t)
-    sse_rate   += numpy.diff(assemble(ts.data,[4],host,0))/numpy.diff(ts.t)
-    stall_rate += numpy.diff(assemble(ts.data,[5],host,0))/numpy.diff(ts.t)
-    clock_rate += numpy.diff(assemble(ts.data,[6],host,0))/numpy.diff(ts.t)
+    read_rate  += numpy.diff(ts.assemble([0],host,0))/numpy.diff(ts.t)
+    write_rate += numpy.diff(ts.assemble([1],host,0))/numpy.diff(ts.t)
+    l1_rate    += numpy.diff(ts.assemble([2],host,0))/numpy.diff(ts.t)
+    avx_rate   += numpy.diff(ts.assemble([3],host,0))/numpy.diff(ts.t)
+    sse_rate   += numpy.diff(ts.assemble([4],host,0))/numpy.diff(ts.t)
+    stall_rate += numpy.diff(ts.assemble([5],host,0))/numpy.diff(ts.t)
+    clock_rate += numpy.diff(ts.assemble([6],host,0))/numpy.diff(ts.t)
 
   read_rate  /= ts.numhosts
   write_rate /= ts.numhosts
@@ -193,6 +186,11 @@ def main():
   fname='msr_v_mdr'
   fig.savefig(fname)
   plt.close()
+
+  markers = itertools.cycle(('o','x','+','^','s','8','p',
+                             'h','*','D','<','>','v','d','.'))
+
+  colors  = itertools.cycle(('b','g','r','c','m','k','y'))
 
   fig,ax=plt.subplots(1,1,figsize=(10,8),dpi=80)
 
