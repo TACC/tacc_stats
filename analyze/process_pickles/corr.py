@@ -92,8 +92,8 @@ def main():
   parser = argparse.ArgumentParser(description='Correlations')
   parser.add_argument('-p', help='Set number of processes',
                       nargs=1, type=int, default=[1])
-  parser.add_argument('-s', help='Use SUs instead of job counts'
-                      nargs=1, type=int, default=[1])
+  parser.add_argument('-s', help='Use SUs instead of job counts',
+                      action='store_true')
   parser.add_argument('filearg', help='File, directory, or quoted'
                       ' glob pattern', nargs='?',default='jobs')
   
