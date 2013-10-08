@@ -2,6 +2,7 @@ cmake_minimum_required(VERSION 2.6)
 set(CMAKE_PROJECT_NAME "tacc_stats")
 set(PROJECT_VERSION "1.0.5")
 
+include(CTest)
 add_subdirectory(monitor)
 
 # add a target to generate API documentation with Doxygen

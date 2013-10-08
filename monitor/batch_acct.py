@@ -1,17 +1,18 @@
 import csv, os, subprocess, datetime, glob
 
-def factory(kind,acct_file):
+def factory(kind,acct_file,host_name_ext=''):
   if kind == 'SGE':
-    return SGEAcct(acct_file)
+    return SGEAcct(acct_file,host_name_ext)
   elif kind == 'SLURM':
-    return SLURMAcct(acct_file)
+    return SLURMAcct(acct_file,host_name_ext)
 
 class BatchAcct(object):
 
-  def __init__(self,batch_kind,acct_file):
+  def __init__(self,batch_kind,acct_file,host_name_ext):
     self.batch_kind=batch_kind
     self.acct_file=acct_file
     self.field_names = [tup[0] for tup in self.fields]
+    self.name_ext = '.'+host_name_ext
 
   def reader(self,start_time=0, end_time=9223372036854775807L, seek=0):
     """reader(start_time=0, end_time=9223372036854775807L, seek=0)
@@ -45,7 +46,7 @@ class BatchAcct(object):
 
 class SGEAcct(BatchAcct):
 
-  def __init__(self, acct_file):
+  def __init__(self, acct_file, host_name_ext):
     self.fields = (
       ('queue',           str, 'Name of the cluster queue in which the job has run.'), # sge 'qname'
       ('hostname',        str, 'Name of the execution host.'),
@@ -93,10 +94,8 @@ class SGEAcct(BatchAcct):
       ('arid',            int, 'Advance reservation identifier. If the job used resources of an advance reservation then this field contains a positive integer identifier otherwise the value is 0.'),
       ('ar_submission_time', int, 'If the job used resources of an advance reservation then this field contains the submission time (GMT unix time stamp) of the advance reservation, otherwise the value is 0.'),
       )
-
-    self.name_ext=''
     
-    BatchAcct.__init__(self,'SGE',acct_file)
+    BatchAcct.__init__(self,'SGE',acct_file,host_name_ext)
 
   def keymap(key): # Batch account keywords are based on SGE names for
                    # historical reasons
@@ -119,7 +118,7 @@ class SGEAcct(BatchAcct):
 
 class SLURMAcct(BatchAcct):
 
-  def __init__(self,acct_file):
+  def __init__(self,acct_file,host_name_ext):
     
     self.fields = (
       ('id', str, 'Job ID'),
@@ -136,10 +135,8 @@ class SLURMAcct(BatchAcct):
       ('nodes', int, 'Nodes requested'),
       ('cores', int, 'CPU cores requested')
       )
-    self.name_ext='.stampede.tacc.utexas.edu'
-      
     
-    BatchAcct.__init__(self,'SLURM',acct_file)
+    BatchAcct.__init__(self,'SLURM',acct_file,host_name_ext)
 
   def get_host_list_path(self,acct,host_list_dir):
     """Return the path of the host list written during the prolog."""
