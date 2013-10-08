@@ -1,3 +1,44 @@
+/*! 
+ \file intel_snb_qpi.c
+ \author Todd Evans 
+ \brief Performance Monitoring Counters for Intel Sandy Bridge QPI Link Layer (QPI)
+
+
+  \par Details such as Tables and Figures can be found in:
+  "Intel® Xeon® Processor E5-2600 Product Family Uncore 
+  Performance Monitoring Guide" 
+  Reference Number: 327043-001 March 2012 \n
+  QPI monitoring is described in Section 2.7.
+
+  \note
+  Sandy Bridge microarchitectures have signatures 06_2a and 06_2d. 
+  Stampede is 06_2d.
+
+
+  \par Location of monitoring register files
+
+  ex) Display PCI Config Space addresses:
+
+       $ lspci -nn | grep "Performance counters"
+       7f:08.2 Performance counters [1101]: Intel Corporation Device [8086:3c41] (rev 07)
+       7f:09.2 Performance counters [1101]: Intel Corporation Device [8086:3c42] (rev 07)
+       ff:08.2 Performance counters [1101]: Intel Corporation Device [8086:3c41] (rev 07)
+       ff:09.2 Performance counters [1101]: Intel Corporation Device [8086:3c42] (rev 07)
+
+   \par PCI address layout of registers:
+
+   ~~~
+   PCI Config Space Dev ID:
+   Socket 1: 7f:08.2, 7f:09.2
+   Socket 0: ff:08.5, 7f:09.2
+   ~~~
+   
+   Layout shown in Table 2-84.
+   2 QPI w/ 4 counters each per socket
+   
+   There are 4 configure, 4 counter, 1 mask and 1 match per QPI.
+*/
+
 #include <stddef.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -14,36 +55,35 @@
 #include "pscanf.h"
 #include "check_pci_id.h"
 
-// Uncore QPI Link Layer events are counted in this file.  The events are accesses in PCI config space.
 
-// Sandy Bridge microarchitectures have signatures 06_2a and 06_2d with non-architectural events
-// listed in Table 19-7, 19-8, and 19-9.  19-8 is 06_2a specific, 19-9 is 06_2d specific.  Stampede
-// is 06_2d but no 06_2d specific events are used here.
+/*! \name QPI Global Control Register
 
-// $ ls -l /dev/cpu/0
-// total 0
-// crw-------  1 root root 203, 0 Oct 28 18:47 cpuid
-// crw-------  1 root root 202, 0 Oct 28 18:47 msr
-
-// $ lspci -nn | grep "Performance counters"
-/*
-7f:08.2 Performance counters [1101]: Intel Corporation Device [8086:3c41] (rev 07)
-7f:09.2 Performance counters [1101]: Intel Corporation Device [8086:3c42] (rev 07)
-ff:08.2 Performance counters [1101]: Intel Corporation Device [8086:3c41] (rev 07)
-ff:09.2 Performance counters [1101]: Intel Corporation Device [8086:3c42] (rev 07)
+  Layout in Table 2-85.  This register controls every QPI performance counter.  It can
+  reset and freeze the counters.
 */
-
-// Info for this stuff is in: 
-//Intel Xeon Processor E5-2600 Product Family Uncore Performance Monitoring Guide
-// 2 QPI units with four counters each
-// PCI Config Space Dev ID:
-// Socket 1: 7f:08.2, 7f:09.2
-// Socket 0: ff:08.5, 7f:09.2
-// Supposedly all registers are 32 bit, but counter
-// registers A and B need to be added to get counter value
-
-// Defs in Table 2-84
 #define QPI_BOX_CTL  0xF4
+
+/*! \name QPI Configurable Performance Monitoring Registers
+
+  Control register layout in Table 2-86.  These are used to select events.  There are 8 per 
+  socket, 4 per QPI.
+
+  ~~~
+  threshhold        [31:24]
+  invert threshold  [23]
+  enable            [22]
+  event ext         [21]
+  edge detect       [18]
+  reset             [17]
+  umask             [15:8]
+  event select      [7:0]
+  ~~~
+
+  \note
+  Counter registers are 64 bits with 48 used for counting.  They actually must be read from 
+  2 32 bit registers, with the first 32 (B) bits least and last 32 (A) bits most  significant.
+  @{
+*/
 #define QPI_CTL0     0xD8
 #define QPI_CTL1     0xDC
 #define QPI_CTL2     0xE0
@@ -57,13 +97,27 @@ ff:09.2 Performance counters [1101]: Intel Corporation Device [8086:3c42] (rev 0
 #define QPI_A_CTR2   0xB4
 #define QPI_B_CTR3   0xB8
 #define QPI_A_CTR3   0xBC
+//@}
 
+/*! \name QPI filter registers
+
+  These are not currently used in tacc_stats.
+  Allow filtering by opcode and address.
+  @{
+ */
 #define QPI_MASK0    0x238
 #define QPI_MASK1    0x23C
 #define QPI_MATCH0   0x228
 #define QPI_MATCH1   0x22C
+//@}
 
-// Width of 48 for QPI Counters
+/*! \name KEYS will define the raw schema for this type. 
+  
+  The required order of registers is:
+  -# Control registers in order
+  -# Counter registers in order
+  @{
+*/
 #define CTL_KEYS \
     X(CTL0, "C", ""), \
     X(CTL1, "C", ""), \
@@ -77,19 +131,17 @@ ff:09.2 Performance counters [1101]: Intel Corporation Device [8086:3c42] (rev 0
     X(CTR3, "E,W=48,U=flt", "")
 
 #define KEYS CTL_KEYS, CTR_KEYS
+//@}
 
-/* Events in QPI
-threshhold        [31:24]
-invert threshold  [23]
-enable            [22]
-event ext         [21]
-edge detect       [18]
-reset             [17]
-umask             [15:8]
-event select      [7:0]
+/*! \brief Event select
+  
+  Events are listed in Table 2-94.  They are defined in detail
+  in Section 2.7.7.
+  
+  To change events to count:
+  -# Define event below
+  -# Modify events array in intel_snb_qpi_begin()
 */
-
-/* Defs in Table 2-61 */
 #define QPI_PERF_EVENT(event, umask) \
   ( (event) \
   | (umask << 8) \
@@ -101,11 +153,18 @@ event select      [7:0]
   | (0x01UL << 24) /* Threshold */ \
   )
 
-/* Definitions in Table 2-94 */
-#define G0_IDLE     QPI_PERF_EVENT(0x00,0x01) /* all null packets */
-#define G0_NON_DATA QPI_PERF_EVENT(0x00,0x04) /* protocol overhead */
-#define G1_DRS_DATA QPI_PERF_EVENT(0x02,0x08) /* for data bandwidth, flits x 8B/time */
-#define G2_NCB_DATA QPI_PERF_EVENT(0x03,0x04) /* for data bandwidth, flits x 8B/time */
+/*! \name Events
+
+  Events are listed in Table 2-40.  They are defined in detail
+  in Section 2.4.7.
+
+@{
+ */
+#define G0_IDLE     QPI_PERF_EVENT(0x00,0x01) //!< all null packets
+#define G0_NON_DATA QPI_PERF_EVENT(0x00,0x04) //!< protocol overhead
+#define G1_DRS_DATA QPI_PERF_EVENT(0x02,0x08) //!< for data bandwidth, flits x 8B/time
+#define G2_NCB_DATA QPI_PERF_EVENT(0x03,0x04) //!< for data bandwidth, flits x 8B/time
+//@}
 
 static int intel_snb_qpi_begin_dev(char *bus_dev, uint32_t *events, size_t nr_events)
 {

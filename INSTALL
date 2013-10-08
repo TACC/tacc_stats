@@ -1,9 +1,0 @@
-# Instructions
-# Install Steps:
-#1) modify do-configure.sh for system/directory structure
-#2) mkdir build
-#3) cd build
-#4) ../do-configure
-#5) make install
-
-# All executables are placed in the bin directory

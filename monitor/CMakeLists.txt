@@ -9,6 +9,7 @@ foreach(T ${TYPES})
 	  set(TYPE_OBJS ${TYPE_OBJS} ${T})
 	  file(APPEND "stats.x" "X(${T}) ")
 endforeach(T)
+file(APPEND "stats.x" "\n")
 
 add_definitions(-D_GNU_SOURCE)
 add_definitions(-DSTATS_PROGRAM=\"${CMAKE_PROJECT_NAME}\")
@@ -53,9 +54,10 @@ configure_file(job_pickles.py.in ${CMAKE_CURRENT_BINARY_DIR}/job_pickles.py @ONL
 configure_file(job_report.py.in ${CMAKE_CURRENT_BINARY_DIR}/job_report.py @ONLY)
 
 # Setup cron script for pickler
-set (PICKLES_DIR ${pickles_dir})
-set (PYTHON_PATH ${python_path})
+set(PICKLES_DIR ${pickles_dir})
+set(PYTHON_PATH ${python_path})
 configure_file(do_job_pickles_cron.sh.in ${CMAKE_CURRENT_BINARY_DIR}/do_job_pickles_cron.sh @ONLY)
+
 
 file(GLOB PY_INC_FILES ${CMAKE_CURRENT_SOURCE_DIR}/*.py) 
 install(PROGRAMS ${PY_INC_FILES}  DESTINATION 
@@ -71,9 +73,4 @@ install(PROGRAMS
 file(GLOB BASH_FILES ${CMAKE_CURRENT_SOURCE_DIR}/*.sh) 
 install(PROGRAMS ${BASH_FILES} DESTINATION ${CMAKE_SOURCE_DIR}/bin)
 
-
-set(ARCHIVE_NAME ${CMAKE_PROJECT_NAME}-${PROJECT_VERSION})
-add_custom_target(dist
-    COMMAND git archive --prefix=${ARCHIVE_NAME}/ HEAD
-        | gzip > ${CMAKE_BINARY_DIR}/${ARCHIVE_NAME}.tar.gz
-    WORKING_DIRECTORY ${CMAKE_SOURCE_DIR})
+add_subdirectory(tests)
