@@ -26,8 +26,8 @@ class TSPLBase:
         self.wayness=16
       except TypeError:
         raise TSPLException('Something is funny with job ' +str(self.j.id) +
-                            ' ' + self.j.acct['cores'] + ' ' +
-                            self.j.acct['nodes'])
+                            ' ' + str(self.j.acct['cores']) + ' ' +
+                            str(self.j.acct['nodes']))
 
     try:
       self.queue=self.j.acct['queue']

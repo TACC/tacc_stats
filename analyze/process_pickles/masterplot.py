@@ -72,7 +72,7 @@ def plot_mmm(ax, ts, index, xscale=1.0, yscale=1.0, xlabel='', ylabel=''):
   tmid=(ts.t[:-1]+ts.t[1:])/2.0
   d=[]
   for k in ts.j.hosts.keys():
-    v=assemble(ts.data,index,k,0)
+    v=ts.assemble(index,k,0)
     d.append(numpy.divide(numpy.diff(v),numpy.diff(ts.t)))
   a=numpy.array(d)
 
