@@ -63,13 +63,13 @@ def compute_ratio(file):
     stall_rate += numpy.diff(ts.assemble([5],host,0))/numpy.diff(ts.t)
     clock_rate += numpy.diff(ts.assemble([6],host,0))/numpy.diff(ts.t)
 
-  read_rate  /= ts.numhosts
-  write_rate /= ts.numhosts
-  l1_rate    /= ts.numhosts
-  avx_rate   /= ts.numhosts
-  sse_rate   /= ts.numhosts
-  stall_rate /= ts.numhosts
-  clock_rate /= ts.numhosts
+  read_rate  /= float(ts.numhosts*int(ts.wayness)*int(ld.threads))
+  write_rate /= float(ts.numhosts*int(ts.wayness)*int(ld.threads))
+  l1_rate    /= float(ts.numhosts*int(ts.wayness)*int(ld.threads))
+  avx_rate   /= float(ts.numhosts*int(ts.wayness)*int(ld.threads))
+  sse_rate   /= float(ts.numhosts*int(ts.wayness)*int(ld.threads))
+  stall_rate /= float(ts.numhosts*int(ts.wayness)*int(ld.threads))
+  clock_rate /= float(ts.numhosts*int(ts.wayness)*int(ld.threads))
     
 
   data_ratio  = (read_rate+write_rate)/l1_rate
@@ -85,12 +85,14 @@ def compute_ratio(file):
   mean_mem_rate=numpy.mean(read_rate + write_rate)
   if mean_mem_rate > 2e9: # Put a print in here and investigate bad jobs
     return
-  return (ename, mean_data_ratio, mean_stall_ratio, mean_mem_rate )
+  return (ts.j.id, ts.su, ename, mean_data_ratio, mean_stall_ratio, mean_mem_rate )
 
 def main():
 
   parser = argparse.ArgumentParser(description='Correlations')
   parser.add_argument('-p', help='Set number of processes',
+                      nargs=1, type=int, default=[1])
+  parser.add_argument('-s', help='Use SUs instead of job counts'
                       nargs=1, type=int, default=[1])
   parser.add_argument('filearg', help='File, directory, or quoted'
                       ' glob pattern', nargs='?',default='jobs')
@@ -108,31 +110,38 @@ def main():
   mdr={}
   msr={}
   mmr={}
+  sus={}
   for tup in res:
     try:
-      (ename,mean_data_ratio,mean_stall_ratio,mean_mem_rate) = tup
+      (jobid,su,ename,mean_data_ratio,mean_stall_ratio,mean_mem_rate) = tup
     except TypeError as e:
       continue
     if ename in mdr:
       mdr[ename]=numpy.append(mdr[ename],numpy.array([mean_data_ratio]))
       msr[ename]=numpy.append(msr[ename],numpy.array([mean_stall_ratio]))
       mmr[ename]=numpy.append(mmr[ename],numpy.array([mean_mem_rate]))
+      sus[ename]+=su
     else:
       mdr[ename]=numpy.array([mean_data_ratio])
       msr[ename]=numpy.array([mean_stall_ratio])
       mmr[ename]=numpy.array([mean_mem_rate])
+      sus[ename]=su
 
   # Find top 15
-  mdrl={}
+  top_count={}
   for k in mdr.keys():
-    mdrl[k]=len(mdr[k])
+    if n.s:
+      top_count[k]=sus[k] # by sus
+    else:
+      top_count[k]=len(mdr[k]) # by count
 
-  d = collections.Counter(mdrl)
+  d = collections.Counter(top_count)
 
   mdr2={}
   msr2={}
   mmr2={}
   for k,v in d.most_common(15):
+    print k,v
     mdr2[k]=numpy.log10(mdr[k])
     msr2[k]=msr[k]
     mmr2[k]=numpy.log10(mmr[k])
@@ -142,7 +151,7 @@ def main():
 #      continue
 #    mdr2[k]=mdr[k]
 
-  x=[len(mdr2[k]) for k in mdr2.keys()]
+  x=[top_count[k] for k in mdr2.keys()]
 
   l=len(mdr2.keys())
   y=numpy.linspace(0.10,0.95,l)
@@ -153,7 +162,7 @@ def main():
   plt.subplots_adjust(hspace=0.35,bottom=0.25)
 
 
-  ax.boxplot(mdr2.values(),widths=widths) #accepts a widths parameter
+  ax.boxplot(mdr2.values(),widths=widths)
   xtickNames = plt.setp(ax,xticklabels=mdr2.keys())
   plt.setp(xtickNames, rotation=45, fontsize=8)
   ax.set_ylabel(r'log(DRAM BW/L1 Fill Rate)')

@@ -19,7 +19,7 @@ class TSPLBase:
     try:
       self.wayness=int(re.findall('\d+',self.j.acct['granted_pe'])[0])
     except KeyError:
-      try: 
+      try:
         self.wayness=self.j.acct['cores']/self.j.acct['nodes']
       except ZeroDivisionError:
         print "Read zero nodes, assuming 16 way job"
@@ -48,6 +48,10 @@ class TSPLBase:
 
     if self.numhosts == 0:
       raise TSPLException('No hosts')
+
+    self.su=float(self.j.acct['end_time'] - self.j.acct['start_time'])* \
+            float(self.numhosts*16.0)/3600.0 # Need to refactor the 16 into the
+                                        # accounting class
 
     if isinstance(k1,dict) and isinstance(k2,dict):
       if 'amd64_core' in self.j.hosts.values()[0].stats:
