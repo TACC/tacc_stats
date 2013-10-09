@@ -35,7 +35,7 @@
   X(uint64_t, port_multicast_xmit_pkts, IB_PC_EXT_XMT_MPKTS_F) \
   X(uint64_t, port_multicast_rcv_pkts, IB_PC_EXT_RCV_MPKTS_F)
 
-static void collect_lid_port(struct stats *stats, int lid, int port)
+static void collect_lid_port(struct stats *stats, char* hca, int lid, int port)
 {
   struct ibmad_port *mad_port = NULL;
   int mgmt_class = IB_PERFORMANCE_CLASS;
@@ -43,26 +43,11 @@ static void collect_lid_port(struct stats *stats, int lid, int port)
   uint8_t mad_buf[1024];
   int timeout = 0;
 
-  mad_port = mad_rpc_open_port(NULL /* ibd_ca */, 0 /* ibd_ca_port */, &mgmt_class, 1);
+  mad_port = mad_rpc_open_port(hca, port, &mgmt_class, 1);
   if (mad_port == NULL) {
     ERROR("cannot open mad rpc port: %m\n");
     goto out;
   }
-
-//   if (ib_resolve_self_via(&portid, &port, NULL, mad_port) < 0) {
-//     ERROR("cannot resolve self port\n");
-//     goto out;
-//   }
-//  TRACE("lid %d\n", portid.lid);
-
-//   if (pma_query_via(mad_buf, &portid, port, timeout, CLASS_PORT_INFO, mad_port) == NULL) {
-//     ERROR("cannot query class port info: %m\n");
-//     goto out;
-//   }
-//
-//   uint16_t cap_mask;
-//   memcpy(&cap_mask, mad_buf + 2, sizeof(cap_mask));
-//   cap_mask = ntohs(cap_mask);
 
   memset(mad_buf, 0, sizeof(mad_buf));
 
@@ -85,7 +70,7 @@ static void collect_lid_port(struct stats *stats, int lid, int port)
     mad_rpc_close_port(mad_port);
 }
 
-static void collect_hca_port(struct stats_type *type, const char *hca, int port)
+static void collect_hca_port(struct stats_type *type, char *hca, int port)
 {
   struct stats *stats = NULL;
   char dev[80];
@@ -119,7 +104,7 @@ static void collect_hca_port(struct stats_type *type, const char *hca, int port)
   if (stats == NULL)
     goto out;
 
-  collect_lid_port(stats, lid, port);
+  collect_lid_port(stats, hca, lid, port);
 
  out:
   (void) 0;
@@ -140,7 +125,7 @@ static void collect_ib_ext(struct stats_type *type)
   while ((sys_ent = readdir(sys_dir)) != NULL) {
     char ports_path[80];
     DIR *ports_dir = NULL;
-    const char *hca = sys_ent->d_name;
+    char *hca = sys_ent->d_name;
     struct dirent *ent;
 
     if (hca[0] == '.')

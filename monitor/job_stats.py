@@ -356,7 +356,7 @@ class Host(object):
 class Job(object):
     # TODO errors/comments
     __slots__ = ('id', 'start_time', 'end_time', 'acct', 'schemas', 'hosts',
-    'times','stats_home', 'host_list_dir', 'batch_acct')
+    'times','stats_home', 'host_list_dir', 'batch_acct', 'edit_flags')
 
     def __init__(self, acct, stats_home, host_list_dir, batch_acct):
         self.id = acct['id']
@@ -369,6 +369,7 @@ class Job(object):
         self.stats_home=stats_home
         self.host_list_dir=host_list_dir
         self.batch_acct=batch_acct
+        self.edit_flags = []
 
     def trace(self, fmt, *args):
         trace('%s: ' + fmt, self.id, *args)
@@ -469,20 +470,26 @@ class Job(object):
                     if v < p:
                         # Looks like rollover.
                         if e.width:
-                            #trace("time %d, counter `%s', rollover prev %d, curr %d\n",
-                            #      self.times[i], e.key, p, v)
+                            trace("time %d, counter `%s', rollover prev %d, curr %d\n",
+                                  self.times[i], e.key, p, v)
                             r -= numpy.uint64(1L << e.width)
                         elif v == 0:
+                            # Spurious reset
                             # This happens with the IB counters.
                             # Ignore this value, use previous instead.
                             # TODO Interpolate or something.
-                            #trace("time %d, counter `%s', suspicious zero, prev %d\n",
-                            #      self.times[i], e.key, p)
+                            trace("time %d, counter `%s', suspicious zero, prev %d\n",
+                                  self.times[i], e.key, p)
                             v = p # Ugh.
-                        #else:
-                            #error("time %d, counter `%s', 64-bit rollover prev %d, curr %d\n",
-                            #      self.times[i], e.key, p, v)
-                            # TODO Discard or something.
+                        else:
+                            # We will assume a spurious reset, 
+                            # and the reset happened at the start of the counting period.
+                            # This happens with IB counters.
+                            # A[i,j] = v + A[i-1,j] = v + v_(t-1) - r
+                            v += A[i-1,j] # Add new value after reset to old re-based value
+                            r = 0 # base is now zero
+                            self.edit_flags.append("(time %d, host `%s', type `%s', dev `%s', key `%s')" %
+                                                   (self.times[i],host.name,type_name,dev_name,e.key))
                     A[i, j] = v - r
                     p = v
             if e.mult:
