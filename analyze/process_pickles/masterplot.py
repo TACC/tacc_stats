@@ -32,24 +32,33 @@ def setlabels(ax,ts,index,xlabel,ylabel,yscale):
 
 # Consolidate several near identical plots to a function
 # Plots lines for each host
-def plot_lines(ax, ts, index, xscale=1.0, yscale=1.0, xlabel='', ylabel=''):
+def plot_lines(ax, ts, index, xscale=1.0, yscale=1.0, xlabel='', ylabel='',
+               do_rate=True):
   tmid=(ts.t[:-1]+ts.t[1:])/2.0
   ax.hold=True
   for k in ts.j.hosts.keys():
     v=ts.assemble(index,k,0)
-    rate=numpy.divide(numpy.diff(v),numpy.diff(ts.t))
-    ax.plot(tmid/xscale,rate/yscale)
+    if do_rate:
+      rate=numpy.divide(numpy.diff(v),numpy.diff(ts.t))
+      ax.plot(tmid/xscale,rate/yscale)
+    else:
+      val=(v[:-1]+v[1:])/2.0
+      ax.plot(tmid/xscale,val/yscale)
   tspl_utils.adjust_yaxis_range(ax,0.1)
   ax.yaxis.set_major_locator(  matplotlib.ticker.MaxNLocator(nbins=6))
   setlabels(ax,ts,index,xlabel,ylabel,yscale)
 
 # Plots "time histograms" for every host
 # This code is likely inefficient
-def plot_thist(ax, ts, index, xscale=1.0, yscale=1.0, xlabel='', ylabel=''):
+def plot_thist(ax, ts, index, xscale=1.0, yscale=1.0, xlabel='', ylabel='',
+               do_rate=False):
   d=[]
   for k in ts.j.hosts.keys():
     v=ts.assemble(index,k,0)
-    d.append(numpy.divide(numpy.diff(v),numpy.diff(ts.t)))
+    if do_rate:
+      d.append(numpy.divide(numpy.diff(v),numpy.diff(ts.t)))
+    else:
+      d.append((v[:-1]+v[1:])/2.0)
   a=numpy.array(d)
 
   h=[]
@@ -68,12 +77,17 @@ def plot_thist(ax, ts, index, xscale=1.0, yscale=1.0, xlabel='', ylabel=''):
   setlabels(ax,ts,index,xlabel,ylabel,yscale)
   ax.autoscale(tight=True)
 
-def plot_mmm(ax, ts, index, xscale=1.0, yscale=1.0, xlabel='', ylabel=''):
+def plot_mmm(ax, ts, index, xscale=1.0, yscale=1.0, xlabel='', ylabel='',
+             do_rate=False):
   tmid=(ts.t[:-1]+ts.t[1:])/2.0
   d=[]
   for k in ts.j.hosts.keys():
     v=ts.assemble(index,k,0)
-    d.append(numpy.divide(numpy.diff(v),numpy.diff(ts.t)))
+    if do_rate:
+      d.append(numpy.divide(numpy.diff(v),numpy.diff(ts.t)))
+    else:
+      d.append((v[:-1]+v[1:])/2.0)
+    
   a=numpy.array(d)
 
   mn=[]
@@ -159,7 +173,8 @@ def master_plot(file,mode='lines',threshold=False,
 
     #Plot key 3
     #plot(ax[2],ts,[2],3600.,1.0/64.0*1e9, ylabel='L1 BW GB/s')
-    plot(ax[2],ts,[8],3600.,1024.0*1024.0*1024.0, ylabel='Memory Usage GB')
+    plot(ax[2],ts,[10],3600.,1024.0*1024.0*1024.0, ylabel='Memory Usage GB',
+         do_rate=False)
   else: #Fix this to support the old amd plots
     print ts.pmc_type + ' not supported'
     return 
