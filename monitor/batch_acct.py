@@ -29,6 +29,14 @@ class BatchAcct(object):
       except:
         pass
 
+      if len(d) > 13 and d['nodes'].isalpha(): 
+        d['name'] = d['name']+':'+d['status']
+        d['status'] = d['nodes']
+        d['nodes'] = d['cores']
+        d['cores'] = d[None]
+        del d[None]
+        print d        
+
       # Accounting records with pe_taskid != NONE are generated for
       # sub_tasks of a tightly integrated job and should be ignored.
       if start_time <= d['end_time'] and d['end_time'] < end_time:
