@@ -1,5 +1,6 @@
 #!/usr/bin/env python
-import datetime, errno, glob, numpy, os, sys, time, subprocess
+import datetime, errno, glob, numpy, os, sys, time, gzip
+from subprocess import Popen, PIPE
 import amd64_pmc, intel_snb, batch_acct
 
 if sys.version.startswith("3"):
@@ -8,7 +9,8 @@ if sys.version.startswith("3"):
 else:
     import cStringIO
     io_method = cStringIO.StringIO
-
+    #import io
+    #io.BufferedIOBase
 verbose = os.getenv('TACC_STATS_VERBOSE')
 
 if not verbose:
@@ -227,7 +229,7 @@ class Host(object):
                         file_schemas[type_name] = schema
                     else:
                         self.error("file `%s', type `%s', schema mismatch desc `%s'\n",
-                                   "filename", type_name, schema_desc)
+                                   file.name, type_name, schema_desc)
                 elif c == SF_PROPERTY_CHAR:
                     pass
                 elif c == SF_COMMENT_CHAR:
@@ -236,7 +238,7 @@ class Host(object):
                     break
             except Exception as exc:
                 self.trace("file `%s', caught `%s' discarding line `%s'\n",
-                           "filename", exc, line)
+                           file.name, exc, line)
                 break
         return file_schemas
 
@@ -245,14 +247,14 @@ class Host(object):
         schema = file_schemas.get(type_name)
         if not schema:
             self.error("file `%s', unknown type `%s', discarding line `%s'\n",
-                       "filename", type_name, line)
+                       file.name, type_name, line)
             return
         # TODO stats_dtype = numpy.uint64
         # XXX count = ?
         vals = numpy.fromstring(rest, dtype=numpy.uint64, sep=' ')
         if vals.shape[0] != len(schema):
             self.error("file `%s', type `%s', expected %d values, read %d, discarding line `%s'\n",
-                       "filename", type_name, len(schema), vals.shape[0], line)
+                       file.name, type_name, len(schema), vals.shape[0], line)
             return
         type_stats = self.raw_stats.setdefault(type_name, {})
         dev_stats = type_stats.setdefault(dev_name, [])
@@ -261,19 +263,8 @@ class Host(object):
     def read_stats_file(self, file):
         file_schemas = self.read_stats_file_header(file)
         if not file_schemas:
-            self.trace("file `%s' bad header\n", "filename")
+            self.trace("file `%s' bad header\n", file.name)
             return
-        """
-        records = (file.read()).split('\n\n')
-        for record in records:
-            str_time,rec_jobid = (record.split('\n')[0]).split()
-            rec_time = long(str_time)
-            if rec_jobid == self.job.id:
-                self.times.append(rec_time)
-                for data in record.split('\n')[1:]:
-                    if data[0].isalpha(): self.parse_stats(rec_time, data, file_schemas, file)
-        """
-        
         # Scan file for records belonging to JOBID.
         for line in file:
             try:
@@ -283,17 +274,17 @@ class Host(object):
                     rec_time = long(str_time)
                     if rec_jobid == self.job.id:
                         self.trace("file `%s' rec_time %d, rec_jobid `%s'\n",
-                                   "filename", rec_time, rec_jobid)
+                                   file.name, rec_time, rec_jobid)
                         self.times.append(rec_time)
                         break
             except Exception as exc:
                 self.trace("file `%s', caught `%s', discarding `%s'\n",
-                           "filename", str(exc), line)
+                           file.name, str(exc), line)
                 stats_file_discard_record(file)
         else:
             # We got to the end of this file wthout finding any
             # records belonging to JOBID.  Try next path.
-            self.trace("file `%s' has no records belonging to job\n", "filename")
+            self.trace("file `%s' has no records belonging to job\n", file.name)
             return
         # OK, we found a record belonging to JOBID.
         for line in file:
@@ -302,10 +293,10 @@ class Host(object):
                 if c.isdigit():
                     str_time, rec_jobid = line.split()
                     rec_time = long(str_time)
-                    if rec_jobid != self.job.id:
+                    if rec_jobid != self.job.id:                        
                         return
                     self.trace("file `%s' rec_time %d, rec_jobid `%s'\n",
-                               "filename", rec_time, rec_jobid)
+                               file.name, rec_time, rec_jobid)
                     self.times.append(rec_time)
                 elif c.isalpha():
                     self.parse_stats(rec_time, line, file_schemas, file)            
@@ -318,7 +309,7 @@ class Host(object):
                     pass #...
             except Exception as exc:
                 self.trace("file `%s', caught `%s', discarding `%s'\n",
-                           "filename", str(exc), line)
+                           file.name, str(exc), line)
                 stats_file_discard_record(file)
 
     def gather_stats(self):
@@ -326,15 +317,13 @@ class Host(object):
         if len(path_list) == 0:
             self.error("no stats files overlapping job\n")
             return False
+
         # read_stats_file() and parse_stats() append stats records
         # into lists of tuples in self.raw_stats.  The lists will be
         # converted into numpy arrays below.
         for path, start_time in path_list:
-            p = subprocess.Popen(["zcat", path], stdout = subprocess.PIPE)
-            file = io_method(p.communicate()[0])        
-            assert p.returncode == 0
-            self.read_stats_file(file)
-            
+            with gzip.open(path) as file:
+                self.read_stats_file(file)
         # begin_mark = 'begin %s' % self.job.id # No '%'.
         # if not begin_mark in self.marks:
         #     self.error("no begin mark found\n")
@@ -357,7 +346,7 @@ class Host(object):
 class Job(object):
     # TODO errors/comments
     __slots__ = ('id', 'start_time', 'end_time', 'acct', 'schemas', 'hosts',
-    'times','stats_home', 'host_list_dir', 'batch_acct')
+    'times','stats_home', 'host_list_dir', 'batch_acct', 'edit_flags')
 
     def __init__(self, acct, stats_home, host_list_dir, batch_acct):
         self.id = acct['id']
@@ -370,6 +359,7 @@ class Job(object):
         self.stats_home=stats_home
         self.host_list_dir=host_list_dir
         self.batch_acct=batch_acct
+        self.edit_flags = []
 
     def trace(self, fmt, *args):
         trace('%s: ' + fmt, self.id, *args)
@@ -470,20 +460,26 @@ class Job(object):
                     if v < p:
                         # Looks like rollover.
                         if e.width:
-                            #trace("time %d, counter `%s', rollover prev %d, curr %d\n",
-                            #      self.times[i], e.key, p, v)
+                            trace("time %d, counter `%s', rollover prev %d, curr %d\n",
+                                  self.times[i], e.key, p, v)
                             r -= numpy.uint64(1L << e.width)
                         elif v == 0:
+                            # Spurious reset
                             # This happens with the IB counters.
                             # Ignore this value, use previous instead.
                             # TODO Interpolate or something.
-                            #trace("time %d, counter `%s', suspicious zero, prev %d\n",
-                            #      self.times[i], e.key, p)
+                            trace("time %d, counter `%s', suspicious zero, prev %d\n",
+                                  self.times[i], e.key, p)
                             v = p # Ugh.
-                        #else:
-                            #error("time %d, counter `%s', 64-bit rollover prev %d, curr %d\n",
-                            #      self.times[i], e.key, p, v)
-                            # TODO Discard or something.
+                        elif (type_name == 'ib_ext' or type_name == 'ib_sw'):
+                            # We will assume a spurious reset, 
+                            # and the reset happened at the start of the counting period.
+                            # This happens with IB counters.
+                            # A[i,j] = v + A[i-1,j] = v + v_(t-1) - r
+                            v += A[i-1,j] # Add new value after reset to old re-based value
+                            r = 0 # base is now zero
+                            self.edit_flags.append("(time %d, host `%s', type `%s', dev `%s', key `%s')" %
+                                                   (self.times[i],host.name,type_name,dev_name,e.key))
                     A[i, j] = v - r
                     p = v
             if e.mult:
@@ -557,9 +553,7 @@ def from_acct(acct, stats_home, host_list_dir, batch_acct):
     stats_home as the base directory, running all required processing.
     """
     job = Job(acct, stats_home, host_list_dir, batch_acct)
-    #start = time.clock()
     job.gather_stats() and job.munge_times() and job.process_stats()
-    #print 'parse stats',time.clock() - start
     return job
 
 
