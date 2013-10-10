@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 import cPickle as pickle
 import os,sys
-sys.path.append('/home1/02561/rtevans/tmp/tacc_stats/include')
+sys.path.append('@CONFIG_PY_DIR@')
 import job_stats
 pickle_file = open(sys.argv[1],'r')
 a = pickle.load(pickle_file)

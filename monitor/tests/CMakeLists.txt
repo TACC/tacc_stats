@@ -18,6 +18,9 @@ configure_file(${CMAKE_CURRENT_SOURCE_DIR}/python/np2text.py
 configure_file(${CMAKE_CURRENT_SOURCE_DIR}/python/1835740_ref
   ${CMAKE_CURRENT_BINARY_DIR}/python/1835740_ref COPYONLY)
 
+configure_file(${CMAKE_CURRENT_SOURCE_DIR}/python/read.py
+  ${CMAKE_CURRENT_BINARY_DIR}/python/read.py @ONLY)
+
 add_test(pickler_runs python ${CMAKE_CURRENT_BINARY_DIR}/python/job_pickles.py 
   ${CMAKE_CURRENT_BINARY_DIR}/python/ 2013-10-01 2013-10-02)
 
