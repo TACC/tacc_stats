@@ -52,8 +52,8 @@ for host_name, new_host in new.hosts.iteritems():
             if array_equal(new_dev_stats.ravel(),old_dev_stats.ravel()): 'test passed'
             else: 
                 print 'test failed due to difference in',type_name,dev
-                print 'new',new_dev_stats
-                print 'old',old_dev_stats
+                #print 'new',new_dev_stats
+                #print 'old',old_dev_stats
                 TEST_PASSED = False
 
 print TEST_PASSED
