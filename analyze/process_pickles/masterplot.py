@@ -164,7 +164,7 @@ def master_plot(file,mode='lines',threshold=False,
   
   if ts.pmc_type == 'intel_snb' :
     # Plot key 1
-    plot(ax[0],ts,[8,9],3600.,1e9*float(ts.wayness),
+    plot(ax[0],ts,[8,9],3600.,1e9,
          ylabel='Total AVX +\nSSE Ginst/s')
     
     # Plot key 2
