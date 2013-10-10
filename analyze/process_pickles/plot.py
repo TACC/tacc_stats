@@ -48,7 +48,8 @@ def main():
                             'llite', 'llite', 'llite', 'llite', 'llite',
                             'llite', 'llite', 'llite', 'llite', 'llite',
                             'llite', 'llite', 'llite', 'llite', 'llite',
-                            'llite', 'llite', 'llite', 'llite', 'llite',],
+                            'llite', 'llite', 'llite', 'llite', 'llite',
+                            'intel_snb','intel_snb', 'intel_snb'],
                       ['CAS_READS', 'CAS_WRITES', 'STALLS',
                        'CLOCKS_UNHALTED_CORE', 'SSE_D_ALL', 'SIMD_D_256',
                        'open','close','mmap','seek','fsync','setattr',
@@ -56,7 +57,9 @@ def main():
                        'setxattr','getxattr',' listxattr',
                        'removexattr', 'inode_permission', 'readdir',
                        'create','lookup',
-                       'link','unlink','symlink','mkdir','rmdir','mknod','rename',])
+                       'link','unlink','symlink','mkdir','rmdir','mknod',
+                       'rename',
+                       'LOAD_OPS_L1_HIT','LOAD_OPS_L2_HIT','LOAD_OPS_LLC_HIT'])
       
       
       
@@ -79,6 +82,9 @@ def main():
     avx_rate = numpy.zeros_like(tmid)
     sse_rate = numpy.zeros_like(tmid)
     meta_rate = numpy.zeros_like(tmid)
+    l1_rate = numpy.zeros_like(tmid)
+    l2_rate = numpy.zeros_like(tmid)
+    l3_rate = numpy.zeros_like(tmid)
 
     for k in ts.j.hosts.keys():
       read_rate +=numpy.diff(ts.assemble([0],k,0))/numpy.diff(ts.t)
@@ -88,6 +94,9 @@ def main():
       avx_rate  +=numpy.diff(ts.assemble([5],k,0))/numpy.diff(ts.t)
       sse_rate  +=numpy.diff(ts.assemble([4],k,0))/numpy.diff(ts.t)
       meta_rate +=numpy.diff(ts.assemble(range(5,32),k,0))/numpy.diff(ts.t)
+      l1_rate +=numpy.diff(ts.assemble([32],k,0))/numpy.diff(ts.t)
+      l2_rate +=numpy.diff(ts.assemble([33],k,0))/numpy.diff(ts.t)
+      l3_rate +=numpy.diff(ts.assemble([34],k,0))/numpy.diff(ts.t)
       
     read_rate  /= float(ts.numhosts)
     write_rate /= float(ts.numhosts)
@@ -96,6 +105,9 @@ def main():
     avx_rate   /= float(ts.numhosts)
     sse_rate   /= float(ts.numhosts)
     meta_rate  /= float(ts.numhosts)
+    l1_rate  /= float(ts.numhosts)
+    l2_rate  /= float(ts.numhosts)
+    l3_rate  /= float(ts.numhosts)
 
     read_frac=read_rate/(read_rate+write_rate+1)
     stall_frac=stall_rate/clock_rate
@@ -104,7 +116,7 @@ def main():
     if ld.exc != 'unknown':
       title += ', E: ' + ld.exc.split('/')[-1]
 
-    fig,ax=plt.subplots(4,1,figsize=(8,8),dpi=80)
+    fig,ax=plt.subplots(5,1,figsize=(8,8),dpi=80)
     plt.subplots_adjust(hspace=0.35)
     
     plt.suptitle(title)
@@ -130,6 +142,10 @@ def main():
     
     ax[3].plot(tmid/3600., meta_rate)
     ax[3].set_ylabel('Meta Data Rate')
+    tspl_utils.adjust_yaxis_range(ax[3],0.1)
+
+    ax[4].plot(tmid/3600., l2_rate/(l1_rate+l2_rate+l3_rate))
+    ax[4].set_ylabel('Meta Data Rate')
     tspl_utils.adjust_yaxis_range(ax[3],0.1)
 
     fname='_'.join(['plot',ts.j.id,ts.owner])
