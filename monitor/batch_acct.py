@@ -29,14 +29,20 @@ class BatchAcct(object):
       except:
         pass
 
-      if len(d) > 13 and d['nodes'].isalpha(): 
-        d['name'] = d['name']+':'+d['status']
-        d['status'] = d['nodes']
-        d['nodes'] = d['cores']
-        d['cores'] = d[None]
+      ## Clean up when colons exist in job name
+      if None in d:
+        #print 'before',d
+        num_cols = len(d[None])
+        for cols in range(num_cols):
+          d['name'] = d['name']+':'+d['status']        
+          d['status'] = str(d['nodes'])
+          d['nodes'] = d['cores']
+          d['cores'] = d[None][0]
+          del d[None][0]
+        d['nodes'] = int(d['nodes'])
+        d['cores'] = int(d['cores'])
         del d[None]
-        print d        
-
+        #print 'after',d
       # Accounting records with pe_taskid != NONE are generated for
       # sub_tasks of a tightly integrated job and should be ignored.
       if start_time <= d['end_time'] and d['end_time'] < end_time:
