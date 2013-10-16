@@ -4,6 +4,7 @@ import glob, os, stat, time, datetime, sys
 import re
 import tspl_utils
 import math
+import logging, multiprocessing
 
 class TSPLException(Exception):
   def __init__(self,arg):
@@ -13,7 +14,10 @@ class TSPLException(Exception):
 class TSPLBase:
   def __init__(self,file,k1,k2):
     self.f=open(file)
-    self.j=pickle.load(self.f)
+    try:
+      self.j=pickle.load(self.f)
+    except EOFError as e:
+      raise TSPLException('End of file found for: ' + file)
     self.f.close()
 
     try:
@@ -22,7 +26,7 @@ class TSPLBase:
       try:
         self.wayness=self.j.acct['cores']/self.j.acct['nodes']
       except ZeroDivisionError:
-        print "Read zero nodes, assuming 16 way job"
+        print "Read zero nodes, assuming 16 way for job " + str(self.j.id)
         self.wayness=16
       except TypeError:
         raise TSPLException('Something is funny with job ' +str(self.j.id) +
@@ -47,7 +51,7 @@ class TSPLBase:
     self.numhosts=len(self.j.hosts.keys())
 
     if self.numhosts == 0:
-      raise TSPLException('No hosts')
+      raise TSPLException('No hosts in job '+ str(self.j.id))
 
     self.su=float(self.j.acct['end_time'] - self.j.acct['start_time'])* \
             float(self.numhosts*16.0)/3600.0 # Need to refactor the 16 into the
