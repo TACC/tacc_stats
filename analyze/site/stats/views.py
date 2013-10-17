@@ -76,7 +76,7 @@ def stats_load(job):
     with open(job.path) as f:
         job.stats = pickle.load(f)
     job.save()
-    return job
+
 
 def stats_unload(job):
     job.stats = []
@@ -84,8 +84,8 @@ def stats_unload(job):
 
 def master_plot(request, pk):
     job = Job.objects.get(id = pk)
-    job = stats_load(job) 
-    fig = mp.master_plot(job.path,mintime=60)
+    stats_load(job) 
+    fig = mp.master_plot(job.path,mintime=600)
     stats_unload(job)
     return figure_to_response(fig)
 
@@ -96,7 +96,7 @@ class JobDetailView(DetailView):
     def get_context_data(self, **kwargs):
         context = super(JobDetailView, self).get_context_data(**kwargs)
         job = context['job']
-        job = stats_load(job)
+        stats_load(job)
         type_list = []
         for host_name, host in job.stats.hosts.iteritems():
             for type_name, type in host.stats.iteritems():
@@ -113,32 +113,45 @@ class JobDetailView(DetailView):
 def type_plot(request, pk, type_name):
 
     job = Job.objects.get(id = pk)
-    job = stats_load(job)
+    stats_load(job)
     data = job.stats
 
     schema = data.get_schema(type_name).desc
     schema = string.replace(schema,',E',' ')
     schema = string.replace(schema,' ,',',').split()
 
-    raw_stats = data.aggregate_stats(type_name)[0]  
+    #raw_stats = data.aggregate_stats(type_name)[0]  
+    
     nr_events = len(schema)
 
     import matplotlib.ticker as tic
-    from numpy import divide, diff
+    from numpy import divide, diff, zeros
     nt = len(data.times)
 
     tmid = (data.times[1:]+data.times[0:nt-1])/2.0
     tmid -= data.times[0]
     tmid /= 3600.
-    fig, axarr = plt.subplots(nr_events, sharex=True, figsize=(10,nr_events*3))
+    fig, axarr = plt.subplots(nr_events, sharex=True, figsize=(8,nr_events*2), dpi=80)
 
-    for i in range(nr_events):
-        rate = divide(diff(raw_stats[:,i]),diff(data.times))
-        axarr[i].plot(tmid, rate)
-        axarr[i].set_ylabel(schema[i])
-        
+    dt = diff(data.times)
+
+
+    host_list = []
+    for host_name, host in data.hosts.iteritems():
+        host_list.append(host_name)
+        raw_stats = zeros((nt,nr_events))            
+        for dev_name, dev_stats in host.stats[type_name].iteritems():
+            raw_stats += dev_stats
+        for i in range(nr_events):
+            rate = divide(diff(raw_stats[:,i]),dt)
+            axarr[i].plot(tmid, rate, label=host_name)
+            axarr[i].set_ylabel(schema[i])
+
+    #plt.legend(loc = 9, bbox_to_anchor = (1,1),bbox_transform = plt.gcf().transFigure )
+
     axarr[0].set_title("Count Rates (1/s)")
     axarr[-1].set_xlabel("Time (hr)")
+
     fig.subplots_adjust(hspace=0.0)
     fig.tight_layout()
     response = HttpResponse(content_type='image/png')
@@ -152,7 +165,7 @@ def type_plot(request, pk, type_name):
 def type_detail(request, pk, type_name):
 
     job = Job.objects.get(id = pk)
-    job = stats_load(job)
+    stats_load(job)
     data = job.stats
 
     schema = data.get_schema(type_name).desc
