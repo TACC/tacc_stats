@@ -15,8 +15,9 @@ class Job(models.Model):
     status = models.CharField(max_length=16, null=True)
     nodes = models.PositiveIntegerField(null=True)
     cores = models.PositiveIntegerField(null=True)
-    path =  models.CharField(max_length=128, null=True)
+    path =  models.FilePathField(max_length=128, null=True)
     stats = PickledObjectField()
+    date = models.DateField(null=True)
 
     def __unicode__(self):
         return str(self.id)

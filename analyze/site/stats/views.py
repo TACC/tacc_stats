@@ -16,26 +16,34 @@ import  cPickle as pickle
 
 path = '/Users/rtevans/pickles/'
 
-def index(request):
-    
-    Job.objects.all().delete()
+def dates(request):
+    date_list = []
+    for date in os.listdir(path):
+        date_list.append(date)
+    return render_to_response("stats/dates.html", { 'date_list' : date_list})
 
-    for jobid in os.listdir(path):
+def index(request, date):
+
+    #Job.objects.all().delete()
+
+    for jobid in os.listdir(path+date):
+        if Job.objects.filter(id=jobid).exists(): continue
+
         try:
-            with open(path+jobid) as f:
+            with open(os.path.join(path,date,jobid)) as f:
                 data = pickle.load(f)
             if len(data.times) == 0: continue
             del data.acct['yesno'], data.acct['unknown']
         except: continue
-
+        
         fields = data.acct
-        fields['path'] = path+jobid
-
+        fields['path'] = os.path.join(path,date,jobid)
+        fields['date'] = date
         job_model, created = Job.objects.get_or_create(**fields) 
 
-    job_list = Job.objects.all().order_by('-id')
+    job_list = Job.objects.filter(date = date).order_by('-id')
 
-    return render_to_response("stats/index.html", {'job_list' : job_list})
+    return render_to_response("stats/index.html", {'job_list' : job_list, 'date' : date})
 
 def figure_to_response(f):
     response = HttpResponse(content_type='image/png')
@@ -44,42 +52,51 @@ def figure_to_response(f):
     f.clear()
     return response
 
-def jobs_summary(request):
+def jobs_summary(request, date):
     # Run times
-    job_times = [job.timespent / 3600. for job in Job.objects.all()]
+    
+    job_times = [job.timespent / 3600. for job in Job.objects.filter(date = date)]
+
     fig = figure()
     ax = fig.add_subplot(211)
-    ax.hist(job_times, len(job_times))
+    ax.hist(job_times, max(5,len(job_times)/20))
     ax.set_title('Run Times (hrs)')
     ax.set_ylabel('# of jobs')
 
     # Number of cores
-    job_size = [job.cores for job in Job.objects.all()]
+    job_size = [job.cores for job in Job.objects.filter(date = date)]
     ax = fig.add_subplot(212)
-    ax.hist(job_size, len(job_size))
+    ax.hist(job_size, max(5,len(job_size)/20))
     ax.set_title('Cores')
     ax.set_ylabel('# of jobs')
    
     return figure_to_response(fig)
 
+def stats_load(job):
+    with open(job.path) as f:
+        job.stats = pickle.load(f)
+    job.save()
+    return job
+
+def stats_unload(job):
+    job.stats = []
+    job.save()
+
 def master_plot(request, pk):
     job = Job.objects.get(id = pk)
-    fig = mp.master_plot(job.path)
+    job = stats_load(job) 
+    fig = mp.master_plot(job.path,mintime=60)
+    stats_unload(job)
     return figure_to_response(fig)
 
 class JobDetailView(DetailView):
 
     model = Job
-
+    
     def get_context_data(self, **kwargs):
         context = super(JobDetailView, self).get_context_data(**kwargs)
         job = context['job']
-
-        with open(job.path) as f:
-            data = pickle.load(f)
-        job.stats = data
-        job.save()
-
+        job = stats_load(job)
         type_list = []
         for host_name, host in job.stats.hosts.iteritems():
             for type_name, type in host.stats.iteritems():
@@ -88,14 +105,15 @@ class JobDetailView(DetailView):
                 schema = string.replace(schema,',',' ')
                 type_list.append( (type_name, schema) )
             break
-        dev_list = sorted(type_list, key = lambda type: type[0])
+        type_list = sorted(type_list, key = lambda type_name: type_name[0])
         context['type_list'] = type_list
+        stats_unload(job)
         return context
 
 def type_plot(request, pk, type_name):
 
-
     job = Job.objects.get(id = pk)
+    job = stats_load(job)
     data = job.stats
 
     schema = data.get_schema(type_name).desc
@@ -112,7 +130,7 @@ def type_plot(request, pk, type_name):
     tmid = (data.times[1:]+data.times[0:nt-1])/2.0
     tmid -= data.times[0]
     tmid /= 3600.
-    fig, axarr = plt.subplots(nr_events, sharex=True, figsize=(10,nr_events*4))
+    fig, axarr = plt.subplots(nr_events, sharex=True, figsize=(10,nr_events*3))
 
     for i in range(nr_events):
         rate = divide(diff(raw_stats[:,i]),diff(data.times))
@@ -127,12 +145,14 @@ def type_plot(request, pk, type_name):
     fig.savefig(response, format='png')
     plt.close(fig)
     fig.clear()
+    stats_unload(job)
     return response
 
 
 def type_detail(request, pk, type_name):
 
     job = Job.objects.get(id = pk)
+    job = stats_load(job)
     data = job.stats
 
     schema = data.get_schema(type_name).desc
@@ -148,6 +168,7 @@ def type_detail(request, pk, type_name):
             temp.append(raw_stats[t,event])
         stats.append((data.times[t],temp))
 
+    stats_unload(job)
 
     return render_to_response("stats/type_detail.html",{"type_name" : type_name, "jobid" : pk, "stats_data" : stats, "schema" : schema})
     

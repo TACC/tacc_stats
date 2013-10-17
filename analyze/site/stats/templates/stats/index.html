@@ -3,13 +3,13 @@
     <title>TACC Stats</title>
 </head>
 <body>
-<h1>TACC Stats Home</h1>
+<h1>Jobs from {{date}}</h1>
 <h2> Charts at a glance </h2>
 
-<img src="jobs_summary" />
+<img src="{% url 'stats:jobs_summary' date %}" />
 
 {% if job_list %}
-    <h1>Recent jobs</h1>
+    <h1>Job Listing</h1>
     <table border="1" cellpadding="5">
         <tr>
 	  <th> Job ID </th>
