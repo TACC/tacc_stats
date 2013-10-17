@@ -1,9 +1,8 @@
 #!/usr/bin/env python
 
-execfile('./analyze.conf') # configuration parameters are stored here
+execfile('/Users/rtevans/tacc_stats/analyze/process_pickles/analyze.conf') # configuration parameters are stored here
 
 import sys
-sys.path.append('../../monitor')
 import datetime, glob, job_stats, os, subprocess, time
 import math
 import matplotlib
@@ -194,12 +193,13 @@ def master_plot(file,mode='lines',threshold=False,
   print 'cc'
   
   title=header+'\n'+ts.title
+  """
   if threshold:
     title+=', V: %(v)-6.1f' % {'v': threshold}
   ld=lariat_utils.LariatData(ts.j.id,ts.j.end_time,'/scratch/projects/lariatData')
   title += '\n' + ld.title()
   print 'dd'
-
+  """
   plt.suptitle(title)
   plt.subplots_adjust(hspace=0.35)
 
@@ -211,7 +211,7 @@ def master_plot(file,mode='lines',threshold=False,
     
   fig.savefig(output_dir+'/'+fname)
   plt.close()
-
+  return fig
 
 def main():
 

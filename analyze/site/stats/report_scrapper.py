@@ -5,8 +5,8 @@ import sys
 import traceback
 
 def fill_jobs( data ):
-    os.environ['DJANGO_SETTINGS_MODULE'] = 'tacc_stats.webapp.settings'
-    from tacc_stats.webapp.tacc_stats.models import Job
+    os.environ['DJANGO_SETTINGS_MODULE'] = 'stats.webapp.settings'
+    from stats.webapp.stats.models import Job
     for d in data:
         try:
             Job(**d).save()

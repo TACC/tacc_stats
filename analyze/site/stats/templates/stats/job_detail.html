@@ -1,0 +1,20 @@
+<html>
+<head>
+    <title>TACC Stats: Job details</title>
+</head>
+<body>
+{% if job %}
+    <h1>Job ID {{ job.id }}</h1>
+    <img src="{% url 'stats:master_plot' job.id %}" />
+    <table border="1" cellpadding="5">
+      <tr><th>Type Name</th><th>Events</th></tr>
+         {% for type_name, schema in type_list %}
+            <tr><th><a href="{{ type_name }}/">{{type_name}}</a></th><<th>{{schema}}</th></tr>
+         {% endfor %}
+    </table>
+
+{% else %}
+    <h1>Job not found</h1>
+{% endif %}
+</body>
+</html>
