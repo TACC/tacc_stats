@@ -11,6 +11,7 @@ import os,sys
 sys.path.append('/Users/rtevans/tacc_stats/monitor')
 sys.path.append('/Users/rtevans/tacc_stats/analyze/process_pickles')
 import masterplot as mp
+import tspl
 import job_stats as data
 import  cPickle as pickle 
 
@@ -18,6 +19,7 @@ path = '/Users/rtevans/pickles/'
 
 def dates(request):
     date_list = []
+
     for date in os.listdir(path):
         date_list.append(date)
     return render_to_response("stats/dates.html", { 'date_list' : date_list})
@@ -25,6 +27,8 @@ def dates(request):
 def index(request, date):
 
     #Job.objects.all().delete()
+    from datetime import datetime
+    from django.utils.timezone import utc
 
     for jobid in os.listdir(path+date):
         if Job.objects.filter(id=jobid).exists(): continue
@@ -39,11 +43,14 @@ def index(request, date):
         fields = data.acct
         fields['path'] = os.path.join(path,date,jobid)
         fields['date'] = date
+        fields['start_time']=datetime.fromtimestamp(data.start_time).replace(tzinfo=utc)
+        fields['end_time']=datetime.fromtimestamp(data.end_time).replace(tzinfo=utc)
+        
         job_model, created = Job.objects.get_or_create(**fields) 
 
     job_list = Job.objects.filter(date = date).order_by('-id')
-
-    return render_to_response("stats/index.html", {'job_list' : job_list, 'date' : date})
+    nj = Job.objects.filter(date = date).count()
+    return render_to_response("stats/index.html", {'job_list' : job_list, 'date' : date, 'nj' : nj})
 
 def figure_to_response(f):
     response = HttpResponse(content_type='image/png')
@@ -53,29 +60,39 @@ def figure_to_response(f):
     return response
 
 def jobs_summary(request, date):
+
+    fig = figure(figsize=(17,6))
     # Run times
-    
     job_times = [job.timespent / 3600. for job in Job.objects.filter(date = date)]
-
-    fig = figure()
-    ax = fig.add_subplot(211)
+    ax = fig.add_subplot(121)
     ax.hist(job_times, max(5,len(job_times)/20))
-    ax.set_title('Run Times (hrs)')
+    ax.set_title('Run Times')
     ax.set_ylabel('# of jobs')
-
+    ax.set_xlabel('# hrs')
     # Number of cores
     job_size = [job.cores for job in Job.objects.filter(date = date)]
-    ax = fig.add_subplot(212)
+    ax = fig.add_subplot(122)
     ax.hist(job_size, max(5,len(job_size)/20))
-    ax.set_title('Cores')
-    ax.set_ylabel('# of jobs')
-   
+    ax.set_title('Job Sizes')
+    ax.set_xlabel('# cores')
+    fig.tight_layout()
     return figure_to_response(fig)
 
 def stats_load(job):
     with open(job.path) as f:
         job.stats = pickle.load(f)
     job.save()
+
+def get_schema(job, type_name):
+    with open(job.path) as f:
+        data = pickle.load(f)
+    schema = data.get_schema(type_name).desc
+    schema = string.replace(schema,',E',' ')
+    schema = string.replace(schema,' ,',',').split()
+    schema = [x.split(',')[0] for x in schema]
+
+    return schema
+
 
 
 def stats_unload(job):
@@ -84,9 +101,9 @@ def stats_unload(job):
 
 def master_plot(request, pk):
     job = Job.objects.get(id = pk)
-    stats_load(job) 
+    #stats_load(job) 
     fig = mp.master_plot(job.path,mintime=600)
-    stats_unload(job)
+    #stats_unload(job)
     return figure_to_response(fig)
 
 class JobDetailView(DetailView):
@@ -98,67 +115,50 @@ class JobDetailView(DetailView):
         job = context['job']
         stats_load(job)
         type_list = []
+        host_list = []
+        ctr = 0
         for host_name, host in job.stats.hosts.iteritems():
-            for type_name, type in host.stats.iteritems():
-                schema = job.stats.get_schema(type_name).desc
-                schema = string.replace(schema,',E',' ')
-                schema = string.replace(schema,',',' ')
-                type_list.append( (type_name, schema) )
-            break
+            #if counter
+            host_list.append(host_name)
+            ctr +=1
+        for type_name, type in host.stats.iteritems():
+            schema = job.stats.get_schema(type_name).desc
+            schema = string.replace(schema,',E',' ')
+            schema = string.replace(schema,',',' ')
+            type_list.append( (type_name, schema) )
+
         type_list = sorted(type_list, key = lambda type_name: type_name[0])
         context['type_list'] = type_list
+        context['host_list'] = host_list
         stats_unload(job)
         return context
 
 def type_plot(request, pk, type_name):
 
     job = Job.objects.get(id = pk)
-    stats_load(job)
-    data = job.stats
+    schema = get_schema(job, type_name)
 
-    schema = data.get_schema(type_name).desc
-    schema = string.replace(schema,',E',' ')
-    schema = string.replace(schema,' ,',',').split()
+    k1 = {'intel_snb' : [type_name]*len(schema)}
+    k2 = {'intel_snb': schema}
 
-    #raw_stats = data.aggregate_stats(type_name)[0]  
+    ts = tspl.TSPLSum(job.path,k1,k2)
     
     nr_events = len(schema)
-
-    import matplotlib.ticker as tic
-    from numpy import divide, diff, zeros
-    nt = len(data.times)
-
-    tmid = (data.times[1:]+data.times[0:nt-1])/2.0
-    tmid -= data.times[0]
-    tmid /= 3600.
     fig, axarr = plt.subplots(nr_events, sharex=True, figsize=(8,nr_events*2), dpi=80)
+    do_rate = True
+    for i in range(nr_events):
+        if type_name == 'mem': do_rate = False
+        axarr[i].set_ylabel(schema[i],size='small')
+        mp.plot_lines(axarr[i], ts, [i], 3600., do_rate = do_rate)
 
-    dt = diff(data.times)
-
-
-    host_list = []
-    for host_name, host in data.hosts.iteritems():
-        host_list.append(host_name)
-        raw_stats = zeros((nt,nr_events))            
-        for dev_name, dev_stats in host.stats[type_name].iteritems():
-            raw_stats += dev_stats
-        for i in range(nr_events):
-            rate = divide(diff(raw_stats[:,i]),dt)
-            axarr[i].plot(tmid, rate, label=host_name)
-            axarr[i].set_ylabel(schema[i])
-
-    #plt.legend(loc = 9, bbox_to_anchor = (1,1),bbox_transform = plt.gcf().transFigure )
-
-    axarr[0].set_title("Count Rates (1/s)")
     axarr[-1].set_xlabel("Time (hr)")
-
     fig.subplots_adjust(hspace=0.0)
     fig.tight_layout()
     response = HttpResponse(content_type='image/png')
     fig.savefig(response, format='png')
     plt.close(fig)
     fig.clear()
-    stats_unload(job)
+
     return response
 
 

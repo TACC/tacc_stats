@@ -160,7 +160,7 @@ def master_plot(file,mode='lines',threshold=False,
     plot=plot_mmm
   else:
     plot=plot_lines
-  
+
   if ts.pmc_type == 'intel_snb' :
     # Plot key 1
     plot(ax[0],ts,[8,9],3600.,1e9,

@@ -7,8 +7,8 @@ class Job(models.Model):
     id = models.BigIntegerField(primary_key=True)
     uid = models.BigIntegerField(null=True)
     project = models.CharField(max_length=128)
-    start_time =  models.PositiveIntegerField(null=True)
-    end_time = models.PositiveIntegerField(null=True)
+    start_time =  models.DateTimeField(null=True)
+    end_time = models.DateTimeField(null=True)
     queue_time = models.PositiveIntegerField(null=True)
     queue = models.CharField(max_length=16, null=True)
     name =  models.CharField(max_length=128, null=True)
@@ -24,7 +24,8 @@ class Job(models.Model):
 
     @property
     def timespent(self):
-        return self.end_time - self.start_time
+        dt = self.end_time-self.start_time
+        return dt.seconds
 
     def color(self):
         ret_val = "LightBlue"
