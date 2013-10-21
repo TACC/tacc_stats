@@ -6,4 +6,4 @@
 matplotlib_output_mode = 'pdf'
 
 
-PY_INC_PATH = '/home1/02561/rtevans/tmp/tacc_stats/include'
+PY_INC_PATH = '@PY_INC_PATH@'

@@ -2,9 +2,9 @@
 
 # This is an inefficient way to do this, but it maps to existing tools and is
 # fast enough for now.
-
+execfile('analyze.conf')
 import sys
-sys.path.append('../../monitor')
+sys.path.append(PY_INC_PATH)
 import datetime, glob, job_stats, os, subprocess, time, argparse
 import numpy
 import scipy

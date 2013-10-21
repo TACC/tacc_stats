@@ -1,9 +1,7 @@
 #!/usr/bin/env python
-
-execfile('./analyze.conf') # configuration parameters are stored here
-
+execfile('analyze.conf') # configuration parameters are stored here
 import sys
-sys.path.append('../../monitor')
+sys.path.append(PY_INC_PATH)
 import datetime, glob, job_stats, os, subprocess, time
 import operator
 import matplotlib
