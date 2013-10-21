@@ -4,24 +4,9 @@ set(PROJECT_VERSION "1.0.5")
 
 include(CTest)
 
-if (ENABLE)
-  if (${ENABLE} MATCHES "all")
-    message("Build all")
-    set(packages monitor pickler analyze)
-  else()
-    foreach(ARG ${ENABLE})
-      message("Build " ${ARG})
-      set(packages ${packages} ${ARG})
-    endforeach()
-  endif()
-else()
-  message("Build all by default")
-  set(packages monitor pickler analyze)
-endif()
-
-foreach(package ${packages})
-  add_subdirectory(${package})
-endforeach()
+add_subdirectory(analyze)
+add_subdirectory(monitor)
+add_subdirectory(pickler)
 
 # add a target to generate API documentation with Doxygen
 find_package(Doxygen)

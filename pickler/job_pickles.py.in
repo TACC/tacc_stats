@@ -4,7 +4,7 @@ sys.path.append('@CONFIG_PY_DIR@')
 import datetime, glob, job_stats, os, batch_acct, subprocess, time
 import cPickle as pickle
 
-execfile("pickles.conf")
+execfile('pickles.conf')
 
 prog_name = os.path.basename(sys.argv[0])
 pickle_prot = pickle.HIGHEST_PROTOCOL
@@ -23,44 +23,6 @@ def getdate(date_str):
         return long(out)
     except subprocess.CalledProcessError, e:
         FATAL("Invalid date: `%s'" % (date_str,))
-
-## host_file_dates = set() # dates we've checked
-## host_file_path_dict = {} # id to path
-## 
-## def read_host_file_dir(day):
-##     if day in host_file_dates:
-##         return
-##     dir_path = os.path.join(host_list_dir, day.strftime("%Y/%m/%d"))
-##     print dir_path
-##     for ent in os.listdir(dir_path):
-##         print ent
-##         tup = ent.split('.')
-##         if len(tup) == 3 and tup[0] == 'prolog_hostfile' and tup[1].isdigit():
-##             host_file_path_dict[tup[1]] = os.path.join(dir_path, ent)
-##     host_file_dates.add(day)
-## 
-## def get_host_list_path(acct):
-##     id = acct['id']
-##     path = host_file_path_dict.get(id)
-##     if path:
-##         return path
-##     start_date = datetime.date.fromtimestamp(acct['start_time'])
-##     for days in (0, -1, 1):
-##         read_host_file_dir(start_date + datetime.timedelta(days))
-##         path = host_file_path_dict.get(id)
-##         if path:
-##             return path
-##     return None
-## 
-## def get_host_list(acct):
-##     path = get_host_list_path(acct)
-##     if not path:
-##         return []
-##     try:
-##         with open(path) as file:
-##             return [host for line in file for host in line.split()]
-##     except IOError as (err, str):
-##         return []
 
 def short_host_name(str):
     return str.split('.')[0]
