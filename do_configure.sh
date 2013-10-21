@@ -94,4 +94,5 @@ cmake \
 -Dhost_name_ext=${host_name_ext} \
 -Dbatch_system=${batch_system} \
 -DTYPES="${TYPES}" \
-..
+$@ \
+../

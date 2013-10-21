@@ -9,7 +9,7 @@ file(APPEND "${CMAKE_CURRENT_BINARY_DIR}/pickles.conf"
   batch_system=\"SLURM\"\n
   seek=0\n)
 
-configure_file(${CMAKE_BINARY_DIR}/monitor/job_pickles.py 
+configure_file(${CMAKE_CURRENT_BINARY_DIR}/../job_pickles.py 
   ${CMAKE_CURRENT_BINARY_DIR}/python/job_pickles.py COPYONLY)
 
 configure_file(${CMAKE_CURRENT_SOURCE_DIR}/python/np2text.py 

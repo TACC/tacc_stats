@@ -3,7 +3,25 @@ set(CMAKE_PROJECT_NAME "tacc_stats")
 set(PROJECT_VERSION "1.0.5")
 
 include(CTest)
-add_subdirectory(monitor)
+
+if (ENABLE)
+  if (${ENABLE} MATCHES "all")
+    message("Build all")
+    set(packages monitor pickler analyze)
+  else()
+    foreach(ARG ${ENABLE})
+      message("Build " ${ARG})
+      set(packages ${packages} ${ARG})
+    endforeach()
+  endif()
+else()
+  message("Build all by default")
+  set(packages monitor pickler analyze)
+endif()
+
+foreach(package ${packages})
+  add_subdirectory(${package})
+endforeach()
 
 # add a target to generate API documentation with Doxygen
 find_package(Doxygen)
@@ -15,7 +33,6 @@ WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
 COMMENT "Generating API documentation with Doxygen" VERBATIM
 )
 endif(DOXYGEN_FOUND)
-
 
 # archive repository in tarball
 set(ARCHIVE_NAME ${CMAKE_PROJECT_NAME}-${PROJECT_VERSION})
