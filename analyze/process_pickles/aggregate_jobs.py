@@ -1,7 +1,6 @@
 #!/usr/bin/env python
+import analyze_conf
 import sys
-execfile('analyze.conf')
-sys.path.append(PY_INC_PATH)
 import datetime, glob, job_stats, os, subprocess, time
 import itertools, argparse
 import matplotlib

@@ -1,9 +1,7 @@
 # -*- mode: python -*-
-
+import sys
 # Config values for analyzers
 
 #matplotlib_output_mode = 'Agg' for pngs
 matplotlib_output_mode = 'pdf'
-
-
-PY_INC_PATH = '/home1/02561/rtevans/tmp/tacc_stats/include'
+sys.path.append('@PY_INC_PATH@')

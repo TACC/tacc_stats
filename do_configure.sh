@@ -19,7 +19,8 @@ acct_path=/scratch/projects/tacc_stats/accounting/tacc_jobs_completed
 # used for jobid
 host_list_dir=/scratch/projects/tacc/hostfile_logs/
 # location to store pickles
-pickles_dir=/scratch/projects/tacc_stats/pickles/
+#pickles_dir=/scratch/projects/tacc_stats/pickles/
+pickles_dir=/Users/rtevans/pickles/
 python_path=/opt/apps/python/epd/7.3.2/bin/
 ## Host Name Extension and Batch System (Currently SGE or SLURM)##
 host_name_ext=stampede.tacc.utexas.edu

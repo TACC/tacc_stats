@@ -1,13 +1,12 @@
 #!/usr/bin/env python
-execfile('analyze.conf') # configuration parameters are stored here
+import analyze_conf
 import sys
-sys.path.append(PY_INC_PATH)
 import datetime, glob, job_stats, os, subprocess, time
 import matplotlib
 # Set the matplotlib output mode from config if it exists
 if not 'matplotlib.pyplot' in sys.modules:
   try:
-    matplotlib.use(matplotlib_output_mode)
+    matplotlib.use(analyze_conf.matplotlib_output_mode)
   except NameError:
     matplotlib.use('pdf')
     

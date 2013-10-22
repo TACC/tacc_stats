@@ -6,16 +6,14 @@ import matplotlib.pyplot as plt
 from pylab import figure, hist, plot
 
 from stats.models import Job
-
+import sys_path_append
 import os,sys
-sys.path.append('/Users/rtevans/tacc_stats/monitor')
-sys.path.append('/Users/rtevans/tacc_stats/analyze/process_pickles')
 import masterplot as mp
 import tspl
 import job_stats as data
 import  cPickle as pickle 
 
-path = '/Users/rtevans/pickles/'
+path = sys_path_append.pickles_dir
 
 def dates(request):
     date_list = []

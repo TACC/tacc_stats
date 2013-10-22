@@ -1,7 +1,6 @@
 #!/usr/bin/env python
-execfile('analyze.conf')
+import analyze_conf
 import sys
-sys.path.append(PY_INC_PATH)
 import datetime, glob, job_stats, os, subprocess, time
 import numpy
 import scipy, scipy.stats

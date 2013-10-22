@@ -1,15 +1,12 @@
 #!/usr/bin/env python
-
-execfile('analyze.conf') # configuration parameters are stored here
-import sys
-sys.path.append(PY_INC_PATH)
+import analyze_conf,sys
 import datetime, glob, job_stats, os, subprocess, time
 import math
 import matplotlib
 # Set the matplotlib output mode from config if it exists
 if not 'matplotlib.pyplot' in sys.modules:
   try:
-    matplotlib.use(matplotlib_output_mode)
+    matplotlib.use(analyze_conf.matplotlib_output_mode)
   except NameError:
     matplotlib.use('pdf')
     
@@ -191,15 +188,13 @@ def master_plot(file,mode='lines',threshold=False,
   
   print ts.j.id + ': '
   print 'cc'
-  
   title=header+'\n'+ts.title
-  """
   if threshold:
     title+=', V: %(v)-6.1f' % {'v': threshold}
-  ld=lariat_utils.LariatData(ts.j.id,ts.j.end_time,'/scratch/projects/lariatData')
+  ld=lariat_utils.LariatData(ts.j.id,ts.j.end_time,'/Users/rtevans/')
   title += '\n' + ld.title()
   print 'dd'
-  """
+  
   plt.suptitle(title)
   plt.subplots_adjust(hspace=0.35)
 
