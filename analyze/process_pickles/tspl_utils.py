@@ -55,11 +55,14 @@ def global_interp_data(ts,samples):
 def getfilelist(filearg):
   filelist=glob.glob(filearg)
   if len(filelist)==1:
-    mode=os.stat(filearg).st_mode
-    if stat.S_ISDIR(mode):
-      filelist=glob.glob(filearg+'/*')
-    else:
-      filelist=[filearg]
+    try: # globbing could return one file, so just catch the not a directory
+         # exception and use the single file if we can't stat
+      mode=os.stat(filearg).st_mode
+      if stat.S_ISDIR(mode):
+        filelist=glob.glob(filearg+'/*')
+    except OSError:
+      pass
+
   return filelist
 
 # Center, expand, and decenter a range
