@@ -1,0 +1,47 @@
+<html>
+<head>
+    <title>TACC Stats</title>
+</head>
+<body>
+<h1>Jobs from {{date}} ({{nj}} Jobs Recorded)</h1>
+<h2> Charts at a glance </h2>
+
+<img src="{% url 'stats:jobs_summary' date %}" />
+
+{% if job_list %}
+    <h1>Job Listing</h1>
+    <table border="1" cellpadding="5">
+        <tr>
+	  <th> Job ID </th>
+	  <th> UID </th>
+	  <th> project </th>
+	  <th> start time </th>
+	  <th> end time </th>
+	  <th> run time (s)</th>
+	  <th> queue </th>
+	  <th> name </th>
+	  <th> status </th>	    
+	  <th> cores </th>
+	  <th> nodes </th>
+	</tr>
+    {% for job in job_list %}
+        <tr bgcolor="{{job.color}}">
+            <td><a href="job/{{ job.id }}/">{{ job.id }}</a>
+            <td>{{ job.uid }}</td>
+            <td align=right>{{ job.project }}</td>
+            <td align=right>{{ job.start_time }}</td>
+            <td align=right>{{ job.end_time }}</td>
+            <td align=right>{{ job.timespent }}</td>
+            <td align=right>{{ job.queue }}</td>
+            <td align=right>{{ job.name }}</td>
+            <td align=right>{{ job.status }}</td>
+            <td align=right>{{ job.cores }}</td>
+            <td align=right>{{ job.nodes }}</td>
+        </tr>
+    {% endfor %}
+    </ul>
+{% else %}
+    <p>No jobs are available.</p>
+{% endif %}
+</body>
+</html>

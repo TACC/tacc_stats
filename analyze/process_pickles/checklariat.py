@@ -1,10 +1,8 @@
 #!/usr/bin/env python
-
 # This is an inefficient way to do this, but it maps to existing tools and is
 # fast enough for now.
-
+import analyze_conf
 import sys
-sys.path.append('../../monitor')
 import datetime, glob, job_stats, os, subprocess, time, argparse
 import numpy
 import scipy

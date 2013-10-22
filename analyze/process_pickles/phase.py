@@ -1,7 +1,6 @@
 #!/usr/bin/env python
-
+import analyze_conf
 import sys
-sys.path.append('../../monitor')
 import datetime, glob, job_stats, os, subprocess, time
 import matplotlib
 if not 'matplotlib.pyplot' in sys.modules:
