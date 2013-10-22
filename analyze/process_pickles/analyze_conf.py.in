@@ -5,3 +5,4 @@ import sys
 #matplotlib_output_mode = 'Agg' for pngs
 matplotlib_output_mode = 'pdf'
 sys.path.append('@PY_INC_PATH@')
+lariat_path='@LARIAT_PATH@'
