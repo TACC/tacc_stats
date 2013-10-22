@@ -142,7 +142,7 @@ def master_plot(file,mode='lines',threshold=False,
     print file
     ts=tspl.TSPLSum(file,k1,k2)
   except tspl.TSPLException as e:
-    return
+    return 
 
   ignore_qs=['gpu','gpudev','vis','visdev']
   if not tspl_utils.checkjob(ts,mintime,wayness,ignore_qs):
@@ -191,7 +191,7 @@ def master_plot(file,mode='lines',threshold=False,
   title=header+'\n'+ts.title
   if threshold:
     title+=', V: %(v)-6.1f' % {'v': threshold}
-  ld=lariat_utils.LariatData(ts.j.id,ts.j.end_time,'/Users/rtevans/')
+  ld=lariat_utils.LariatData(ts.j.id,ts.j.end_time,analyze_conf.lariat_path)
   title += '\n' + ld.title()
   print 'dd'
   
@@ -206,7 +206,13 @@ def master_plot(file,mode='lines',threshold=False,
     
   fig.savefig(output_dir+'/'+fname)
   plt.close()
+
   return fig
+
+def mp_wrapper(file,mode='lines',threshold=False,
+                output_dir='.',prefix='graph',mintime=3600,wayness=16,
+                header='Master',figs=[]):
+  master_plot(file,mode,threshold,output_dir,prefix,mintime,wayness,header)
 
 def main():
 
@@ -231,9 +237,9 @@ def main():
     print 'Must have at least one file'
     exit(1)
     
-  pool   = multiprocessing.Pool(processes=procs)
+  pool = multiprocessing.Pool(processes=procs)
 
-  partial_master=functools.partial(master_plot,mode=n.m[0],
+  partial_master=functools.partial(mp_wrapper,mode=n.m[0],
                                    threshold=False,
                                    output_dir=n.o[0],
                                    prefix='graph',
@@ -244,7 +250,6 @@ def main():
   
   pool.close()
   pool.join()
-
 
 if __name__ == '__main__':
   main()
