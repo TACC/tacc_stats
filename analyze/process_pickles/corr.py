@@ -38,7 +38,7 @@ def compute_ratio(file):
   tmid=(ts.t[:-1]+ts.t[1:])/2.0
 
   ld=lariat_utils.LariatData(ts.j.id,ts.j.end_time,
-                             '/scratch/projects/lariatData')
+                             analyze_conf.lariat_path)
   if ld.exc == 'unknown':
     return
 

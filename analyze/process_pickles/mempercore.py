@@ -23,7 +23,7 @@ def mem_usage(file):
     print e
     return []
 
-  ld=lariat_utils.LariatData(ts.j.id,ts.j.end_time,'/scratch/projects/lariatData')
+  ld=lariat_utils.LariatData(ts.j.id,ts.j.end_time,analyze_conf.lariat_path)
   mem_max=0.
   for host in ts.j.hosts.keys():
     mem_max=max(numpy.max(ts.data[0][host]),mem_max)

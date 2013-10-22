@@ -70,7 +70,7 @@ def main():
 
     tmid=(ts.t[:-1]+ts.t[1:])/2.0
 
-    ld=lariat_utils.LariatData(ts.j.id,ts.j.end_time,'lariatData')
+    ld=lariat_utils.LariatData(ts.j.id,ts.j.end_time,analyze_conf.lariat_path)
     
     read_rate=numpy.zeros_like(tmid)
     write_rate=numpy.zeros_like(tmid)
