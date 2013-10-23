@@ -9,11 +9,15 @@ def test(name, args, outfile):
         print name+' test failed'
         print False
         sys.exit()
-    subprocess.call('rm @CMAKE_CURRENT_BINARY_DIR@/' + outfile, shell=True)
+    #subprocess.call('rm @CMAKE_CURRENT_BINARY_DIR@/' + outfile, shell=True)
     
 programs = [
     ['aggregate_jobs.py', '-f @TEST_DATA@ -k1 intel_snb -k2 SSE_D_ALL -p 1', 'bar.pdf'],
+    #['catastrophe.py', '-o @CMAKE_CURRENT_BINARY_DIR@ @TEST_DATA@','*step*master*'],
     ['dump_csv_weijia.py', '-p 1 @TEST_DATA@', 'dump.csv'],
+    #['idlehost.py','@TEST_DATE@',],
+    ['imbalance.py','0.01 intel_snb SSE_D_ALL @TEST_DATA@','*graph*imbalance*'],
+    ['lowflops.py','-t 1000 -o @CMAKE_CURRENT_BINARY_DIR@ @TEST_DATA@','*lowflops*master*'],
     ['masterplot.py', '@TEST_DATA@ -m lines -p 1 -s 1 -o @CMAKE_CURRENT_BINARY_DIR@', 'graph*1835740*master.*'],
     ['membw.py', '-t 0.01 @TEST_DATA@ -o @CMAKE_CURRENT_BINARY_DIR@','high*1835740*master.*'],
     ['mempercore.py', '@TEST_DATA@', 'mempercore*'],
