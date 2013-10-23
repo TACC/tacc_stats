@@ -11,7 +11,8 @@ import os,sys
 import masterplot as mp
 import tspl
 import job_stats as data
-import  cPickle as pickle 
+import MetaData
+import cPickle as pickle 
 
 path = sys_path_append.pickles_dir
 
@@ -25,28 +26,20 @@ def dates(request):
 def index(request, date):
 
     #Job.objects.all().delete()
-    from datetime import datetime
-    from django.utils.timezone import utc
 
-    for jobid in os.listdir(path+date):
-        if Job.objects.filter(id=jobid).exists(): continue
+    # Use meta_file to load up database if available
+    if not os.path.exists(os.path.join(path,date,'meta_file')):
+        meta = MetaData.MetaData()
+        meta.build_meta_file(os.path.join(path,date))
 
-        try:
-            with open(os.path.join(path,date,jobid)) as f:
-                data = pickle.load(f)
-            if len(data.times) == 0: continue
-            del data.acct['yesno'], data.acct['unknown']
-        except: continue
-        
-        fields = data.acct
-        fields['path'] = os.path.join(path,date,jobid)
-        fields['date'] = date
-        fields['start_time']=datetime.fromtimestamp(data.start_time).replace(tzinfo=utc)
-        fields['end_time']=datetime.fromtimestamp(data.end_time).replace(tzinfo=utc)
-        
-        job_model, created = Job.objects.get_or_create(**fields) 
+    with open(os.path.join(path,date,'meta_file')) as f:
+        data = pickle.load(f)
+        for json in data:
+            if Job.objects.filter(id=json['id']).exists(): continue
+            job_model, created = Job.objects.get_or_create(**json) 
 
     job_list = Job.objects.filter(date = date).order_by('-id')
+    #job_list = Job.objects.filter(date = date).order_by('end_time')
     nj = Job.objects.filter(date = date).count()
     return render_to_response("stats/index.html", {'job_list' : job_list, 'date' : date, 'nj' : nj})
 

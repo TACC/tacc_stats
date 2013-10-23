@@ -14,10 +14,6 @@ urlpatterns = patterns('',
                        url(r'^date/\d{4}-\d{2}-\d{2}/job/(?P<pk>\d+)/(?P<type_name>\w+)/$',
                            type_detail, name = 'type_detail'),
 
-                       url(r'^joblist$',
-                           ListView.as_view(
-                               queryset=Job.objects.order_by('-id')[:100])),
-
                        url(r'^type_plot/(?P<pk>\d+)/(?P<type_name>\w+)/$', 
                            type_plot, name = 'type_plot'),
 
