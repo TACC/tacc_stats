@@ -92,9 +92,7 @@ def stats_unload(job):
 
 def master_plot(request, pk):
     job = Job.objects.get(id = pk)
-    #stats_load(job) 
-    fig = mp.master_plot(job.path,mintime=600)
-    #stats_unload(job)
+    fig, fname = mp.master_plot(job.path,mintime=600)
     return figure_to_response(fig)
 
 class JobDetailView(DetailView):

@@ -204,15 +204,16 @@ def master_plot(file,mode='lines',threshold=False,
   elif mode == 'percentile':
     fname+='_perc'
     
-  fig.savefig(output_dir+'/'+fname)
+
   plt.close()
 
-  return fig
+  return fig, fname
 
 def mp_wrapper(file,mode='lines',threshold=False,
                 output_dir='.',prefix='graph',mintime=3600,wayness=16,
                 header='Master',figs=[]):
-  master_plot(file,mode,threshold,output_dir,prefix,mintime,wayness,header)
+  fig, fname = master_plot(file,mode,threshold,output_dir,prefix,mintime,wayness,header)
+  fig.savefig(output_dir+'/'+fname)
 
 def main():
 
