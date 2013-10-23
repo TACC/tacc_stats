@@ -18,7 +18,7 @@
 	    <h2> Hosts </h2>
 	    <table border="1" cellpadding="5"
 		   {% for host_name in host_list %} 
-	 	   <tr><th>{{host_name}}</th></tr>
+	 	   <tr><td>{{host_name}}</td></tr>
 	           {% endfor %}
             </table>
            </div>
@@ -30,7 +30,7 @@
     <table border="1" cellpadding="5"
       <tr><th>Type Name</th><th>Recorded Performance Events</th></tr>
          {% for type_name, schema in type_list %}
-            <tr><th><a href="{{ type_name }}/">{{ type_name }}</a></th><<th>{{ schema }}</th></tr>
+            <tr><td><a href="{{ type_name }}/">{{ type_name }}</a></td><<td>{{ schema }}</td></tr>
          {% endfor %}
     </table>
 
