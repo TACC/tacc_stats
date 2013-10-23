@@ -125,7 +125,7 @@ def master_plot(file,mode='lines',threshold=False,
                  'lnet', 'lnet', 'ib_sw','ib_sw','cpu'],
       'intel_snb' : ['intel_snb_imc', 'intel_snb_imc', 'intel_snb', 
                      'lnet', 'lnet', 'ib_sw','ib_sw','cpu',
-                     'intel_snb', 'intel_snb', 'mem'],
+                     'intel_snb', 'intel_snb', 'mem', 'mem'],
       }
   
   k2={'amd64':
@@ -135,14 +135,14 @@ def master_plot(file,mode='lines',threshold=False,
                  'rx_bytes','tx_bytes', 'rx_bytes','tx_bytes','user'],
       'intel_snb' : ['CAS_READS', 'CAS_WRITES', 'LOAD_L1D_ALL',
                      'rx_bytes','tx_bytes', 'rx_bytes','tx_bytes','user',
-                     'SSE_D_ALL', 'SIMD_D_256', 'MemUsed'],
+                     'SSE_D_ALL', 'SIMD_D_256', 'MemUsed', 'AnonPages'],
       }
 
   try:
     print file
     ts=tspl.TSPLSum(file,k1,k2)
   except tspl.TSPLException as e:
-    return
+    return 
 
   ignore_qs=['gpu','gpudev','vis','visdev']
   if not tspl_utils.checkjob(ts,mintime,wayness,ignore_qs):
@@ -169,7 +169,7 @@ def master_plot(file,mode='lines',threshold=False,
 
     #Plot key 3
     #plot(ax[2],ts,[2],3600.,1.0/64.0*1e9, ylabel='L1 BW GB/s')
-    plot(ax[2],ts,[10],3600.,1024.0*1024.0*1024.0, ylabel='Memory Usage GB',
+    plot(ax[2],ts,[10,-11],3600.,1024.0*1024.0*1024.0, ylabel='Memory Usage GB',
          do_rate=False)
   else: #Fix this to support the old amd plots
     print ts.pmc_type + ' not supported'
@@ -191,7 +191,7 @@ def master_plot(file,mode='lines',threshold=False,
   title=header+'\n'+ts.title
   if threshold:
     title+=', V: %(v)-6.1f' % {'v': threshold}
-  ld=lariat_utils.LariatData(ts.j.id,ts.j.end_time,'/Users/rtevans/')
+  ld=lariat_utils.LariatData(ts.j.id,ts.j.end_time,analyze_conf.lariat_path)
   title += '\n' + ld.title()
   print 'dd'
   
@@ -206,7 +206,13 @@ def master_plot(file,mode='lines',threshold=False,
     
   fig.savefig(output_dir+'/'+fname)
   plt.close()
+
   return fig
+
+def mp_wrapper(file,mode='lines',threshold=False,
+                output_dir='.',prefix='graph',mintime=3600,wayness=16,
+                header='Master',figs=[]):
+  master_plot(file,mode,threshold,output_dir,prefix,mintime,wayness,header)
 
 def main():
 
@@ -231,9 +237,9 @@ def main():
     print 'Must have at least one file'
     exit(1)
     
-  pool   = multiprocessing.Pool(processes=procs)
+  pool = multiprocessing.Pool(processes=procs)
 
-  partial_master=functools.partial(master_plot,mode=n.m[0],
+  partial_master=functools.partial(mp_wrapper,mode=n.m[0],
                                    threshold=False,
                                    output_dir=n.o[0],
                                    prefix='graph',
@@ -244,7 +250,6 @@ def main():
   
   pool.close()
   pool.join()
-
 
 if __name__ == '__main__':
   main()

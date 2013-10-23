@@ -20,7 +20,7 @@ def do_check(f,jobs):
 
   
   ld=lariat_utils.LariatData(ts.j.id,ts.j.end_time,
-                             '/scratch/projects/lariatData')
+                             analyze_conf.lariat_path)
   jobs[ts.j.id]=ld.exc
   
 

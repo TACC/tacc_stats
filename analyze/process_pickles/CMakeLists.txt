@@ -1,4 +1,5 @@
 set(PY_INC_PATH ${CMAKE_SOURCE_DIR}/include)
+set(LARIAT_PATH ${lariat_path})
 configure_file(analyze_conf.py.in ${CMAKE_CURRENT_SOURCE_DIR}/analyze_conf.py @ONLY)
 
 file(GLOB PY_ANALYZE_FILES ${CMAKE_CURRENT_SOURCE_DIR}/*.py)

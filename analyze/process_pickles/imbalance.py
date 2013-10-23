@@ -23,7 +23,7 @@ def plot_ratios(ts,tmid,ratio,ratio2,rate,var,fig,ax,full):
   ymax=max(numpy.maximum(ratio,ratio2))
   ymin,ymax=tspl_utils.expand_range(ymin,ymax,0.1)
 
-  ld=lariat_utils.LariatData(ts.j.id,ts.j.end_time,'lariatData')
+  ld=lariat_utils.LariatData(ts.j.id,ts.j.end_time,analyze_conf.lariat_path)
 
   print '---------------------'
   ax[0].plot(tmid/3600,ratio)

@@ -13,14 +13,14 @@ import tspl, tspl_utils, masterplot
 def do_mp(arg):
   masterplot.master_plot(*arg)
 
-def getuser(file,user,files):
+def getuser(file,user,output_dir):
   try:
     ts=tspl.TSPLBase(file,['lnet'],['rx_bytes'])
   except tspl.TSPLException as e:
     return
 
   if ts.owner == user:
-    masterplot.master_plot(file)
+    masterplot.master_plot(file,output_dir=output_dir)
 
 def main():
   parser=argparse.ArgumentParser(description='Deal with a directory of pickle'
@@ -39,9 +39,8 @@ def main():
 
   pool   = multiprocessing.Pool(processes=n.p[0])
   m      = multiprocessing.Manager()
-  files  = m.list()
 
-  partial_getuser=functools.partial(getuser,user=n.u[0],files=files)
+  partial_getuser=functools.partial(getuser,user=n.u[0],output_dir=n.o[0])
   pool.map(partial_getuser,filelist)
   pool.close()
   pool.join()
