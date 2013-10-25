@@ -19,12 +19,12 @@ def USAGE(str):
 
 def getdate(date_str):
     try:        
-        if sys.platform == 'linux':
+        try:
             out = subprocess.check_output(['date', '--date', date_str, '+%s'])
-        if sys.platform == 'darwin':
+        except:
             out = subprocess.check_output([
-                'date','-j','-f',"""'%Y-%m-%d'""",
-                """'"""+date_str+"""'""",'+%s'])
+                    'date','-j','-f',"""'%Y-%m-%d'""",
+                    """'"""+date_str+"""'""",'+%s'])
         return long(out)
     except subprocess.CalledProcessError, e:
         FATAL("Invalid date: `%s'" % (date_str,))
