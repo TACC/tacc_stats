@@ -40,15 +40,32 @@ def search(request):
         message = 'You searched for: %r' % request.GET['q']
         try:
             job = Job.objects.get(id = q)
-            return HttpResponseRedirect("/stats/date/"+str(job.date)+"/job/"+str(job.id)+"/")
+            return HttpResponseRedirect("/stats/job/"+str(job.id)+"/")
         except: pass
+
+    if 'u' in request.GET:
+        u = request.GET['u']
+        message = 'You searched for: %r' % request.GET['u']
+        try:
+            return user_view(request, u)
+        except: pass
+
     return render(request, 'stats/dates.html', {'error' : True})
+
+
+def user_view(request, user):
+
+    job_list = Job.objects.filter(uid = user).order_by('-id')
+    nj = len(job_list)
+    
+    return render_to_response("stats/index.html", {'job_list' : job_list, 'user' : user, 'nj' : nj})
+
 
 def index(request, date):
 
     job_list = Job.objects.filter(date = date).order_by('-id')
-    nj = Job.objects.filter(date = date).count()
-
+    nj = len(job_list)
+    
     return render_to_response("stats/index.html", {'job_list' : job_list, 'date' : date, 'nj' : nj})
 
 def figure_to_response(f):
@@ -58,7 +75,7 @@ def figure_to_response(f):
     f.clear()
     return response
 
-def jobs_summary(request, date):
+def date_summary(request, date):
 
     fig = figure(figsize=(17,6))
 
@@ -71,6 +88,27 @@ def jobs_summary(request, date):
     ax.set_xlabel('# hrs')
     # Number of cores
     job_size = [job.cores for job in Job.objects.filter(date = date, status='COMPLETED')]
+    ax = fig.add_subplot(122)
+    ax.hist(job_size, max(5,30))
+    ax.set_title('Run Sizes for Completed Jobs')
+    ax.set_xlabel('# cores')
+    fig.tight_layout()
+
+    return figure_to_response(fig)
+
+def user_summary(request, user):
+
+    fig = figure(figsize=(17,6))
+
+    # Run times
+    job_times = [job.timespent / 3600. for job in Job.objects.filter(uid = user, status = 'COMPLETED')]
+    ax = fig.add_subplot(121)
+    ax.hist(job_times, max(5,30))
+    ax.set_title('Run Times for Completed Jobs')
+    ax.set_ylabel('# of jobs')
+    ax.set_xlabel('# hrs')
+    # Number of cores
+    job_size = [job.cores for job in Job.objects.filter(uid = user, status='COMPLETED')]
     ax = fig.add_subplot(122)
     ax.hist(job_size, max(5,30))
     ax.set_title('Run Sizes for Completed Jobs')

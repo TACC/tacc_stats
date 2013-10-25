@@ -4,19 +4,23 @@
 </head>
 <body>
 <h1>TACC Stats Home</h1>
-<h2>Job Dates</h2>
 {% if error %}
-   <p style="color: red;">Submit a valid Job ID.</p>
+   <p style="color: red;">Requested ID doesn't exists in current database.</p>
 {% endif %}
 Search for Job ID
 <form action="{% url 'stats:search' %}" method="get">
   <input type="text" name ="q">
   <input type="submit" value="Search">
 </form>
+Search for User ID
+<form action="{% url 'stats:search' %}" method="get">
+  <input type="text" name ="u">
+  <input type="submit" value="Search">
+</form>
 
 {% if date_list %}
  <table border="1" cellpadding="5">
-   <tr><th>Currently Available Job Completion Dates</th></tr>
+   <tr><th>Browse Jobs by Completion Date</th></tr>
    {% for date in date_list %}
         <tr><th><a href="date/{{date}}">{{date}} </th></tr>
    {% endfor %}

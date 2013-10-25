@@ -3,10 +3,20 @@
     <title>TACC Stats</title>
 </head>
 <body>
-<h1>Jobs from {{date}} ({{nj}} Jobs Recorded)</h1>
-<h2> Charts at a glance </h2>
 
-<img src="{% url 'stats:jobs_summary' date %}" />
+<h1>Jobs ({{nj}} counted)</h1>
+
+{% if date %}
+<h1>For date: {{ date }}</h1>
+<h2> Charts at a glance </h2>
+<img src="{% url 'stats:date_summary' date %}" />
+{% endif %}
+
+{% if user %}
+<h1>For user: {{ user }}</h1>
+<h2> Charts at a glance </h2>
+<img src="{% url 'stats:user_summary' user %}" />
+{% endif %}
 
 {% if job_list %}
     <h1>Job Listing</h1>
@@ -26,8 +36,8 @@
 	</tr>
     {% for job in job_list %}
         <tr bgcolor="{{job.color}}">
-            <td><a href="job/{{ job.id }}/">{{ job.id }}</a>
-            <td>{{ job.uid }}</td>
+            <td><a href="{% url 'stats:job'  job.id %}">{{ job.id }}</a>
+            <td><a href="{% url 'stats:user_view' job.uid %}" >{{ job.uid }}</td>
             <td align=right>{{ job.project }}</td>
             <td align=right>{{ job.start_time }}</td>
             <td align=right>{{ job.end_time }}</td>
@@ -43,5 +53,6 @@
 {% else %}
     <p>No jobs are available.</p>
 {% endif %}
+
 </body>
 </html>
