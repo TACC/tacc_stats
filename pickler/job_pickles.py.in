@@ -3,7 +3,7 @@ import sys
 sys.path.append('@CONFIG_PY_DIR@')
 import datetime, glob, job_stats, os, batch_acct, subprocess, time
 import cPickle as pickle
-
+import MetaData
 execfile('pickles.conf')
 
 prog_name = os.path.basename(sys.argv[0])
@@ -19,7 +19,12 @@ def USAGE(str):
 
 def getdate(date_str):
     try:        
-        out = subprocess.check_output(['date', '--date', date_str, '+%s'])
+        if sys.platform == 'linux':
+            out = subprocess.check_output(['date', '--date', date_str, '+%s'])
+        if sys.platform == 'darwin':
+            out = subprocess.check_output([
+                'date','-j','-f',"""'%Y-%m-%d'""",
+                """'"""+date_str+"""'""",'+%s'])
         return long(out)
     except subprocess.CalledProcessError, e:
         FATAL("Invalid date: `%s'" % (date_str,))
@@ -38,8 +43,11 @@ end = getdate(sys.argv[3])
 #  seek = 800 << 20 # XXX
 
 # Run though all jobs that ended after start and before end + 3 days.
+# This window -> start_pickle < end_time < end_pickle
+
 a=batch_acct.factory(batch_system, acct_path, host_name_ext)
 
+meta_data = MetaData.MetaData(pickle_dir)
 for acct in a.reader(start_time=start,end_time=end,seek=seek):
     if acct['end_time'] == 0:
         continue
@@ -49,6 +57,8 @@ for acct in a.reader(start_time=start,end_time=end,seek=seek):
 
     job = job_stats.from_acct(acct, tacc_stats_home, host_list_dir, a)
     pickle_path = os.path.join(pickle_dir, job.id)
-    pickle_file = open(pickle_path, 'w')
+    pickle_file = open(pickle_path, 'wb')
     pickle.dump(job, pickle_file, pickle_prot)
+    pickle_file.close()
+    meta_data.load_update()
 

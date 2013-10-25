@@ -22,4 +22,6 @@ urlpatterns = patterns('',
 
                        url(r'^jobs_summary/(?P<date>\d{4}-\d{2}-\d{2})/$', 
                            jobs_summary, name = 'jobs_summary' ),
+
+                       url(r'^search/$',search, name='search'),
 )

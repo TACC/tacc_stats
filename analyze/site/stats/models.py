@@ -1,6 +1,7 @@
 """The database models of tacc stats"""
 
 from django.db import models
+from django.forms import ModelForm
 from picklefield.fields import PickledObjectField
 
 class Job(models.Model):
@@ -28,7 +29,14 @@ class Job(models.Model):
         return dt.seconds
 
     def color(self):
-        ret_val = "LightBlue"
+        ret_val = "silver"
         if self.status != 'COMPLETED':
-            ret_val = "red"
+            ret_val = "lightred"
+        if self.timespent > 600:
+            ret_val = "lightblue"
         return ret_val
+
+class JobForm(ModelForm):
+    class Meta:
+        model = Job
+        fields = ['id']

@@ -1,11 +1,11 @@
-from django.http import HttpResponse
-from django.shortcuts import render_to_response
+from django.http import HttpResponse, HttpResponseRedirect
+from django.shortcuts import render_to_response, render
 from django.views.generic import DetailView, ListView
 import matplotlib, string
 import matplotlib.pyplot as plt
 from pylab import figure, hist, plot
 
-from stats.models import Job
+from stats.models import Job, JobForm
 import sys_path_append
 import os,sys
 import masterplot as mp
@@ -14,33 +14,41 @@ import job_stats as data
 import MetaData
 import cPickle as pickle 
 
+
+
 path = sys_path_append.pickles_dir
 
 def dates(request):
     date_list = []
 
+    #Job.objects.all().delete()
     for date in os.listdir(path):
         date_list.append(date)
+        meta = MetaData.MetaData(os.path.join(path,date))    
+        meta.load_update()
+        
+        for jobid, json in meta.json.iteritems():
+            if Job.objects.filter(id = jobid).exists(): continue
+            job_model, created = Job.objects.get_or_create(**json) 
+
     return render_to_response("stats/dates.html", { 'date_list' : date_list})
+
+def search(request):
+
+    if 'q' in request.GET:
+        q = request.GET['q']
+        message = 'You searched for: %r' % request.GET['q']
+        try:
+            job = Job.objects.get(id = q)
+            return HttpResponseRedirect("/stats/date/"+str(job.date)+"/job/"+str(job.id)+"/")
+        except: pass
+    return render(request, 'stats/dates.html', {'error' : True})
 
 def index(request, date):
 
-    #Job.objects.all().delete()
-
-    # Use meta_file to load up database if available
-    if not os.path.exists(os.path.join(path,date,'meta_file')):
-        meta = MetaData.MetaData()
-        meta.build_meta_file(os.path.join(path,date))
-
-    with open(os.path.join(path,date,'meta_file')) as f:
-        data = pickle.load(f)
-        for json in data:
-            if Job.objects.filter(id=json['id']).exists(): continue
-            job_model, created = Job.objects.get_or_create(**json) 
-
     job_list = Job.objects.filter(date = date).order_by('-id')
-    #job_list = Job.objects.filter(date = date).order_by('end_time')
     nj = Job.objects.filter(date = date).count()
+
     return render_to_response("stats/index.html", {'job_list' : job_list, 'date' : date, 'nj' : nj})
 
 def figure_to_response(f):
@@ -53,20 +61,22 @@ def figure_to_response(f):
 def jobs_summary(request, date):
 
     fig = figure(figsize=(17,6))
+
     # Run times
-    job_times = [job.timespent / 3600. for job in Job.objects.filter(date = date)]
+    job_times = [job.timespent / 3600. for job in Job.objects.filter(date = date, status = 'COMPLETED')]
     ax = fig.add_subplot(121)
-    ax.hist(job_times, max(5,len(job_times)/20))
-    ax.set_title('Run Times')
+    ax.hist(job_times, max(5,30))
+    ax.set_title('Run Times for Completed Jobs')
     ax.set_ylabel('# of jobs')
     ax.set_xlabel('# hrs')
     # Number of cores
-    job_size = [job.cores for job in Job.objects.filter(date = date)]
+    job_size = [job.cores for job in Job.objects.filter(date = date, status='COMPLETED')]
     ax = fig.add_subplot(122)
-    ax.hist(job_size, max(5,len(job_size)/20))
-    ax.set_title('Job Sizes')
+    ax.hist(job_size, max(5,30))
+    ax.set_title('Run Sizes for Completed Jobs')
     ax.set_xlabel('# cores')
     fig.tight_layout()
+
     return figure_to_response(fig)
 
 def stats_load(job):

@@ -9,7 +9,7 @@ def test(name, args, outfile):
         print name+' test failed'
         print False
         sys.exit()
-    #subprocess.call('rm @CMAKE_CURRENT_BINARY_DIR@/' + outfile, shell=True)
+    subprocess.call('rm @CMAKE_CURRENT_BINARY_DIR@/' + outfile, shell=True)
     
 programs = [
     ['adjust.py','intel_snb SSE_D_ALL @TEST_DATA@','graph*adjust.*'],

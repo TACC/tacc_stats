@@ -5,6 +5,35 @@
 <body>
 {% if job %}
     <h1>Job ID {{ job.id }}</h1>
+   <h2> Job Summary    </h2>
+ <table border="1" cellpadding="5">
+        <tr>
+	  <th> Job ID </th>
+	  <th> UID </th>
+	  <th> project </th>
+	  <th> start time </th>
+	  <th> end time </th>
+	  <th> run time (s)</th>
+	  <th> queue </th>
+	  <th> name </th>
+	  <th> status </th>	    
+	  <th> cores </th>
+	  <th> nodes </th>
+	</tr>
+        <tr bgcolor="{{job.color}}">
+            <td><a href="job/{{ job.id }}/">{{ job.id }}</a>
+            <td>{{ job.uid }}</td>
+            <td align=right>{{ job.project }}</td>
+            <td align=right>{{ job.start_time }}</td>
+            <td align=right>{{ job.end_time }}</td>
+            <td align=right>{{ job.timespent }}</td>
+            <td align=right>{{ job.queue }}</td>
+            <td align=right>{{ job.name }}</td>
+            <td align=right>{{ job.status }}</td>
+            <td align=right>{{ job.cores }}</td>
+            <td align=right>{{ job.nodes }}</td>
+        </tr>
+   </table>
 
     <table>
       <tr>
@@ -15,17 +44,16 @@
 	</td>
 	<td>
 	  <div id="dv02">
-	    <h2> Hosts </h2>
 	    <table border="1" cellpadding="5"
-		   {% for host_name in host_list %} 
-	 	   <tr><td>{{host_name}}</td></tr>
-	           {% endfor %}
+		   <tr><th>Hosts</th></tr>
+		   <tr><td>{% for host_name in host_list %} 
+	 	   {{host_name}}
+	           {% endfor %}</td></tr>
             </table>
            </div>
         </td>
        </tr>
      </table>
-
    <h2> Schema Summary </h2>
     <table border="1" cellpadding="5"
       <tr><th>Type Name</th><th>Recorded Performance Events</th></tr>
