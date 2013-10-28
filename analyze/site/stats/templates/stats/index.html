@@ -18,6 +18,13 @@
 <img src="{% url 'stats:user_summary' user %}" />
 {% endif %}
 
+{% if project %}
+<h1>For project: {{ project }}</h1>
+<h2> Charts at a glance </h2>
+<img src="{% url 'stats:project_summary' project %}" />
+{% endif %}
+
+
 {% if job_list %}
     <h1>Job Listing</h1>
     <table border="1" cellpadding="5">
@@ -38,7 +45,7 @@
         <tr bgcolor="{{job.color}}">
             <td><a href="{% url 'stats:job'  job.id %}">{{ job.id }}</a>
             <td><a href="{% url 'stats:user_view' job.uid %}" >{{ job.uid }}</td>
-            <td align=right>{{ job.project }}</td>
+            <td align=right><a href="{% url 'stats:project_view' job.project %}" >{{ job.project }}</td>
             <td align=right>{{ job.start_time }}</td>
             <td align=right>{{ job.end_time }}</td>
             <td align=right>{{ job.timespent }}</td>

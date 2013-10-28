@@ -31,8 +31,8 @@ class Job(models.Model):
     def color(self):
         ret_val = "silver"
         if self.status != 'COMPLETED':
-            ret_val = "lightred"
-        if self.timespent > 600:
+            ret_val = "red"
+        elif self.timespent > 600:
             ret_val = "lightblue"
         return ret_val
 

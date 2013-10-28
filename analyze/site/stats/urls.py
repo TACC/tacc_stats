@@ -26,8 +26,15 @@ urlpatterns = patterns('',
                        url(r'^user_summary/(?P<user>\d+)/$', 
                            user_summary, name = 'user_summary' ),
 
+                       url(r'^project_summary/(?P<project>\w+.*\w+)/$', 
+                           project_summary, name = 'project_summary' ),
+
+
                        url(r'^user/(?P<user>\d+)/$',
                            user_view, name='user_view'),
+
+                       url(r'^project/(?P<project>\w+.*\w+)/$',
+                           project_view, name='project_view'),
 
 
                        url(r'^search/$',search, name='search'),

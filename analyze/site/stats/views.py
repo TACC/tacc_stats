@@ -60,6 +60,13 @@ def user_view(request, user):
     
     return render_to_response("stats/index.html", {'job_list' : job_list, 'user' : user, 'nj' : nj})
 
+def project_view(request, project):
+
+    job_list = Job.objects.filter(project = project).order_by('-id')
+    nj = len(job_list)
+    
+    return render_to_response("stats/index.html", {'job_list' : job_list, 'project' : project, 'nj' : nj})
+
 
 def index(request, date):
 
@@ -82,14 +89,14 @@ def date_summary(request, date):
     # Run times
     job_times = [job.timespent / 3600. for job in Job.objects.filter(date = date, status = 'COMPLETED')]
     ax = fig.add_subplot(121)
-    ax.hist(job_times, max(5,30))
+    ax.hist(job_times, 30)
     ax.set_title('Run Times for Completed Jobs')
     ax.set_ylabel('# of jobs')
     ax.set_xlabel('# hrs')
     # Number of cores
     job_size = [job.cores for job in Job.objects.filter(date = date, status='COMPLETED')]
     ax = fig.add_subplot(122)
-    ax.hist(job_size, max(5,30))
+    ax.hist(job_size, 30)
     ax.set_title('Run Sizes for Completed Jobs')
     ax.set_xlabel('# cores')
     fig.tight_layout()
@@ -109,6 +116,27 @@ def user_summary(request, user):
     ax.set_xlabel('# hrs')
     # Number of cores
     job_size = [job.cores for job in Job.objects.filter(uid = user, status='COMPLETED')]
+    ax = fig.add_subplot(122)
+    ax.hist(job_size, max(5,30))
+    ax.set_title('Run Sizes for Completed Jobs')
+    ax.set_xlabel('# cores')
+    fig.tight_layout()
+
+    return figure_to_response(fig)
+
+def project_summary(request, project):
+
+    fig = figure(figsize=(17,6))
+
+    # Run times
+    job_times = [job.timespent / 3600. for job in Job.objects.filter(project = project, status = 'COMPLETED')]
+    ax = fig.add_subplot(121)
+    ax.hist(job_times, max(5,30))
+    ax.set_title('Run Times for Completed Jobs')
+    ax.set_ylabel('# of jobs')
+    ax.set_xlabel('# hrs')
+    # Number of cores
+    job_size = [job.cores for job in Job.objects.filter(project = project, status='COMPLETED')]
     ax = fig.add_subplot(122)
     ax.hist(job_size, max(5,30))
     ax.set_title('Run Sizes for Completed Jobs')
