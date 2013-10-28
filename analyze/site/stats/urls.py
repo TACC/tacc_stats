@@ -6,8 +6,6 @@ from stats.views import *
 urlpatterns = patterns('',
                        url(r'^$',dates, name='dates'),
 
-                       url(r'^date/(?P<date>\d{4}-\d{2}-\d{2})/$', index),
-
                        url(r'^job/(?P<pk>\d+)/$',
                            JobDetailView.as_view(), name='job'),
 
@@ -20,23 +18,23 @@ urlpatterns = patterns('',
                        url(r'^master_plot/(?P<pk>\d+)/$', 
                            master_plot, name = 'master_plot'),
 
-                       url(r'^date_summary/(?P<date>\d{4}-\d{2}-\d{2})/$', 
-                           date_summary, name = 'date_summary' ),
+                       url(r'^heat_map/(?P<pk>\d+)/$', 
+                           heat_map, name = 'heat_map'),
 
-                       url(r'^user_summary/(?P<user>\d+)/$', 
-                           user_summary, name = 'user_summary' ),
-
+                       url(r'^date_summary/(?P<date>\d{4}-\d{2}-\d{2})/$',
+                           hist_summary, name = 'date_summary', 
+                           ),
+                       url(r'^uid_summary/(?P<uid>\d+)/$', 
+                           hist_summary, name = 'uid_summary' ),
                        url(r'^project_summary/(?P<project>\w+.*\w+)/$', 
-                           project_summary, name = 'project_summary' ),
+                           hist_summary, name = 'project_summary' ),
 
-
-                       url(r'^user/(?P<user>\d+)/$',
-                           user_view, name='user_view'),
-
+                       url(r'^date/(?P<date>\d{4}-\d{2}-\d{2})/$', 
+                           index, name='date_view'),
+                       url(r'^uid/(?P<uid>\d+)/$',
+                           index, name='uid_view'),
                        url(r'^project/(?P<project>\w+.*\w+)/$',
-                           project_view, name='project_view'),
-
+                           index, name='project_view'),
 
                        url(r'^search/$',search, name='search'),
-                       url(r'^search/job/(?P<pk>\d+)/$', JobDetailView.as_view()),
 )

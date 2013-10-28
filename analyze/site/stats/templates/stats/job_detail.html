@@ -22,8 +22,8 @@
 	</tr>
         <tr bgcolor="{{job.color}}">
 	  <td><a href="{% url 'stats:job'  job.id %}">{{ job.id }}</a>
-	  <td><a href="{% url 'stats:user_view' job.uid %}" >{{ job.uid }}</td>            
-          <td align=right>{{ job.project }}</td>
+	  <td><a href="{% url 'stats:uid_view' job.uid %}" >{{ job.uid }}</td>            
+          <td><a href="{% url 'stats:project_view' job.project %}">{{ job.project }}</td>
           <td align=right>{{ job.start_time }}</td>
           <td align=right>{{ job.end_time }}</td>
           <td align=right>{{ job.timespent }}</td>
@@ -44,12 +44,13 @@
 	</td>
 	<td>
 	  <div id="dv02">
-	    <table border="1" cellpadding="5"
+<!--	    <table border="1" cellpadding="5"
 		   <tr><th>Hosts</th></tr>
 		   <tr><td>{% for host_name in host_list %} 
 	 	   {{host_name}}
 	           {% endfor %}</td></tr>
-            </table>
+            </table> -->
+              <img src="{% url 'stats:heat_map' job.id %}" alt="heat map failed"/> 
            </div>
         </td>
        </tr>

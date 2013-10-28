@@ -9,6 +9,7 @@ from stats.models import Job, JobForm
 import sys_path_append
 import os,sys
 import masterplot as mp
+import plotkey
 import tspl
 import job_stats as data
 import MetaData
@@ -20,13 +21,16 @@ path = sys_path_append.pickles_dir
 
 def dates(request):
     date_list = []
-
+    import time
     #Job.objects.all().delete()
     for date in os.listdir(path):
+        print 'Date',date
+        start = time.clock()
         date_list.append(date)
         meta = MetaData.MetaData(os.path.join(path,date))    
         meta.load_update()
-        
+
+        start = time.clock()
         for jobid, json in meta.json.iteritems():
             if Job.objects.filter(id = jobid).exists(): continue
             job_model, created = Job.objects.get_or_create(**json) 
@@ -47,100 +51,64 @@ def search(request):
         u = request.GET['u']
         message = 'You searched for: %r' % request.GET['u']
         try:
-            return user_view(request, u)
+            return index(request, uid = u)
         except: pass
 
     return render(request, 'stats/dates.html', {'error' : True})
 
 
-def user_view(request, user):
+def index(request, date = None, uid = None, project = None):
 
-    job_list = Job.objects.filter(uid = user).order_by('-id')
-    nj = len(job_list)
+    field = {}
+    if date:
+        field['date'] = date
+    if uid:
+        field['uid'] = uid
+    if project:
+        field['project'] = project
+        
+    job_list = Job.objects.filter(**field).order_by('-id')
+
+    field['job_list'] = job_list
+    field['nj'] = len(job_list)
     
-    return render_to_response("stats/index.html", {'job_list' : job_list, 'user' : user, 'nj' : nj})
-
-def project_view(request, project):
-
-    job_list = Job.objects.filter(project = project).order_by('-id')
-    nj = len(job_list)
     
-    return render_to_response("stats/index.html", {'job_list' : job_list, 'project' : project, 'nj' : nj})
+    return render_to_response("stats/index.html", field)
 
+def hist_summary(request, date = None, uid = None, project = None):
 
-def index(request, date):
+    field = {}
+    if date:
+        field['date'] = date
+    if uid:
+        field['uid'] = uid
+    if project:
+        field['project'] = project
+        
+    field['status'] = 'COMPLETED'
 
-    job_list = Job.objects.filter(date = date).order_by('-id')
-    nj = len(job_list)
-    
-    return render_to_response("stats/index.html", {'job_list' : job_list, 'date' : date, 'nj' : nj})
+    job_list = Job.objects.filter(**field)
 
-def figure_to_response(f):
-    response = HttpResponse(content_type='image/png')
-    f.savefig(response, format='png')
-    plt.close(f)
-    f.clear()
-    return response
-
-def date_summary(request, date):
-
-    fig = figure(figsize=(17,6))
+    fig = figure(figsize=(12,6))
 
     # Run times
-    job_times = [job.timespent / 3600. for job in Job.objects.filter(date = date, status = 'COMPLETED')]
+    job_times = [job.timespent / 3600. for job in job_list]
     ax = fig.add_subplot(121)
-    ax.hist(job_times, 30)
-    ax.set_title('Run Times for Completed Jobs')
+    ax.hist(job_times, max(5, len(job_list)/5))
+    ax.set_xlim((0,max(job_times)+1))
     ax.set_ylabel('# of jobs')
     ax.set_xlabel('# hrs')
+    
     # Number of cores
-    job_size = [job.cores for job in Job.objects.filter(date = date, status='COMPLETED')]
+    job_size = [job.cores for job in job_list]
     ax = fig.add_subplot(122)
-    ax.hist(job_size, 30)
+    ax.hist(job_size, max(5, len(job_list)/5))
+    ax.set_xlim((0,max(job_size)+1))
     ax.set_title('Run Sizes for Completed Jobs')
     ax.set_xlabel('# cores')
-    fig.tight_layout()
 
-    return figure_to_response(fig)
-
-def user_summary(request, user):
-
-    fig = figure(figsize=(17,6))
-
-    # Run times
-    job_times = [job.timespent / 3600. for job in Job.objects.filter(uid = user, status = 'COMPLETED')]
-    ax = fig.add_subplot(121)
-    ax.hist(job_times, max(5,30))
     ax.set_title('Run Times for Completed Jobs')
-    ax.set_ylabel('# of jobs')
-    ax.set_xlabel('# hrs')
-    # Number of cores
-    job_size = [job.cores for job in Job.objects.filter(uid = user, status='COMPLETED')]
-    ax = fig.add_subplot(122)
-    ax.hist(job_size, max(5,30))
-    ax.set_title('Run Sizes for Completed Jobs')
-    ax.set_xlabel('# cores')
-    fig.tight_layout()
 
-    return figure_to_response(fig)
-
-def project_summary(request, project):
-
-    fig = figure(figsize=(17,6))
-
-    # Run times
-    job_times = [job.timespent / 3600. for job in Job.objects.filter(project = project, status = 'COMPLETED')]
-    ax = fig.add_subplot(121)
-    ax.hist(job_times, max(5,30))
-    ax.set_title('Run Times for Completed Jobs')
-    ax.set_ylabel('# of jobs')
-    ax.set_xlabel('# hrs')
-    # Number of cores
-    job_size = [job.cores for job in Job.objects.filter(project = project, status='COMPLETED')]
-    ax = fig.add_subplot(122)
-    ax.hist(job_size, max(5,30))
-    ax.set_title('Run Sizes for Completed Jobs')
-    ax.set_xlabel('# cores')
     fig.tight_layout()
 
     return figure_to_response(fig)
@@ -161,6 +129,12 @@ def get_schema(job, type_name):
     return schema
 
 
+def figure_to_response(f):
+    response = HttpResponse(content_type='image/png')
+    f.savefig(response, format='png')
+    plt.close(f)
+    f.clear()
+    return response
 
 def stats_unload(job):
     job.stats = []
@@ -169,6 +143,57 @@ def stats_unload(job):
 def master_plot(request, pk):
     job = Job.objects.get(id = pk)
     fig, fname = mp.master_plot(job.path,mintime=600)
+    return figure_to_response(fig)
+
+def heat_map(request, pk):
+    job = Job.objects.get(id = pk)
+    
+    import numpy as np
+    k1 = {'intel_snb' : ['intel_snb']}
+    k2 = {'intel_snb': ['INSTRUCTIONS_RETIRED']}
+    ts0 = tspl.TSPLBase(job.path,k1,k2)
+
+    k1 = {'intel_snb' : ['intel_snb']}
+    k2 = {'intel_snb': ['CLOCKS_UNHALTED_CORE']}
+    ts1 = tspl.TSPLBase(job.path,k1,k2)
+
+    tmid=(ts0.t[:-1]+ts0.t[1:])/2.0
+
+    cpi = np.array([])
+    hosts = []
+    for v in ts0.data[0]:
+        hosts.append(v)
+        for k in range(len(ts0.data[0][v])):
+            i = np.array(ts0.data[0][v][k],dtype=np.float)
+            c = np.array(ts1.data[0][v][k],dtype=np.float)
+            ratio = np.divide(np.diff(i),np.diff(c))
+            if not cpi.size: cpi = np.array([ratio])
+            else: cpi = np.vstack((cpi,ratio))
+
+    cpi_min, cpi_max = cpi.min(), cpi.max()
+    fig,ax=plt.subplots(1,1,figsize=(8,12),dpi=160)
+
+    y=np.arange(len(hosts)+1)*16
+    
+    yfine = np.arange(cpi.shape[0]+1)
+    
+    time = tmid/3600.
+    print cpi.shape,yfine.shape
+    
+    for l in range(len(y)):
+        plt.axhline(y=y[l]+16, linewidth=0.5,color='black',linestyle='--')
+
+
+    plt.pcolor(time, yfine, cpi, vmin=cpi_min, vmax=cpi_max)
+    plt.colorbar()
+    plt.clim(cpi_min,cpi_max)
+    plt.yticks(y+8,hosts,size='small')
+    plt.title('Instructions Retired per Core Clock Cycle')
+    plt.axis([time.min(),time.max(),yfine.min(),yfine.max()])
+    ax.set_xlabel('Time (hrs)')
+    plt.tight_layout()
+    plt.close()
+
     return figure_to_response(fig)
 
 class JobDetailView(DetailView):
@@ -181,11 +206,8 @@ class JobDetailView(DetailView):
         stats_load(job)
         type_list = []
         host_list = []
-        ctr = 0
         for host_name, host in job.stats.hosts.iteritems():
-            #if counter
             host_list.append(host_name)
-            ctr +=1
         for type_name, type in host.stats.iteritems():
             schema = job.stats.get_schema(type_name).desc
             schema = string.replace(schema,',E',' ')
