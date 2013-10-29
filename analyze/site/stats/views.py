@@ -54,6 +54,13 @@ def search(request):
             return index(request, uid = u)
         except: pass
 
+    if 'p' in request.GET:
+        project = request.GET['p']
+        message = 'You searched for: %r' % request.GET['p']
+        try:
+            return index(request, project = project)
+        except: pass
+
     return render(request, 'stats/dates.html', {'error' : True})
 
 

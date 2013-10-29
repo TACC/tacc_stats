@@ -4,10 +4,10 @@
 </head>
 <body>
     <h1>Job {{ jobid }} / Type {{ type_name }}</h1>
-    <h2>Aggregated over devices</h2>
+    <h2>Rates Aggregated over devices</h2>
 <img src="{% url 'stats:type_plot' jobid type_name %}"/>
 {% if stats_data %}
-    <h2>Aggregated over devices and hosts</h2>
+    <h2>Counts Aggregated over devices and hosts</h2>
     <table border="1" cellpadding="5">
       <tr><th>record</th>{% for key in schema %} <th>{{key}}</th>{% endfor %}</tr>
       {% for time, values in stats_data %}
