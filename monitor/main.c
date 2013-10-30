@@ -41,7 +41,7 @@ static int open_lock_timeout( const char *path, int timeout ) {
         .l_type = F_WRLCK,
         .l_whence = SEEK_SET,
     };
-
+    
     fd = open( path, O_CREAT | O_RDWR, 0600 );
     if ( fd < 0 ) {
         /* create the required directory if necessary */
@@ -125,8 +125,14 @@ static void dumpProcFile( FILE *f, const char *filename ) {
     fprintf( f, "\n\n" );
 }
 
+/* 
+ * The main function of the tacc_stats code. This will read the types
+ * that were assigned in stats.x and write them to the log file.
+ */
 int main( int argc, char *argv[] ) {
+    
     int lock_fd = -1;
+
     char current_path[sizeof( STATS_DIR_PATH ) + 100];
     /* modified by charngda */
     const char *pid_path = STATS_DIR_PATH"/.pid";
@@ -143,6 +149,8 @@ int main( int argc, char *argv[] ) {
     };
 
     int c;
+    // Gets command line arguments, the linux function getopt_long uses
+    // the optarg variable defined in unisted.h
     while ( ( c = getopt_long( argc, argv, "hm:", opts, 0 ) ) != -1 ) {
         switch ( c ) {
             case 'h':
@@ -157,8 +165,12 @@ int main( int argc, char *argv[] ) {
         }
     }
 
+    // files rw-r--r--
+    // directories rwxr-xr-x
     umask( 022 );
 
+    // Variable optind is the index of the next element to be processed in argv,
+    // it is defined in unistd.h and modified by getopt_long function above
     if ( !( optind < argc ) )
         FATAL( "must specify one of the commands: begin, end, collect, rotate, mark, daemon\n" );
 
@@ -182,6 +194,7 @@ int main( int argc, char *argv[] ) {
         cmd_daemon,
     } cmd;
 
+    // set cmd flag
     if ( strcmp( cmd_str, "begin" ) == 0 )
         cmd = cmd_begin;
     else if ( strcmp( cmd_str, "collect" ) == 0 )
@@ -232,6 +245,7 @@ int main( int argc, char *argv[] ) {
         FATAL( "cannot acquire lock. Are you sure there is no other instance of %s running ?\n", argv[0] );
 
     current_time = time( NULL );
+    
     /* pscanf( JOBID_FILE_PATH, "%79s", current_jobid ); */
     /* modified for CCR TORQUE environment by charngda
        At CCR we have job files under JOBID_FILE_PATH directory,
@@ -263,54 +277,56 @@ int main( int argc, char *argv[] ) {
     }
 		*/
 
-		/* modified for CCR SLURM environment */
-		{
+    /* Gets the current job id's that are running based on the files provided by
+     * Slrum in a specific directoy, modified for CCR SLURM environment */
+    {
 
-				// setup directory structs
-				struct dirent *ent;
-				DIR *dir = opendir( JOBID_FILE_PATH );
+        // setup directory structs
+        struct dirent *ent;
+        DIR *dir = opendir( JOBID_FILE_PATH );
 
-				// get the hostname
-				char formatStr[64];
-				gethostname( formatStr, sizeof formatStr );
+        // get the hostname
+        char formatStr[64];
+        gethostname( formatStr, sizeof formatStr );
 
-				// setup format string
-				strcat( formatStr, "_%d.%*d" );
+        // setup format string
+        strcat( formatStr, "_%d.%*d" );
 
-				// tmp vars
-				int tmpId = 0;
-				char tmpStr[16];
+        // tmp vars
+        int tmpId = 0;
+        char tmpStr[16];
 
-				// zero the jobid string
-				current_jobid[0] = 0;
+        // zero the jobid string
+        current_jobid[0] = 0;
 
-				if ( dir ) {
+        if ( dir ) {
 
-						// read all files in the directory
-						while ( ( ent = readdir( dir ) ) != NULL ) {
+            // read all files in the directory
+            while ( ( ent = readdir( dir ) ) != NULL ) {
 
-								// check if filename matches the format, store id
-								if ( sscanf( ent->d_name, formatStr, &tmpId ) ) {
+                // check if filename matches the format, store id
+                if ( sscanf( ent->d_name, formatStr, &tmpId ) ) {
 
-								    sprintf( tmpStr, "%d", tmpId );
-								    strcat( current_jobid, tmpStr );
-								    strcat( current_jobid, "," );
+                    sprintf( tmpStr, "%d", tmpId );
+                    strcat( current_jobid, tmpStr );
+                    strcat( current_jobid, "," );
 
-								}
+                }
 
-						}
+            }
 
-				}
+        }
 
-				if ( 0 == current_jobid[0] )
-						strcpy( current_jobid, "0" );
-				else
-						current_jobid[strlen( current_jobid ) - 1] = 0;
+        if ( 0 == current_jobid[0] )
+            strcpy( current_jobid, "0" );
+        else
+            current_jobid[strlen( current_jobid ) - 1] = 0;
 
-		}
+    }
 
     nr_cpus = sysconf( _SC_NPROCESSORS_ONLN );
 
+    // create the tacc_stats directory to hold the data
     if ( mkdir( STATS_DIR_PATH, 0777 ) < 0 ) {
         /* modified by charngda */
         /* use /bin/mkdir instead */
@@ -412,24 +428,33 @@ DaemonLoopBeginHere:
     }
 
     i = 0;
+    // main loop to collect data, loop through the stats_type structs, the
+    // var i is increased by the stats_type_for_each function
     while ( ( type = stats_type_for_each( &i ) ) != NULL ) {
+        
+        // enable the type to be collected
         if ( enable_all )
             type->st_enabled = 1;
 
+        // check if not enabled, if so continue to next type
         if ( !type->st_enabled )
             continue;
 
+        // init type, disable type if init returns < 0
         if ( stats_type_init( type ) < 0 ) {
             type->st_enabled = 0;
             continue;
         }
 
+        // enable selected
         if ( select_all )
             type->st_selected = 1;
 
+        // call begin function if it has one
         if ( cmd == cmd_begin && type->st_begin != NULL )
             ( *type->st_begin )( type );
 
+        // collect data for type
         if ( type->st_enabled && type->st_selected )
             ( *type->st_collect )( type );
 
@@ -437,6 +462,7 @@ DaemonLoopBeginHere:
         /* in daemon mode, call st_begin after each reading */
         if ( cmd == cmd_daemon && type->st_begin != NULL )
             ( *type->st_begin )( type );
+            
     }
 
     if ( mark != NULL )
@@ -568,6 +594,7 @@ DaemonLoopBeginHere:
         unlink( tmpFileName );
     }
 
+    // write the stats to the file
     if ( stats_file_close( &sf ) < 0 )
         rc = 1;
 

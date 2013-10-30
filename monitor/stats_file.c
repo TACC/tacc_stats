@@ -231,11 +231,13 @@ int stats_file_close(struct stats_file *sf)
 {
   int rc = 0;
 
+  /* write header */
   if (sf->sf_empty)
     sf_wr_hdr(sf);
 
   fseek(sf->sf_file, 0, SEEK_END);
 
+  /* write timestamp and job id's */
   sf_printf(sf, "\n%ld %s\n", (long) current_time, current_jobid);
 
   /* Write mark. */
@@ -259,6 +261,7 @@ int stats_file_close(struct stats_file *sf)
   size_t i = 0;
   struct stats_type *type;
   while ((type = stats_type_for_each(&i)) != NULL) {
+      
     if (!(type->st_enabled && type->st_selected))
       continue;
 
@@ -275,6 +278,7 @@ int stats_file_close(struct stats_file *sf)
 
       sf_printf(sf, "\n");
     }
+    
   }
 
   if (ferror(sf->sf_file)) {
