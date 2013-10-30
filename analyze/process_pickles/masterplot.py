@@ -148,6 +148,12 @@ def master_plot(file,mode='lines',threshold=False,
   if not tspl_utils.checkjob(ts,mintime,wayness,ignore_qs):
     return
 
+  ld=lariat_utils.LariatData(ts.j.id,ts.j.end_time,analyze_conf.lariat_path)
+
+  wayness=ts.wayness
+  if ld.wayness != -1 and ld.wayness < ts.wayness:
+    wayness=ld.wayness
+
   fig,ax=plt.subplots(6,1,figsize=(8,12),dpi=80)
   ax=my_utils.flatten(ax)
 
@@ -182,7 +188,7 @@ def master_plot(file,mode='lines',threshold=False,
   plot(ax[4],ts,[5,6,-3,-4],3600.,1024.**2,ylabel='Total (ib_sw-lnet) MB/s') 
 
   #Plot CPU user time
-  plot(ax[5],ts,[7],3600.,ts.wayness*100.,
+  plot(ax[5],ts,[7],3600.,wayness*100.,
        xlabel='Time (hr)',
        ylabel='Total cpu user\nfraction')
   
@@ -191,7 +197,6 @@ def master_plot(file,mode='lines',threshold=False,
   title=header+'\n'+ts.title
   if threshold:
     title+=', V: %(v)-6.1f' % {'v': threshold}
-  ld=lariat_utils.LariatData(ts.j.id,ts.j.end_time,analyze_conf.lariat_path)
   title += '\n' + ld.title()
   print 'dd'
   
