@@ -4,6 +4,7 @@ import os,sys
 sys.path.append('@CONFIG_PY_DIR@')
 import job_stats
 from numpy import *
+import subprocess
 
 TEST_PASSED = True
 
@@ -56,4 +57,8 @@ for host_name, new_host in new.hosts.iteritems():
                 #print 'old',old_dev_stats
                 TEST_PASSED = False
 
+try:
+    subprocess.call('rm @CMAKE_CURRENT_BINARY_DIR@/python/' + new.id, shell=True)
+    subprocess.call('rm @CMAKE_CURRENT_BINARY_DIR@/python/meta*', shell=True)
+except: pass
 print TEST_PASSED

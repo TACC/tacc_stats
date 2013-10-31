@@ -5,6 +5,35 @@
 <body>
 {% if job %}
     <h1>Job ID {{ job.id }}</h1>
+   <h2> Job Summary    </h2>
+ <table border="1" cellpadding="5">
+        <tr>
+	  <th> Job ID </th>
+	  <th> UID </th>
+	  <th> project </th>
+	  <th> start time </th>
+	  <th> end time </th>
+	  <th> run time (s)</th>
+	  <th> queue </th>
+	  <th> name </th>
+	  <th> status </th>	    
+	  <th> cores </th>
+	  <th> nodes </th>
+	</tr>
+        <tr bgcolor="{{job.color}}">
+	  <td><a href="{% url 'stats:job'  job.id %}">{{ job.id }}</a>
+	  <td><a href="{% url 'stats:uid_view' job.uid %}" >{{ job.uid }}</td>            
+          <td><a href="{% url 'stats:project_view' job.project %}">{{ job.project }}</td>
+          <td align=right>{{ job.start_time }}</td>
+          <td align=right>{{ job.end_time }}</td>
+          <td align=right>{{ job.timespent }}</td>
+          <td align=right>{{ job.queue }}</td>
+          <td align=right>{{ job.name }}</td>
+          <td align=right>{{ job.status }}</td>
+          <td align=right>{{ job.cores }}</td>
+          <td align=right>{{ job.nodes }}</td>
+        </tr>
+   </table>
 
     <table>
       <tr>
@@ -15,22 +44,22 @@
 	</td>
 	<td>
 	  <div id="dv02">
-	    <h2> Hosts </h2>
-	    <table border="1" cellpadding="5"
-		   {% for host_name in host_list %} 
-	 	   <tr><th>{{host_name}}</th></tr>
-	           {% endfor %}
-            </table>
+<!--	    <table border="1" cellpadding="5"
+		   <tr><th>Hosts</th></tr>
+		   <tr><td>{% for host_name in host_list %} 
+	 	   {{host_name}}
+	           {% endfor %}</td></tr>
+            </table> -->
+              <img src="{% url 'stats:heat_map' job.id %}" alt="heat map failed"/> 
            </div>
         </td>
        </tr>
      </table>
-
-   <h2> Schema Summary </h2>
+   <h2> Schema Summary: Choose Type Name below to access plots and counts of Performance Events. </h2>
     <table border="1" cellpadding="5"
       <tr><th>Type Name</th><th>Recorded Performance Events</th></tr>
          {% for type_name, schema in type_list %}
-            <tr><th><a href="{{ type_name }}/">{{ type_name }}</a></th><<th>{{ schema }}</th></tr>
+            <tr><td><a href="{{ type_name }}/">{{ type_name }}</a></td><<td>{{ schema }}</td></tr>
          {% endfor %}
     </table>
 

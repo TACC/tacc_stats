@@ -112,9 +112,9 @@ def main():
     for (ind,ratio) in res[fn]:
       if ratio < 1e-3:
         print fn + ': ' + str(res[fn])
-        masterplot.master_plot(fn,'lines',False,n.o[0],'step',
-                               1,[x+1 for x in range(16)],
-                               header='Step Function Performance') 
+        masterplot.mp_wrapper(fn,'lines',False,n.o[0],'step',
+                              1,[x+1 for x in range(16)],
+                              header='Step Function Performance') 
         break
    
 if __name__ == '__main__':

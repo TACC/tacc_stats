@@ -1,0 +1,38 @@
+import os, sys, subprocess, glob
+
+### Test plotters
+
+def test(name, args, outfile):
+    subprocess.call('@CMAKE_CURRENT_SOURCE_DIR@/../' + name + ' ' + args, shell=True)
+    plot_files = glob.glob('@CMAKE_CURRENT_BINARY_DIR@/' + outfile)
+    if not plot_files:
+        print name+' test failed'
+        print False
+        sys.exit()
+    #subprocess.call('rm @CMAKE_CURRENT_BINARY_DIR@/' + outfile, shell=True)
+    
+programs = [
+    ['adjust.py','intel_snb SSE_D_ALL @TEST_DATA@','graph*adjust.*'],
+    ['aggregate_jobs.py', '-f @TEST_DATA@ -k1 intel_snb -k2 SSE_D_ALL -p 1', 'bar.*'],
+    #['catastrophe.py', '-o @CMAKE_CURRENT_BINARY_DIR@ @TEST_DATA@','*step*master*'],
+    ['corr.py','-p 1 @TEST_DATA@','msr_v_mem*.*'],
+    ['dump_csv_weijia.py', '-p 1 @TEST_DATA@', 'dump.csv'],
+    #['idlehost.py','@TEST_DATE@',],
+    ['imbalance.py','0.01 intel_snb SSE_D_ALL @TEST_DATA@','graph*imbalance*.*'],
+    ['lowflops.py','-t 1000 -o @CMAKE_CURRENT_BINARY_DIR@ @TEST_DATA@','lowflops*master*.*'],
+    ['masterplot.py', '@TEST_DATA@ -m lines -p 1 -s 1 -o @CMAKE_CURRENT_BINARY_DIR@', 'graph*master.*'],
+    ['membw.py', '-t 0.01 @TEST_DATA@ -o @CMAKE_CURRENT_BINARY_DIR@','high*master.*'],
+    ['mempercore.py', '@TEST_DATA@', 'mempercore*.*'],
+    ['memusage.py', '@TEST_DATA@', 'graph*mem*Mem*.*'],
+    ['metadata_rate.py','-t 0.01 @TEST_DATA@','metadata*.*'],
+    ['phase.py','intel_snb SSE_D_ALL @TEST_DATA@','graph*phase*.*'],
+    ['plot.py','@TEST_DATA@','plot_*'],
+    ['plotkey.py','intel_snb SSE_D_ALL @TEST_DATA@ -m','graph*heatmap*.*'],
+    ['uncorrelated.py','1 intel_snb SSE_D_ALL intel_snb STALLS @TEST_DATA@','graph*vs*.*'],
+    ['userplot.py','-p 1 -o @CMAKE_CURRENT_BINARY_DIR@ @TEST_DATA@ -u r_tsyshe', 'r_tsyshe.*']
+    ]
+for program, arg, outfile in programs:
+    print 'Test '+program
+    test(program, arg, outfile)
+
+print True

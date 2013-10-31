@@ -1,0 +1,18 @@
+<html>
+<head>
+    <title>TACC Stats</title>
+</head>
+<body>
+<h1>TACC Stats Home</h1>
+<h2>Job Dates</h2>
+{% if date_list %}
+ <table border="1" cellpadding="5">
+   {% for date in date_list %}
+        <tr><th><a href="date/{{date}}">{{date}} </th></tr>
+   {% endfor %}
+{% else %}
+    <p> No job data available </p>
+{% endif %}   
+
+</body>
+</html>

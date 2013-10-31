@@ -13,8 +13,8 @@ import tspl, tspl_utils, lariat_utils, masterplot
 
 def do_mp(arg):
   (file,thresh,out_dir)=arg
-  masterplot.master_plot(file,'lines',thresh,out_dir,'highmembw',
-                         header='High Memory Bandwdith')
+  masterplot.mp_wrapper(file,'lines',thresh,out_dir,'highmembw',
+                        header='High Memory Bandwdith')
 
 def do_bw(file,thresh,bw):
   bw[file]=has_highbw(file,thresh)
@@ -94,7 +94,7 @@ def main():
     if bw[i]:
       jobs.append(i)
   
-
+  
   pool  = multiprocessing.Pool(processes=n.p[0])
   if len(jobs) != 0:
     pool.map(do_mp,zip(jobs,

@@ -8,4 +8,8 @@ build/
 doc/
 *.db
 *master.png
+*master.pdf
 *~
+.DS_Store
+sys_path_append.py
+analyze_conf.py

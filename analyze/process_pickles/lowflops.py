@@ -12,9 +12,10 @@ import tspl, tspl_utils, lariat_utils, masterplot
 
 def do_mp(arg):
   (file,thresh,out_dir)=arg
-  masterplot.master_plot(file,'lines',thresh,out_dir,'lowflops',
+
+  masterplot.mp_wrapper(file,'lines',thresh,out_dir,'lowflops',
                          header='Measured Low Flops')
-  masterplot.master_plot(file,'percentile',thresh,out_dir,'lowflops',
+  masterplot.mp_wrapper(file,'percentile',thresh,out_dir,'lowflops',
                          header='Measured Low Flops')
 
 def do_floppy(file,thresh,floppy):
@@ -62,8 +63,8 @@ def is_unfloppy(file,thresh):
 
   print mfr/peak[ts.pmc_type][0], (mdr/peak[ts.pmc_type][1])
 
-  #print [ts.j.id,mfr/peak[0],mdr/peak[1],mcr/peak[2]]
-
+  # [ts.j.id,mfr/peak[0],mdr/peak[1],mcr/peak[2]
+  #print 'mcr',mcr/peak[ts.pmc_type][2], (mfr/peak[ts.pmc_type][0])/(mdr/peak[ts.pmc_type][1])
   if ( (mcr/peak[ts.pmc_type][2] > 0.5 ) and
        (mfr/peak[ts.pmc_type][0])/(mdr/peak[ts.pmc_type][1]) < thresh ):
     return True

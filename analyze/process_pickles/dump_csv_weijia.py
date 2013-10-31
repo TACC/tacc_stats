@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 
 import sys
-sys.path.append('../../monitor')
+import analyze_conf
 import datetime, glob, job_stats, os, subprocess, time
 import numpy
 import scipy, scipy.stats

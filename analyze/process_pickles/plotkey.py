@@ -61,12 +61,14 @@ def main():
     if not n.t or m > float(n.t):
       print ts.j.id + ': ' + str(m)
       if n.m:
-        heatmap(ts,n,m,full)
+        fig, fname = heatmap(ts,n,m,full)
       else:
-        lineplot(ts,n,m,full)
+        fig, fname = lineplot(ts,n,m,full)
     else:
       print ts.j.id + ': under threshold, ' + str(m) + ' < ' + n.t
-      
+
+    fig.savefig(fname)      
+
 # Plot key pair vs. time in a a traditional y vs. t line plot--one line per host
 # (normal) or one line per data stream (full)
 def lineplot(ts,n,m,full):
@@ -87,8 +89,11 @@ def lineplot(ts,n,m,full):
   ax.set_xlabel('Time (hr)')
   ax.set_ylabel('Total ' + ts.label(ts.k1[0],ts.k2[0]) + '/s')
   fname='_'.join(['graph',ts.j.id,ts.k1[0],ts.k2[0],'vs_t'+full])
-  fig.savefig(fname)
   plt.close()
+
+  return fig, fname
+
+
 
 # Plot a heat map of the data. X-axis time, Y-axis host (normal) or data stream
 # (full). Colorbar for data range.
@@ -97,6 +102,7 @@ def heatmap(ts,n,m,full):
   fig,ax=plt.subplots(1,1,figsize=(8,6),dpi=80)
   ymin=0. # Wrong in general, but min must be 0. or less
   ymax=0.
+
   first=True
   for v in ts:
     rate=numpy.divide(numpy.diff(v),numpy.diff(ts.t))
@@ -124,8 +130,10 @@ def heatmap(ts,n,m,full):
   else:
     ax.set_ylabel('Host')
   fname='_'.join(['graph',ts.j.id,ts.k1[0],ts.k2[0],'heatmap'+full])
-  fig.savefig(fname)
   plt.close()
+
+  return fig, fname
+
 
 
 if __name__ == '__main__':
