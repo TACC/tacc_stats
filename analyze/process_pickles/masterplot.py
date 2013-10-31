@@ -212,8 +212,11 @@ def master_plot(file,mode='lines',threshold=False,
 def mp_wrapper(file,mode='lines',threshold=False,
                 output_dir='.',prefix='graph',mintime=3600,wayness=16,
                 header='Master',figs=[]):
-  fig, fname = master_plot(file,mode,threshold,output_dir,prefix,mintime,wayness,header)
-  fig.savefig(output_dir+'/'+fname)
+  
+  ret = master_plot(file,mode,threshold,output_dir,prefix,mintime,wayness,header)
+  if ret != None:
+    fig, fname = ret
+    fig.savefig(output_dir+'/'+fname)
 
 def main():
 
