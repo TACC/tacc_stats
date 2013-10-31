@@ -20,14 +20,53 @@ class LariatDataException(Exception):
     print self.value
 
 class LariatData:
-  def __init__(self,jobid,end_epoch,directory):
-    ds=make_date_string(end_epoch)
-    matches=[]
-    for root, dirnames, filenames in os.walk(directory):
-      for fn in fnmatch.filter(filenames,'*'+ds+'.json'):
-        matches.append(os.path.join(root,fn))
+  def __init__(self,jobid,end_epoch=-1,directory=None,daysback=0,olddata=None):
 
     self.jobid=jobid
+
+    # Initialize to invalid/empty states
+    self.ld=None
+    self.user='nobody'
+    self.exc='unknown'
+    self.cwd='unknown'
+    self.threads=1
+    self.wayness=-1
+
+
+    # Find the set of JSON files matching the end_epoch date
+    newdata=None
+    if end_epoch > 0 and directory != None:
+      matches=[]
+      for day in range(daysback+1):
+        ds=make_date_string(end_epoch-day*24*3600)
+        for root, dirnames, filenames in os.walk(directory):
+          for fn in fnmatch.filter(filenames,'*'+ds+'.json'):
+            matches.append(os.path.join(root,fn))
+      if len(matches) != 0:
+        newdata=dict()
+        for m in matches:
+          print "Loading:", m
+          newdata.update(json.load(open(m))) # Should be only one match
+      else:
+        print 'File for ' + self.jobid + ' not found in ' + directory
+
+    if olddata != None:
+      self.ld=olddata
+    else:
+      self.ld=dict()
+    if newdata != None:
+      self.ld.update(newdata)
+
+    try:
+      self.user=self.ld[jobid][0]['user']
+      self.exc=replace_path_bits(self.ld[jobid][0]['exec'],self.user,60)
+      self.cwd=replace_path_bits(self.ld[jobid][0]['cwd'], self.user,60)
+      self.threads=self.ld[jobid][0]['numThreads']
+      self.wayness=int(self.ld[jobid][0]['numCores'])/int(self.ld[jobid][0]['numNodes'])
+    except KeyError:
+      print str(jobid) + ' did not call ibrun' + \
+            ' or has no lariat data for some other reason'
+
     self.equiv_patterns = {
       r'^charmrun' : 'Charm++*',
       r'^wrf' : 'WRF*',
@@ -47,33 +86,7 @@ class LariatData:
       r'^charmm' : 'CHARMM*',
       r'^c37b1'  : 'CHARMM*',
       }
-
-
-    if len(matches) == 0:
-      self.ld=None
-      self.user='nobody'
-      self.exc='unknown'
-      self.cwd='unknown'
-      self.threads=1
-      self.wayness=-1
-      print 'File for ' + jobid + ' not found in ' + directory
-    else:
-      self.ld=json.load(open(matches[0]))
-      try:
-        self.user=self.ld[jobid][0]['user']
-        self.exc=replace_path_bits(self.ld[jobid][0]['exec'],self.user,60)
-        self.cwd=replace_path_bits(self.ld[jobid][0]['cwd'], self.user,60)
-        self.threads=self.ld[jobid][0]['numThreads']
-        self.wayness=int(self.ld[jobid][0]['numCores'])/int(self.ld[jobid][0]['numNodes'])
-      except KeyError:
-        print str(jobid) + ' did not call ibrun' + \
-              ' or has no lariat data for some other reason'
-        self.user='nobody'
-        self.exc='unknown'
-        self.cwd='unknown'
-        self.threads=1
-        self.wayness=-1
-
+    
   def title(self):
     title='E: ' + self.exc
     if (self.cwd != 'unknown'):

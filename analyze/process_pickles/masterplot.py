@@ -16,6 +16,7 @@ import scipy, scipy.stats
 import argparse
 import multiprocessing, functools
 import tspl, tspl_utils, lariat_utils, my_utils
+import cPickle as pickle
 
 def setlabels(ax,ts,index,xlabel,ylabel,yscale):
   if xlabel != '':
@@ -117,7 +118,7 @@ def plot_mmm(ax, ts, index, xscale=1.0, yscale=1.0, xlabel='', ylabel='',
 
 def master_plot(file,mode='lines',threshold=False,
                 output_dir='.',prefix='graph',mintime=3600,wayness=16,
-                header='Master'):
+                header='Master',lariat_dict=None):
   k1={'amd64' :
       ['amd64_core','amd64_core','amd64_sock','lnet','lnet',
        'ib_sw','ib_sw','cpu'],
@@ -148,8 +149,11 @@ def master_plot(file,mode='lines',threshold=False,
   if not tspl_utils.checkjob(ts,mintime,wayness,ignore_qs):
     return
 
-  ld=lariat_utils.LariatData(ts.j.id,ts.j.end_time,analyze_conf.lariat_path)
-
+  if lariat_dict == None:
+    ld=lariat_utils.LariatData(ts.j.id,end_epoch=ts.j.end_time,daysback=3,directory=analyze_conf.lariat_path)
+  else:
+    ld=lariat_utils.LariatData(ts.j.id,olddata=lariat_dict)
+    
   wayness=ts.wayness
   if ld.wayness != -1 and ld.wayness < ts.wayness:
     wayness=ld.wayness
@@ -216,8 +220,8 @@ def master_plot(file,mode='lines',threshold=False,
 
 def mp_wrapper(file,mode='lines',threshold=False,
                 output_dir='.',prefix='graph',mintime=3600,wayness=16,
-                header='Master',figs=[]):
-  master_plot(file,mode,threshold,output_dir,prefix,mintime,wayness,header)
+                header='Master',figs=[],lariat_dict=None):
+  master_plot(file,mode,threshold,output_dir,prefix,mintime,wayness,header,lariat_dict)
 
 def main():
 
@@ -238,6 +242,12 @@ def main():
   filelist=tspl_utils.getfilelist(n.filearg)
   procs  = min(len(filelist),n.p[0])
 
+  job=pickle.load(open(filelist[0]))
+  jid=job.id
+  epoch=job.end_time
+
+  ld=lariat_utils.LariatData(jid,end_epoch=epoch,daysback=3,directory=analyze_conf.lariat_path)
+  
   if procs < 1:
     print 'Must have at least one file'
     exit(1)
@@ -249,7 +259,8 @@ def main():
                                    output_dir=n.o[0],
                                    prefix='graph',
                                    mintime=n.s[0],
-                                   wayness=[x+1 for x in range(16)])
+                                   wayness=[x+1 for x in range(16)],
+                                   lariat_dict=ld.ld)
   
   pool.map(partial_master,filelist)
   
