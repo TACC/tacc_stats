@@ -1,6 +1,7 @@
 import json
 import time, os, fnmatch
 import re
+import textwrap
 
 def make_date_string(t):
   lt=time.localtime(t)
@@ -10,8 +11,24 @@ def replace_path_bits(path,user,maxlen):
   res=re.sub('/work/[0-9]+/'+user,r'\$WORK',path)
   res=re.sub('/scratch/[0-9]+/'+user,r'\$SCRATCH',res)
   res=re.sub('.*?/home.*?/[0-9]+/'+user,'~'+user,res)
+  return res
+
+def replace_and_shorten_path_bits(path,user,maxlen):
+  res=replace_path_bits(path,user,maxlen)
   if len(res) > maxlen:
     res=re.sub(r'/[^/][^/]*/..*/(..*/)',r'/.../\1',res)
+  return res
+
+def replace_and_wrap_path_bits(path,user,maxlen,indent=0):
+  res=replace_path_bits(path,user,maxlen)
+  if len(res) < maxlen:
+    return res
+  wrapped=textwrap.wrap(' '.join(res.split('/')),maxlen)
+  res=''
+  for i in range(len(wrapped)-1):
+    res += '/'.join(wrapped[i].split(' ')) + '/\n' + (' '*indent)
+  res+='/'.join(wrapped[-1].split(' '))
+
   return res
 
 class LariatDataException(Exception):
@@ -25,6 +42,7 @@ class LariatData:
     self.jobid=jobid
 
     # Initialize to invalid/empty states
+    self.id=0
     self.ld=None
     self.user='nobody'
     self.exc='unknown'
@@ -45,7 +63,6 @@ class LariatData:
       if len(matches) != 0:
         newdata=dict()
         for m in matches:
-          print "Loading:", m
           newdata.update(json.load(open(m))) # Should be only one match
       else:
         print 'File for ' + self.jobid + ' not found in ' + directory
@@ -58,9 +75,12 @@ class LariatData:
       self.ld.update(newdata)
 
     try:
+      self.id=self.ld[jobid][0]['jobID']
       self.user=self.ld[jobid][0]['user']
-      self.exc=replace_path_bits(self.ld[jobid][0]['exec'],self.user,60)
-      self.cwd=replace_path_bits(self.ld[jobid][0]['cwd'], self.user,60)
+      self.exc=replace_and_shorten_path_bits(self.ld[jobid][0]['exec'],
+                                             self.user,60)
+      self.cwd=replace_and_shorten_path_bits(self.ld[jobid][0]['cwd'],
+                                             self.user,60)
       self.threads=self.ld[jobid][0]['numThreads']
       self.wayness=int(self.ld[jobid][0]['numCores'])/int(self.ld[jobid][0]['numNodes'])
     except KeyError:
@@ -102,6 +122,7 @@ class LariatData:
       if re.search(i,name):
         return patterns[i]
     return name
+
 
   
 
