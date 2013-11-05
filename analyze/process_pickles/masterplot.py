@@ -217,9 +217,14 @@ def master_plot(file,mode='lines',threshold=False,
   
   plt.subplots_adjust(hspace=0.35)
   if wide:
-    left_text=my_utils.text(ld,ts)
+    left_text=my_utils.summary_text(ld,ts)
     text_len=len(left_text.split('\n'))
-    plt.figtext(.05,.8-.01*(text_len-1),left_text)
+    fontsize=ax[0].yaxis.label.get_size()
+    linespacing=1.2
+    fontrate=float(fontsize*linespacing)/72./15.5
+    yloc=.8-fontrate*(text_len-1) # this doesn't quite work. fontrate is too
+                                  # small by a small amount
+    plt.figtext(.05,yloc,left_text,linespacing=linespacing)
     fname='_'.join([prefix,ts.j.id,ts.owner,'wide_master'])
   else:
     plt.suptitle(title)

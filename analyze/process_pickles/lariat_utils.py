@@ -123,7 +123,15 @@ class LariatData:
         return patterns[i]
     return name
 
+  def get_runtimes(self,end_epoch):
+    start_times=[int(ibr['startEpoch']) for ibr in self.ld[self.id]]
 
+    start_times.extend([end_epoch])
+
+    return [(a-b) for (a,b) in zip(start_times[1:],start_times[:-1])]
+    
+    
+      
   
 
 
