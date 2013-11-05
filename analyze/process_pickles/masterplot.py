@@ -16,6 +16,7 @@ import scipy, scipy.stats
 import argparse
 import multiprocessing, functools
 import tspl, tspl_utils, lariat_utils, my_utils
+import cPickle as pickle
 
 def setlabels(ax,ts,index,xlabel,ylabel,yscale):
   if xlabel != '':
@@ -117,7 +118,7 @@ def plot_mmm(ax, ts, index, xscale=1.0, yscale=1.0, xlabel='', ylabel='',
 
 def master_plot(file,mode='lines',threshold=False,
                 output_dir='.',prefix='graph',mintime=3600,wayness=16,
-                header='Master'):
+                header='Master',lariat_dict=None,wide=False):
   k1={'amd64' :
       ['amd64_core','amd64_core','amd64_sock','lnet','lnet',
        'ib_sw','ib_sw','cpu'],
@@ -148,8 +149,28 @@ def master_plot(file,mode='lines',threshold=False,
   if not tspl_utils.checkjob(ts,mintime,wayness,ignore_qs):
     return
 
-  fig,ax=plt.subplots(6,1,figsize=(8,12),dpi=80)
-  ax=my_utils.flatten(ax)
+  if lariat_dict == None:
+    ld=lariat_utils.LariatData(ts.j.id,end_epoch=ts.j.end_time,daysback=3,directory=analyze_conf.lariat_path)
+  else:
+    ld=lariat_utils.LariatData(ts.j.id,olddata=lariat_dict)
+    
+  wayness=ts.wayness
+  if ld.wayness != -1 and ld.wayness < ts.wayness:
+    wayness=ld.wayness
+
+  if wide:
+    fig,ax=plt.subplots(6,2,figsize=(15.5,12),dpi=110)
+
+    # Make 2-d array into 1-d, and reorder so that the left side is blank
+    ax=my_utils.flatten(ax)
+    ax_even=ax[0:12:2]
+    ax_odd =ax[1:12:2]
+    ax=ax_odd + ax_even
+    
+    for a in ax_even:
+      a.axis('off')
+  else:
+    fig,ax=plt.subplots(6,1,figsize=(8,12),dpi=110)
 
   if mode == 'hist':
     plot=plot_thist
@@ -182,7 +203,7 @@ def master_plot(file,mode='lines',threshold=False,
   plot(ax[4],ts,[5,6,-3,-4],3600.,1024.**2,ylabel='Total (ib_sw-lnet) MB/s') 
 
   #Plot CPU user time
-  plot(ax[5],ts,[7],3600.,ts.wayness*100.,
+  plot(ax[5],ts,[7],3600.,wayness*100.,
        xlabel='Time (hr)',
        ylabel='Total cpu user\nfraction')
   
@@ -191,14 +212,19 @@ def master_plot(file,mode='lines',threshold=False,
   title=header+'\n'+ts.title
   if threshold:
     title+=', V: %(v)-6.1f' % {'v': threshold}
-  ld=lariat_utils.LariatData(ts.j.id,ts.j.end_time,analyze_conf.lariat_path)
   title += '\n' + ld.title()
   print 'dd'
   
-  plt.suptitle(title)
   plt.subplots_adjust(hspace=0.35)
+  if wide:
+    left_text=my_utils.text(ld,ts)
+    text_len=len(left_text.split('\n'))
+    plt.figtext(.05,.8-.01*(text_len-1),left_text)
+    fname='_'.join([prefix,ts.j.id,ts.owner,'wide_master'])
+  else:
+    plt.suptitle(title)
+    fname='_'.join([prefix,ts.j.id,ts.owner,'master'])
 
-  fname='_'.join([prefix,ts.j.id,ts.owner,'master'])
   if mode == 'hist':
     fname+='_hist'
   elif mode == 'percentile':
@@ -211,9 +237,12 @@ def master_plot(file,mode='lines',threshold=False,
 
 def mp_wrapper(file,mode='lines',threshold=False,
                 output_dir='.',prefix='graph',mintime=3600,wayness=16,
-                header='Master',figs=[]):
-  fig, fname = master_plot(file,mode,threshold,output_dir,prefix,mintime,wayness,header)
-  fig.savefig(output_dir+'/'+fname)
+                header='Master',figs=[],lariat_dict=None, wide=False):
+  ret = master_plot(file,mode,threshold,output_dir,prefix,
+                    mintime,wayness,header,lariat_dict,wide)
+  if ret != None:
+    fig, fname = ret
+    fig.savefig(output_dir+'/'+fname)
 
 def main():
 
@@ -229,11 +258,18 @@ def main():
                       nargs=1, type=int, default=[1])
   parser.add_argument('-s', help='Set minimum time in seconds',
                       nargs=1, type=int, default=[3600])
+  parser.add_argument('-w', help='Set wide plot format', action='store_true')
   n=parser.parse_args()
 
   filelist=tspl_utils.getfilelist(n.filearg)
   procs  = min(len(filelist),n.p[0])
 
+  job=pickle.load(open(filelist[0]))
+  jid=job.id
+  epoch=job.end_time
+
+  ld=lariat_utils.LariatData(jid,end_epoch=epoch,daysback=3,directory=analyze_conf.lariat_path)
+  
   if procs < 1:
     print 'Must have at least one file'
     exit(1)
@@ -245,7 +281,9 @@ def main():
                                    output_dir=n.o[0],
                                    prefix='graph',
                                    mintime=n.s[0],
-                                   wayness=[x+1 for x in range(16)])
+                                   wayness=[x+1 for x in range(16)],
+                                   lariat_dict=ld.ld,
+                                   wide=n.w)
   
   pool.map(partial_master,filelist)
   

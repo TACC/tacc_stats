@@ -108,6 +108,8 @@ class TSPLBase:
     g=self.j.hosts[self.j.hosts.keys()[0]]
     self.size=len(g.stats[self.k1[0]].values()[0])
 
+    d=datetime.datetime.fromtimestamp(self.j.acct['start_time'])
+    self.start_date=d.strftime('%Y-%m-%d %H:%M:%S')
     d=datetime.datetime.fromtimestamp(self.j.acct['end_time'])
     self.end_date=d.strftime('%Y-%m-%d %H:%M:%S')
 
