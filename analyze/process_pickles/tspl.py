@@ -39,6 +39,16 @@ class TSPLBase:
       print 'No queue found'
       self.queue = None
 
+    self.status='Unknown'
+    try:
+      self.status=self.j.acct['status']
+    except KeyError:
+      try:
+        self.status=self.j.acct['exit_stats']
+      except KeyError as e:
+        pass
+      pass
+
     try:
       self.owner=self.j.acct['owner']
     except KeyError:
