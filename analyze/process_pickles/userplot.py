@@ -19,9 +19,6 @@ import multiprocessing
 import functools
 import tspl, tspl_utils, masterplot
 
-def do_mp(arg):
-  masterplot.master_plot(*arg)
-
 def getuser(file,user):
   try:
     k1=['intel_snb_imc', 'intel_snb_imc', 'intel_snb', 
