@@ -128,7 +128,9 @@ class LariatData:
 
     start_times.extend([end_epoch])
 
-    return [(a-b) for (a,b) in zip(start_times[1:],start_times[:-1])]
+    st2=sorted(start_times)
+
+    return [(a-b) for (a,b) in zip(st2[1:],st2[:-1])]
     
     
       
