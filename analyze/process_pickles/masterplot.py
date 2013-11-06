@@ -208,16 +208,10 @@ def master_plot(file,mode='lines',threshold=False,
        ylabel='Total cpu user\nfraction')
   
   print ts.j.id + ': '
-  print 'cc'
-  title=header+'\n'+ts.title
-  if threshold:
-    title+=', V: %(v)-6.1f' % {'v': threshold}
-  title += '\n' + ld.title()
-  print 'dd'
   
   plt.subplots_adjust(hspace=0.35)
   if wide:
-    left_text=my_utils.summary_text(ld,ts)
+    left_text=header+'\n'+my_utils.summary_text(ld,ts)
     text_len=len(left_text.split('\n'))
     fontsize=ax[0].yaxis.label.get_size()
     linespacing=1.2
@@ -226,8 +220,14 @@ def master_plot(file,mode='lines',threshold=False,
                                   # small by a small amount
     plt.figtext(.05,yloc,left_text,linespacing=linespacing)
     fname='_'.join([prefix,ts.j.id,ts.owner,'wide_master'])
-  else:
+  elif header != None:
+    title=header+'\n'+ts.title
+    if threshold:
+      title+=', V: %(v)-6.1f' % {'v': threshold}
+    title += '\n' + ld.title()
     plt.suptitle(title)
+    fname='_'.join([prefix,ts.j.id,ts.owner,'master'])
+  else:
     fname='_'.join([prefix,ts.j.id,ts.owner,'master'])
 
   if mode == 'hist':

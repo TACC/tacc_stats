@@ -10,9 +10,6 @@ import multiprocessing
 import functools
 import tspl, tspl_utils, masterplot
 
-def do_mp(arg):
-  masterplot.master_plot(*arg)
-
 def getuser(file,user,output_dir):
   try:
     ts=tspl.TSPLBase(file,['lnet'],['rx_bytes'])
@@ -20,7 +17,7 @@ def getuser(file,user,output_dir):
     return
 
   if ts.owner == user:
-    masterplot.master_plot(file,output_dir=output_dir)
+    masterplot.mp_wrapper(file,output_dir=output_dir,wide=True)
 
 def main():
   parser=argparse.ArgumentParser(description='Deal with a directory of pickle'

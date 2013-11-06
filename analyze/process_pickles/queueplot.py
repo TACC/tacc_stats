@@ -19,7 +19,7 @@ import multiprocessing
 import functools
 import tspl, tspl_utils, masterplot
 
-def getuser(file,user):
+def getqueue(file,queue):
   try:
     k1=['intel_snb_imc', 'intel_snb_imc', 'intel_snb', 
         'lnet', 'lnet', 'ib_sw','ib_sw','cpu',
@@ -33,11 +33,10 @@ def getuser(file,user):
     except tspl.TSPLException as e:
       return
 
-    if ts.owner != user:
+    if ts.queue != queue:
       return
     
-    ignore_qs=['gpu','gpudev','vis','visdev']
-    if not tspl_utils.checkjob(ts,1.,range(1,17),ignore_qs):
+    if not tspl_utils.checkjob(ts,1.,range(1,33)):
       return
 
     tmid=(ts.t[:-1]+ts.t[1:])/2.0
@@ -117,22 +116,22 @@ def main():
                       nargs=1, type=int, default=[1])
   parser.add_argument('-o', help='Output directory',
                       nargs=1, type=str, default=['.'], metavar='output_dir')
-  parser.add_argument('-u', help='User',
-                      nargs=1, type=str, default=['bbarth'], metavar='username')
+  parser.add_argument('-q', help='Queue',
+                      nargs=1, type=str, default=['normal'], metavar='queue')
   parser.add_argument('filearg', help='File, directory, or quoted'
                       ' glob pattern', nargs='?',default='jobs')
   n=parser.parse_args()
 
   filelist=tspl_utils.getfilelist(n.filearg)
-  target_user=n.u[0]
+  target_queue=n.q[0]
 
   pool   = multiprocessing.Pool(processes=n.p[0])
   m      = multiprocessing.Manager()
   files  = m.list()
 
 
-  partial_getuser=functools.partial(getuser,user=target_user)
-  res = pool.map(partial_getuser,filelist)
+  partial_getqueue=functools.partial(getqueue,queue=target_queue)
+  res = pool.map(partial_getqueue,filelist)
   pool.close()
   pool.join()
 
@@ -204,12 +203,12 @@ def main():
 
   ax[5].set_xlabel('t')
 
-  plt.suptitle(target_user+' '+start_date+' -- '+end_date)
-  fname=target_user
+  plt.suptitle(target_queue+' '+start_date+' -- '+end_date)
+  fname=target_queue
   fig.savefig(fname)
   plt.close()
 
-  print 'Found', len(res_sorted), 'jobs for', target_user, ids
+  print 'Found', len(res_sorted), 'jobs for', target_queue, ids
 
 if __name__ == "__main__":
   main()

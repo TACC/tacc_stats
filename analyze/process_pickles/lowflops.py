@@ -14,9 +14,9 @@ def do_mp(arg):
   (file,thresh,out_dir)=arg
 
   masterplot.mp_wrapper(file,'lines',thresh,out_dir,'lowflops',
-                         header='Measured Low Flops')
+                         header='Measured Low Flops', wide=True)
   masterplot.mp_wrapper(file,'percentile',thresh,out_dir,'lowflops',
-                         header='Measured Low Flops')
+                         header='Measured Low Flops (Percentile)', wide=True)
 
 def do_floppy(file,thresh,floppy):
   floppy[file]=is_unfloppy(file,thresh)
