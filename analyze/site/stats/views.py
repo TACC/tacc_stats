@@ -2,6 +2,7 @@ from django.http import HttpResponse, HttpResponseRedirect
 from django.shortcuts import render_to_response, render
 from django.views.generic import DetailView, ListView
 import matplotlib, string
+matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 from pylab import figure, hist, plot
 
@@ -9,39 +10,64 @@ from stats.models import Job, JobForm
 import sys_path_append
 import os,sys
 import masterplot as mp
-import plotkey
-import tspl
+import plotkey, tspl, lariat_utils
 import job_stats as data
 import MetaData
 import cPickle as pickle 
-
+import time
 
 
 path = sys_path_append.pickles_dir
 
-def dates(request):
-    date_list = []
-    import time
+
+def update():
     #Job.objects.all().delete()
     for date in os.listdir(path):
         print 'Date',date
-        start = time.clock()
-        date_list.append(date)
+
         meta = MetaData.MetaData(os.path.join(path,date))    
         meta.load_update()
 
-        start = time.clock()
+        # Only need to populate lariat cache once
+        jobid = meta.json.keys()[0]
+        ld = lariat_utils.LariatData(jobid,
+                                     end_epoch = meta.json[jobid]['end_epoch'],
+                                     directory = sys_path_append.lariat_path,
+                                     daysback = 2)
+        
         for jobid, json in meta.json.iteritems():
-            if Job.objects.filter(id = jobid).exists(): continue
-            job_model, created = Job.objects.get_or_create(**json) 
+            if Job.objects.filter(id = jobid).exists(): continue  
+            ld = lariat_utils.LariatData(jobid,
+                                         olddata = ld.ld)
+            json['user'] = ld.user
+            json['exe'] = ld.exc.split('/')[-1]
+            json['cwd'] = ld.cwd
+            try:
+                job_model, created = Job.objects.get_or_create(**json) 
+            except:
+                print "Something wrong with json",json
+    return 
 
+def dates(request):
+    date_list = os.listdir(path)
+    date_list = sorted(date_list, key=lambda d: map(int, d.split('-')))
+
+    month_dict ={}
+
+    for date in date_list:
+        y,m,d = date.split('-')
+        key = y+' / '+m
+        if key not in month_dict: month_dict[key] = []
+        date_pair = (date, d)
+        month_dict[key].append(date_pair)
+
+    date_list = month_dict
     return render_to_response("stats/dates.html", { 'date_list' : date_list})
 
 def search(request):
 
     if 'q' in request.GET:
         q = request.GET['q']
-        message = 'You searched for: %r' % request.GET['q']
         try:
             job = Job.objects.get(id = q)
             return HttpResponseRedirect("/stats/job/"+str(job.id)+"/")
@@ -49,74 +75,95 @@ def search(request):
 
     if 'u' in request.GET:
         u = request.GET['u']
-        message = 'You searched for: %r' % request.GET['u']
         try:
             return index(request, uid = u)
         except: pass
 
+    if 'n' in request.GET:
+        user = request.GET['n']
+        try:
+            return index(request, user = user)
+        except: pass
+
     if 'p' in request.GET:
         project = request.GET['p']
-        message = 'You searched for: %r' % request.GET['p']
         try:
             return index(request, project = project)
+        except: pass
+
+    if 'x' in request.GET:
+        x = request.GET['x']
+        try:
+            return index(request, exe = x)
         except: pass
 
     return render(request, 'stats/dates.html', {'error' : True})
 
 
-def index(request, date = None, uid = None, project = None):
-
+def index(request, date = None, uid = None, project = None, user = None, exe = None):
     field = {}
     if date:
         field['date'] = date
     if uid:
         field['uid'] = uid
+    if user:
+        field['user'] = user
     if project:
         field['project'] = project
-        
-    job_list = Job.objects.filter(**field).order_by('-id')
+    if exe:
+        field['exe'] = exe
 
+    if exe:
+        job_list = Job.objects.filter(exe__contains=exe).order_by('-id')
+    else:
+        job_list = Job.objects.filter(**field).order_by('-id')
     field['job_list'] = job_list
     field['nj'] = len(job_list)
-    
-    
+
     return render_to_response("stats/index.html", field)
 
-def hist_summary(request, date = None, uid = None, project = None):
+def hist_summary(request, date = None, uid = None, project = None, user = None, exe = None):
+    from numpy import log,array
 
     field = {}
     if date:
         field['date'] = date
     if uid:
         field['uid'] = uid
+    if user:
+        field['user'] = user
     if project:
         field['project'] = project
+    if exe:
+        field['exe'] = exe
         
     field['status'] = 'COMPLETED'
 
-    job_list = Job.objects.filter(**field)
+    if exe:
+        job_list = Job.objects.filter(exe__contains=exe)
+    else:
+        job_list = Job.objects.filter(**field)
 
-    fig = figure(figsize=(12,6))
+    fig = figure(figsize=(16,6))
 
     # Run times
-    job_times = [job.timespent / 3600. for job in job_list]
+    job_times = array([job.timespent for job in job_list])/3600.
     ax = fig.add_subplot(121)
-    ax.hist(job_times, max(5, len(job_list)/5))
+    ax.hist(job_times, max(5, 5*log(len(job_list))))
     ax.set_xlim((0,max(job_times)+1))
     ax.set_ylabel('# of jobs')
     ax.set_xlabel('# hrs')
-    
+    ax.set_title('Run Times for Completed Jobs')
+
     # Number of cores
     job_size = [job.cores for job in job_list]
     ax = fig.add_subplot(122)
-    ax.hist(job_size, max(5, len(job_list)/5))
+    ax.hist(job_size, max(5, 5*log(len(job_list))))
     ax.set_xlim((0,max(job_size)+1))
     ax.set_title('Run Sizes for Completed Jobs')
     ax.set_xlabel('# cores')
 
-    ax.set_title('Run Times for Completed Jobs')
-
-    fig.tight_layout()
+    #fig.tight_layout()
 
     return figure_to_response(fig)
 
@@ -137,8 +184,8 @@ def get_schema(job, type_name):
 
 
 def figure_to_response(f):
-    response = HttpResponse(content_type='image/png')
-    f.savefig(response, format='png')
+    response = HttpResponse(content_type='image/svg+xml')
+    f.savefig(response, format='svg')
     plt.close(f)
     f.clear()
     return response
@@ -149,7 +196,7 @@ def stats_unload(job):
 
 def master_plot(request, pk):
     job = Job.objects.get(id = pk)
-    fig, fname = mp.master_plot(job.path,mintime=600)
+    fig, fname = mp.master_plot(job.path,header=None,mintime=600)
     return figure_to_response(fig)
 
 def heat_map(request, pk):
@@ -164,7 +211,7 @@ def heat_map(request, pk):
     k2 = {'intel_snb': ['CLOCKS_UNHALTED_CORE']}
     ts1 = tspl.TSPLBase(job.path,k1,k2)
 
-    tmid=(ts0.t[:-1]+ts0.t[1:])/2.0
+    tmid=ts0.t#(ts0.t[:-1]+ts0.t[1:])/2.0
 
     cpi = np.array([])
     hosts = []
@@ -178,27 +225,33 @@ def heat_map(request, pk):
             else: cpi = np.vstack((cpi,ratio))
 
     cpi_min, cpi_max = cpi.min(), cpi.max()
-    fig,ax=plt.subplots(1,1,figsize=(8,12),dpi=160)
+    fig,ax=plt.subplots(1,1,figsize=(8,12),dpi=110)
 
     y=np.arange(len(hosts)+1)*16
     
     yfine = np.arange(cpi.shape[0]+1)
     
     time = tmid/3600.
-    print cpi.shape,yfine.shape
-    
+    #time = np.concatenate((tmid/3600.,np.array([ts0.t[-1]/3600.])))
+    #print time
     for l in range(len(y)):
         plt.axhline(y=y[l]+16, linewidth=0.5,color='black',linestyle='--')
-
+    plt.yticks(y+8,hosts,size='small')
+    plt.axis([time.min(),time.max(),yfine.min(),yfine.max()])
+    #print time.shape,yfine.shape,cpi.shape,yfine.max()
 
     plt.pcolor(time, yfine, cpi, vmin=cpi_min, vmax=cpi_max)
-    plt.colorbar()
-    plt.clim(cpi_min,cpi_max)
-    plt.yticks(y+8,hosts,size='small')
     plt.title('Instructions Retired per Core Clock Cycle')
-    plt.axis([time.min(),time.max(),yfine.min(),yfine.max()])
+    #print cpi
+    plt.clim(cpi_min,cpi_max)
+    plt.colorbar()
+    #print cpi_min,cpi_max
+    #plt.tight_layout()    
+
+
+
     ax.set_xlabel('Time (hrs)')
-    plt.tight_layout()
+
     plt.close()
 
     return figure_to_response(fig)
@@ -242,18 +295,14 @@ def type_plot(request, pk, type_name):
     do_rate = True
     for i in range(nr_events):
         if type_name == 'mem': do_rate = False
-        axarr[i].set_ylabel(schema[i],size='small')
-        mp.plot_lines(axarr[i], ts, [i], 3600., do_rate = do_rate)
 
+        mp.plot_lines(axarr[i], ts, [i], 3600., do_rate = do_rate)
+        axarr[i].set_ylabel(schema[i],size='small')
     axarr[-1].set_xlabel("Time (hr)")
     fig.subplots_adjust(hspace=0.0)
     fig.tight_layout()
-    response = HttpResponse(content_type='image/png')
-    fig.savefig(response, format='png')
-    plt.close(fig)
-    fig.clear()
 
-    return response
+    return figure_to_response(fig)
 
 
 def type_detail(request, pk, type_name):

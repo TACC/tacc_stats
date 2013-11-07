@@ -18,12 +18,24 @@
 <img src="{% url 'stats:uid_summary' uid %}" />
 {% endif %}
 
+{% if user %}
+<h1>For user: {{ user }}</h1>
+<h2> Charts at a glance </h2>
+<img src="{% url 'stats:user_summary' user %}" />
+{% endif %}
+
 {% if project %}
 <h1>For project: {{ project }}</h1>
 <h2> Charts at a glance </h2>
 <img src="{% url 'stats:project_summary' project %}" />
 {% endif %}
 
+{% if exe %}
+<h1>For exe: {{ exe }}</h1>
+<h2> Charts at a glance </h2>
+<img src="{% url 'stats:exe_summary' exe %}" />
+{% endif %}
+<hr>
 
 {% if job_list %}
     <h1>Job Listing</h1>
@@ -31,7 +43,9 @@
         <tr>
 	  <th> Job ID </th>
 	  <th> UID </th>
+	  <th> user </th>	  
 	  <th> project </th>
+	  <th> executable </th>
 	  <th> start time </th>
 	  <th> end time </th>
 	  <th> run time (s)</th>
@@ -45,7 +59,10 @@
         <tr bgcolor="{{job.color}}">
             <td><a href="{% url 'stats:job'  job.id %}">{{ job.id }}</a>
             <td><a href="{% url 'stats:uid_view' job.uid %}" >{{ job.uid }}</td>
-            <td align=right><a href="{% url 'stats:project_view' job.project %}" >{{ job.project }}</td>
+            <td><a href="{% url 'stats:uid_view' job.uid %}" >{{ job.user }}</td> 
+           <td align=right><a href="{% url 'stats:project_view' job.project %}" >{{ job.project }}</td>
+            <td align=right><a href="{% url 'stats:exe_view' job.exe %}" >{{ job.exe }}</td>
+
             <td align=right>{{ job.start_time }}</td>
             <td align=right>{{ job.end_time }}</td>
             <td align=right>{{ job.timespent }}</td>

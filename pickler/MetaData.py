@@ -24,22 +24,31 @@ class MetaData():
         del job.acct['yesno'], job.acct['unknown']
         field = job.acct
         field['path'] = pickle_path
+        
+        field['start_epoch'] = field['start_time']
+        field['end_epoch'] = field['end_time']
 
         utc_start = datetime.utcfromtimestamp(field['start_time']).replace(tzinfo=pytz.utc)
         utc_end = datetime.utcfromtimestamp(field['end_time']).replace(tzinfo=pytz.utc)
         tz = pytz.timezone('US/Central')
-
+        
         field['start_time'] = utc_start.astimezone(tz) 
         field['end_time'] =  utc_end.astimezone(tz)
 
         field['date'] = field['end_time'].date()
+
         self.json[field['id']] = field
 
     def load_update(self):
 
         try: 
             with open(self.meta_path, 'rb') as f:
-                meta_dict = pickle.load(f)                
+                meta_dict = pickle.load(f)          
+            # Get the correct dirs for this sytem
+            meta_dict['pickle_dir'] = self.pickle_dir
+            meta_dict['meta_path'] = self.meta_path
+            meta_dict['directory'] = self.directory
+
             self.__dict__.update(meta_dict)
             print 'Use old json for meta data but update if necessary'
         except: 
@@ -54,7 +63,7 @@ class MetaData():
                     self.add_job(data, pickle_path)
             except: 
                 if os.path.join(self.pickle_dir,pickle_file) == self.meta_path: pass
-                #else: print "Pass over ",pickle_file,": it's not a job object." 
+                else: print "Pass over ",pickle_file,": it doesn't appear to contain a job object." 
 
         with open(self.meta_path, 'wb') as f:
             pickle.dump(self.__dict__,f,pickle_prot)
