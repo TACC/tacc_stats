@@ -11,6 +11,7 @@ class Job(models.Model):
     end_time = models.DateTimeField(null=True)
     start_epoch =  models.PositiveIntegerField(null=True)
     end_epoch = models.PositiveIntegerField(null=True)
+    run_time = models.PositiveIntegerField(null=True)
     queue_time = models.PositiveIntegerField(null=True)
     queue = models.CharField(max_length=16, null=True)
     name =  models.CharField(max_length=128, null=True)
@@ -22,21 +23,21 @@ class Job(models.Model):
     user = models.CharField(max_length=128, null=True)
     exe = models.CharField(max_length=128, null=True)
     cwd = models.CharField(max_length=128, null=True)
-    
+    threads = models.BigIntegerField(null=True)
 
     def __unicode__(self):
         return str(self.id)
-
+    """
     @property
     def timespent(self):
         dt = self.end_epoch-self.start_epoch
         return dt
-
+    """    
     def color(self):
         ret_val = "silver"
         if self.status != 'COMPLETED':
             ret_val = "red"
-        elif self.timespent > 600:
+        elif self.run_time > 600:
             ret_val = "lightblue"
         return ret_val
 

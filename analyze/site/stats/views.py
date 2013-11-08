@@ -15,7 +15,9 @@ import job_stats as data
 import MetaData
 import cPickle as pickle 
 import time
-
+   
+import numpy as np
+ 
 
 path = sys_path_append.pickles_dir
 
@@ -42,6 +44,8 @@ def update():
             json['user'] = ld.user
             json['exe'] = ld.exc.split('/')[-1]
             json['cwd'] = ld.cwd
+            json['run_time'] = meta.json[jobid]['end_epoch'] - meta.json[jobid]['start_epoch']
+            json['threads'] = ld.threads
             try:
                 job_model, created = Job.objects.get_or_create(**json) 
             except:
@@ -115,16 +119,16 @@ def index(request, date = None, uid = None, project = None, user = None, exe = N
         field['exe'] = exe
 
     if exe:
-        job_list = Job.objects.filter(exe__contains=exe).order_by('-id')
+        job_list = Job.objects.filter(exe__contains=exe).filter(run_time__gte=60).order_by('-id')
     else:
-        job_list = Job.objects.filter(**field).order_by('-id')
+        job_list = Job.objects.filter(**field).filter(run_time__gte=60).order_by('-id')
     field['job_list'] = job_list
     field['nj'] = len(job_list)
     print "index =",time.clock()-start
     return render_to_response("stats/index.html", field)
 
 def hist_summary(request, date = None, uid = None, project = None, user = None, exe = None):
-    from numpy import log,array
+
     start = time.clock()
     field = {}
     if date:
@@ -148,9 +152,9 @@ def hist_summary(request, date = None, uid = None, project = None, user = None, 
     fig = figure(figsize=(16,6))
 
     # Run times
-    job_times = array([job.timespent for job in job_list])/3600.
+    job_times = np.array([job.run_time for job in job_list])/3600.
     ax = fig.add_subplot(121)
-    ax.hist(job_times, max(5, 5*log(len(job_list))))
+    ax.hist(job_times, max(5, 5*np.log(len(job_list))))
     ax.set_xlim((0,max(job_times)+1))
     ax.set_ylabel('# of jobs')
     ax.set_xlabel('# hrs')
@@ -159,7 +163,7 @@ def hist_summary(request, date = None, uid = None, project = None, user = None, 
     # Number of cores
     job_size = [job.cores for job in job_list]
     ax = fig.add_subplot(122)
-    ax.hist(job_size, max(5, 5*log(len(job_list))))
+    ax.hist(job_size, max(5, 5*np.log(len(job_list))))
     ax.set_xlim((0,max(job_size)+1))
     ax.set_title('Run Sizes for Completed Jobs')
     ax.set_xlabel('# cores')
@@ -187,6 +191,8 @@ def get_schema(job, type_name):
 def figure_to_response(f):
     response = HttpResponse(content_type='image/svg+xml')
     f.savefig(response, format='svg')
+    #response = HttpResponse(content_type='image/png')
+    #f.savefig(response, format='png')
     plt.close(f)
     f.clear()
     return response
@@ -197,59 +203,50 @@ def stats_unload(job):
 
 def master_plot(request, pk):
     job = Job.objects.get(id = pk)
-    fig, fname = mp.master_plot(job.path,header=None,mintime=600)
+    fig, fname = mp.master_plot(job.path,header=None,mintime=60)
     return figure_to_response(fig)
 
 def heat_map(request, pk):
     job = Job.objects.get(id = pk)
-    
-    import numpy as np
     k1 = {'intel_snb' : ['intel_snb']}
+
     k2 = {'intel_snb': ['INSTRUCTIONS_RETIRED']}
     ts0 = tspl.TSPLBase(job.path,k1,k2)
 
-    k1 = {'intel_snb' : ['intel_snb']}
     k2 = {'intel_snb': ['CLOCKS_UNHALTED_CORE']}
     ts1 = tspl.TSPLBase(job.path,k1,k2)
 
-    tmid=ts0.t#(ts0.t[:-1]+ts0.t[1:])/2.0
+
 
     cpi = np.array([])
     hosts = []
     for v in ts0.data[0]:
         hosts.append(v)
-        for k in range(len(ts0.data[0][v])):
+        ncores = len(ts0.data[0][v])
+        for k in range(ncores):
             i = np.array(ts0.data[0][v][k],dtype=np.float)
             c = np.array(ts1.data[0][v][k],dtype=np.float)
             ratio = np.divide(np.diff(i),np.diff(c))
             if not cpi.size: cpi = np.array([ratio])
             else: cpi = np.vstack((cpi,ratio))
-
     cpi_min, cpi_max = cpi.min(), cpi.max()
+
     fig,ax=plt.subplots(1,1,figsize=(8,12),dpi=110)
 
-    y=np.arange(len(hosts)+1)*16
-    
-    yfine = np.arange(cpi.shape[0]+1)
-    
-    time = tmid/3600.
-    #time = np.concatenate((tmid/3600.,np.array([ts0.t[-1]/3600.])))
-    #print time
-    for l in range(len(y)):
-        plt.axhline(y=y[l]+16, linewidth=0.5,color='black',linestyle='--')
-    plt.yticks(y+8,hosts,size='small')
-    plt.axis([time.min(),time.max(),yfine.min(),yfine.max()])
-    #print time.shape,yfine.shape,cpi.shape,yfine.max()
+    ycore = np.arange(cpi.shape[0]+1)
+    time = ts0.t/3600.
 
-    plt.pcolor(time, yfine, cpi, vmin=cpi_min, vmax=cpi_max)
+    yhost=np.arange(len(hosts)+1)*ncores + ncores    
+    for l in range(len(yhost)):
+        plt.axhline(y=yhost[l], color='black', lw=2, linestyle='--', rasterized=True)
+
+    plt.yticks(yhost - ncores/2.,hosts,size='small')
+    plt.axis([time.min(),time.max(),ycore.min(),ycore.max()])
+
+    plt.pcolor(time, ycore, cpi, vmin=cpi_min, vmax=cpi_max)
     plt.title('Instructions Retired per Core Clock Cycle')
-    #print cpi
     plt.clim(cpi_min,cpi_max)
     plt.colorbar()
-    #print cpi_min,cpi_max
-    #plt.tight_layout()    
-
-
 
     ax.set_xlabel('Time (hrs)')
 
