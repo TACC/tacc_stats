@@ -65,7 +65,7 @@ def main():
     except tspl.TSPLException as e:
       continue
 
-    if not tspl_utils.checkjob(ts,3600.,range(1,17)):
+    if not tspl_utils.checkjob(ts,3600.,range(1,33)):
       continue
 
     tmid=(ts.t[:-1]+ts.t[1:])/2.0

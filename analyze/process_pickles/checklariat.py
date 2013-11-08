@@ -15,7 +15,7 @@ def do_check(f,jobs):
   except tspl.TSPLException:
     return
 
-  if not tspl_utils.checkjob(ts,3600,[x+1 for x in range(16)]): # 1 hour
+  if not tspl_utils.checkjob(ts,3600,range(1,33)): # 1 hour
     return
 
   
