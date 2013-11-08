@@ -33,12 +33,12 @@ exec 2> $tmp_dir/$prog.err.$label_start.$label_end
 set -x
 
 mkdir $tmp_dir/$label_start
-$prog_dir/job_pickles.py $tmp_dir/$label_start "$start0" "$end3"
-#($prog_dir/job_pickles.py $tmp_dir/$label_start "$start0" "$end0") &
-#($prog_dir/job_pickles.py $tmp_dir/$label_start "$start1" "$end1") &
-#($prog_dir/job_pickles.py $tmp_dir/$label_start "$start2" "$end2") &
-#($prog_dir/job_pickles.py $tmp_dir/$label_start "$start3" "$end3") &
+($prog_dir/job_pickles.py $tmp_dir/$label_start "$start0" "$end0") &
+($prog_dir/job_pickles.py $tmp_dir/$label_start "$start1" "$end1") &
+($prog_dir/job_pickles.py $tmp_dir/$label_start "$start2" "$end2") &
+($prog_dir/job_pickles.py $tmp_dir/$label_start "$start3" "$end3") &
 
+wait
 
 tar -C $tmp_dir -czf $dst_dir/$label_start.tar.gz $label_start
 rm -r $tmp_dir/$label_start
