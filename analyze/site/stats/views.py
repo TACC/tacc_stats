@@ -101,6 +101,7 @@ def search(request):
 
 
 def index(request, date = None, uid = None, project = None, user = None, exe = None):
+    start = time.clock()
     field = {}
     if date:
         field['date'] = date
@@ -119,12 +120,12 @@ def index(request, date = None, uid = None, project = None, user = None, exe = N
         job_list = Job.objects.filter(**field).order_by('-id')
     field['job_list'] = job_list
     field['nj'] = len(job_list)
-
+    print "index =",time.clock()-start
     return render_to_response("stats/index.html", field)
 
 def hist_summary(request, date = None, uid = None, project = None, user = None, exe = None):
     from numpy import log,array
-
+    start = time.clock()
     field = {}
     if date:
         field['date'] = date
@@ -164,7 +165,7 @@ def hist_summary(request, date = None, uid = None, project = None, user = None, 
     ax.set_xlabel('# cores')
 
     #fig.tight_layout()
-
+    print "hist =", time.clock()-start
     return figure_to_response(fig)
 
 def stats_load(job):
