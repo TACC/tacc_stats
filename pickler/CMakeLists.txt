@@ -30,7 +30,8 @@ configure_file(do_job_pickles_cron.sh.in
 
 # Install support modules for pickler
 file(GLOB PY_INC_FILES ${CMAKE_CURRENT_SOURCE_DIR}/*.py) 
-file(COPY ${PY_INC_FILES} DESTINATION ${CMAKE_SOURCE_DIR}/include) 
+file(COPY ${PY_INC_FILES} DESTINATION ${CMAKE_SOURCE_DIR}/include
+  FILE_PERMISSIONS OWNER_READ OWNER_WRITE GROUP_READ WORLD_READ) 
 
 # Install pickler scripts
 file(COPY   
