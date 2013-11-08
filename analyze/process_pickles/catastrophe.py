@@ -114,7 +114,7 @@ def main():
         print fn + ': ' + str(res[fn])
         masterplot.mp_wrapper(fn,'lines',False,n.o[0],'step',
                               1,[x+1 for x in range(16)],
-                              header='Step Function Performance') 
+                              header='Step Function Performance',wide=True) 
         break
    
 if __name__ == '__main__':

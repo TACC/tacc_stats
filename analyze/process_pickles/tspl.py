@@ -39,6 +39,16 @@ class TSPLBase:
       print 'No queue found'
       self.queue = None
 
+    self.status='Unknown'
+    try:
+      self.status=self.j.acct['status']
+    except KeyError:
+      try:
+        self.status=self.j.acct['exit_stats']
+      except KeyError as e:
+        pass
+      pass
+
     try:
       self.owner=self.j.acct['owner']
     except KeyError:
@@ -108,6 +118,8 @@ class TSPLBase:
     g=self.j.hosts[self.j.hosts.keys()[0]]
     self.size=len(g.stats[self.k1[0]].values()[0])
 
+    d=datetime.datetime.fromtimestamp(self.j.acct['start_time'])
+    self.start_date=d.strftime('%Y-%m-%d %H:%M:%S')
     d=datetime.datetime.fromtimestamp(self.j.acct['end_time'])
     self.end_date=d.strftime('%Y-%m-%d %H:%M:%S')
 
