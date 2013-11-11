@@ -19,13 +19,13 @@ acct_path=/scratch/projects/tacc_stats/accounting/tacc_jobs_completed
 # used for jobid
 host_list_dir=/scratch/projects/tacc/hostfile_logs/
 # location to store pickles
-pickles_dir=/hpc/tacc_stats_site/stampede/pickles/
+pickles_dir=/scratch/projects/tacc_stats/pickles/
 python_path=/opt/apps/python/epd/7.3.2/bin/
 ## Host Name Extension and Batch System (Currently SGE or SLURM)##
 host_name_ext=stampede.tacc.utexas.edu
 batch_system=SLURM
 ## Path to lariat data
-lariat_path=/hpc/tacc_stats/stampede/lariatData/2013
+lariat_path=/scratch/projects/lariatData/2013/
 
 ## System specific Schema items. ##
 ## Chips type and infiniband may need to be
