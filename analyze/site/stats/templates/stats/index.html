@@ -4,8 +4,6 @@
 </head>
 <body>
 
-<h1>Jobs ({{nj}} counted)</h1>
-
 {% if date %}
 <h1>For date: {{ date }}</h1>
 <h2> Charts at a glance </h2>
@@ -35,6 +33,7 @@
 <h2> Charts at a glance </h2>
 <img src="{% url 'stats:exe_summary' exe %}" />
 {% endif %}
+<h1># Jobs over 1 mn in run time = {{nj}}</h1>
 <hr>
 
 {% if job_list %}

@@ -105,7 +105,7 @@ def search(request):
 
 
 def index(request, date = None, uid = None, project = None, user = None, exe = None):
-    start = time.clock()
+
     field = {}
     if date:
         field['date'] = date
@@ -119,17 +119,16 @@ def index(request, date = None, uid = None, project = None, user = None, exe = N
         field['exe'] = exe
 
     if exe:
-        job_list = Job.objects.filter(exe__contains=exe).filter(run_time__gte=60).order_by('-id')
+        job_list = Job.objects.filter(exe__contains=exe).filter(run_time__gte=60).order_by('-id')[0::1]
     else:
-        job_list = Job.objects.filter(**field).filter(run_time__gte=60).order_by('-id')
+        job_list = Job.objects.filter(**field).filter(run_time__gte=60).order_by('-id')[0::1]
     field['job_list'] = job_list
     field['nj'] = len(job_list)
-    print "index =",time.clock()-start
+
     return render_to_response("stats/index.html", field)
 
 def hist_summary(request, date = None, uid = None, project = None, user = None, exe = None):
 
-    start = time.clock()
     field = {}
     if date:
         field['date'] = date
@@ -145,10 +144,9 @@ def hist_summary(request, date = None, uid = None, project = None, user = None, 
     field['status'] = 'COMPLETED'
 
     if exe:
-        job_list = Job.objects.filter(exe__contains=exe)
+        job_list = Job.objects.filter(exe__contains=exe).filter(run_time__gte=60)#[0::1]
     else:
-        job_list = Job.objects.filter(**field)
-
+        job_list = Job.objects.filter(**field).filter(run_time__gte=60)#[0::1]
     fig = figure(figsize=(16,6))
 
     # Run times
@@ -168,8 +166,6 @@ def hist_summary(request, date = None, uid = None, project = None, user = None, 
     ax.set_title('Run Sizes for Completed Jobs')
     ax.set_xlabel('# cores')
 
-    #fig.tight_layout()
-    print "hist =", time.clock()-start
     return figure_to_response(fig)
 
 def stats_load(job):
@@ -237,15 +233,22 @@ def heat_map(request, pk):
     time = ts0.t/3600.
 
     yhost=np.arange(len(hosts)+1)*ncores + ncores    
-    for l in range(len(yhost)):
-        plt.axhline(y=yhost[l], color='black', lw=2, linestyle='--', rasterized=True)
 
-    plt.yticks(yhost - ncores/2.,hosts,size='small')
+    """
+    for l in range(len(yhost)):
+        plt.axhline(y=yhost[l], color='black', linestyle='--', rasterized=True)
+    """
+
+    fontsize = 10
+
+    if len(yhost) > 80:
+        fontsize /= 0.5*np.log(len(yhost))
+        
+    plt.yticks(yhost - ncores/2.,hosts,size=fontsize) 
+    plt.pcolormesh(time, ycore, cpi, vmin=cpi_min, vmax=cpi_max)
     plt.axis([time.min(),time.max(),ycore.min(),ycore.max()])
 
-    plt.pcolor(time, ycore, cpi, vmin=cpi_min, vmax=cpi_max)
     plt.title('Instructions Retired per Core Clock Cycle')
-    plt.clim(cpi_min,cpi_max)
     plt.colorbar()
 
     ax.set_xlabel('Time (hrs)')

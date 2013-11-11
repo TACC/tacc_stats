@@ -145,7 +145,7 @@ def master_plot(file,mode='lines',threshold=False,
   except tspl.TSPLException as e:
     return 
 
-  ignore_qs=['gpu','gpudev','vis','visdev']
+  ignore_qs=[]#'gpu','gpudev','vis','visdev']
   if not tspl_utils.checkjob(ts,mintime,wayness,ignore_qs):
     return
 
