@@ -1,0 +1,3 @@
++ python /home/rtevans/tacc_stats/analyze/site/tar.py
++ python /home/rtevans/tacc_stats/analyze/site/update_db.py
+./update_cron.sh: line 19: 15728 Killed                  python $prog_dir/update_db.py

@@ -22,37 +22,35 @@ import numpy as np
 path = sys_path_append.pickles_dir
 
 
-def update():
+def update(meta = None):
+    if not meta: return
+
     #Job.objects.all().delete()
-    for date in os.listdir(path):
-        print 'Date',date
 
-        meta = MetaData.MetaData(os.path.join(path,date))    
-        meta.load_update()
-
-        # Only need to populate lariat cache once
-        jobid = meta.json.keys()[0]
-        ld = lariat_utils.LariatData(jobid,
-                                     end_epoch = meta.json[jobid]['end_epoch'],
-                                     directory = sys_path_append.lariat_path,
-                                     daysback = 2)
+    # Only need to populate lariat cache once
+    jobid = meta.json.keys()[0]
+    ld = lariat_utils.LariatData(jobid,
+                                 end_epoch = meta.json[jobid]['end_epoch'],
+                                 directory = sys_path_append.lariat_path,
+                                 daysback = 2)
         
-        for jobid, json in meta.json.iteritems():
-            if Job.objects.filter(id = jobid).exists(): continue  
-            ld = lariat_utils.LariatData(jobid,
-                                         olddata = ld.ld)
-            json['user'] = ld.user
-            json['exe'] = ld.exc.split('/')[-1]
-            json['cwd'] = ld.cwd
-            json['run_time'] = meta.json[jobid]['end_epoch'] - meta.json[jobid]['start_epoch']
-            json['threads'] = ld.threads
-            try:
-                job_model, created = Job.objects.get_or_create(**json) 
-            except:
-                print "Something wrong with json",json
+    for jobid, json in meta.json.iteritems():
+        if Job.objects.filter(id = jobid).exists(): continue  
+        ld = lariat_utils.LariatData(jobid,
+                                     olddata = ld.ld)
+        json['user'] = ld.user
+        json['exe'] = ld.exc.split('/')[-1]
+        json['cwd'] = ld.cwd
+        json['run_time'] = meta.json[jobid]['end_epoch'] - meta.json[jobid]['start_epoch']
+        json['threads'] = ld.threads
+        try:
+            job_model, created = Job.objects.get_or_create(**json) 
+        except:
+            print "Something wrong with json",json
     return 
 
 def dates(request):
+
     date_list = os.listdir(path)
     date_list = sorted(date_list, key=lambda d: map(int, d.split('-')))
 
@@ -168,11 +166,6 @@ def hist_summary(request, date = None, uid = None, project = None, user = None, 
 
     return figure_to_response(fig)
 
-def stats_load(job):
-    with open(job.path) as f:
-        job.stats = pickle.load(f)
-    job.save()
-
 def get_schema(job, type_name):
     with open(job.path) as f:
         data = pickle.load(f)
@@ -192,10 +185,6 @@ def figure_to_response(f):
     plt.close(f)
     f.clear()
     return response
-
-def stats_unload(job):
-    job.stats = []
-    job.save()
 
 def master_plot(request, pk):
     job = Job.objects.get(id = pk)
@@ -264,13 +253,16 @@ class JobDetailView(DetailView):
     def get_context_data(self, **kwargs):
         context = super(JobDetailView, self).get_context_data(**kwargs)
         job = context['job']
-        stats_load(job)
+
+        with open(job.path) as f:
+            stats = pickle.load(f)
+
         type_list = []
         host_list = []
-        for host_name, host in job.stats.hosts.iteritems():
+        for host_name, host in stats.hosts.iteritems():
             host_list.append(host_name)
         for type_name, type in host.stats.iteritems():
-            schema = job.stats.get_schema(type_name).desc
+            schema = stats.get_schema(type_name).desc
             schema = string.replace(schema,',E',' ')
             schema = string.replace(schema,',',' ')
             type_list.append( (type_name, schema) )
@@ -278,7 +270,7 @@ class JobDetailView(DetailView):
         type_list = sorted(type_list, key = lambda type_name: type_name[0])
         context['type_list'] = type_list
         context['host_list'] = host_list
-        stats_unload(job)
+
         return context
 
 def type_plot(request, pk, type_name):
@@ -309,8 +301,9 @@ def type_plot(request, pk, type_name):
 def type_detail(request, pk, type_name):
 
     job = Job.objects.get(id = pk)
-    stats_load(job)
-    data = job.stats
+
+    with open(job.path) as f:
+        data = pickle.load(f)
 
     schema = data.get_schema(type_name).desc
     schema = string.replace(schema,',E',' ')
@@ -325,7 +318,6 @@ def type_detail(request, pk, type_name):
             temp.append(raw_stats[t,event])
         stats.append((data.times[t],temp))
 
-    stats_unload(job)
 
     return render_to_response("stats/type_detail.html",{"type_name" : type_name, "jobid" : pk, "stats_data" : stats, "schema" : schema})
     
