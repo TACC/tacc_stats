@@ -18,7 +18,7 @@ for date in os.listdir(path):
     print 'Date',date
 
     meta = MetaData.MetaData(os.path.join(path,date))
-    if os.path.exists(meta.meta_path):continue
+    if os.path.exists(meta.meta_path): continue
     meta.load_update()
 
     views.update(meta = meta)

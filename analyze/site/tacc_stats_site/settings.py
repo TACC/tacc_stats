@@ -1,6 +1,6 @@
 # Django settings for tacc_stats_site project.
 
-DEBUG = True
+DEBUG = True#False
 TEMPLATE_DEBUG = DEBUG
 
 ADMINS = (
@@ -158,5 +158,13 @@ LOGGING = {
             'level': 'ERROR',
             'propagate': True,
         },
+    }
+}
+
+
+CACHES = {
+    'default': {
+        'BACKEND': 'django.core.cache.backends.memcached.MemcachedCache',
+        'LOCATION': '127.0.0.1:11211',
     }
 }

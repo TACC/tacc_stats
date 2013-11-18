@@ -17,9 +17,11 @@ import cPickle as pickle
 import time
    
 import numpy as np
- 
+
+from django.core.cache import cache 
 
 path = sys_path_append.pickles_dir
+
 
 
 def update(meta = None):
@@ -72,7 +74,7 @@ def search(request):
         q = request.GET['q']
         try:
             job = Job.objects.get(id = q)
-            return HttpResponseRedirect("/stats/job/"+str(job.id)+"/")
+            return HttpResponseRedirect("/job/"+str(job.id)+"/")
         except: pass
 
     if 'u' in request.GET:
@@ -166,42 +168,29 @@ def hist_summary(request, date = None, uid = None, project = None, user = None, 
 
     return figure_to_response(fig)
 
-def get_schema(job, type_name):
-    with open(job.path) as f:
-        data = pickle.load(f)
-    schema = data.get_schema(type_name).desc
-    schema = string.replace(schema,',E',' ')
-    schema = string.replace(schema,' ,',',').split()
-    schema = [x.split(',')[0] for x in schema]
-
-    return schema
-
 
 def figure_to_response(f):
     response = HttpResponse(content_type='image/svg+xml')
     f.savefig(response, format='svg')
-    #response = HttpResponse(content_type='image/png')
-    #f.savefig(response, format='png')
     plt.close(f)
     f.clear()
     return response
 
 def master_plot(request, pk):
     job = Job.objects.get(id = pk)
-    fig, fname = mp.master_plot(job.path,header=None,mintime=60)
+    fig, fname = mp.master_plot(None,header=None,mintime=60,job_stats=cache.get('stats'))
     return figure_to_response(fig)
 
 def heat_map(request, pk):
     job = Job.objects.get(id = pk)
+
     k1 = {'intel_snb' : ['intel_snb']}
 
     k2 = {'intel_snb': ['INSTRUCTIONS_RETIRED']}
-    ts0 = tspl.TSPLBase(job.path,k1,k2)
+    ts0 = tspl.TSPLBase(None,k1,k2,job_stats = cache.get('stats'))
 
     k2 = {'intel_snb': ['CLOCKS_UNHALTED_CORE']}
-    ts1 = tspl.TSPLBase(job.path,k1,k2)
-
-
+    ts1 = tspl.TSPLBase(None,k1,k2,job_stats = cache.get('stats'))
 
     cpi = np.array([])
     hosts = []
@@ -246,6 +235,16 @@ def heat_map(request, pk):
 
     return figure_to_response(fig)
 
+def get_schema(job, type_name):
+
+    data = cache.get('stats')
+    schema = data.get_schema(type_name).desc
+    schema = string.replace(schema,',E',' ')
+    schema = string.replace(schema,' ,',',').split()
+    schema = [x.split(',')[0] for x in schema]
+
+    return schema
+
 class JobDetailView(DetailView):
 
     model = Job
@@ -254,15 +253,15 @@ class JobDetailView(DetailView):
         context = super(JobDetailView, self).get_context_data(**kwargs)
         job = context['job']
 
-        with open(job.path) as f:
-            stats = pickle.load(f)
-
+        with open(job.path,'rb') as f:
+            cache.set('stats', pickle.load(f))
+ 
         type_list = []
         host_list = []
-        for host_name, host in stats.hosts.iteritems():
+        for host_name, host in cache.get('stats').hosts.iteritems():
             host_list.append(host_name)
         for type_name, type in host.stats.iteritems():
-            schema = stats.get_schema(type_name).desc
+            schema = cache.get('stats').get_schema(type_name).desc
             schema = string.replace(schema,',E',' ')
             schema = string.replace(schema,',',' ')
             type_list.append( (type_name, schema) )
@@ -281,7 +280,7 @@ def type_plot(request, pk, type_name):
     k1 = {'intel_snb' : [type_name]*len(schema)}
     k2 = {'intel_snb': schema}
 
-    ts = tspl.TSPLSum(job.path,k1,k2)
+    ts = tspl.TSPLSum(None,k1,k2,job_stats=cache.get('stats'))
     
     nr_events = len(schema)
     fig, axarr = plt.subplots(nr_events, sharex=True, figsize=(8,nr_events*2), dpi=80)
@@ -302,8 +301,7 @@ def type_detail(request, pk, type_name):
 
     job = Job.objects.get(id = pk)
 
-    with open(job.path) as f:
-        data = pickle.load(f)
+    data = cache.get('stats')
 
     schema = data.get_schema(type_name).desc
     schema = string.replace(schema,',E',' ')

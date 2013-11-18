@@ -12,13 +12,17 @@ class TSPLException(Exception):
     print self.value
 
 class TSPLBase:
-  def __init__(self,file,k1,k2):
-    self.f=open(file)
-    try:
-      self.j=pickle.load(self.f)
-    except EOFError as e:
-      raise TSPLException('End of file found for: ' + file)
-    self.f.close()
+  def __init__(self,file,k1,k2,job_stats = None):
+
+    if job_stats:
+      self.j = job_stats
+    else:
+      self.f=open(file)
+      try:
+        self.j=pickle.load(self.f)
+      except EOFError as e:
+        raise TSPLException('End of file found for: ' + file)
+      self.f.close()
 
     try:
       self.wayness=int(re.findall('\d+',self.j.acct['granted_pe'])[0])
@@ -223,8 +227,8 @@ class TSPLBase:
 # two lists of keys. 
 
 class TSPLSum(TSPLBase):
-  def __init__(self,file,k1,k2):
-    TSPLBase.__init__(self,file,k1,k2)
+  def __init__(self,file,k1,k2, job_stats = None):
+    TSPLBase.__init__(self,file,k1,k2, job_stats = job_stats)
 
   # Initialize with an zero array and accumuluate to the first list element with
   # a sum
