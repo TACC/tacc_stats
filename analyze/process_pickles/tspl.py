@@ -22,6 +22,8 @@ class TSPLBase:
 
     try:
       self.wayness=int(re.findall('\d+',self.j.acct['granted_pe'])[0])
+    except AttributeError:
+      raise TSPLException("Pickle file broken: " + file)
     except KeyError:
       try:
         self.wayness=self.j.acct['cores']/self.j.acct['nodes']

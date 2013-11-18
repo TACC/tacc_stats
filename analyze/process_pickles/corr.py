@@ -124,7 +124,7 @@ def main():
       mmr[ename]=numpy.array([mean_mem_rate])
       sus[ename]=su
 
-  # Find top 15
+  # Find top codes by SUs
   top_count={}
   for k in mdr.keys():
     if n.s:
