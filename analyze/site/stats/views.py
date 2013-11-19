@@ -18,11 +18,9 @@ import time
    
 import numpy as np
 
-from django.core.cache import cache 
+from django.core.cache import cache,get_cache 
 
 path = sys_path_append.pickles_dir
-
-
 
 def update(meta = None):
     if not meta: return
@@ -31,12 +29,14 @@ def update(meta = None):
 
     # Only need to populate lariat cache once
     jobid = meta.json.keys()[0]
+
     ld = lariat_utils.LariatData(jobid,
                                  end_epoch = meta.json[jobid]['end_epoch'],
                                  directory = sys_path_append.lariat_path,
                                  daysback = 2)
         
     for jobid, json in meta.json.iteritems():
+
         if Job.objects.filter(id = jobid).exists(): continue  
         ld = lariat_utils.LariatData(jobid,
                                      olddata = ld.ld)
@@ -144,9 +144,9 @@ def hist_summary(request, date = None, uid = None, project = None, user = None, 
     field['status'] = 'COMPLETED'
 
     if exe:
-        job_list = Job.objects.filter(exe__contains=exe).filter(run_time__gte=60)#[0::1]
+        job_list = Job.objects.filter(exe__contains=exe).filter(run_time__gte=60)[0::1]
     else:
-        job_list = Job.objects.filter(**field).filter(run_time__gte=60)#[0::1]
+        job_list = Job.objects.filter(**field).filter(run_time__gte=60)[0::1]
     fig = figure(figsize=(16,6))
 
     # Run times
@@ -177,20 +177,21 @@ def figure_to_response(f):
     return response
 
 def master_plot(request, pk):
-    job = Job.objects.get(id = pk)
-    fig, fname = mp.master_plot(None,header=None,mintime=60,job_stats=cache.get('stats'))
+    data = cache.get(pk)
+
+    fig, fname = mp.master_plot(None,header=None,mintime=60,lariat_dict="pass",job_stats=data)
     return figure_to_response(fig)
 
 def heat_map(request, pk):
-    job = Job.objects.get(id = pk)
+    data = cache.get(pk)
 
     k1 = {'intel_snb' : ['intel_snb']}
 
     k2 = {'intel_snb': ['INSTRUCTIONS_RETIRED']}
-    ts0 = tspl.TSPLBase(None,k1,k2,job_stats = cache.get('stats'))
+    ts0 = tspl.TSPLBase(None,k1,k2,job_stats = data)
 
     k2 = {'intel_snb': ['CLOCKS_UNHALTED_CORE']}
-    ts1 = tspl.TSPLBase(None,k1,k2,job_stats = cache.get('stats'))
+    ts1 = tspl.TSPLBase(None,k1,k2,job_stats = data)
 
     cpi = np.array([])
     hosts = []
@@ -234,17 +235,17 @@ def heat_map(request, pk):
     plt.close()
 
     return figure_to_response(fig)
-
+"""
 def get_schema(job, type_name):
+    data = cache.get(pk)
 
-    data = cache.get('stats')
     schema = data.get_schema(type_name).desc
     schema = string.replace(schema,',E',' ')
     schema = string.replace(schema,' ,',',').split()
     schema = [x.split(',')[0] for x in schema]
 
     return schema
-
+"""
 class JobDetailView(DetailView):
 
     model = Job
@@ -254,14 +255,16 @@ class JobDetailView(DetailView):
         job = context['job']
 
         with open(job.path,'rb') as f:
-            cache.set('stats', pickle.load(f))
- 
+            data = pickle.load(f)
+            cache.set(job.id, data)
+
         type_list = []
         host_list = []
-        for host_name, host in cache.get('stats').hosts.iteritems():
+
+        for host_name, host in data.hosts.iteritems():
             host_list.append(host_name)
         for type_name, type in host.stats.iteritems():
-            schema = cache.get('stats').get_schema(type_name).desc
+            schema = data.get_schema(type_name).desc
             schema = string.replace(schema,',E',' ')
             schema = string.replace(schema,',',' ')
             type_list.append( (type_name, schema) )
@@ -273,14 +276,17 @@ class JobDetailView(DetailView):
         return context
 
 def type_plot(request, pk, type_name):
+    data = cache.get(pk)
+    schema = data.get_schema(type_name).desc
+    schema = string.replace(schema,',E',' ')
+    schema = string.replace(schema,' ,',',').split()
+    schema = [x.split(',')[0] for x in schema]
 
-    job = Job.objects.get(id = pk)
-    schema = get_schema(job, type_name)
 
     k1 = {'intel_snb' : [type_name]*len(schema)}
     k2 = {'intel_snb': schema}
 
-    ts = tspl.TSPLSum(None,k1,k2,job_stats=cache.get('stats'))
+    ts = tspl.TSPLSum(None,k1,k2,job_stats=data)
     
     nr_events = len(schema)
     fig, axarr = plt.subplots(nr_events, sharex=True, figsize=(8,nr_events*2), dpi=80)
@@ -298,10 +304,7 @@ def type_plot(request, pk, type_name):
 
 
 def type_detail(request, pk, type_name):
-
-    job = Job.objects.get(id = pk)
-
-    data = cache.get('stats')
+    data = cache.get(pk)
 
     schema = data.get_schema(type_name).desc
     schema = string.replace(schema,',E',' ')

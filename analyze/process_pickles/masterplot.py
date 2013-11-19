@@ -151,9 +151,12 @@ def master_plot(file,mode='lines',threshold=False,
 
   if lariat_dict == None:
     ld=lariat_utils.LariatData(ts.j.id,end_epoch=ts.j.end_time,daysback=3,directory=analyze_conf.lariat_path)
+  elif lariat_dict == "pass": ld = lariat_utils.LariatData(ts.j.id)
   else:
     ld=lariat_utils.LariatData(ts.j.id,olddata=lariat_dict)
+
     
+
   wayness=ts.wayness
   if ld.wayness != -1 and ld.wayness < ts.wayness:
     wayness=ld.wayness
