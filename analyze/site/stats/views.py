@@ -176,14 +176,25 @@ def figure_to_response(f):
     f.clear()
     return response
 
+def get_data(pk):
+    if cache.has_key(pk):
+        data = cache.get(pk)
+    else:
+        job = Job.objects.get(pk = pk)
+        with open(job.path,'rb') as f:
+            data = pickle.load(f)
+            cache.set(job.id, data)
+    return data
+
 def master_plot(request, pk):
-    data = cache.get(pk)
+    data = get_data(pk)
 
     fig, fname = mp.master_plot(None,header=None,mintime=60,lariat_dict="pass",job_stats=data)
     return figure_to_response(fig)
 
 def heat_map(request, pk):
-    data = cache.get(pk)
+    
+    data = get_data(pk)
 
     k1 = {'intel_snb' : ['intel_snb']}
 
@@ -213,11 +224,6 @@ def heat_map(request, pk):
 
     yhost=np.arange(len(hosts)+1)*ncores + ncores    
 
-    """
-    for l in range(len(yhost)):
-        plt.axhline(y=yhost[l], color='black', linestyle='--', rasterized=True)
-    """
-
     fontsize = 10
 
     if len(yhost) > 80:
@@ -235,17 +241,7 @@ def heat_map(request, pk):
     plt.close()
 
     return figure_to_response(fig)
-"""
-def get_schema(job, type_name):
-    data = cache.get(pk)
 
-    schema = data.get_schema(type_name).desc
-    schema = string.replace(schema,',E',' ')
-    schema = string.replace(schema,' ,',',').split()
-    schema = [x.split(',')[0] for x in schema]
-
-    return schema
-"""
 class JobDetailView(DetailView):
 
     model = Job
@@ -254,9 +250,7 @@ class JobDetailView(DetailView):
         context = super(JobDetailView, self).get_context_data(**kwargs)
         job = context['job']
 
-        with open(job.path,'rb') as f:
-            data = pickle.load(f)
-            cache.set(job.id, data)
+        data = get_data(job.id)
 
         type_list = []
         host_list = []
@@ -276,7 +270,7 @@ class JobDetailView(DetailView):
         return context
 
 def type_plot(request, pk, type_name):
-    data = cache.get(pk)
+    data = get_data(pk)
     schema = data.get_schema(type_name).desc
     schema = string.replace(schema,',E',' ')
     schema = string.replace(schema,' ,',',').split()
@@ -304,7 +298,7 @@ def type_plot(request, pk, type_name):
 
 
 def type_detail(request, pk, type_name):
-    data = cache.get(pk)
+    data = get_data(pk)
 
     schema = data.get_schema(type_name).desc
     schema = string.replace(schema,',E',' ')
