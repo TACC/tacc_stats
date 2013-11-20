@@ -41,6 +41,7 @@ class Job(models.Model):
             ret_val = "lightblue"
         return ret_val
 
+
 class JobForm(ModelForm):
     class Meta:
         model = Job

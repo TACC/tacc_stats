@@ -17,10 +17,10 @@ import cPickle as pickle
 import time
    
 import numpy as np
- 
+
+from django.core.cache import cache,get_cache 
 
 path = sys_path_append.pickles_dir
-
 
 def update(meta = None):
     if not meta: return
@@ -29,12 +29,14 @@ def update(meta = None):
 
     # Only need to populate lariat cache once
     jobid = meta.json.keys()[0]
+
     ld = lariat_utils.LariatData(jobid,
                                  end_epoch = meta.json[jobid]['end_epoch'],
                                  directory = sys_path_append.lariat_path,
                                  daysback = 2)
         
     for jobid, json in meta.json.iteritems():
+
         if Job.objects.filter(id = jobid).exists(): continue  
         ld = lariat_utils.LariatData(jobid,
                                      olddata = ld.ld)
@@ -72,7 +74,7 @@ def search(request):
         q = request.GET['q']
         try:
             job = Job.objects.get(id = q)
-            return HttpResponseRedirect("/stats/job/"+str(job.id)+"/")
+            return HttpResponseRedirect("/job/"+str(job.id)+"/")
         except: pass
 
     if 'u' in request.GET:
@@ -142,9 +144,9 @@ def hist_summary(request, date = None, uid = None, project = None, user = None, 
     field['status'] = 'COMPLETED'
 
     if exe:
-        job_list = Job.objects.filter(exe__contains=exe).filter(run_time__gte=60)#[0::1]
+        job_list = Job.objects.filter(exe__contains=exe).filter(run_time__gte=60)[0::1]
     else:
-        job_list = Job.objects.filter(**field).filter(run_time__gte=60)#[0::1]
+        job_list = Job.objects.filter(**field).filter(run_time__gte=60)[0::1]
     fig = figure(figsize=(16,6))
 
     # Run times
@@ -166,42 +168,41 @@ def hist_summary(request, date = None, uid = None, project = None, user = None, 
 
     return figure_to_response(fig)
 
-def get_schema(job, type_name):
-    with open(job.path) as f:
-        data = pickle.load(f)
-    schema = data.get_schema(type_name).desc
-    schema = string.replace(schema,',E',' ')
-    schema = string.replace(schema,' ,',',').split()
-    schema = [x.split(',')[0] for x in schema]
-
-    return schema
-
 
 def figure_to_response(f):
     response = HttpResponse(content_type='image/svg+xml')
     f.savefig(response, format='svg')
-    #response = HttpResponse(content_type='image/png')
-    #f.savefig(response, format='png')
     plt.close(f)
     f.clear()
     return response
 
+def get_data(pk):
+    if cache.has_key(pk):
+        data = cache.get(pk)
+    else:
+        job = Job.objects.get(pk = pk)
+        with open(job.path,'rb') as f:
+            data = pickle.load(f)
+            cache.set(job.id, data)
+    return data
+
 def master_plot(request, pk):
-    job = Job.objects.get(id = pk)
-    fig, fname = mp.master_plot(job.path,header=None,mintime=60)
+    data = get_data(pk)
+
+    fig, fname = mp.master_plot(None,header=None,mintime=60,lariat_dict="pass",job_stats=data)
     return figure_to_response(fig)
 
 def heat_map(request, pk):
-    job = Job.objects.get(id = pk)
+    
+    data = get_data(pk)
+
     k1 = {'intel_snb' : ['intel_snb']}
 
     k2 = {'intel_snb': ['INSTRUCTIONS_RETIRED']}
-    ts0 = tspl.TSPLBase(job.path,k1,k2)
+    ts0 = tspl.TSPLBase(None,k1,k2,job_stats = data)
 
     k2 = {'intel_snb': ['CLOCKS_UNHALTED_CORE']}
-    ts1 = tspl.TSPLBase(job.path,k1,k2)
-
-
+    ts1 = tspl.TSPLBase(None,k1,k2,job_stats = data)
 
     cpi = np.array([])
     hosts = []
@@ -222,11 +223,6 @@ def heat_map(request, pk):
     time = ts0.t/3600.
 
     yhost=np.arange(len(hosts)+1)*ncores + ncores    
-
-    """
-    for l in range(len(yhost)):
-        plt.axhline(y=yhost[l], color='black', linestyle='--', rasterized=True)
-    """
 
     fontsize = 10
 
@@ -254,15 +250,15 @@ class JobDetailView(DetailView):
         context = super(JobDetailView, self).get_context_data(**kwargs)
         job = context['job']
 
-        with open(job.path) as f:
-            stats = pickle.load(f)
+        data = get_data(job.id)
 
         type_list = []
         host_list = []
-        for host_name, host in stats.hosts.iteritems():
+
+        for host_name, host in data.hosts.iteritems():
             host_list.append(host_name)
         for type_name, type in host.stats.iteritems():
-            schema = stats.get_schema(type_name).desc
+            schema = data.get_schema(type_name).desc
             schema = string.replace(schema,',E',' ')
             schema = string.replace(schema,',',' ')
             type_list.append( (type_name, schema) )
@@ -274,14 +270,17 @@ class JobDetailView(DetailView):
         return context
 
 def type_plot(request, pk, type_name):
+    data = get_data(pk)
+    schema = data.get_schema(type_name).desc
+    schema = string.replace(schema,',E',' ')
+    schema = string.replace(schema,' ,',',').split()
+    schema = [x.split(',')[0] for x in schema]
 
-    job = Job.objects.get(id = pk)
-    schema = get_schema(job, type_name)
 
     k1 = {'intel_snb' : [type_name]*len(schema)}
     k2 = {'intel_snb': schema}
 
-    ts = tspl.TSPLSum(job.path,k1,k2)
+    ts = tspl.TSPLSum(None,k1,k2,job_stats=data)
     
     nr_events = len(schema)
     fig, axarr = plt.subplots(nr_events, sharex=True, figsize=(8,nr_events*2), dpi=80)
@@ -299,11 +298,7 @@ def type_plot(request, pk, type_name):
 
 
 def type_detail(request, pk, type_name):
-
-    job = Job.objects.get(id = pk)
-
-    with open(job.path) as f:
-        data = pickle.load(f)
+    data = get_data(pk)
 
     schema = data.get_schema(type_name).desc
     schema = string.replace(schema,',E',' ')

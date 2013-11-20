@@ -63,7 +63,12 @@ class LariatData:
       if len(matches) != 0:
         newdata=dict()
         for m in matches:
-          newdata.update(json.load(open(m))) # Should be only one match
+          try:
+            newdata.update(json.load(open(m))) # Should be only one match
+          except:
+            json_str = open(m).read()
+            json_str = re.sub(r'\\','',json_str)
+            newdata.update(json.loads(json_str))
       else:
         print 'File for ' + self.jobid + ' not found in ' + directory
 

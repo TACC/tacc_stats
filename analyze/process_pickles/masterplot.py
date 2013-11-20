@@ -118,7 +118,7 @@ def plot_mmm(ax, ts, index, xscale=1.0, yscale=1.0, xlabel='', ylabel='',
 
 def master_plot(file,mode='lines',threshold=False,
                 output_dir='.',prefix='graph',mintime=3600,wayness=16,
-                header='Master',lariat_dict=None,wide=False):
+                header='Master',lariat_dict=None,wide=False,job_stats=None):
   k1={'amd64' :
       ['amd64_core','amd64_core','amd64_sock','lnet','lnet',
        'ib_sw','ib_sw','cpu'],
@@ -141,7 +141,7 @@ def master_plot(file,mode='lines',threshold=False,
 
   try:
     print file
-    ts=tspl.TSPLSum(file,k1,k2)
+    ts=tspl.TSPLSum(file,k1,k2,job_stats)
   except tspl.TSPLException as e:
     return 
 
@@ -151,9 +151,12 @@ def master_plot(file,mode='lines',threshold=False,
 
   if lariat_dict == None:
     ld=lariat_utils.LariatData(ts.j.id,end_epoch=ts.j.end_time,daysback=3,directory=analyze_conf.lariat_path)
+  elif lariat_dict == "pass": ld = lariat_utils.LariatData(ts.j.id)
   else:
     ld=lariat_utils.LariatData(ts.j.id,olddata=lariat_dict)
+
     
+
   wayness=ts.wayness
   if ld.wayness != -1 and ld.wayness < ts.wayness:
     wayness=ld.wayness

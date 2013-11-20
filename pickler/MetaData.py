@@ -39,7 +39,7 @@ class MetaData():
 
         self.json[field['id']] = field
 
-    def load_update(self):
+    def load_dict(self):
 
         try: 
             with open(self.meta_path, 'rb') as f:
@@ -54,18 +54,33 @@ class MetaData():
         except: 
             print 'Build new json for meta data'
 
-        for pickle_file in os.listdir(self.pickle_dir):
+    def load_update(self):
+
+        files = os.listdir(self.pickle_dir)
+        
+        self.load_dict()
+        ctr = 0
+
+        for pickle_file in files:
             if pickle_file in self.json: continue
             try:
                 pickle_path = os.path.join(self.pickle_dir,pickle_file) 
                 with open(pickle_path, 'rb') as fh:
                     data = pickle.load(fh)
                     self.add_job(data, pickle_path)
+                ctr = ctr + 1
             except: 
                 if os.path.join(self.pickle_dir,pickle_file) == self.meta_path: pass
-                else: print "Pass over ",pickle_file,": it doesn't appear to contain a job object." 
+                else: 
+                    print "Pass over ",pickle_file,": it doesn't appear to contain a job object." 
+                
+            if ctr % 1000 == 0:
+                with open(self.meta_path, 'wb') as f:
+                    pickle.dump(self.__dict__,f,pickle_prot)
+
+                self.load_dict()
+                ctr = 0
 
         with open(self.meta_path, 'wb') as f:
             pickle.dump(self.__dict__,f,pickle_prot)
-
 
