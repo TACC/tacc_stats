@@ -393,6 +393,9 @@ class Job(object):
             return False
         for host_name in host_list:
             # TODO Keep bad_hosts.
+            try: host_name = host_name.split('.')[0]
+            except: pass
+            
             host = Host(self, host_name, self.stats_home + '/archive',self.batch_acct.name_ext )
             if host.gather_stats():
                 self.hosts[host_name] = host

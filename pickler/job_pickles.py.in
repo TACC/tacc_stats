@@ -56,7 +56,7 @@ def main():
     start = getdate(sys.argv[2])
     end = getdate(sys.argv[3])
     
-    pool = multiprocessing.Pool(processes = 8)
+    pool = multiprocessing.Pool(processes = 1)
     a=batch_acct.factory(batch_system, acct_path, host_name_ext)
 
     partial_pickler = functools.partial(job_pickler, pickle_dir = pickle_dir, batch = a)

@@ -14,16 +14,18 @@ jobid_file=/var/run/TACC_jobid
 # home directory for presistent stats data 
 tacc_stats_home=/scratch/projects/tacc_stats/
 # file that contains characterizes all logged jobs
-acct_path=/scratch/projects/tacc_stats/accounting/tacc_jobs_completed
+acct_path=/work/02561/rtevans/accounting
+#/sge_common/default/accounting
+#/scratch/projects/tacc_stats/accounting
 # location of host files, labeled by jobid and containing hosts
 # used for jobid
-host_list_dir=/scratch/projects/tacc/hostfile_logs/
+host_list_dir=/scratch/projects/tacc_stats/hostfiles/
 # location to store pickles
 pickles_dir=/scratch/projects/tacc_stats/pickles/
 python_path=/opt/apps/python/epd/7.3.2/bin/
 ## Host Name Extension and Batch System (Currently SGE or SLURM)##
-host_name_ext=stampede.tacc.utexas.edu
-batch_system=SLURM
+host_name_ext=ls4.tacc.utexas.edu
+batch_system=SGE
 ## Path to lariat data
 lariat_path=/hpc/tacc_stats/stampede/lariatData/
 

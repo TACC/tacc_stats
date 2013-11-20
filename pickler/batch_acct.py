@@ -108,9 +108,9 @@ class SGEAcct(BatchAcct):
       ('arid',            int, 'Advance reservation identifier. If the job used resources of an advance reservation then this field contains a positive integer identifier otherwise the value is 0.'),
       ('ar_submission_time', int, 'If the job used resources of an advance reservation then this field contains the submission time (GMT unix time stamp) of the advance reservation, otherwise the value is 0.'),
       )
-    
-    BatchAcct.__init__(self,'SGE',acct_file,host_name_ext)
 
+    BatchAcct.__init__(self,'SGE',acct_file,host_name_ext)
+    
   def keymap(key): # Batch account keywords are based on SGE names for
                    # historical reasons
     return key

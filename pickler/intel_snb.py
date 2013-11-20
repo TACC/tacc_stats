@@ -7,7 +7,7 @@
 # -# Programmable CTR registers
 # -# Fixed CTR registers
 # -# If CTL register programming failed it (QPI) it seems to be 0, so this is added to event maps
-
+# ---->>>> Programmable CTL registers must be in same order as CTR 
 import numpy
 
 ## Processor events
@@ -93,6 +93,34 @@ r2pci_event_map = {
     R2PCI_PERF_EVENT(0x08, 0x0F) : 'ACKNOWLEDGED_USED,E',              
     R2PCI_PERF_EVENT(0x09, 0x0F) : 'DATA_USED,E',              
     }
+## WESTMERE events
+def WTM_PERF_EVENT(event, umask):
+    return (event) | (umask << 8) | (1L << 16) | (1L << 17) | (1L <<21) | (1L << 22)
+## WTM map
+wtm_event_map = {
+    WTM_PERF_EVENT(0x0F, 0x10) : 'MEM_UNCORE_RETIRED_REMOTE_DRAM,E',
+    WTM_PERF_EVENT(0x0F, 0x20) : 'MEM_UNCORE_RETIRED_LOCAL_DRAM,E',
+    WTM_PERF_EVENT(0x10, 0x01) : 'FP_COMP_OPS_EXE_X87,E',
+    WTM_PERF_EVENT(0xCB, 0x01) : 'MEM_LOAD_RETIRED_L1D_HIT,E',              
+    'FIXED0'                   : 'INSTRUCTIONS_RETIRED,E',
+    'FIXED1'                   : 'CLOCKS_UNHALTED_CORE,E',
+    'FIXED2'                   : 'CLOCKS_UNHALTED_REF,E',
+    }
+## WESTMERE UNCORE events
+def WTMUNC_PERF_EVENT(event, umask):
+    return (event) | (umask << 8) | (1L << 22)
+## WTM map
+wtmunc_event_map = {
+    WTMUNC_PERF_EVENT(0x08, 0x01) : 'L3_HITS_READ,E',
+    WTMUNC_PERF_EVENT(0x08, 0x02) : 'L3_HITS_WRITE,E',
+    WTMUNC_PERF_EVENT(0x08, 0x04) : 'L3_HITS_PROBE,E',
+    WTMUNC_PERF_EVENT(0x09, 0x01) : 'L3_MISS_READ,E',
+    WTMUNC_PERF_EVENT(0x09, 0x02) : 'L3_MISS_WRITE,E',
+    WTMUNC_PERF_EVENT(0x09, 0x04) : 'L3_MISS_PROBE,E',
+    WTMUNC_PERF_EVENT(0x0A, 0x0F) : 'L3_LINES_IN_ANY,E',
+    WTMUNC_PERF_EVENT(0x0B, 0x1F) : 'L3_LINES_OUT_ANY,E',              
+    'FIXED0'                      : 'CLOCKS_UNCORE,E',
+    }
 
 ## Reformats the counter arrays with configurable events
 class reformat_counters:
@@ -107,6 +135,8 @@ class reformat_counters:
         self.ctl_registers = []
         ## List of CTR registers
         self.ctr_registers = []
+        ## List of Fixed registers
+        self.fix_registers = []
 
         # Just need the first hosts schema
         for host in job.hosts.itervalues():
@@ -118,8 +148,14 @@ class reformat_counters:
         registers = schema_desc.split()
 
         for reg in registers:    
-            if reg.split(',')[1] != 'C': self.ctr_registers.append(registers.index(reg))
-            else: self.ctl_registers.append(registers.index(reg))
+            if reg.split(',')[1] != 'C':
+                if reg.find('FIXED') == -1:
+                    self.ctr_registers.append(registers.index(reg))
+                else:
+                    self.fix_registers.append(registers.index(reg))
+            else:
+                if reg.find('GLOBAL') == -1 and reg.find('FIXED') == -1 and reg.find('OPCODE_MATCH') == -1:
+                    self.ctl_registers.append(registers.index(reg))
 
         # Build Schema from ctl registers and event maps
         dev_schema = []
@@ -131,7 +167,7 @@ class reformat_counters:
 
 
         # Schema appended for fixed ctrs 
-        nr_fixed = len(self.ctr_registers) - len(self.ctl_registers)
+        nr_fixed = len(self.fix_registers)
         for i in range(0,nr_fixed):
             dev_schema.append(event_map['FIXED'+str(i)])
 
@@ -145,13 +181,18 @@ class reformat_counters:
         # Build stats without ctl registers
         if self.name not in host.stats: return
         stats = host.stats[self.name]
-        dev_stats = dict((str(i), numpy.zeros((len(self.job.times),len(self.ctr_registers)),numpy.uint64)) for i in stats.keys())
+        dev_stats = dict((str(i), numpy.zeros((len(self.job.times),len(self.ctr_registers)+len(self.fix_registers)),numpy.uint64)) for i in stats.keys())
 
         for dev, array in stats.iteritems():
             data = dev_stats[dev]
+            idx = 0
             for j in self.ctr_registers:                
-                data[:,j - len(self.ctl_registers)] = numpy.array(array[:,j], numpy.uint64)
-
+                data[:,idx] = numpy.array(array[:,j], numpy.uint64)
+                idx += 1
+            for j in self.fix_registers:                
+                data[:,idx] = numpy.array(array[:,j], numpy.uint64)
+                idx += 1
+                
         host.stats[self.name] = dev_stats
 
 
@@ -191,3 +232,12 @@ def process_job(job):
         r2pci = reformat_counters(job, 'intel_snb_r2pci',r2pci_event_map)
         for host in job.hosts.itervalues():
             r2pci.register(host)
+
+    if 'intel_pmc3' in job.schemas:
+        wtm = reformat_counters(job, 'intel_pmc3',wtm_event_map)
+        for host in job.hosts.itervalues():
+            wtm.register(host)
+    if 'intel_uncore' in job.schemas:
+        wtmunc = reformat_counters(job, 'intel_uncore',wtmunc_event_map)
+        for host in job.hosts.itervalues():
+            wtmunc.register(host)
