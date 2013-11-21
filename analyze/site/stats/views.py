@@ -6,7 +6,7 @@ matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 from pylab import figure, hist, plot
 
-from stats.models import Job, JobForm
+from stats.models import Job, JobForm, LS4Job, LS4JobForm
 import sys_path_append
 import os,sys
 import masterplot as mp
@@ -50,6 +50,46 @@ def update(meta = None):
         except:
             print "Something wrong with json",json
     return 
+
+
+def ls4_update(meta = None):
+    if not meta: return
+
+    #LS4Job.objects.all().delete()
+
+    # Only need to populate lariat cache once
+    jobid = meta.json.keys()[0]
+
+    ld = lariat_utils.LariatData(jobid,
+                                 end_epoch = meta.json[jobid]['end_epoch'],
+                                 directory = sys_path_append.lariat_path,
+                                 daysback = 2)
+        
+    for jobid, json in meta.json.iteritems():
+
+        if LS4Job.objects.filter(id = jobid).exists(): continue  
+        ld = lariat_utils.LariatData(jobid,
+                                     olddata = ld.ld)
+        json['user'] = json['owner']
+        json['project'] = json['account']
+        
+        if json['status'] != 0: json['status'] = 'FAILED'
+        else: json['status'] = 'COMPLETED'
+
+        json['nodes'] = str(int(json['slots'])/12)
+        json['cores'] = str(int(json['granted_pe'].rstrip('way'))*int(json['nodes']))
+
+        del json['owner'], json['account'], json['slots'], json['granted_pe']
+        json['exe'] = ld.exc.split('/')[-1]
+        json['cwd'] = ld.cwd
+        json['run_time'] = meta.json[jobid]['end_epoch'] - meta.json[jobid]['start_epoch']
+        json['threads'] = ld.threads
+        try:
+            job_model, created = LS4Job.objects.get_or_create(**json) 
+        except:
+            print "Something wrong with json",json
+    return 
+
 
 def dates(request):
 

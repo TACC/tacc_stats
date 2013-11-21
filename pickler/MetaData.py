@@ -20,8 +20,10 @@ class MetaData():
 
     ## Add a job to the meta_data json list
     def add_job(self, job, pickle_path):
+        try:
+            del job.acct['yesno'], job.acct['unknown']
+        except: pass
 
-        del job.acct['yesno'], job.acct['unknown']
         field = job.acct
         field['path'] = pickle_path
         

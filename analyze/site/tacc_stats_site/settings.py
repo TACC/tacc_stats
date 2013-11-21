@@ -1,4 +1,6 @@
 # Django settings for tacc_stats_site project.
+import os
+DIR = os.path.abspath(os.path.dirname(__file__))
 
 DEBUG = True#False
 TEMPLATE_DEBUG = DEBUG
@@ -12,7 +14,7 @@ MANAGERS = ADMINS
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.sqlite3', # Add 'postgresql_psycopg2', 'mysql', 'sqlite3' or 'oracle'.
-        'NAME': '/home/rtevans/tacc_stats/analyze/site/sqlite3.db',                      # Or path to database file if using sqlite3.
+        'NAME': os.path.join(DIR,'sqlite3.db'),                      # Or path to database file if using sqlite3.
         # The following settings are not used with sqlite3:
         'USER': '',
         'PASSWORD': '',
