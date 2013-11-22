@@ -1,0 +1,5 @@
+import sys
+sys.path.append('@PY_INC_PATH@')
+sys.path.append('@PY_PROCESS_PICKLES_PATH@')
+pickles_dir = '@PICKLES_DIR@'
+lariat_path='@LARIAT_PATH@'

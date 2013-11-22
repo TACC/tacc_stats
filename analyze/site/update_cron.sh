@@ -17,3 +17,4 @@ set -x
 
 python $prog_dir/tar.py
 python $prog_dir/update_db.py yesterday
+python $prog_dir/ls4_update_db.py yesterday

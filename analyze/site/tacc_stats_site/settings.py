@@ -52,12 +52,12 @@ USE_TZ = True
 
 # Absolute filesystem path to the directory that will hold user-uploaded files.
 # Example: "/var/www/example.com/media/"
-MEDIA_ROOT = ''
+MEDIA_ROOT = os.path.join(DIR,'media/')
 
 # URL that handles the media served from MEDIA_ROOT. Make sure to use a
 # trailing slash.
 # Examples: "http://example.com/media/", "http://media.example.com/"
-MEDIA_URL = ''
+MEDIA_URL = 'media/'
 
 # Absolute path to the directory static files should be collected to.
 # Don't put anything in this directory yourself; store your static files
@@ -111,7 +111,7 @@ ROOT_URLCONF = 'tacc_stats_site.urls'
 WSGI_APPLICATION = 'tacc_stats_site.wsgi.application'
 
 TEMPLATE_DIRS = (
-    '/Users/rtevans/tacc_stats_site/templates'
+    os.path.join(DIR,'templates')
     # Put strings here, like "/home/html/django_templates" or "C:/www/django/templates".
     # Always use forward slashes, even on Windows.
     # Don't forget to use absolute paths, not relative paths.
@@ -129,7 +129,8 @@ INSTALLED_APPS = (
     'django.contrib.admin',
     # Uncomment the next line to enable admin documentation:
     # 'django.contrib.admindocs',
-    'stats',
+    'stampede',
+    'lonestar',
 )
 
 SESSION_SERIALIZER = 'django.contrib.sessions.serializers.JSONSerializer'
@@ -170,7 +171,7 @@ CACHES = {
         'LOCATION': '127.0.0.1:11211',
         },
     'default': { 
-        'BACKEND':'stats.cache.LargeMemcachedCache',
+        'BACKEND':'tacc_stats_site.cache.LargeMemcachedCache',
         'LOCATION': '127.0.0.1:11211',
         'TIMEOUT': None,
         }

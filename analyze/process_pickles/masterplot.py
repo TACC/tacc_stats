@@ -123,7 +123,7 @@ def master_plot(file,mode='lines',threshold=False,
       ['amd64_core','amd64_core','amd64_sock','lnet','lnet',
        'ib_sw','ib_sw','cpu'],
       'intel' : ['intel_pmc3', 'intel_pmc3', 'intel_pmc3', 
-                 'lnet', 'lnet', 'ib_sw','ib_sw','cpu'],
+                 'lnet', 'lnet', 'ib_ext','ib_ext','cpu','mem','mem'],
       'intel_snb' : ['intel_snb_imc', 'intel_snb_imc', 'intel_snb', 
                      'lnet', 'lnet', 'ib_sw','ib_sw','cpu',
                      'intel_snb', 'intel_snb', 'mem', 'mem'],
@@ -132,8 +132,9 @@ def master_plot(file,mode='lines',threshold=False,
   k2={'amd64':
       ['SSE_FLOPS','DCSF','DRAM','rx_bytes','tx_bytes',
        'rx_bytes','tx_bytes','user'],
-      'intel' : ['PMC3', 'PMC2', 'FIXED_CTR0',
-                 'rx_bytes','tx_bytes', 'rx_bytes','tx_bytes','user'],
+      'intel' : ['MEM_LOAD_RETIRED_L1D_HIT', 'FP_COMP_OPS_EXE_X87', 
+                 'INSTRUCTIONS_RETIRED', 'rx_bytes','tx_bytes', 
+                 'port_recv_data','port_xmit_data','user', 'MemUsed', 'AnonPages'],
       'intel_snb' : ['CAS_READS', 'CAS_WRITES', 'LOAD_L1D_ALL',
                      'rx_bytes','tx_bytes', 'rx_bytes','tx_bytes','user',
                      'SSE_D_ALL', 'SIMD_D_256', 'MemUsed', 'AnonPages'],
@@ -144,7 +145,7 @@ def master_plot(file,mode='lines',threshold=False,
     ts=tspl.TSPLSum(file,k1,k2,job_stats)
   except tspl.TSPLException as e:
     return 
-
+  
   ignore_qs=[]#'gpu','gpudev','vis','visdev']
   if not tspl_utils.checkjob(ts,mintime,wayness,ignore_qs):
     return
@@ -195,17 +196,25 @@ def master_plot(file,mode='lines',threshold=False,
     #plot(ax[2],ts,[2],3600.,1.0/64.0*1e9, ylabel='L1 BW GB/s')
     plot(ax[2],ts,[10,-11],3600.,1024.0*1024.0*1024.0, ylabel='Memory Usage GB',
          do_rate=False)
-  else: #Fix this to support the old amd plots
+  elif ts.pmc_type == 'intel':
+    plot(ax[0],ts,[1],3600.,1e9,ylabel='FP Ginst/s')
+    plot(ax[2],ts,[8,-9],3600.,1024.0*1024.0*1024.0, ylabel='Memory Usage GB',do_rate=False)
+  else: 
+    #Fix this to support the old amd plots
     print ts.pmc_type + ' not supported'
     return 
-  
+
   # Plot lnet sum rate
   plot(ax[3],ts,[3,4],3600.,1024.**2,ylabel='Total lnet MB/s')
 
   # Plot remaining IB sum rate
-  plot(ax[4],ts,[5,6,-3,-4],3600.,1024.**2,ylabel='Total (ib_sw-lnet) MB/s') 
+  if ts.pmc_type == 'intel_snb' :
+    plot(ax[4],ts,[5,6,-3,-4],3600.,1024.**2,ylabel='Total (ib_sw-lnet) MB/s') 
+  elif ts.pmc_type == 'intel' :
+    plot(ax[4],ts,[5,6,-3,-4],3600.,1024.**2,ylabel='Total (ib_ext-lnet) MB/s') 
 
   #Plot CPU user time
+  print 'wayness',wayness
   plot(ax[5],ts,[7],3600.,wayness*100.,
        xlabel='Time (hr)',
        ylabel='Total cpu user\nfraction')
