@@ -80,6 +80,7 @@ class LariatData:
       self.ld.update(newdata)
 
     try:
+      self.ld[jobid].sort(key=lambda ibr: int(ibr['startEpoch']))
       self.id=self.ld[jobid][0]['jobID']
       self.user=self.ld[jobid][0]['user']
       self.exc=replace_and_shorten_path_bits(self.ld[jobid][0]['exec'],
