@@ -11,7 +11,7 @@ def flatten(x):
 
   return result
 
-def summary_text(ld,ts):
+def summary_text(ld,ts,maxwidth=55,maxlines=49):
   text=''
   text+='Job ID: ' + str(ts.j.id) + ', '
   text+='User: '   + ts.owner + ', '
@@ -29,10 +29,10 @@ def summary_text(ld,ts):
       text += 'ibrun ' + str(cnt) + ':\n'
       text+='    Executable: ' + \
              lariat_utils.replace_and_wrap_path_bits(ibr['exec'],
-                                                   ld.user,60,16) + '\n'
+                                                   ld.user,maxwidth,16) + '\n'
       text+='    CWD: ' + \
              lariat_utils.replace_and_wrap_path_bits(ibr['cwd'], 
-                                                     ld.user,60,9) + '\n'
+                                                     ld.user,maxwidth,9) + '\n'
       text+='    Run time: ' + str(float(runtimes[cnt])/3600.) + '\n'
       if len(ibr['pkgT']) > 0:
         text+= '    Linked modules:\n'
@@ -41,6 +41,10 @@ def summary_text(ld,ts):
       cnt+=1
   except Exception as e:
     pass
+
+  text='\n'.join(text.split('\n')[-maxlines:])
+
+  text='...\n'+text
   
   return text
     
