@@ -214,7 +214,6 @@ def master_plot(file,mode='lines',threshold=False,
     plot(ax[4],ts,[5,6,-3,-4],3600.,1024.**2,ylabel='Total (ib_ext-lnet) MB/s') 
 
   #Plot CPU user time
-  print 'wayness',wayness
   plot(ax[5],ts,[7],3600.,wayness*100.,
        xlabel='Time (hr)',
        ylabel='Total cpu user\nfraction')
