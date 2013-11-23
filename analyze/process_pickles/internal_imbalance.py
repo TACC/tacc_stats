@@ -51,11 +51,13 @@ def compute_imbalance(file,k1,k2,thresh,lariat_dict):
   else:
     ld=lariat_utils.LariatData(ts.j.id,olddata=lariat_dict)
 
-  print ld
-
   if ld.wayness == -1:
     print 'Unknown wayness: ', ts.j.id
     return
+  elif ld.wayness != ts.wayness:
+    print 'Lariat and TACC Stats disagree about wayness. Skipping: ', ts.j.id
+    return
+    
   
   tmid=(ts.t[:-1]+ts.t[1:])/2.0
   rng=range(1,len(tmid)) # Throw out first and last
