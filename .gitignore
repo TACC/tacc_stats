@@ -13,3 +13,5 @@ doc/
 .DS_Store
 sys_path_append.py
 analyze_conf.py
+*.out.*
+*.err.*

@@ -3,16 +3,14 @@
 from django.db import models
 from django.forms import ModelForm
 
-class Job(models.Model):
+class LS4Job(models.Model):
     id = models.BigIntegerField(primary_key=True)
-    uid = models.BigIntegerField(null=True)
     project = models.CharField(max_length=128)
     start_time =  models.DateTimeField(null=True)
     end_time = models.DateTimeField(null=True)
     start_epoch =  models.PositiveIntegerField(null=True)
     end_epoch = models.PositiveIntegerField(null=True)
     run_time = models.PositiveIntegerField(null=True)
-    queue_time = models.PositiveIntegerField(null=True)
     queue = models.CharField(max_length=16, null=True)
     name =  models.CharField(max_length=128, null=True)
     status = models.CharField(max_length=16, null=True)
@@ -27,12 +25,7 @@ class Job(models.Model):
 
     def __unicode__(self):
         return str(self.id)
-    """
-    @property
-    def timespent(self):
-        dt = self.end_epoch-self.start_epoch
-        return dt
-    """    
+
     def color(self):
         ret_val = "silver"
         if self.status != 'COMPLETED':
@@ -41,7 +34,8 @@ class Job(models.Model):
             ret_val = "lightblue"
         return ret_val
 
-class JobForm(ModelForm):
+
+class LS4JobForm(ModelForm):
     class Meta:
-        model = Job
+        model = LS4Job
         fields = ['id']

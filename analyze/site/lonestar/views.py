@@ -6,7 +6,7 @@ matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 from pylab import figure, hist, plot
 
-from stats.models import Job, JobForm
+from lonestar.models import LS4Job, LS4JobForm
 import sys_path_append
 import os,sys
 import masterplot as mp
@@ -17,42 +17,70 @@ import cPickle as pickle
 import time
    
 import numpy as np
- 
+
+from django.core.cache import cache,get_cache 
 
 path = sys_path_append.pickles_dir
 
+def ls4_update(meta = None):
+    if not meta: return
 
-def update():
-    #Job.objects.all().delete()
-    for date in os.listdir(path):
-        print 'Date',date
+    #LS4Job.objects.all().delete()
 
-        meta = MetaData.MetaData(os.path.join(path,date))    
-        meta.load_update()
+    # Only need to populate lariat cache once
+    jobid = meta.json.keys()[0]
 
-        # Only need to populate lariat cache once
-        jobid = meta.json.keys()[0]
-        ld = lariat_utils.LariatData(jobid,
-                                     end_epoch = meta.json[jobid]['end_epoch'],
-                                     directory = sys_path_append.lariat_path,
-                                     daysback = 2)
+    ld = lariat_utils.LariatData(jobid,
+                                 end_epoch = meta.json[jobid]['end_epoch'],
+                                 directory = sys_path_append.lariat_path,
+                                 daysback = 2)
         
-        for jobid, json in meta.json.iteritems():
-            if Job.objects.filter(id = jobid).exists(): continue  
-            ld = lariat_utils.LariatData(jobid,
-                                         olddata = ld.ld)
-            json['user'] = ld.user
-            json['exe'] = ld.exc.split('/')[-1]
-            json['cwd'] = ld.cwd
-            json['run_time'] = meta.json[jobid]['end_epoch'] - meta.json[jobid]['start_epoch']
-            json['threads'] = ld.threads
-            try:
-                job_model, created = Job.objects.get_or_create(**json) 
-            except:
-                print "Something wrong with json",json
+    for jobid, json in meta.json.iteritems():
+
+        if LS4Job.objects.filter(id = jobid).exists(): continue  
+        ld = lariat_utils.LariatData(jobid,
+                                     olddata = ld.ld)
+
+        if json['exit_status'] != 0: json['status'] = 'TIMEOUT/CANCELLED'
+        else: json['status'] = 'COMPLETED'
+        if json['failed'] != 0: json['status'] = 'FAILED'
+
+        json['nodes'] = str(int(json['slots'])/12)
+        json['cores'] = str(int(json['granted_pe'].rstrip('way'))*int(json['nodes']))
+        json['run_time'] = meta.json[jobid]['end_epoch'] - meta.json[jobid]['start_epoch']
+
+        jsondb = {}
+        jsondb['id'] = json['id']
+        jsondb['project'] = json['account']
+        jsondb['start_time'] = json['start_time']
+        jsondb['end_time'] = json['end_time']
+        jsondb['start_epoch'] = json['start_epoch']
+        jsondb['end_epoch'] = json['end_epoch']
+        jsondb['run_time'] = json['run_time']
+        jsondb['queue'] = json['queue']
+        jsondb['name'] = json['name']
+        jsondb['status'] = json['status']
+        jsondb['nodes'] = json['nodes']
+        jsondb['cores'] = json['cores']
+        jsondb['path'] = json['path']
+        jsondb['date'] = json['date']
+        jsondb['user'] = json['owner']
+
+        # LD
+        jsondb['exe'] = ld.exc.split('/')[-1]
+        jsondb['cwd'] = ld.cwd
+        jsondb['threads'] = ld.threads
+        
+        
+        try:
+            job_model, created = LS4Job.objects.get_or_create(**jsondb) 
+        except:
+            print "Something wrong with json",jsondb
     return 
 
+
 def dates(request):
+    
     date_list = os.listdir(path)
     date_list = sorted(date_list, key=lambda d: map(int, d.split('-')))
 
@@ -66,21 +94,21 @@ def dates(request):
         month_dict[key].append(date_pair)
 
     date_list = month_dict
-    return render_to_response("stats/dates.html", { 'date_list' : date_list})
+    return render_to_response("lonestar/dates.html", { 'date_list' : date_list})
 
 def search(request):
 
     if 'q' in request.GET:
         q = request.GET['q']
         try:
-            job = Job.objects.get(id = q)
-            return HttpResponseRedirect("/stats/job/"+str(job.id)+"/")
+            job = LS4Job.objects.get(id = q)
+            return HttpResponseRedirect("/job/"+str(job.id)+"/")
         except: pass
 
     if 'u' in request.GET:
         u = request.GET['u']
         try:
-            return index(request, uid = u)
+            return index(request, user = u)
         except: pass
 
     if 'n' in request.GET:
@@ -101,16 +129,14 @@ def search(request):
             return index(request, exe = x)
         except: pass
 
-    return render(request, 'stats/dates.html', {'error' : True})
+    return render(request, 'lonestar/dates.html', {'error' : True})
 
 
-def index(request, date = None, uid = None, project = None, user = None, exe = None):
-    start = time.clock()
+def index(request, date = None, project = None, user = None, exe = None):
+
     field = {}
     if date:
         field['date'] = date
-    if uid:
-        field['uid'] = uid
     if user:
         field['user'] = user
     if project:
@@ -119,22 +145,19 @@ def index(request, date = None, uid = None, project = None, user = None, exe = N
         field['exe'] = exe
 
     if exe:
-        job_list = Job.objects.filter(exe__contains=exe).filter(run_time__gte=60).order_by('-id')
+        job_list = LS4Job.objects.filter(exe__contains=exe).filter(run_time__gte=60).order_by('-id')[0::1]
     else:
-        job_list = Job.objects.filter(**field).filter(run_time__gte=60).order_by('-id')
+        job_list = LS4Job.objects.filter(**field).filter(run_time__gte=60).order_by('-id')[0::1]
     field['job_list'] = job_list
     field['nj'] = len(job_list)
-    print "index =",time.clock()-start
-    return render_to_response("stats/index.html", field)
 
-def hist_summary(request, date = None, uid = None, project = None, user = None, exe = None):
+    return render_to_response("lonestar/index.html", field)
 
-    start = time.clock()
+def hist_summary(request, date = None, project = None, user = None, exe = None):
+
     field = {}
     if date:
         field['date'] = date
-    if uid:
-        field['uid'] = uid
     if user:
         field['user'] = user
     if project:
@@ -145,10 +168,9 @@ def hist_summary(request, date = None, uid = None, project = None, user = None, 
     field['status'] = 'COMPLETED'
 
     if exe:
-        job_list = Job.objects.filter(exe__contains=exe)
+        job_list = LS4Job.objects.filter(exe__contains=exe).filter(run_time__gte=60)[0::1]
     else:
-        job_list = Job.objects.filter(**field)
-
+        job_list = LS4Job.objects.filter(**field).filter(run_time__gte=60)[0::1]
     fig = figure(figsize=(16,6))
 
     # Run times
@@ -168,55 +190,44 @@ def hist_summary(request, date = None, uid = None, project = None, user = None, 
     ax.set_title('Run Sizes for Completed Jobs')
     ax.set_xlabel('# cores')
 
-    #fig.tight_layout()
-    print "hist =", time.clock()-start
     return figure_to_response(fig)
-
-def stats_load(job):
-    with open(job.path) as f:
-        job.stats = pickle.load(f)
-    job.save()
-
-def get_schema(job, type_name):
-    with open(job.path) as f:
-        data = pickle.load(f)
-    schema = data.get_schema(type_name).desc
-    schema = string.replace(schema,',E',' ')
-    schema = string.replace(schema,' ,',',').split()
-    schema = [x.split(',')[0] for x in schema]
-
-    return schema
 
 
 def figure_to_response(f):
     response = HttpResponse(content_type='image/svg+xml')
     f.savefig(response, format='svg')
-    #response = HttpResponse(content_type='image/png')
-    #f.savefig(response, format='png')
     plt.close(f)
     f.clear()
     return response
 
-def stats_unload(job):
-    job.stats = []
-    job.save()
+def get_data(pk):
+    if cache.has_key(pk):
+        data = cache.get(pk)
+    else:
+        job = LS4Job.objects.get(pk = pk)
+        with open(job.path,'rb') as f:
+            data = pickle.load(f)
+            cache.set(job.id, data)
+    return data
 
 def master_plot(request, pk):
-    job = Job.objects.get(id = pk)
-    fig, fname = mp.master_plot(job.path,header=None,mintime=60)
+    data = get_data(pk)
+    
+    fig, fname = mp.master_plot(None,header=None,mintime=60,wayness=int(data.acct['granted_pe'].rstrip('way')),lariat_dict="pass",job_stats=data)
     return figure_to_response(fig)
 
 def heat_map(request, pk):
-    job = Job.objects.get(id = pk)
-    k1 = {'intel_snb' : ['intel_snb']}
+    
+    data = get_data(pk)
 
-    k2 = {'intel_snb': ['INSTRUCTIONS_RETIRED']}
-    ts0 = tspl.TSPLBase(job.path,k1,k2)
+    k1 = {'intel' : ['intel_pmc3']}
 
-    k2 = {'intel_snb': ['CLOCKS_UNHALTED_CORE']}
-    ts1 = tspl.TSPLBase(job.path,k1,k2)
+    k2 = {'intel': ['MEM_LOAD_RETIRED_L1D_HIT']}
+    #k2 = {'intel': ['INSTRUCTIONS_RETIRED']}
+    ts0 = tspl.TSPLBase(None,k1,k2,job_stats = data)
 
-
+    k2 = {'intel': ['CLOCKS_UNHALTED_CORE']}
+    ts1 = tspl.TSPLBase(None,k1,k2,job_stats = data)
 
     cpi = np.array([])
     hosts = []
@@ -237,15 +248,17 @@ def heat_map(request, pk):
     time = ts0.t/3600.
 
     yhost=np.arange(len(hosts)+1)*ncores + ncores    
-    for l in range(len(yhost)):
-        plt.axhline(y=yhost[l], color='black', lw=2, linestyle='--', rasterized=True)
 
-    plt.yticks(yhost - ncores/2.,hosts,size='small')
+    fontsize = 10
+
+    if len(yhost) > 80:
+        fontsize /= 0.5*np.log(len(yhost))
+        
+    plt.yticks(yhost - ncores/2.,hosts,size=fontsize) 
+    plt.pcolormesh(time, ycore, cpi, vmin=cpi_min, vmax=cpi_max)
     plt.axis([time.min(),time.max(),ycore.min(),ycore.max()])
 
-    plt.pcolor(time, ycore, cpi, vmin=cpi_min, vmax=cpi_max)
-    plt.title('Instructions Retired per Core Clock Cycle')
-    plt.clim(cpi_min,cpi_max)
+    plt.title('L1D Load Hits per Core Clock Cycle')
     plt.colorbar()
 
     ax.set_xlabel('Time (hrs)')
@@ -254,39 +267,49 @@ def heat_map(request, pk):
 
     return figure_to_response(fig)
 
-class JobDetailView(DetailView):
+def build_schema(data,name):
+    schema = []
+    for key,value in data.get_schema(name).iteritems():
+        if value.unit:
+            schema.append(value.key + ','+value.unit)
+        else: schema.append(value.key)
+    return schema
 
-    model = Job
+class LS4JobDetailView(DetailView):
+
+    model = LS4Job
     
     def get_context_data(self, **kwargs):
-        context = super(JobDetailView, self).get_context_data(**kwargs)
-        job = context['job']
-        stats_load(job)
+        context = super(LS4JobDetailView, self).get_context_data(**kwargs)
+        job = context['ls4job']
+
+        data = get_data(job.id)
+
         type_list = []
         host_list = []
-        for host_name, host in job.stats.hosts.iteritems():
+
+        for host_name, host in data.hosts.iteritems():
             host_list.append(host_name)
         for type_name, type in host.stats.iteritems():
-            schema = job.stats.get_schema(type_name).desc
-            schema = string.replace(schema,',E',' ')
-            schema = string.replace(schema,',',' ')
+            schema = ' '.join(build_schema(data,type_name))
             type_list.append( (type_name, schema) )
 
         type_list = sorted(type_list, key = lambda type_name: type_name[0])
         context['type_list'] = type_list
         context['host_list'] = host_list
-        stats_unload(job)
+
         return context
 
 def type_plot(request, pk, type_name):
+    data = get_data(pk)
 
-    job = Job.objects.get(id = pk)
-    schema = get_schema(job, type_name)
+    schema = build_schema(data,type_name)
+    schema = [x.split(',')[0] for x in schema]
 
-    k1 = {'intel_snb' : [type_name]*len(schema)}
-    k2 = {'intel_snb': schema}
+    k1 = {'intel' : [type_name]*len(schema)}
+    k2 = {'intel': schema}
 
-    ts = tspl.TSPLSum(job.path,k1,k2)
+    ts = tspl.TSPLSum(None,k1,k2,job_stats=data)
     
     nr_events = len(schema)
     fig, axarr = plt.subplots(nr_events, sharex=True, figsize=(8,nr_events*2), dpi=80)
@@ -305,14 +328,9 @@ def type_plot(request, pk, type_name):
 
 def type_detail(request, pk, type_name):
 
-    job = Job.objects.get(id = pk)
-    stats_load(job)
-    data = job.stats
+    data = get_data(pk)
 
-    schema = data.get_schema(type_name).desc
-    schema = string.replace(schema,',E',' ')
-    schema = string.replace(schema,' ,',',').split()
-
+    schema = build_schema(data,type_name)
     raw_stats = data.aggregate_stats(type_name)[0]  
 
     stats = []
@@ -322,7 +340,6 @@ def type_detail(request, pk, type_name):
             temp.append(raw_stats[t,event])
         stats.append((data.times[t],temp))
 
-    stats_unload(job)
 
-    return render_to_response("stats/type_detail.html",{"type_name" : type_name, "jobid" : pk, "stats_data" : stats, "schema" : schema})
+    return render_to_response("lonestar/type_detail.html",{"type_name" : type_name, "jobid" : pk, "stats_data" : stats, "schema" : schema})
     

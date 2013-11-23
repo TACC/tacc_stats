@@ -1,6 +1,8 @@
 # Django settings for tacc_stats_site project.
+import os
+DIR = os.path.abspath(os.path.dirname(__file__))
 
-DEBUG = True
+DEBUG = True#False
 TEMPLATE_DEBUG = DEBUG
 
 ADMINS = (
@@ -12,7 +14,7 @@ MANAGERS = ADMINS
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.sqlite3', # Add 'postgresql_psycopg2', 'mysql', 'sqlite3' or 'oracle'.
-        'NAME': '/home/rtevans/tacc_stats/analyze/site/sqlite3.db',                      # Or path to database file if using sqlite3.
+        'NAME': os.path.join(DIR,'sqlite3.db'),                      # Or path to database file if using sqlite3.
         # The following settings are not used with sqlite3:
         'USER': '',
         'PASSWORD': '',
@@ -50,12 +52,12 @@ USE_TZ = True
 
 # Absolute filesystem path to the directory that will hold user-uploaded files.
 # Example: "/var/www/example.com/media/"
-MEDIA_ROOT = ''
+MEDIA_ROOT = os.path.join(DIR,'media/')
 
 # URL that handles the media served from MEDIA_ROOT. Make sure to use a
 # trailing slash.
 # Examples: "http://example.com/media/", "http://media.example.com/"
-MEDIA_URL = ''
+MEDIA_URL = 'media/'
 
 # Absolute path to the directory static files should be collected to.
 # Don't put anything in this directory yourself; store your static files
@@ -98,7 +100,7 @@ MIDDLEWARE_CLASSES = (
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
-    'tacc_stats_site.middleware.ProfileMiddleware',
+    #'tacc_stats_site.middleware.ProfileMiddleware',
     # Uncomment the next line for simple clickjacking protection:
     # 'django.middleware.clickjacking.XFrameOptionsMiddleware',
 )
@@ -109,7 +111,7 @@ ROOT_URLCONF = 'tacc_stats_site.urls'
 WSGI_APPLICATION = 'tacc_stats_site.wsgi.application'
 
 TEMPLATE_DIRS = (
-    '/Users/rtevans/tacc_stats_site/templates'
+    os.path.join(DIR,'templates')
     # Put strings here, like "/home/html/django_templates" or "C:/www/django/templates".
     # Always use forward slashes, even on Windows.
     # Don't forget to use absolute paths, not relative paths.
@@ -127,7 +129,8 @@ INSTALLED_APPS = (
     'django.contrib.admin',
     # Uncomment the next line to enable admin documentation:
     # 'django.contrib.admindocs',
-    'stats',
+    'stampede',
+    'lonestar',
 )
 
 SESSION_SERIALIZER = 'django.contrib.sessions.serializers.JSONSerializer'
@@ -160,3 +163,16 @@ LOGGING = {
         },
     }
 }
+
+
+CACHES = {
+    'normal': {
+        'BACKEND': 'django.core.cache.backends.memcached.MemcachedCache',
+        'LOCATION': '127.0.0.1:11211',
+        },
+    'default': { 
+        'BACKEND':'tacc_stats_site.cache.LargeMemcachedCache',
+        'LOCATION': '127.0.0.1:11211',
+        'TIMEOUT': None,
+        }
+    }
