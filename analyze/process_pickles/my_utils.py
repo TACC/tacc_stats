@@ -11,17 +11,8 @@ def flatten(x):
 
   return result
 
-def summary_text(ld,ts,maxwidth=55,maxlines=49):
+def summary_text(ld,ts,maxwidth=55,max_ibrun_lines=45):
   text=''
-  text+='Job ID: ' + str(ts.j.id) + ', '
-  text+='User: '   + ts.owner + ', '
-  text+='Job Name: ' + tspl_utils.string_shorten(ts.j.acct['name'],15) + ', '
-  text+='Queue: ' + ts.queue + '\n'
-  text+='Start Time: ' + ts.start_date + ', End Time: ' + ts.end_date + '\n'
-  text+='Status: ' + ts.status + '\n'
-  text+='Hosts: ' + str(ts.numhosts) + ', Threads: ' + str(ld.threads) + \
-         ', Wayness: ' + str(ld.wayness) + '\n'
-
   cnt = 0
   try:
     runtimes=ld.get_runtimes(ts.j.acct['end_time'])
@@ -42,9 +33,22 @@ def summary_text(ld,ts,maxwidth=55,maxlines=49):
   except Exception as e:
     pass
 
-  text='\n'.join(text.split('\n')[-maxlines:])
+  res=text.split('\n')
+  if len(res) > max_ibrun_lines:
+    text='...\n'+'\n'.join(res[-max_ibrun_lines:])
 
-  text='...\n'+text
+
+  top_text ='Job ID: ' + str(ts.j.id) + ', '
+  top_text+='User: '   + ts.owner + ', '
+  top_text+='Job Name: ' + tspl_utils.string_shorten(ts.j.acct['name'],15) + \
+             ', '
+  top_text+='Queue: ' + ts.queue + '\n'
+  top_text+='Start Time: ' + ts.start_date + ', End Time: ' + ts.end_date + '\n'
+  top_text+='Status: ' + ts.status + '\n'
+  top_text+='Hosts: ' + str(ts.numhosts) + ', Threads: ' + str(ld.threads) + \
+             ', Wayness: ' + str(ld.wayness) + '\n'
+
+  text=top_text+text
   
   return text
     
