@@ -15,11 +15,11 @@ import matplotlib.pyplot as plt
 import numpy
 import scipy, scipy.stats
 import argparse
-import multiprocessing, functools
+import multiprocessing, functools, cPickle as pickle
 import collections, itertools
 import tspl, tspl_utils, lariat_utils, my_utils
 
-def compute_ratio(file):
+def compute_ratio(file,lariat_dict=None):
   try:
     ts=tspl.TSPLSum(file,['intel_snb_imc', 'intel_snb_imc',
                           'intel_snb', 'intel_snb', 'intel_snb',
@@ -37,9 +37,13 @@ def compute_ratio(file):
 
   tmid=(ts.t[:-1]+ts.t[1:])/2.0
 
-  ld=lariat_utils.LariatData(ts.j.id,ts.j.end_time,
-                             analyze_conf.lariat_path)
-  if ld.exc == 'unknown':
+  if lariat_dict == None:
+    ld=lariat_utils.LariatData(ts.j.id,end_epoch=ts.j.end_time,daysback=3,directory=analyze_conf.lariat_path)
+  else:
+    ld=lariat_utils.LariatData(ts.j.id,olddata=lariat_dict)
+
+  if ld.exc == 'unknown' or \
+       ld.wayness != ts.wayness:
     return
 
   read_rate  = numpy.zeros_like(tmid)
@@ -60,6 +64,10 @@ def compute_ratio(file):
     stall_rate += numpy.diff(ts.assemble([5],host,0))/numpy.diff(ts.t)
     clock_rate += numpy.diff(ts.assemble([6],host,0))/numpy.diff(ts.t)
 
+  if float(ts.numhosts*int(ts.wayness)*int(ld.threads)) == 0:
+    print 'No tasks in', ts.j.id, ' skipping'
+    return
+
   read_rate  /= float(ts.numhosts*int(ts.wayness)*int(ld.threads))
   write_rate /= float(ts.numhosts*int(ts.wayness)*int(ld.threads))
   l1_rate    /= float(ts.numhosts*int(ts.wayness)*int(ld.threads))
@@ -69,26 +77,42 @@ def compute_ratio(file):
   clock_rate /= float(ts.numhosts*int(ts.wayness)*int(ld.threads))
     
 
-  data_ratio  = (read_rate+write_rate)/l1_rate
+  try:
+    data_ratio  = (read_rate+write_rate)/l1_rate
+  except RuntimeWarning:
+    print 'Division by zero, skipping:', ts.j.id
+    return
   flops       = avx_rate+sse_rate
-  flops_ratio = (flops-numpy.min(flops))/(numpy.max(flops)-numpy.min(flops))
-  stall_ratio = stall_rate/clock_rate
+  try:
+    flops_ratio = (flops-numpy.min(flops))/(numpy.max(flops)-numpy.min(flops))
+  except RuntimeWarning:
+    print 'Division by zero, skipping:', ts.j.id
+    return
+  try:
+    stall_ratio = stall_rate/clock_rate
+  except RuntimeWarning:
+    print 'Division by zero, skipping:', ts.j.id
+    return
+
 
   mean_data_ratio=numpy.mean(data_ratio)
   mean_stall_ratio=numpy.mean(stall_ratio)
 
   ename=ld.exc.split('/')[-1]
   ename=ld.comp_name(ename,ld.equiv_patterns)
-  mean_mem_rate=numpy.mean(read_rate + write_rate)
-  if mean_mem_rate > 2e9: # Put a print in here and investigate bad jobs
-    return
+  mean_mem_rate=numpy.mean(read_rate + write_rate)*64.0
+##  if mean_mem_rate > 2e9: # Put a print in here and investigate bad jobs
+##    return
   return (ts.j.id, ts.su, ename, mean_data_ratio, mean_stall_ratio, mean_mem_rate )
 
 def main():
-
+  mem_rate_thresh = 0.5*75*1000000000/16
+  stall_thresh    = 0.5
   parser = argparse.ArgumentParser(description='Correlations')
   parser.add_argument('-p', help='Set number of processes',
                       nargs=1, type=int, default=[1])
+  parser.add_argument('-n', help='Set number of executables to catalog',
+                      nargs=1, type=int, default=[15])
   parser.add_argument('-s', help='Use SUs instead of job counts',
                       action='store_true')
   parser.add_argument('filearg', help='File, directory, or quoted'
@@ -97,12 +121,24 @@ def main():
   n=parser.parse_args()
 
   filelist=tspl_utils.getfilelist(n.filearg)
+
+  job=pickle.load(open(filelist[0]))
+  jid=job.id
+  epoch=job.end_time
+
+  ld=lariat_utils.LariatData(jid,end_epoch=epoch,daysback=3,directory=analyze_conf.lariat_path)
+  
+  if n.p[0] < 1:
+    print 'Must have at least one file'
+    exit(1)
+
+  partial_compute=functools.partial(compute_ratio,lariat_dict=ld.ld)
+
   pool   = multiprocessing.Pool(processes=n.p[0])
 
-  if len(filelist) !=0:
-    res=pool.map(compute_ratio,filelist)
-    pool.close()
-    pool.join()
+  res=pool.map(partial_compute,filelist)
+  pool.close()
+  pool.join()
 
   mdr={}
   msr={}
@@ -123,6 +159,10 @@ def main():
       msr[ename]=numpy.array([mean_stall_ratio])
       mmr[ename]=numpy.array([mean_mem_rate])
       sus[ename]=su
+    if (mean_mem_rate <= mem_rate_thresh) and \
+       (mean_stall_ratio > stall_thresh) :
+      print ename, jobid, mean_mem_rate/1000000000, mean_stall_ratio
+    
 
   # Find top codes by SUs
   top_count={}
@@ -137,7 +177,7 @@ def main():
   mdr2={}
   msr2={}
   mmr2={}
-  for k,v in d.most_common(15):
+  for k,v in d.most_common(n.n[0]):
     print k,v
     mdr2[k]=numpy.log10(mdr[k])
     msr2[k]=msr[k]
@@ -205,6 +245,19 @@ def main():
             markeredgecolor=colors.next(),
             linestyle='', markerfacecolor='None')
     ax.hold=True
+
+
+  ax.plot(numpy.log10([mem_rate_thresh, mem_rate_thresh]),
+          [0.95*min(numpy.concatenate(msr2.values())),
+           1.05*max(numpy.concatenate(msr2.values()))],
+          'r--')
+
+  print [min(numpy.concatenate(mmr2.values())), max(numpy.concatenate(mmr2.values()))], [stall_thresh, stall_thresh], 'r--'
+  ax.plot([min(numpy.concatenate(mmr2.values())),
+           max(numpy.concatenate(mmr2.values()))],
+          [stall_thresh, stall_thresh],
+          'r--')
+  
 
   box = ax.get_position()
   ax.set_position([box.x0, box.y0, box.width * 0.75, box.height])
