@@ -83,7 +83,6 @@ def compute_imbalance(file,k1,k2,thresh,lariat_dict):
       mean.append(scipy.stats.tmean(vals[j]))
       std.append(scipy.stats.tstd(vals[j]))
 
-    imbl=maxval-minval
     ratio=numpy.divide(std,mean)
 
     var=scipy.stats.tmean(ratio)
