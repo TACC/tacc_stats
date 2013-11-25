@@ -2,7 +2,7 @@
 import os
 DIR = os.path.abspath(os.path.dirname(__file__))
 
-DEBUG = True#False
+DEBUG = False
 TEMPLATE_DEBUG = DEBUG
 
 ADMINS = (
