@@ -42,7 +42,7 @@ def update(meta = None):
                                      olddata = ld.ld)
         json['user'] = ld.user
         json['exe'] = ld.exc.split('/')[-1]
-        json['cwd'] = ld.cwd
+        json['cwd'] = ld.cwd[0:128]
         json['run_time'] = meta.json[jobid]['end_epoch'] - meta.json[jobid]['start_epoch']
         json['threads'] = ld.threads
         try:
@@ -74,7 +74,7 @@ def search(request):
         q = request.GET['q']
         try:
             job = Job.objects.get(id = q)
-            return HttpResponseRedirect("/job/"+str(job.id)+"/")
+            return HttpResponseRedirect("/stampede/job/"+str(job.id)+"/")
         except: pass
 
     if 'u' in request.GET:

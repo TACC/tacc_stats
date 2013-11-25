@@ -102,7 +102,7 @@ def search(request):
         q = request.GET['q']
         try:
             job = LS4Job.objects.get(id = q)
-            return HttpResponseRedirect("/job/"+str(job.id)+"/")
+            return HttpResponseRedirect("lonestar/job/"+str(job.id)+"/")
         except: pass
 
     if 'u' in request.GET:
