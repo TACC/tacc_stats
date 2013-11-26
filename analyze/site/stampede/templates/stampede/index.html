@@ -28,10 +28,10 @@
 <img src="{% url 'stampede:project_summary' project %}" />
 {% endif %}
 
-{% if exe %}
-<h1>For exe: {{ exe }}</h1>
+{% if exe__contains %}
+<h1>For exe: {{ exe__contains }}</h1>
 <h2> Charts at a glance </h2>
-<img src="{% url 'stampede:exe_summary' exe %}" />
+<img src="{% url 'stampede:exe_summary' exe__contains %}" />
 {% endif %}
 <h1># Jobs over 1 mn in run time = {{nj}}</h1>
 <hr>

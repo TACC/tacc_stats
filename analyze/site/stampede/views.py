@@ -116,12 +116,11 @@ def index(request, date = None, uid = None, project = None, user = None, exe = N
     if project:
         field['project'] = project
     if exe:
-        field['exe'] = exe
+        field['exe__contains'] = exe
+    
+    field['run_time__gte'] = 60 
 
-    if exe:
-        job_list = Job.objects.filter(exe__contains=exe).filter(run_time__gte=60).order_by('-id')[0::1]
-    else:
-        job_list = Job.objects.filter(**field).filter(run_time__gte=60).order_by('-id')[0::1]
+    job_list = Job.objects.filter(**field).order_by('-id')
     field['job_list'] = job_list
     field['nj'] = len(job_list)
 
@@ -139,14 +138,12 @@ def hist_summary(request, date = None, uid = None, project = None, user = None, 
     if project:
         field['project'] = project
     if exe:
-        field['exe'] = exe
-        
+        field['exe__contains'] = exe
+    
+    field['run_time__gte'] = 60 
     field['status'] = 'COMPLETED'
 
-    if exe:
-        job_list = Job.objects.filter(exe__contains=exe).filter(run_time__gte=60)[0::1]
-    else:
-        job_list = Job.objects.filter(**field).filter(run_time__gte=60)[0::1]
+    job_list = Job.objects.filter(**field)
     fig = figure(figsize=(16,6))
 
     # Run times

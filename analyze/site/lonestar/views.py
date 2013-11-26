@@ -102,7 +102,7 @@ def search(request):
         q = request.GET['q']
         try:
             job = LS4Job.objects.get(id = q)
-            return HttpResponseRedirect("lonestar/job/"+str(job.id)+"/")
+            return HttpResponseRedirect("/lonestar/job/"+str(job.id)+"/")
         except: pass
 
     if 'u' in request.GET:
@@ -142,12 +142,11 @@ def index(request, date = None, project = None, user = None, exe = None):
     if project:
         field['project'] = project
     if exe:
-        field['exe'] = exe
+        field['exe__contains'] = exe
 
-    if exe:
-        job_list = LS4Job.objects.filter(exe__contains=exe).filter(run_time__gte=60).order_by('-id')[0::1]
-    else:
-        job_list = LS4Job.objects.filter(**field).filter(run_time__gte=60).order_by('-id')[0::1]
+    field['run_time__gte'] = 60 
+
+    job_list = LS4Job.objects.filter(**field).order_by('-id')
     field['job_list'] = job_list
     field['nj'] = len(job_list)
 
@@ -163,14 +162,12 @@ def hist_summary(request, date = None, project = None, user = None, exe = None):
     if project:
         field['project'] = project
     if exe:
-        field['exe'] = exe
-        
+        field['exe__contains'] = exe
+    
+    field['run_time__gte'] = 60 
     field['status'] = 'COMPLETED'
 
-    if exe:
-        job_list = LS4Job.objects.filter(exe__contains=exe).filter(run_time__gte=60)[0::1]
-    else:
-        job_list = LS4Job.objects.filter(**field).filter(run_time__gte=60)[0::1]
+    job_list = LS4Job.objects.filter(**field)
     fig = figure(figsize=(16,6))
 
     # Run times
