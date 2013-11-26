@@ -15,7 +15,7 @@ for tarball in os.listdir(tar_dir):
     p = Popen(["/bin/tar -zxvf " + tar_path + " -C " + untar_dir],shell=True)
     p.communicate()
 
-
+"""
 tar_dir = '/hpc/tacc_stats/lonestar/pickles/'
 untar_dir = '/hpc/tacc_stats_site/lonestar/pickles/'
 
@@ -26,3 +26,4 @@ for tarball in os.listdir(tar_dir):
     print tar_path
     p = Popen(["/bin/tar -zxvf " + tar_path + " -C " + untar_dir],shell=True)
     p.communicate()
+"""
