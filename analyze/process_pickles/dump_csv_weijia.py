@@ -28,7 +28,7 @@ def do_compute(file):
     return
 
   ignore_qs=['gpu','gpudev','vis','visdev']
-  if not tspl_utils.checkjob(ts,3600.,range(1,17),ignore_qs):
+  if not tspl_utils.checkjob(ts,3600.,range(1,33),ignore_qs):
     return
   
   ld=lariat_utils.LariatData(ts.j.id,ts.j.end_time,

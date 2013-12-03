@@ -11,17 +11,8 @@ def flatten(x):
 
   return result
 
-def summary_text(ld,ts):
+def summary_text(ld,ts,maxwidth=55,max_ibrun_lines=45):
   text=''
-  text+='Job ID: ' + str(ts.j.id) + ', '
-  text+='User: '   + ts.owner + ', '
-  text+='Job Name: ' + tspl_utils.string_shorten(ts.j.acct['name'],15) + ', '
-  text+='Queue: ' + ts.queue + '\n'
-  text+='Start Time: ' + ts.start_date + ', End Time: ' + ts.end_date + '\n'
-  text+='Status: ' + ts.status + '\n'
-  text+='Hosts: ' + str(ts.numhosts) + ', Threads: ' + str(ld.threads) + \
-         ', Wayness: ' + str(ld.wayness) + '\n'
-
   cnt = 0
   try:
     runtimes=ld.get_runtimes(ts.j.acct['end_time'])
@@ -29,10 +20,10 @@ def summary_text(ld,ts):
       text += 'ibrun ' + str(cnt) + ':\n'
       text+='    Executable: ' + \
              lariat_utils.replace_and_wrap_path_bits(ibr['exec'],
-                                                   ld.user,60,16) + '\n'
+                                                   ld.user,maxwidth,16) + '\n'
       text+='    CWD: ' + \
              lariat_utils.replace_and_wrap_path_bits(ibr['cwd'], 
-                                                     ld.user,60,9) + '\n'
+                                                     ld.user,maxwidth,9) + '\n'
       text+='    Run time: ' + str(float(runtimes[cnt])/3600.) + '\n'
       if len(ibr['pkgT']) > 0:
         text+= '    Linked modules:\n'
@@ -41,6 +32,23 @@ def summary_text(ld,ts):
       cnt+=1
   except Exception as e:
     pass
+
+  res=text.split('\n')
+  if len(res) > max_ibrun_lines:
+    text='...\n'+'\n'.join(res[-max_ibrun_lines:])
+
+
+  top_text ='Job ID: ' + str(ts.j.id) + ', '
+  top_text+='User: '   + ts.owner + ', '
+  top_text+='Job Name: ' + tspl_utils.string_shorten(ts.j.acct['name'],15) + \
+             ', '
+  top_text+='Queue: ' + ts.queue + '\n'
+  top_text+='Start Time: ' + ts.start_date + ', End Time: ' + ts.end_date + '\n'
+  top_text+='Status: ' + ts.status + '\n'
+  top_text+='Hosts: ' + str(ts.numhosts) + ', Threads: ' + str(ld.threads) + \
+             ', Wayness: ' + str(ld.wayness) + '\n'
+
+  text=top_text+text
   
   return text
     

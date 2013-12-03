@@ -37,7 +37,7 @@ def getuser(file,user):
       return
     
     ignore_qs=['gpu','gpudev','vis','visdev']
-    if not tspl_utils.checkjob(ts,1.,range(1,17),ignore_qs):
+    if not tspl_utils.checkjob(ts,1.,range(1,33),ignore_qs):
       return
 
     tmid=(ts.t[:-1]+ts.t[1:])/2.0
