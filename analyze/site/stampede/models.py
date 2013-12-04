@@ -19,7 +19,7 @@ class Job(models.Model):
     nodes = models.PositiveIntegerField(null=True)
     cores = models.PositiveIntegerField(null=True)
     path =  models.FilePathField(max_length=128, null=True)
-    date = models.DateField(null=True)
+    date = models.DateField(db_index=True,null=True)
     user = models.CharField(max_length=128, null=True)
     exe = models.CharField(max_length=128, null=True)
     cwd = models.CharField(max_length=128, null=True)
