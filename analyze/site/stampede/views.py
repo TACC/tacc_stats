@@ -239,6 +239,56 @@ def heat_map(request, pk):
 
     return figure_to_response(fig)
 
+def cache_map(request, pk):
+
+    data = get_data(pk)
+
+    k1 = {'intel_snb' : ['intel_snb','intel_snb','intel_snb','intel_snb']}
+
+    k2 = {'intel_snb': ['LOAD_OPS_ALL', 'LOAD_OPS_L1_HIT', 'LOAD_OPS_L2_HIT', 'LOAD_OPS_LLC_HIT']}
+
+    ts0 = tspl.TSPLBase(None,k1,k2,job_stats = data)
+
+    miss_rate = np.array([])
+    hosts = []
+    for v in ts0.data[0]:
+        hosts.append(v)
+        ncores = len(ts0.data[0][v])
+        for k in range(ncores):
+            cache_misses = ts0.assemble([0,-1,-2,-3],v,k)
+            load_ops = ts0.assemble([0],v,k)
+            i = np.array(cache_misses,dtype=np.float)
+            c = np.array(load_ops,dtype=np.float)
+            ratio = np.divide(np.diff(i),np.diff(c))
+            if not miss_rate.size: miss_rate = np.array([ratio])
+            else: miss_rate = np.vstack((miss_rate,ratio))
+    miss_rate_min, miss_rate_max = miss_rate.min(), miss_rate.max()
+
+    fig,ax=plt.subplots(1,1,figsize=(8,12),dpi=110)
+
+    ycore = np.arange(miss_rate.shape[0]+1)
+    time = ts0.t/3600.
+
+    yhost=np.arange(len(hosts)+1)*ncores + ncores    
+
+    fontsize = 10
+
+    if len(yhost) > 80:
+        fontsize /= 0.5*np.log(len(yhost))
+        
+    plt.yticks(yhost - ncores/2.,hosts,size=fontsize) 
+    plt.pcolormesh(time, ycore, miss_rate, vmin=miss_rate_min, vmax=miss_rate_max)
+    plt.axis([time.min(),time.max(),ycore.min(),ycore.max()])
+
+    plt.title('Cache Miss Rate')
+    plt.colorbar()
+
+    ax.set_xlabel('Time (hrs)')
+
+    plt.close()
+
+    return figure_to_response(fig)
+
 class JobDetailView(DetailView):
 
     model = Job
