@@ -25,6 +25,89 @@ def getlimits(vals):
     ymax=max(ymin,max(vals))
     return (ymin,ymax)
 
+def get_data(file,mintime=1.,wayness=range(1,33),lariat_dict=None):
+  try:
+    ts=tspl.TSPLSum(file,['intel_snb_imc', 'intel_snb_imc', 'intel_snb',
+                          'intel_snb', 'intel_snb', 'intel_snb','llite',
+                          'llite', 'llite', 'llite', 'llite', 'llite',
+                          'llite', 'llite', 'llite', 'llite', 'llite',
+                          'llite', 'llite', 'llite', 'llite', 'llite',
+                          'llite', 'llite', 'llite', 'llite', 'llite',
+                          'llite', 'llite', 'llite', 'llite', 'llite',
+                          'intel_snb','intel_snb','intel_snb', 'intel_snb', 'intel_snb'],
+                    ['CAS_READS', 'CAS_WRITES', 'STALLS',
+                     'CLOCKS_UNHALTED_CORE', 'SSE_D_ALL', 'SIMD_D_256',
+                     'open','close','mmap','seek','fsync','setattr',
+                     'truncate','flock','getattr','statfs','alloc_inode',
+                     'setxattr','getxattr',' listxattr',
+                     'removexattr', 'inode_permission', 'readdir',
+                     'create','lookup',
+                     'link','unlink','symlink','mkdir','rmdir','mknod',
+                     'rename',
+                     'LOAD_OPS_L1_HIT','LOAD_OPS_L2_HIT','LOAD_OPS_LLC_HIT',
+                     'LOAD_OPS_ALL','INSTRUCTIONS_RETIRED' ])
+      
+      
+  except tspl.TSPLException as e:
+    return
+
+  if not tspl_utils.checkjob(ts,mintime,wayness):
+    return
+
+  tmid=(ts.t[:-1]+ts.t[1:])/2.0
+
+  if lariat_dict == None:
+    ld=lariat_utils.LariatData(ts.j.id,end_epoch=ts.j.end_time,daysback=3,directory=analyze_conf.lariat_path)
+  else:
+    ld=lariat_utils.LariatData(ts.j.id,olddata=lariat_dict)
+    
+  read_rate=numpy.zeros_like(tmid)
+  write_rate=numpy.zeros_like(tmid)
+  stall_rate=numpy.zeros_like(tmid)
+  clock_rate=numpy.zeros_like(tmid)
+  avx_rate = numpy.zeros_like(tmid)
+  sse_rate = numpy.zeros_like(tmid)
+  inst_rate = numpy.zeros_like(tmid)
+  meta_rate = numpy.zeros_like(tmid)
+  l1_rate = numpy.zeros_like(tmid)
+  l2_rate = numpy.zeros_like(tmid)
+  l3_rate = numpy.zeros_like(tmid)
+  load_rate = numpy.zeros_like(tmid)
+
+  for k in ts.j.hosts.keys():
+    read_rate +=numpy.diff(ts.assemble([0],k,0))/numpy.diff(ts.t)
+    write_rate+=numpy.diff(ts.assemble([1],k,0))/numpy.diff(ts.t)
+    stall_rate+=numpy.diff(ts.assemble([2],k,0))/numpy.diff(ts.t)
+    clock_rate+=numpy.diff(ts.assemble([3],k,0))/numpy.diff(ts.t)
+    avx_rate  +=numpy.diff(ts.assemble([5],k,0))/numpy.diff(ts.t)
+    sse_rate  +=numpy.diff(ts.assemble([4],k,0))/numpy.diff(ts.t)
+    inst_rate  +=numpy.diff(ts.assemble([36],k,0))/numpy.diff(ts.t)
+    meta_rate +=numpy.diff(ts.assemble(range(5,32),k,0))/numpy.diff(ts.t)
+    l1_rate +=numpy.diff(ts.assemble([32],k,0))/numpy.diff(ts.t)
+    l2_rate +=numpy.diff(ts.assemble([33],k,0))/numpy.diff(ts.t)
+    l3_rate +=numpy.diff(ts.assemble([34],k,0))/numpy.diff(ts.t)
+    load_rate += numpy.diff(ts.assemble([35],k,0))/numpy.diff(ts.t)
+    
+  read_rate  /= float(ts.numhosts)
+  write_rate /= float(ts.numhosts)
+  stall_rate /= float(ts.numhosts)
+  clock_rate /= float(ts.numhosts)
+  avx_rate   /= float(ts.numhosts)
+  sse_rate   /= float(ts.numhosts)
+  inst_rate   /= float(ts.numhosts)
+  meta_rate  /= float(ts.numhosts)
+  l1_rate  /= float(ts.numhosts)
+  l2_rate  /= float(ts.numhosts)
+  l3_rate  /= float(ts.numhosts)
+  load_rate /= float(ts.numhosts)
+
+  read_frac=read_rate/(read_rate+write_rate+1)
+  stall_frac=stall_rate/clock_rate
+
+
+  return (ts, ld, tmid,
+          read_rate, write_rate, stall_rate, clock_rate, avx_rate, sse_rate, inst_rate,
+          meta_rate, l1_rate, l2_rate, l3_rate, load_rate, read_frac, stall_frac)
 
 def main():
 
@@ -38,76 +121,14 @@ def main():
   filelist=tspl_utils.getfilelist(n.filearg)
 
   for file in filelist:
-    try:
-      ts=tspl.TSPLSum(file,['intel_snb_imc', 'intel_snb_imc', 'intel_snb',
-                            'intel_snb', 'intel_snb', 'intel_snb','llite',
-                            'llite', 'llite', 'llite', 'llite', 'llite',
-                            'llite', 'llite', 'llite', 'llite', 'llite',
-                            'llite', 'llite', 'llite', 'llite', 'llite',
-                            'llite', 'llite', 'llite', 'llite', 'llite',
-                            'llite', 'llite', 'llite', 'llite', 'llite',
-                            'intel_snb','intel_snb', 'intel_snb'],
-                      ['CAS_READS', 'CAS_WRITES', 'STALLS',
-                       'CLOCKS_UNHALTED_CORE', 'SSE_D_ALL', 'SIMD_D_256',
-                       'open','close','mmap','seek','fsync','setattr',
-                       'truncate','flock','getattr','statfs','alloc_inode',
-                       'setxattr','getxattr',' listxattr',
-                       'removexattr', 'inode_permission', 'readdir',
-                       'create','lookup',
-                       'link','unlink','symlink','mkdir','rmdir','mknod',
-                       'rename',
-                       'LOAD_OPS_L1_HIT','LOAD_OPS_L2_HIT','LOAD_OPS_LLC_HIT'])
-      
-      
-      
-      
-      
-    except tspl.TSPLException as e:
+
+    res=get_data(file)
+    if (res is None):
       continue
 
-    if not tspl_utils.checkjob(ts,3600.,range(1,33)):
-      continue
-
-    tmid=(ts.t[:-1]+ts.t[1:])/2.0
-
-    ld=lariat_utils.LariatData(ts.j.id,ts.j.end_time,analyze_conf.lariat_path)
-    
-    read_rate=numpy.zeros_like(tmid)
-    write_rate=numpy.zeros_like(tmid)
-    stall_rate=numpy.zeros_like(tmid)
-    clock_rate=numpy.zeros_like(tmid)
-    avx_rate = numpy.zeros_like(tmid)
-    sse_rate = numpy.zeros_like(tmid)
-    meta_rate = numpy.zeros_like(tmid)
-    l1_rate = numpy.zeros_like(tmid)
-    l2_rate = numpy.zeros_like(tmid)
-    l3_rate = numpy.zeros_like(tmid)
-
-    for k in ts.j.hosts.keys():
-      read_rate +=numpy.diff(ts.assemble([0],k,0))/numpy.diff(ts.t)
-      write_rate+=numpy.diff(ts.assemble([1],k,0))/numpy.diff(ts.t)
-      stall_rate+=numpy.diff(ts.assemble([2],k,0))/numpy.diff(ts.t)
-      clock_rate+=numpy.diff(ts.assemble([3],k,0))/numpy.diff(ts.t)
-      avx_rate  +=numpy.diff(ts.assemble([5],k,0))/numpy.diff(ts.t)
-      sse_rate  +=numpy.diff(ts.assemble([4],k,0))/numpy.diff(ts.t)
-      meta_rate +=numpy.diff(ts.assemble(range(5,32),k,0))/numpy.diff(ts.t)
-      l1_rate +=numpy.diff(ts.assemble([32],k,0))/numpy.diff(ts.t)
-      l2_rate +=numpy.diff(ts.assemble([33],k,0))/numpy.diff(ts.t)
-      l3_rate +=numpy.diff(ts.assemble([34],k,0))/numpy.diff(ts.t)
-      
-    read_rate  /= float(ts.numhosts)
-    write_rate /= float(ts.numhosts)
-    stall_rate /= float(ts.numhosts)
-    clock_rate /= float(ts.numhosts)
-    avx_rate   /= float(ts.numhosts)
-    sse_rate   /= float(ts.numhosts)
-    meta_rate  /= float(ts.numhosts)
-    l1_rate  /= float(ts.numhosts)
-    l2_rate  /= float(ts.numhosts)
-    l3_rate  /= float(ts.numhosts)
-
-    read_frac=read_rate/(read_rate+write_rate+1)
-    stall_frac=stall_rate/clock_rate
+    (ts, ld, tmid,
+     read_rate, write_rate, stall_rate, clock_rate, avx_rate, sse_rate,
+     meta_rate, l1_rate, l2_rate, l3_rate, load_rate, read_frac, stall_frac) = res
 
     title=ts.title
     if ld.exc != 'unknown':
@@ -141,8 +162,8 @@ def main():
     ax[3].set_ylabel('Meta Data Rate')
     tspl_utils.adjust_yaxis_range(ax[3],0.1)
 
-    ax[4].plot(tmid/3600., l2_rate/(l1_rate+l2_rate+l3_rate))
-    ax[4].set_ylabel('Meta Data Rate')
+    ax[4].plot(tmid/3600., load_rate-(l1_rate+l2_rate+l3_rate))
+    ax[4].set_ylabel('Cache Miss Rate?')
     tspl_utils.adjust_yaxis_range(ax[3],0.1)
 
     fname='_'.join(['plot',ts.j.id,ts.owner])

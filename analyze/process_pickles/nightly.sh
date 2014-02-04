@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/bash 
 
 wd=/work/00564/bbarth/tacc_stats/analyze/process_pickles
 if [ "$1" == "" ]; then
@@ -7,21 +7,21 @@ else
   y=$1
 fi
 tsd=/scratch/projects/tacc_stats/pickles
-jd=${wd}/nightly_jobs
+jd=/corral-repl/tacc/hpc/tacc_stats_site/stampede/pickles
 nf=${tsd}/${y}.tar.gz
 od=${wd}/nightlies/${y}
 
 cd $wd
 
 if [ -f $nf ]; then
-  if [ ! -d $jd ]; then
-    mkdir $jd
-  fi
-  if [ ! -d ${jd}/${y} ]; then
-    cd $jd
-    stat $nf
-    tar zxf $nf
-  fi
+##   if [ ! -d $jd ]; then
+##     mkdir $jd
+##   fi
+##   if [ ! -d ${jd}/${y} ]; then
+##     cd $jd
+##     stat $nf
+##     tar zxf $nf
+##   fi
   
   cd $wd
 

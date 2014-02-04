@@ -42,8 +42,9 @@ def compute_ratio(file,lariat_dict=None):
   else:
     ld=lariat_utils.LariatData(ts.j.id,olddata=lariat_dict)
 
-  if ld.exc == 'unknown' or \
-       ld.wayness != ts.wayness:
+  if ld.exc == 'unknown' or ld.wayness != ts.wayness: # try loading older lariat
+    ld=lariat_utils.LariatData(ts.j.id,end_epoch=ts.j.end_time,daysback=3,directory=analyze_conf.lariat_path,olddata=ld.ld)
+  if ld.exc == 'unknown' or ld.wayness != ts.wayness: # Still nothing; return
     return
 
   read_rate  = numpy.zeros_like(tmid)
@@ -97,10 +98,14 @@ def compute_ratio(file,lariat_dict=None):
 
   mean_data_ratio=numpy.mean(data_ratio)
   mean_stall_ratio=numpy.mean(stall_ratio)
+  mean_mem_rate=numpy.mean(read_rate + write_rate)*64.0
+  if mean_stall_ratio > 1.:
+    return
+  elif mean_mem_rate > 75.*1000000000./16.:
+    return
 
   ename=ld.exc.split('/')[-1]
   ename=ld.comp_name(ename,ld.equiv_patterns)
-  mean_mem_rate=numpy.mean(read_rate + write_rate)*64.0
 ##  if mean_mem_rate > 2e9: # Put a print in here and investigate bad jobs
 ##    return
   return (ts.j.id, ts.su, ename, mean_data_ratio, mean_stall_ratio, mean_mem_rate )
