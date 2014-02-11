@@ -1,8 +1,9 @@
 # -*- mode: python -*-
-import sys
+import os,sys
 # Config values for analyzers
 
 #matplotlib_output_mode = 'Agg' #for pngs
 matplotlib_output_mode = 'pdf'
 sys.path.append('@PY_INC_PATH@')
+sys.path.append(os.path.dirname(__file__))
 lariat_path='@LARIAT_PATH@'

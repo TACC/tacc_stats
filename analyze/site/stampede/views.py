@@ -167,10 +167,11 @@ def hist_summary(request, date = None, uid = None, project = None, user = None, 
 
 
 def figure_to_response(f):
-    response = HttpResponse(content_type='image/svg+xml')
-    f.savefig(response, format='svg')
-    plt.close(f)
-    f.clear()
+    response = HttpResponse(content_type='image/png')
+    f.savefig(response, format='png')
+    #plt.close(f)
+    #f.clear()
+    #response['Content-Disposition'] = "attachment; filename=master.svg"
     return response
 
 def get_data(pk):

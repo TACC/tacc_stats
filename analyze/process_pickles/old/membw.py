@@ -76,24 +76,20 @@ def main():
   
   filelist=tspl_utils.getfilelist(n.filearg)
 
-  pool   = multiprocessing.Pool(processes=n.p[0])
-  m      = multiprocessing.Manager()
-  bw     = m.dict()
   thresh = n.t[0]
   outdir = n.o[0]
   
-  partial_highbw=functools.partial(do_bw,thresh=thresh,bw=bw)
-
-  if len(filelist) != 0:
-    pool.map(partial_highbw,filelist)
-    pool.close()
-    pool.join()
-
+  test = Mem_bw(thresh,processes=2)
+  test.run()
+  bw = test.results
+  
   jobs=[]
   for i in bw.keys():
     if bw[i]:
+      print i,bw[i]
       jobs.append(i)
   
+  sys.exit()
   
   pool  = multiprocessing.Pool(processes=n.p[0])
   if len(jobs) != 0:
