@@ -1,7 +1,10 @@
-import csv
+import csv, os, subprocess
 
 # Fields in the sge accounting file.
 # From /opt/sge6.2/man/man5/accounting.5
+
+stats_home = os.getenv('TACC_STATS_HOME', '/scratch/projects/tacc_stats')
+acct_path = os.getenv('TACC_STATS_ACCT', os.path.join(stats_home, 'accounting'))
 
 fields = (
     ('queue',           str, 'Name of the cluster queue in which the job has run.'), # sge 'qname'
@@ -48,17 +51,112 @@ fields = (
     ('pe_taskid',       str, 'If this identifier is set the task was part of a parallel job and was passed to Sun Grid Engine via the qrsh -inherit interface.'),
     ('maxvmem',       float, 'The maximum vmem size in bytes.'), # Bogus.
     ('arid',            int, 'Advance reservation identifier. If the job used resources of an advance reservation then this field contains a positive integer identifier otherwise the value is 0.'),
+    ('ar_submission_time', int, 'If the job used resources of an advance reservation then this field contains the submission time (GMT unix time stamp) of the advance reservation, otherwise the value is 0.'),
 )
 
 field_names = [tup[0] for tup in fields]
 
-# Return an iterator for all jobs that finished between start_time and end_time.
 
 def reader(file, start_time=0, end_time=9223372036854775807L):
+    """reader(file, start_time=0, end_time=9223372036854775807L)
+    Return an iterator for all jobs that finished between start_time and end_time.
+    """
+    if type(file) == str:
+        file = open(file)
     for d in csv.DictReader(file, delimiter=':', fieldnames=field_names):
-        for n, t, x in fields:
-            d[n] = t(d[n])
-        if start_time <= d['end_time'] and d['end_time'] < end_time:
+        try:
+            for n, t, x in fields:
+                d[n] = t(d[n])
+        except:
+            pass
+        # Accounting records with pe_taskid != NONE are generated for
+        # sub_tasks of a tightly integrated job and should be ignored.
+        if start_time <= d['end_time'] and d['end_time'] < end_time and d['pe_taskid'] == 'NONE':
             yield d
 
-# r_lis = [r for r in sge_acct.reader(open('accounting', 'r'))]
+
+def from_id_with_file_1(id, acct_file):
+    for acct in reader(acct_file):
+        if acct['id'] == id:
+            return acct
+        return None
+
+
+def from_id_with_file(id, acct_file, **kwargs):
+    """from_id_with_file(id, acct_file, use_awk=True)
+    Return SGE accounting data for the job with SGE ID id from acct_file,
+    or None if no such data was found.
+    """
+    id = str(id)
+    if kwargs.get('use_awk', True):
+        # Use awk to filter accounting file (2s with, 100s without).
+        prog = '$6 == "%s" && $42 == "NONE" { print $0; exit 0; }' % id
+        pipe = subprocess.Popen(['/bin/awk', '-F:', prog],
+                                bufsize=-1,
+                                stdin=acct_file,
+                                stdout=subprocess.PIPE)
+        try:
+            return from_id_with_file_1(id, pipe.stdout)
+        finally:
+            if pipe.poll() is None:
+                pipe.kill()
+                pipe.wait()
+    else:
+        return from_id_with_file_1(id, acct_file)
+
+
+def from_id(id, **kwargs):
+    """from_id(id, acct_file=None, acct_path=acct_path, use_awk=True)
+    Return SGE accounting data for the job with SGE ID id from acct_file
+    or acct_path.
+    """
+    acct_file = kwargs.get('acct_file')
+    if acct_file:
+        return acct_from_id_with_file(id, acct_file, **kwargs)
+    else:
+        with open(kwargs.get('acct_path', acct_path)) as acct_file:
+            return from_id_with_file(id, acct_file, **kwargs)
+
+
+def fill_with_file_1(id_dict, acct_file):
+    for acct in reader(acct_file):
+        if acct['id'] in id_dict:
+            id_dict[acct['id']] = acct
+
+
+def fill_with_file(id_dict, acct_file, **kwargs):
+    """fill_with_file(id_dict, acct_file, use_awk=True)
+    Fill SGE accounting data for the jobs with SGE ids in id_dict from acct_file.
+    The keys of id_dict must be strings.
+    """
+    if kwargs.get('use_awk', True):
+        # Use awk to filter accounting file (2s with, 100s without).
+        a_defs = ''
+        for id in id_dict:
+            a_defs += 'a["%s"] = 1;' % id
+        prog = 'BEGIN { %s } $6 in a && $42 == "NONE" { print $0; }' % a_defs
+        pipe = subprocess.Popen(['/bin/awk', '-F:', prog],
+                                bufsize=-1,
+                                stdin=acct_file,
+                                stdout=subprocess.PIPE)
+        try:
+            return fill_with_file_1(id_dict, pipe.stdout)
+        finally:
+            if pipe.poll() is None:
+                pipe.kill()
+                pipe.wait()
+    else:
+        return fill_with_file_1(id_dict, acct_file)
+
+
+def fill(id_dict, **kwargs):
+    """fill(id_dict, acct_file=None, acct_path=acct_path, use_awk=True)
+    Fill SGE accounting data for the jobs with SGE ids in id_dict from acct_file.
+    The keys of id_dict must be strings.
+    """
+    acct_file = kwargs.get('acct_file')
+    if acct_file:
+        return fill_with_file(id_dict, acct_file, **kwargs)
+    else:
+        with open(kwargs.get('acct_path', acct_path)) as acct_file:
+            return fill_with_file(id_dict, acct_file, **kwargs)
