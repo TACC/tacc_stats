@@ -1,0 +1,68 @@
+#!/bin/bash
+
+# May 2013
+# Kyle Marcus
+
+# This script should be called by cron to update the lonestar tacc_stats files that are mirrored on this server
+# lonestar.tacc.utexas.edu tacc_stats files located at /scratch/projects/tacc_stats
+# tas-db1 mirrors these files on /data/scratch/Lonestar
+# This script has also been updated to include creating the pickle files for the current day
+
+# Create initial ssh connection
+l=xdtas@login2.ls4.tacc.utexas.edu
+ssh -i /user/xdtas/.ssh/id_dsa_xdtas_xsede_cron -MnNf -o ControlMaster=yes -o ControlPath="$HOME/.ssh/ctl/%L-%r@%h:%p" $l
+
+# Update accounting file
+date
+rsync -v -t -z -e 'ssh -i /user/xdtas/.ssh/id_dsa_xdtas_xsede_cron -o "ControlPath='$HOME'/.ssh/ctl/%L-%r@%h:%p"' $l:/sge_common/default/accounting /data/scratch/Lonestar/accounting
+
+# Update hostfiles
+date
+rsync -v -t -r -e 'ssh -i /user/xdtas/.ssh/id_dsa_xdtas_xsede_cron -o "ControlPath='$HOME'/.ssh/ctl/%L-%r@%h:%p"' $l:/home1/0000/sge/tacc/hostfile_logs /data/scratch/Lonestar
+
+# Update lariat data
+date
+rsync -v -t -r -e 'ssh -i /user/xdtas/.ssh/id_dsa_xdtas_xsede_cron -o "ControlPath='$HOME'/.ssh/ctl/%L-%r@%h:%p"' $l:/scratch/projects/lariatData /data/scratch/Lonestar
+
+# Update archive tacc_stats raw data files for each node
+# NOTE: if a new node is added on lonestar, then it will need to be added here first in order for it to update,
+#       each individual node is updated with rsync because it seems to run faster this way instead of doing the
+#       rsync for the whole archive/ directory. The rsync command used here will exclude any files that are 
+#       older than 2 days, this makes the updating process much faster! It will spawn 25 process at once and 
+#       will continue to create new process (with a max of 25 at a time) until all the nodes have been updated.
+date
+cd /data/scratch/Lonestar/archive
+for f in /data/scratch/Lonestar/archive/*
+do
+	if [ -d $f ]
+	then
+		x=`basename $f`
+		find $x -type f -mtime +2 | sed 's_.*/__' | rsync --exclude-from - -t -r -v -e 'ssh -i /user/xdtas/.ssh/id_dsa_xdtas_xsede_cron -o "ControlPath='$HOME'/.ssh/ctl/%L-%r@%h:%p"' $l:/scratch/projects/tacc_stats/archive/$x /data/scratch/Lonestar/archive &
+	fi
+	while [ `jobs -p | wc -l` -gt 15 ]
+	do
+		sleep 1
+	done
+done
+
+wait
+
+# create the pickle for today, pickles are stored in /data/scratch/Lonestar/pickles
+date
+#/data/scratch/tacc_stats_jhammond/monitor/do_job_pickles_cron.sh
+mkdir -p /dev/shm/tmp/Lonestar
+/data/scratch/tacc_stats_kylemarcus/monitor/do_job_pickles_cron.sh /data/scratch/Lonestar/pickle.conf
+
+# create summaries, create tar.gz file for each date and put it into ifs directory
+d=$(date -d 'now -2 days' +%F)
+mkdir -p /dev/shm/logs/batchSummary/Lonestar/
+/user/xdtas/kmarcus2/batchSummary.sh ${d} Lonestar > /dev/shm/logs/batchSummary/Lonestar/${d}.o 2> /dev/shm/logs/batchSummary/Lonestar/${d}.e
+
+# put sumaries into mongo
+#python /user/xdtas/kmarcus2/summaryConvertToMongo.py /ifs/projects/xdtas/summaries/lonestar/${d}-json lonestar >/dev/shm/logs/mongo/Lonestar/${d}.o 2>/dev/shm/logs/mongo/Lonestar/${d}.e
+mkdir -p /dev/shm/logs/mongo/Lonestar/
+python /user/xdtas/kmarcus2/summaryConvertToMongo.py /dev/shm/json/Lonestar/${d}-json lonestar >/dev/shm/logs/mongo/Lonestar/${d}.o 2>/dev/shm/logs/mongo/Lonestar/${d}.e
+rm -r /dev/shm/json/Lonestar/${d}-json
+
+# close the ssh session
+ssh -O exit -o ControlPath="$HOME/.ssh/ctl/%L-%r@%h:%p" $l

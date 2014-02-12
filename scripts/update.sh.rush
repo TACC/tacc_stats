@@ -1,0 +1,24 @@
+# update the accounting files using the sacct command.
+# sacct can only be run on Rush, so you must ssh into
+# Rush and then run the sacct command.
+f="jobid,cluster,partition,account,group,user,submit,eligible,start,end,exitcode,nnodes,ncpus,nodelist,jobname"
+s=`date --date='yesterday' +%Y-%m-%dT00:00:00`
+e=`date +%Y-%m-%dT00:00:00`
+a=/data/scratch/Rush/accounting
+ssh rush "sacct --allusers --parsable2 --noheader --allocations --allclusters --format $f --state CA,CD,F,NF,TO --starttime $s --endtime $e" > $a/`date --date='yesterday' +%Y%m%d`
+#ssh rush "sacct --allusers --parsable2 --noheader --allocations --allclusters --format $f --state COMPLETED --starttime $s --endtime $e" > $a/`date --date='yesterday' +%Y%m%d`
+
+# create the pickle for today, pickles are stored in /data/scratch/Rush/pickles
+mkdir -p /dev/shm/tmp/Rush
+/data/scratch/tacc_stats_kylemarcus/monitor/do_job_pickles_cron.sh /data/scratch/Rush/pickle.conf
+
+# create summaries for the date and put into tar.gz file which is send to ifs
+d=$(date -d 'now -2 days' +%F)
+mkdir -p /dev/shm/logs/batchSummary/Rush/
+/user/xdtas/kmarcus2/batchSummary.sh ${d} Rush > /dev/shm/logs/batchSummary/Rush/${d}.o 2> /dev/shm/logs/batchSummary/Rush/${d}.e
+
+# put sumaries into mongo
+#python /user/xdtas/kmarcus2/summaryConvertToMongo.py /ifs/projects/xdtas/summaries/rush/${d}-json rush >/dev/shm/logs/mongo/Rush/${d}.o 2>/dev/shm/logs/mongo/Rush/${d}.e
+mkdir -p /dev/shm/json/Rush/
+python /user/xdtas/kmarcus2/summaryConvertToMongo.py /dev/shm/json/Rush/${d}-json rush >/dev/shm/logs/mongo/Rush/${d}.o 2>/dev/shm/logs/mongo/Rush/${d}.e
+rm -r /dev/shm/json/Rush/${d}-json
