@@ -1,0 +1,16 @@
+Source: supremm
+Maintainer: Joseph P White <jpwhite4@buffalo.edu>
+Section: misc
+Priority: optional
+Standards-Version: 3.9.3
+Build-Depends: debhelper (>= 9),
+               python (>= 2.7.3)
+X-Python-Version: >= 2.7
+
+
+Package: supremm
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}, ${python:Depends}
+Description: Utility scripts to process tacc_stats records.
+ Utility scripts to mirror tacc_stats raw data from reomote systems and post
+ process them.
