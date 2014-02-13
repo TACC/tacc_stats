@@ -12,5 +12,5 @@ Package: supremm
 Architecture: all
 Depends: ${shlibs:Depends}, ${misc:Depends}, ${python:Depends}
 Description: Utility scripts to process tacc_stats records.
- Utility scripts to mirror tacc_stats raw data from reomote systems and post
+ Utility scripts to mirror tacc_stats raw data from remote systems and post
  process them.

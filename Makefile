@@ -18,13 +18,17 @@ libdir = $(prefix)/lib
 
 CONFIG_FILES =  scripts/pickle.conf.lonestar \
 				scripts/pickle.conf.rush \
-				scripts/pickle.conf.stampede
+				scripts/pickle.conf.stampede \
+				scripts/supremm.conf \
+				scripts/stampede.conf \
+				scripts/lonestar.conf
 
 SCRIPT_FILES =  scripts/summaryConvertToMongo.py \
 				scripts/summary.py \
 				scripts/summary_rush_slurm.py \
 				scripts/summary_stampede_slurm.py \
-				scripts/batchSummary.sh
+				scripts/batchSummary.sh \
+				scripts/rawTaccStatsTarTransfer.sh
 
 PYTHONLIBS = pickler/amd64_pmc.py \
 			 pickler/batch_acct.py \
@@ -34,6 +38,7 @@ PYTHONLIBS = pickler/amd64_pmc.py \
 			 pickler/torque_acct.py \
 			 pickler/slurm_stampede_acct.py \
 			 pickler/slurm_rush_acct.py \
+			 pickler/getProcdumpData.py \
 			 pickler/setup.py
 
 all:
