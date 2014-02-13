@@ -28,7 +28,8 @@ SCRIPT_FILES =  scripts/summaryConvertToMongo.py \
 				scripts/summary_rush_slurm.py \
 				scripts/summary_stampede_slurm.py \
 				scripts/batchSummary.sh \
-				scripts/rawTaccStatsTarTransfer.sh
+				scripts/rawTaccStatsTarTransfer.sh \
+				scripts/update.sh
 
 PYTHONLIBS = pickler/amd64_pmc.py \
 			 pickler/batch_acct.py \
