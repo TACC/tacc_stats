@@ -20,6 +20,7 @@ CONFIG_FILES =  scripts/pickle.conf.lonestar \
 				scripts/pickle.conf.rush \
 				scripts/pickle.conf.stampede \
 				scripts/supremm.conf \
+				scripts/rush.conf \
 				scripts/stampede.conf \
 				scripts/lonestar.conf
 
@@ -29,6 +30,7 @@ SCRIPT_FILES =  scripts/summaryConvertToMongo.py \
 				scripts/summary_stampede_slurm.py \
 				scripts/batchSummary.sh \
 				scripts/rawTaccStatsTarTransfer.sh \
+				scripts/validate.sh \
 				scripts/update.sh
 
 PYTHONLIBS = pickler/amd64_pmc.py \
