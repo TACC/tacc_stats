@@ -15,23 +15,26 @@
 #       older than 2 days, this makes the updating process much faster! It will spawn 25 process at once and 
 #       will continue to create new process (with a max of 25 at a time) until all the nodes have been updated.
 
+CONTROLPATH="$HOME/.ssh/ctl/$$-%L-%r@%h:%p"
+RSYNCRSH="ssh -i /user/xdtas/.ssh/id_dsa_xdtas_xsede_cron -o ControlPath=${CONTROLPATH}"
+
 # Create initial ssh connection
-ssh -i /user/xdtas/.ssh/id_dsa_xdtas_xsede_cron -MnNf -o ControlMaster=yes -o ControlPersist=yes -o ControlPath="$HOME/.ssh/ctl/%L-%r@%h:%p" xdtas@login2.stampede.tacc.utexas.edu
+ssh -i /user/xdtas/.ssh/id_dsa_xdtas_xsede_cron -MnNf -o ControlMaster=yes -o ControlPersist=yes -o ControlPath=${CONTROLPATH} xdtas@login2.stampede.tacc.utexas.edu
 
 # Update accounting file
 date
-rsync -v -t -z -e 'ssh -i /user/xdtas/.ssh/id_dsa_xdtas_xsede_cron -o "ControlPath='$HOME'/.ssh/ctl/%L-%r@%h:%p"' xdtas@login2.stampede.tacc.utexas.edu:/scratch/projects/tacc_stats/accounting/tacc_jobs_completed /data/scratch/Stampede/accounting/tacc_jobs_completed
+rsync -v -t -z -e "${RSYNCRSH}" xdtas@login2.stampede.tacc.utexas.edu:/scratch/projects/tacc_stats/accounting/tacc_jobs_completed /data/scratch/Stampede/accounting/tacc_jobs_completed
 
 # Update hostfiles
 date
-rsync -v -t -r -e 'ssh -i /user/xdtas/.ssh/id_dsa_xdtas_xsede_cron -o "ControlPath='$HOME'/.ssh/ctl/%L-%r@%h:%p"' xdtas@login2.stampede.tacc.utexas.edu:/scratch/projects/tacc/hostfile_logs /data/scratch/Stampede
+rsync -v -t -r -e "${RSYNCRSH}" xdtas@login2.stampede.tacc.utexas.edu:/scratch/projects/tacc/hostfile_logs /data/scratch/Stampede
 
 # Update lariat data
 date
-rsync -v -t -r -e 'ssh -i /user/xdtas/.ssh/id_dsa_xdtas_xsede_cron -o "ControlPath='$HOME'/.ssh/ctl/%L-%r@%h:%p"' xdtas@login2.stampede.tacc.utexas.edu:/scratch/projects/lariatData /data/scratch/Stampede
+rsync -v -t -r -e "${RSYNCRSH}" xdtas@login2.stampede.tacc.utexas.edu:/scratch/projects/lariatData /data/scratch/Stampede
 
 ###
-ssh -i /user/xdtas/.ssh/id_dsa_xdtas_xsede_cron -o "ControlPath='$HOME'/.ssh/ctl/%L-%r@%h:%p" "./rawTaccStatsTarTransfer.sh" | tar xfk - -C /data/scratch/Stampede/archive
+ssh -i /user/xdtas/.ssh/id_dsa_xdtas_xsede_cron -o ControlPath=${CONTROLPATH} xdtas@login2.stampede.tacc.utexas.edu "./rawTaccStatsTarTransfer.sh" | tar xfk - -C /data/scratch/Stampede/archive
 ###
 
 #date
@@ -57,7 +60,10 @@ ssh -i /user/xdtas/.ssh/id_dsa_xdtas_xsede_cron -o "ControlPath='$HOME'/.ssh/ctl
 
 # get pickle from stampede
 d=$(date -d 'now -2 days' +%F)
-rsync -v -t -e 'ssh -i /user/xdtas/.ssh/id_dsa_xdtas_xsede_cron -o "ControlPath='$HOME'/.ssh/ctl/%L-%r@%h:%p"' xdtas@login2.stampede.tacc.utexas.edu:/scratch/projects/tacc_stats/pickles/${d}.tar.gz /data/scratch/Stampede/pickles/${d}.tar.gz
+rsync -v -t -e "${RSYNCRSH}" xdtas@login2.stampede.tacc.utexas.edu:/scratch/projects/tacc_stats/pickles/${d}.tar.gz /data/scratch/Stampede/pickles/${d}.tar.gz
+
+# close the ssh session
+ssh -O exit -o ControlPath=${CONTROLPATH} xdtas@login2.stampede.tacc.utexas.edu
 
 # create summaries, for each date create a .tar.gz file that is put into ifs
 mkdir -p /dev/shm/logs/batchSummary/Stampede/
@@ -70,5 +76,3 @@ mkdir -p /dev/shm/logs/mongo/Stampede/
 python /user/xdtas/kmarcus2/summaryConvertToMongo.py /dev/shm/json/Stampede/${d}-json stampede >/dev/shm/logs/mongo/Stampede/${d}.o 2>/dev/shm/logs/mongo/Stampede/${d}.e
 rm -r /dev/shm/json/Stampede/${d}-json
 
-# close the ssh session
-ssh -O exit -o ControlPath="$HOME/.ssh/ctl/%L-%r@%h:%p" xdtas@login2.stampede.tacc.utexas.edu
