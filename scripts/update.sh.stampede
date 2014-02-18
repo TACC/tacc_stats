@@ -15,10 +15,9 @@
 #       older than 2 days, this makes the updating process much faster! It will spawn 25 process at once and 
 #       will continue to create new process (with a max of 25 at a time) until all the nodes have been updated.
 
+
 function gentimedirlist
 {
-    basepath=$1
-
     export TZ=utc0
 
     # Note only generate the datestamp once to avoid race condition in date
@@ -28,7 +27,7 @@ function gentimedirlist
 
     for (( i = 3; i > 0; i-- ));
     do
-        echo -n " $basepath/"$(date -d "$now - $i day" +%Y/%m/%d)
+        echo -n " "$(date -d "$now - $i day" +%Y/%m/%d)
     done
 }
 
@@ -58,6 +57,7 @@ date
 rsync -v -t -r -e "${RSYNCRSH}" xdtas@login2.stampede.tacc.utexas.edu:/scratch/projects/lariatData /data/scratch/Stampede
 
 ###
+date
 ssh -i /user/xdtas/.ssh/id_dsa_xdtas_xsede_cron -o ControlPath=${CONTROLPATH} xdtas@login2.stampede.tacc.utexas.edu "./rawTaccStatsTarTransfer.sh" | tar xfk - -C /data/scratch/Stampede/archive
 ###
 
