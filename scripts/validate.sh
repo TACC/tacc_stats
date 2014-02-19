@@ -83,4 +83,12 @@ checkdir LOCAL_MIRROR_PATH
 checkdir PROCESSED_SUMMARY_PATH
 checkdir PROCESSED_PICKLES_PATH
 
+# Check that the remote ssh settings work (if they are set)
+if [ -n "$REMOTE_LOGIN" ];
+then
+    if ! ssh -n -i $REMOTE_ID $REMOTE_LOGIN true > /dev/null 2>&1
+    then
+        echo "Error could not run command on remote host"
+    fi
+fi
 
