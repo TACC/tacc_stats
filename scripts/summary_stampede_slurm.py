@@ -199,9 +199,8 @@ def main():
                 sums[k][l][interface] = sums[k][l][interface] + (v[-1]
                       - v[0]) / walltime  # divide walltime here, to avoid overflow in summation
                 if len(reciprocals) == len(v) - 1:
-                  rates = [(v[n] - v[n - 1]) * reciprocals[n - 1] for n in
-                           range(1, len(v))]
-                  series[k][l][interface].extend(rates)
+                  rates = numpy.diff(v) * reciprocals
+                  series[k][l][interface].extend(rates.tolist() )
               else:
                 # else the datatype is an instantaneous value such as memory, load ave or disk usage.
                 if 2 < len(v):
