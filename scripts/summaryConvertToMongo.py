@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/env python
 
 # About:
 # Inserts summary data from tacc_stats into mongo.
@@ -55,7 +55,7 @@ def getJson(fpath, machine, nodeinfo):
     # to search for in mongo, each machine has different names.
     try:
         if machine.lower() == 'rush':
-            j["_id"] = machine + '-' + str(j["acct"]["id"])
+            j["_id"] = machine + '-' + j["acct"]['cluster'] + "-" + str(j["acct"]["id"])
             j["start_date"] = datetime.datetime.utcfromtimestamp(j["acct"]["start_time"])
             j["end_date"] = datetime.datetime.utcfromtimestamp(j["acct"]["end_time"])
             j["submit_date"] = datetime.datetime.utcfromtimestamp(j["acct"]["submit"])
