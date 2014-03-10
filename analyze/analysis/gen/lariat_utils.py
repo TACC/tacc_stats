@@ -37,47 +37,64 @@ class LariatDataException(Exception):
     print self.value
 
 class LariatData:
-  def __init__(self,jobid,end_epoch=-1,directory=None,daysback=0,olddata=None):
 
-    self.jobid=jobid
+  equiv_patterns = {
+    r'^charmrun' : 'Charm++*',
+    r'^wrf' : 'WRF*',
+    r'^vasp' : 'VASP*',
+    r'^run\.cctm' : 'CMAQ CCTM*',
+    r'^lmp_' : 'LAMMPS*',
+    r'^mdrun' : 'Gromacs*',
+    r'^enzo' : 'ENZO*',
+    r'^dlpoly' : 'DL_POLY*',
+    r'^su3_' : 'MILC*',
+    r'^qcprog' : 'QCHEM*',
+    r'^namd2' : 'NAMD*',
+    r'^cactus' : 'Cactus*',
+    r'^pw.x' : 'Q. Esp*',
+    r'^pmemd' : 'Amber*',
+    r'^sander' : 'Amber*',
+    r'^charmm' : 'CHARMM*',
+    r'^c37b1'  : 'CHARMM*',
+    }
 
+  def __init__(self):
     # Initialize to invalid/empty states
     self.id=0
-    self.ld=None
+    self.ld=dict()
+    self.user='nobody'
+    self.exc='unknown'
+    self.cwd='unknown'
+    self.threads=1
+    self.wayness=-1
+  def set_job(self,jobid,end_epoch=-1,directory=None,daysback=0):
+    # Find the set of JSON files matching the end_epoch date
+    # Initialize to invalid/empty states
+    self.id=0
     self.user='nobody'
     self.exc='unknown'
     self.cwd='unknown'
     self.threads=1
     self.wayness=-1
 
-
-    # Find the set of JSON files matching the end_epoch date
-    newdata=None
-    if end_epoch > 0 and directory != None:
-      matches=[]
+    if jobid not in self.ld: 
+      if end_epoch > 0 and directory != None:
+        matches=[]
       for day in range(daysback+1):
         ds=make_date_string(end_epoch-day*24*3600)
         for root, dirnames, filenames in os.walk(directory):
           for fn in fnmatch.filter(filenames,'*'+ds+'.json'):
             matches.append(os.path.join(root,fn))
       if len(matches) != 0:
-        newdata=dict()
         for m in matches:
           try:
-            newdata.update(json.load(open(m))) # Should be only one match
+            self.ld.update(json.load(open(m))) # Should be only one match
           except:
             json_str = open(m).read()
             json_str = re.sub(r'\\','',json_str)
-            newdata.update(json.loads(json_str))
+            self.ld.update(json.loads(json_str))
       else:
-        print 'File for ' + self.jobid + ' not found in ' + directory
-
-    if olddata != None:
-      self.ld=olddata
-    else:
-      self.ld=dict()
-    if newdata != None:
-      self.ld.update(newdata)
+        print 'File for ' + jobid + ' not found in ' + directory
 
     try:
       self.ld[jobid].sort(key=lambda ibr: int(ibr['startEpoch']))
@@ -92,27 +109,9 @@ class LariatData:
     except KeyError:
       print str(jobid) + ' did not call ibrun' + \
             ' or has no lariat data for some other reason'
+      self.ld[jobid]=None
+    except: pass
 
-    self.equiv_patterns = {
-      r'^charmrun' : 'Charm++*',
-      r'^wrf' : 'WRF*',
-      r'^vasp' : 'VASP*',
-      r'^run\.cctm' : 'CMAQ CCTM*',
-      r'^lmp_' : 'LAMMPS*',
-      r'^mdrun' : 'Gromacs*',
-      r'^enzo' : 'ENZO*',
-      r'^dlpoly' : 'DL_POLY*',
-      r'^su3_' : 'MILC*',
-      r'^qcprog' : 'QCHEM*',
-      r'^namd2' : 'NAMD*',
-      r'^cactus' : 'Cactus*',
-      r'^pw.x' : 'Q. Esp*',
-      r'^pmemd' : 'Amber*',
-      r'^sander' : 'Amber*',
-      r'^charmm' : 'CHARMM*',
-      r'^c37b1'  : 'CHARMM*',
-      }
-    
   def title(self):
     title='E: ' + self.exc
     if (self.cwd != 'unknown'):
@@ -131,11 +130,8 @@ class LariatData:
 
   def get_runtimes(self,end_epoch):
     start_times=[int(ibr['startEpoch']) for ibr in self.ld[self.id]]
-
     start_times.extend([end_epoch])
-
     st2=sorted(start_times)
-
     return [(a-b) for (a,b) in zip(st2[1:],st2[:-1])]
     
     

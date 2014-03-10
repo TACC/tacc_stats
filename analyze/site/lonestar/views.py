@@ -9,10 +9,10 @@ from pylab import figure, hist, plot
 from lonestar.models import LS4Job, LS4JobForm
 import sys_path_append
 import os,sys
-import masterplot as mp
-import plotkey, tspl, lariat_utils
+import analysis
+from analysis.gen import tspl, lariat_utils
+from analysis.plot import plots as plt
 import job_stats as data
-import MetaData
 import cPickle as pickle 
 import time
    

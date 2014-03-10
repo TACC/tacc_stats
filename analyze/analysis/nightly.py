@@ -1,7 +1,6 @@
 #!/usr/bin/env python
 import argparse,sys
 
-import analyze_conf
 from gen import tspl_utils
 from exam import tests
 from plot import plots
@@ -33,47 +32,57 @@ def main():
   outdir = args.o[0]
 
   # Node Imbalance
+  print '-----------------'
   print "Imbalance test"
-  imb_test = tests.Imbalance(['intel_snb'],['INSTRUCTIONS_RETIRED'],
-                             processes=2,aggregated=False,plot=True)
-  imb_test.run(filelist,threshold=0.25)
+  imb_test = tests.Imbalance(['intel_snb'],['LOAD_L1D_ALL'],
+                             processes=args.p[0],threshold=1.0,
+                             plot=False)
+  imb_test.run(filelist)
+  imb_test.find_top_users()
+  failed_jobs = imb_test.failed()
 
+  print "Jobs with imbalances"
+  print failed_jobs
+
+  imb_test = tests.Imbalance(['intel_snb'],['LOAD_L1D_ALL'],
+                             processes=args.p[0],threshold=1.0,
+                             plot=True)
+  imb_test.run(failed_jobs)
+  
   # Idle
+  print '-----------------'
   print "Idle host test"
-  idle_test = tests.Idle(processes=2)
-  idle_test.run(filelist,threshold=1-0.001)
-  print "Jobs with idle hosts"
+  idle_test = tests.Idle(processes=args.p[0],threshold=1-0.001)
+  idle_test.run(filelist)
+
+  print 'Failed Jobs List'
   print idle_test.failed()
 
   # Catastrophic
+  print '-----------------'
   print "Catastrophic test"
-  cat_test = tests.Catastrophe(processes=2,plot=True)
-  cat_test.run(filelist,threshold=0.001)
-  jobs = cat_test.failed()
+  cat_test = tests.Catastrophe(processes=args.p[0],plot=False,threshold=0.001)
+  cat_test.run(filelist)
+  failed_jobs = cat_test.failed()
+
+  print 'Failed Jobs List'
+  print failed_jobs
+
+  cat_test = tests.Catastrophe(processes=args.p[0],plot=True,threshold=0.001)
+  cat_test.run(failed_jobs)
+
 
   # Low FLOPS test
+  print '-----------------'
   print "Low FLOPS test"
-  flops_test = tests.Low_FLOPS(processes=2,plot=True)
-  flops_test.run(filelist,threshold=0.001)
-  jobs = flops_test.failed()
+  flops_test = tests.LowFLOPS(processes=args.p[0],plot=False,threshold=0.001)
+  flops_test.run(filelist)
 
-  """
-  # Membw
-  print "Memory Bandwidth test"
-  membw_test = tests.Mem_bw(processes=2)
-  membw_test.run(filelist,threshold=thresh)
-  jobs = membw_test.failed()
+  print 'Failed Jobs List'
+  print flops_test.failed()
 
-  plot=plots.MasterPlot(processes=2)
-  plot.run(jobs,mode='lines',threshold=thresh,
-           outdir=outdir,save=True,prefix='highmembw',
-           header='High Memory Bandwidth',)
-
-  # MemUsage Plot
-  print "MemUsage Plot"
-  plot = plots.MemUsage(processes=2)
-  plot.run(idle_test.failed())
-  """
+  flops_test = tests.LowFLOPS(processes=args.p[0],plot=True,threshold=0.001)
+  flops_test.run(failed_jobs)
 
 if __name__ == '__main__':
   main()

@@ -1,2 +1,2 @@
-add_subdirectory(process_pickles)
+add_subdirectory(analysis)
 add_subdirectory(site)

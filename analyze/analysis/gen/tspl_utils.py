@@ -1,30 +1,32 @@
 import os, stat, glob
 import tspl
-import numpy, scipy, scipy.interpolate
+from numpy import zeros,array
+from scipy import interpolate
+
+VERBOSE=False
 
 # Check a TSPickleLoader object to see if its job has a minimum run time and has
 # its wayness in a list
 def checkjob(ts, minlen, way, skip_queues=[]):
   if ts.t[len(ts.t)-1] < minlen:
-    print ts.j.id + ': %(time)8.3f' % {'time' : ts.t[len(ts.t)-1]/3600} \
-          + ' hours'
+    if VERBOSE: print ts.j.id + ': %(time)8.3f' % {'time' : ts.t[len(ts.t)-1]/3600} + ' hours'
     return False
   elif getattr(way, '__iter__', False):
     if ts.wayness not in way:
-      print ts.j.id + ': skipping ' + str(ts.wayness) + '-way'
+      if VERBOSE: print ts.j.id + ': skipping ' + str(ts.wayness) + '-way'
       return False
   elif ts.wayness != way:
-    print ts.j.id + ': skipping ' + str(ts.wayness) + '-way'
+    if VERBOSE: print ts.j.id + ': skipping ' + str(ts.wayness) + '-way'
     return False
   elif (len(skip_queues) > 0) and (ts.queue in skip_queues):
-    print ts.j.id + ' skipping queue: ' + ts.queue
+    if VERBOSE: print ts.j.id + ' skipping queue: ' + ts.queue
     return False
   return True
 
 
 def global_interp_data(ts,samples):
-  vals=numpy.zeros(len(samples))
-  accum=numpy.zeros(len(ts.j.times))
+  vals=zeros(len(samples))
+  accum=zeros(len(ts.j.times))
   for i in range(len(ts.k1)):
     for h in ts.data[i].values():
       accum+=h[0]
@@ -32,7 +34,7 @@ def global_interp_data(ts,samples):
   if len(ts.j.times)<2:
     return vals
   
-  f=scipy.interpolate.interp1d(ts.j.times,accum)
+  f=interpolate.interp1d(ts.j.times,accum)
 
   mint=min(ts.j.times)
   maxt=max(ts.j.times)
@@ -98,7 +100,7 @@ def lost_data(ts):
       flag=True
       for vals in v[host]:
         t=vals[-3:-2][0]
-        tarr=numpy.array([t,t,t])
+        tarr=array([t,t,t])
         if (vals[-3:] == tarr).all():
           pass
         else:
@@ -107,3 +109,4 @@ def lost_data(ts):
         bad_hosts.append(host)
 
   return bad_hosts
+

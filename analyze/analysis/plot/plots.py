@@ -1,34 +1,55 @@
+## @package plot
+#
+# Plot generation tools for job analysis
+
 import os
 import abc
 import math
 import numpy
 import multiprocessing
-from matplotlib import pyplot as plt
+import matplotlib
+from scipy.stats import scoreatpercentile as score
+matplotlib.use('pdf')
+import matplotlib.pyplot as plt
 import job_stats
-from analyze_conf import lariat_path,matplotlib
-from gen import tspl,tspl_utils,lariat_utils,my_utils
+from analysis_conf import lariat_path,matplotlib_output_mode
+from analysis.gen import tspl,tspl_utils,lariat_utils,my_utils
 
+## Multiprocessing Unwrapper
+#
+# Multiprocessor module cannot work with class objects.
+# This unwrapper accepts a Plot class and extracts the
+# class method plot.
 def unwrap(arg):
   kwarg = arg[2]
   return arg[0].plot(arg[1],**kwarg)
 
+## Plot Class
+#
+# This is an abstract base class for plotting.
 class Plot(object):
   __metaclass__ = abc.ABCMeta
-
+  fig=None
+  ## Stat data object
   ts=None
+  ## Lariat data object
   ld=None
-  aggregated=True
+  ## Aggregate cores in nodes flag
+  aggregate=True
 
+  ## Default constructor
   def __init__(self,processes=1,**kwarg):
     self.processes=processes
 
-
+  ## Plot the list of files using multiprocessing
   def run(self,filelist,**kwargs):
     if not filelist: return 
     pool=multiprocessing.Pool(processes=self.processes) 
     pool.map(unwrap,zip([self]*len(filelist),filelist,[kwargs]*len(filelist)))
-    #for f in filelist: unwrap([self,f,kwargs])
+    pool.close()
+    pool.join()
 
+  ## Set the x and y axis labels for a plot
   def setlabels(self,ax,index,xlabel,ylabel,yscale):
     if xlabel != '':
       ax.set_xlabel(xlabel)
@@ -37,30 +58,15 @@ class Plot(object):
     else:
       ax.set_ylabel('Total '+self.ts.label(self.ts.k1[index[0]],
                                       self.ts.k2[index[0]],yscale)+'/s' )
-  # Build ts object
-  def setup(self,jobid,lariat_dict=None,stats=None):
-
-    try:
-      if not self.ts:
-        if self.aggregated:
-          self.ts=tspl.TSPLSum(jobid,self.k1,self.k2,job_data=stats)
-        else:
-          self.ts=tspl.TSPLBase(jobid,self.k1,self.k2,job_data=stats)
-      if not self.ld:
-        if lariat_dict == None:
-          ld=lariat_utils.LariatData(self.ts.j.id,end_epoch=self.ts.j.end_time,
-                                     daysback=3,directory=lariat_path)
-        elif lariat_dict == "pass": 
-          ld=lariat_utils.LariatData(self.ts.j.id)        
-        else:
-          ld=lariat_utils.LariatData(self.ts.j.id,olddata=lariat_dict)
-      self.ld=ld
-      return
-    except tspl.TSPLException as e:
-      return
-    except EOFError as e:
-      print 'End of file found reading: ' + jobid
-      return
+  def setup(self,jobid,k1,k2,job_data=None):
+    if self.aggregate:
+      self.ts=tspl.TSPLSum(jobid,self.k1,self.k2,job_data=job_data)
+    else:
+      self.ts=tspl.TSPLBase(jobid,self.k1,self.k2,job_data=job_data)
+      if self.ld != 'pass':
+        self.ld.set_job(self.ts.j.id,
+                        end_epoch=self.ts.j.end_time,
+                        directory=lariat_path,daysback=3)
 
   # Plots lines for each host
   def plot_lines(self,ax,index,xscale=1.0,yscale=1.0,xlabel='',ylabel='',
@@ -131,9 +137,9 @@ class Plot(object):
     mx=[]
     for i in range(len(self.ts.t)-1):
       mn.append(min(a[:,i]))
-      p25.append(scipy.stats.scoreatpercentile(a[:,i],25))
-      p50.append(scipy.stats.scoreatpercentile(a[:,i],50))
-      p75.append(scipy.stats.scoreatpercentile(a[:,i],75))
+      p25.append(score(a[:,i],25))
+      p50.append(score(a[:,i],50))
+      p75.append(score(a[:,i],75))
       mx.append(max(a[:,i]))
 
     mn=numpy.array(mn)
@@ -149,7 +155,7 @@ class Plot(object):
     ax.plot(tmid/xscale,p75/yscale)
     ax.plot(tmid/xscale,mx/yscale,'--')
 
-    self.setlabels(ax,ts,index,xlabel,ylabel,yscale)
+    self.setlabels(ax,index,xlabel,ylabel,yscale)
     ax.yaxis.set_major_locator( matplotlib.ticker.MaxNLocator(nbins=4))
     tspl_utils.adjust_yaxis_range(ax,0.1)
 
@@ -183,15 +189,19 @@ class MasterPlot(Plot):
 
   fname='master'
 
-  def plot(self,jobid,mode='lines',threshold=False,
-           prefix='graph',mintime=3600,wayness=16,save=False,outdir='.',
-           header='Master',lariat_dict=None,wide=False,job_stats=None):
+  def plot(self,jobid,mode='lines',
+           threshold=False,ld=None,
+           prefix='graph',mintime=3600,
+           wayness=16,save=False,outdir='.',
+           header='Master',wide=False,job_data=None):
 
-    self.setup(jobid,lariat_dict=lariat_dict,stats=job_stats)
+    self.ld=ld
+    self.setup(jobid,self.k1,self.k2,job_data=job_data)
 
     wayness=self.ts.wayness
-    if self.ld.wayness != -1 and self.ld.wayness < self.ts.wayness:
-      wayness=self.ld.wayness
+    if ld != 'pass':
+      if self.ld.wayness != -1 and self.ld.wayness < self.ts.wayness:
+        wayness=self.ld.wayness
       
     if wide:
       self.fig,ax=plt.subplots(6,2,figsize=(15.5,12),dpi=110)
@@ -294,13 +304,20 @@ class MasterPlot(Plot):
     plt.close()
     if save:
       self.fig.savefig(os.path.join(outdir,self.fname))
-
+    return self.fig
 class MemUsage(Plot):
   k1=['mem','mem']
   k2=['MemUsed','AnonPages']
   
   def plot(self,jobid,save=False,outdir='.'):
-    self.setup(jobid)
+
+    if ts==None or ld==None:
+      data=self.setup(jobid,self.k1,self.k2)
+      self.ts=data.ts
+      self.ld=data.ld
+    else:
+      self.ts=ts
+      self.ld=ld
 
     fig,ax=plt.subplots(1,1,figsize=(8,8),dpi=80)
 
@@ -326,14 +343,12 @@ class RatioPlot(Plot):
     super(RatioPlot,self).__init__(processes=processes)
 
   def plot(self,jobid,save=False,outdir='.'):
+    if not self.imbalance: 
+      print "Generate ratio data using Imbalance test first for job",jobid
+      return
 
     imb = self.imbalance
-    if not imb.ts:
-      # Generate needed data
-      imb.test(jobid)
-      imb.ts=imb.ts
-      imb.ld=imb.ld
-
+  
     # Compute y-axis min and max, expand the limits by 10%
     ymin=min(numpy.minimum(imb.ratio,imb.ratio2))
     ymax=max(numpy.maximum(imb.ratio,imb.ratio2))
@@ -370,7 +385,7 @@ class RatioPlot(Plot):
     ax[0].set_ylim(bottom=ymin,top=ymax)
     ax[1].set_ylim(bottom=ymin1,top=ymax1)
 
-    if imb.aggregated: full=''
+    if imb.aggregate: full=''
     else: full='_full'
 
     imb.fname='_'.join(['graph',imb.ts.j.id,imb.ts.owner,
@@ -380,5 +395,124 @@ class RatioPlot(Plot):
     if save:
       fig.savefig(os.path.join(outdir,imb.fname))
 
+class MetaDataRate(Plot):
+  k1=['llite', 'llite', 'llite', 'llite', 'llite',
+      'llite', 'llite', 'llite', 'llite', 'llite',
+      'llite', 'llite', 'llite', 'llite', 'llite',
+      'llite', 'llite', 'llite', 'llite', 'llite',
+      'llite', 'llite', 'llite', ]
+  k2=['open','close','mmap','fsync','setattr',
+      'truncate','flock','getattr','statfs','alloc_inode',
+      'setxattr',' listxattr',
+      'removexattr', 'readdir',
+      'create','lookup','link','unlink','symlink','mkdir',
+      'rmdir','mknod','rename',]
+
+  def __init__(self,mdrate,processes=1):
+    self.mdrate=mdrate
+    super(MetaDataRate,self).__init__(processes=processes)
+
+  def plot(self,jobid,save=False,outdir='.'):
+    if not self.mdrate: 
+      print "Generate MetaDataRate test data first for job",jobid
+      return
+
+    mdrate = self.mdrate
+    ld = mdrate.ld
+    ts = mdrate.ts
+
+    title=ts.title
+    if ld.exc != 'unknown':
+      title += ', E: ' + ld.exc.split('/')[-1]
+
+    fig,ax=plt.subplots(1,1,figsize=(10,8),dpi=80)
+    plt.subplots_adjust(hspace=0.35)
+    plt.suptitle(title)
+
+    markers = ('o','x','+','^','s','8','p',
+                 'h','*','D','<','>','v','d','.')
+
+    colors  = ('b','g','r','c','m','k','y')
+
+    cnt=0
+    for v in ts.data:
+      for host in v:
+        for vals in v[host]:
+          rate=numpy.diff(vals)/numpy.diff(ts.t)
+          c=colors[cnt % len(colors)]
+          m=markers[cnt % len(markers)]
+
+          ax.plot(tmid/3600., rate, marker=m,
+                  markeredgecolor=c, linestyle='-', color=c,
+                  markerfacecolor='None', label=k2[cnt])
+          ax.hold=True
+      cnt=cnt+1
+
+    ax.set_ylabel('Meta Data Rate (op/s)')
+    tspl_utils.adjust_yaxis_range(ax,0.1)
+
+    handles,labels=ax.get_legend_handles_labels()
+    new_handles={}
+    for h,l in zip(handles,labels):
+      new_handles[l]=h
+
+    box = ax.get_position()
+    ax.set_position([box.x0, box.y0, box.width * 0.9, box.height])
+    ax.legend(new_handles.values(),new_handles.keys(),prop={'size':8},
+              bbox_to_anchor=(1.05,1), borderaxespad=0., loc=2)
+
+    fname='_'.join(['metadata',ts.j.id,ts.owner])
+    if self.save: fig.savefig(fname)
+
+    plt.close()
 
 
+class HeatMap(Plot):
+
+  def __init__(self,k1,k2):
+    self.aggregate = False
+    self.k1 = k1
+    self.k2 = k2
+
+  def plot(self,jobid,save=False,outdir='.',ld=None,job_data=None):
+    self.ld=ld
+    self.setup(jobid,self.k1,self.k2,job_data=job_data)
+    ts=self.ts
+
+    cpi = numpy.array([])
+    hosts = []
+    for v in ts.data[0]:
+        hosts.append(v)
+        ncores = len(ts.data[0][v])
+        for k in range(ncores):
+            i = numpy.array(ts.data[0][v][k],dtype=numpy.float)
+            c = numpy.array(ts.data[1][v][k],dtype=numpy.float)
+            ratio = numpy.divide(numpy.diff(i),numpy.diff(c))
+            if not cpi.size: cpi = numpy.array([ratio])
+            else: cpi = numpy.vstack((cpi,ratio))
+    cpi_min, cpi_max = cpi.min(), cpi.max()
+
+    self.fig,ax=plt.subplots(1,1,figsize=(8,12),dpi=110)
+
+    ycore = numpy.arange(cpi.shape[0]+1)
+    time = ts.t/3600.
+
+    yhost=numpy.arange(len(hosts)+1)*ncores + ncores
+
+    fontsize = 10
+
+    if len(yhost) > 80:
+        fontsize /= 0.5*numpy.log(len(yhost))
+
+    plt.yticks(yhost - ncores/2.,hosts,size=fontsize)
+    plt.pcolormesh(time, ycore, cpi, vmin=cpi_min, vmax=cpi_max)
+    plt.axis([time.min(),time.max(),ycore.min(),ycore.max()])
+
+    plt.title('Instructions Retired per Core Clock Cycle')
+    plt.colorbar()
+
+    ax.set_xlabel('Time (hrs)')
+
+    plt.close()
+
+    return self.fig

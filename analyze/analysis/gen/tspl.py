@@ -1,11 +1,11 @@
 import cPickle as pickle
-import numpy
+import numpy,pwd
 import glob, os, stat, time, datetime, sys
 import re
 import tspl_utils
 import math
 import logging, multiprocessing
-
+VERBOSE=False
 class TSPLException(Exception):
   def __init__(self,arg):
     self.value=arg
@@ -24,6 +24,24 @@ class TSPLBase:
         raise TSPLException('End of file found for: ' + file)
       self.f.close()
 
+    try: 
+      self.wayness=self.j.acct['cores']/self.j.acct['nodes']
+    except ZeroDivisionError:
+      if VERBOSE: print "Read zero nodes, assuming 16 way for job " + str(self.j.id)
+      self.wayness=16
+    except KeyError:
+      try:
+        self.wayness=int(re.findall('\d+',self.j.acct['granted_pe'])[0])
+      except AttributeError:
+        raise TSPLException("Pickle file broken: " + file)
+    except TypeError:
+      raise TSPLException('Something is funny with job ' +str(self.j.id) +
+                            ' ' + str(self.j.acct['cores']) + ' ' +
+                            str(self.j.acct['nodes']))
+    except:
+      raise TSPLException('Something is funny with file' + file )
+    
+    """
     try:
       self.wayness=int(re.findall('\d+',self.j.acct['granted_pe'])[0])
     except AttributeError:
@@ -32,13 +50,13 @@ class TSPLBase:
       try:
         self.wayness=self.j.acct['cores']/self.j.acct['nodes']
       except ZeroDivisionError:
-        print "Read zero nodes, assuming 16 way for job " + str(self.j.id)
+        if VERBOSE: print "Read zero nodes, assuming 16 way for job " + str(self.j.id)
         self.wayness=16
       except TypeError:
         raise TSPLException('Something is funny with job ' +str(self.j.id) +
                             ' ' + str(self.j.acct['cores']) + ' ' +
                             str(self.j.acct['nodes']))
-
+    """
     try:
       self.queue=self.j.acct['queue']
     except KeyError:
@@ -50,19 +68,20 @@ class TSPLBase:
       self.status=self.j.acct['status']
     except KeyError:
       try:
-        self.status=self.j.acct['exit_stats']
+        self.status=self.j.acct['exit_status']
       except KeyError as e:
         pass
       pass
 
     try:
-      self.owner=self.j.acct['owner']
+      self.owner=pwd.getpwuid(int(self.j.acct['uid']))[0]
     except KeyError:
       try:
-        import pwd
-        self.owner=pwd.getpwuid(int(self.j.acct['uid']))[0]
+        self.owner=self.j.acct['owner']
       except Exception as e:
-        self.owner=self.j.acct['uid']
+        self.owner=self.j.acct['uid']        
+    except Exception as e:
+      self.owner=self.j.acct['uid']
       
     self.numhosts=len(self.j.hosts.keys())
 
@@ -103,8 +122,10 @@ class TSPLBase:
       raise TSPLException('Input types must match and be lists or dicts: ' +
                           str(type(k1)) + ' ' + str(type(k2)))
 
-
     self.t=(self.j.times-self.j.times[0])
+
+    if len(self.t) == 0:
+      raise TSPLException('Time range is 0')
 
     if len(k1) != len(k2):
       raise TSPLException('Lengths don\'t match')
@@ -153,10 +174,9 @@ class TSPLBase:
             continue
             
     except Exception as e:
-      import sys
       exc_type, exc_obj, exc_tb = sys.exc_info()
       fname = os.path.split(exc_tb.tb_frame.f_code.co_filename)[1]
-      print(exc_type, fname, exc_tb.tb_lineno)
+      if VERBOSE: print(exc_type, fname, exc_tb.tb_lineno)
       
   # Initialize to an empty array and accumulate with appending
   def data_init(self):
@@ -204,7 +224,6 @@ class TSPLBase:
     inds=numpy.unravel_index(self.ind,(self.a,self.b,self.c))
     k=self.data[inds[0]].keys()[inds[1]]
     return self.data[inds[0]][k][inds[2]]
-
 
   # Return a numpy array that accumulates from data using the indices of the
   # loaded keys. Negative indices subtract.

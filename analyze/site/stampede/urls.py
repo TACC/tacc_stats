@@ -19,7 +19,7 @@ urlpatterns = patterns('',
                            master_plot, name = 'master_plot'),
 
                        url(r'^heat_map/(?P<pk>\d+)/$', 
-                           cache_map, name = 'heat_map'),
+                           heat_map, name = 'heat_map'),
 
                        url(r'^date_summary/(?P<date>\d{4}-\d{2}-\d{2})/$',
                            hist_summary, name = 'date_summary', 
