@@ -9,7 +9,8 @@ import numpy
 import multiprocessing
 import matplotlib
 from scipy.stats import scoreatpercentile as score
-matplotlib.use('pdf')
+if not matplotlib:
+  matplotlib.use('pdf',warn=False)
 import matplotlib.pyplot as plt
 import job_stats
 from analysis_conf import lariat_path,matplotlib_output_mode
@@ -508,11 +509,43 @@ class HeatMap(Plot):
     plt.pcolormesh(time, ycore, cpi, vmin=cpi_min, vmax=cpi_max)
     plt.axis([time.min(),time.max(),ycore.min(),ycore.max()])
 
-    plt.title('Instructions Retired per Core Clock Cycle')
+    plt.title(self.k2[0] +'/'+self.k2[1])
     plt.colorbar()
 
     ax.set_xlabel('Time (hrs)')
 
     plt.close()
+
+    return self.fig
+
+class DevPlot(Plot):
+
+  def __init__(self,k1,k2):
+    self.k1 = k1
+    self.k2 = k2
+
+  def plot(self,jobid,save=False,outdir='.',ld=None,job_data=None):
+    self.ld=ld
+    self.setup(jobid,self.k1,self.k2,job_data=job_data)
+    cpu_name = self.k1.keys()[0]
+    type_name=self.k1[cpu_name][0]
+    schema = self.k2[cpu_name]
+    ts=self.ts
+    nr_events = len(schema)
+    self.fig, axarr = plt.subplots(nr_events, sharex=True, figsize=(8,nr_events*2), dpi=80)
+    do_rate = True
+    scale = 1.0
+    for i in range(nr_events):
+        if type_name == 'mem': 
+          do_rate = False
+          scale=2.0**10
+        if type_name == 'cpu':
+          scale=ts.wayness*100.0
+        self.plot_lines(axarr[i], [i], 3600., yscale=scale, do_rate = do_rate)
+
+        axarr[i].set_ylabel(schema[i],size='small')
+    axarr[-1].set_xlabel("Time (hr)")
+    self.fig.subplots_adjust(hspace=0.0)
+    self.fig.tight_layout()
 
     return self.fig

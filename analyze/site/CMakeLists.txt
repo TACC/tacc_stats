@@ -5,3 +5,6 @@ set(PY_INC_PATH ${CMAKE_SOURCE_DIR}/include)
 
 configure_file(${CMAKE_CURRENT_SOURCE_DIR}/stampede/sys_path_append.py.in 
   ${CMAKE_CURRENT_SOURCE_DIR}/stampede/sys_path_append.py @ONLY)
+
+configure_file(${CMAKE_CURRENT_SOURCE_DIR}/lonestar/sys_path_append.py.in 
+  ${CMAKE_CURRENT_SOURCE_DIR}/lonestar/sys_path_append.py @ONLY)

@@ -183,18 +183,17 @@ def get_data(pk):
 
 def master_plot(request, pk):
     data = get_data(pk)
-
     mp = plt.MasterPlot()
-    
     fig = mp.plot(pk,ld="pass",mintime=60,job_data=data)
     return figure_to_response(fig)
 
 def heat_map(request, pk):
     
     data = get_data(pk)
-    hm = plt.HeatMap(['intel_snb','intel_snb'],['INSTRUCTIONS_RETIRED','CLOCKS_UNHALTED_CORE'])
+    hm = plt.HeatMap(['intel_snb','intel_snb'],
+                     ['CLOCKS_UNHALTED_REF',
+                      'INSTRUCTIONS_RETIRED'])
     fig = hm.plot(pk,ld="pass",job_data=data)
-
     return figure_to_response(fig)
 
 class JobDetailView(DetailView):
@@ -226,28 +225,18 @@ class JobDetailView(DetailView):
 
 def type_plot(request, pk, type_name):
     data = get_data(pk)
+
     schema = data.get_schema(type_name).desc
     schema = string.replace(schema,',E',' ')
     schema = string.replace(schema,' ,',',').split()
     schema = [x.split(',')[0] for x in schema]
 
-
     k1 = {'intel_snb' : [type_name]*len(schema)}
     k2 = {'intel_snb': schema}
 
-    ts = tspl.TSPLSum(None,k1,k2,job_stats=data)
-    
-    nr_events = len(schema)
-    fig, axarr = plt.subplots(nr_events, sharex=True, figsize=(8,nr_events*2), dpi=80)
-    do_rate = True
-    for i in range(nr_events):
-        if type_name == 'mem': do_rate = False
+    tp = plt.DevPlot(k1,k2)
 
-        mp.plot_lines(axarr[i], ts, [i], 3600., do_rate = do_rate)
-        axarr[i].set_ylabel(schema[i],size='small')
-    axarr[-1].set_xlabel("Time (hr)")
-    fig.subplots_adjust(hspace=0.0)
-    fig.tight_layout()
+    fig=tp.plot(pk,ld='pass',job_data=data)
 
     return figure_to_response(fig)
 
@@ -262,10 +251,12 @@ def type_detail(request, pk, type_name):
     raw_stats = data.aggregate_stats(type_name)[0]  
 
     stats = []
+    scale = 1.0
+    if type_name == 'mem': scale=1.0/2**10.
     for t in range(len(raw_stats)):
         temp = []
         for event in range(len(raw_stats[t])):
-            temp.append(raw_stats[t,event])
+            temp.append(raw_stats[t,event]*scale)
         stats.append((data.times[t],temp))
 
 
