@@ -30,16 +30,15 @@ def ls4_update(meta = None):
     # Only need to populate lariat cache once
     jobid = meta.json.keys()[0]
 
-    ld = lariat_utils.LariatData(jobid,
-                                 end_epoch = meta.json[jobid]['end_epoch'],
-                                 directory = sys_path_append.lariat_path,
-                                 daysback = 2)
+    ld = lariat_utils.LariatData()
         
     for jobid, json in meta.json.iteritems():
 
         if LS4Job.objects.filter(id = jobid).exists(): continue  
-        ld = lariat_utils.LariatData(jobid,
-                                     olddata = ld.ld)
+        ld = ld.set_job(jobid,
+                        end_epoch = meta.json[jobid]['end_epoch'],
+                        directory = sys_path_append.lariat_path,
+                        daysback = 2)
 
         if json['exit_status'] != 0: json['status'] = 'TIMEOUT/CANCELLED'
         else: json['status'] = 'COMPLETED'

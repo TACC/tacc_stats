@@ -30,16 +30,17 @@ def update(meta = None):
     # Only need to populate lariat cache once
     jobid = meta.json.keys()[0]
 
-    ld = lariat_utils.LariatData(jobid,
-                                 end_epoch = meta.json[jobid]['end_epoch'],
-                                 directory = sys_path_append.lariat_path,
-                                 daysback = 2)
+    ld = lariat_utils.LariatData()
         
     for jobid, json in meta.json.iteritems():
 
         if Job.objects.filter(id = jobid).exists(): continue  
-        ld = lariat_utils.LariatData(jobid,
-                                     olddata = ld.ld)
+        
+        ld = ld.set_job(jobid,
+                        end_epoch = meta.json[jobid]['end_epoch'],
+                        directory = sys_path_append.lariat_path,
+                        daysback = 2)
+
         json['user'] = ld.user
         json['exe'] = ld.exc.split('/')[-1]
         json['cwd'] = ld.cwd[0:128]
