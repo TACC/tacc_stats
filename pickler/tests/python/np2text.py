@@ -2,7 +2,7 @@
 import cPickle as pickle
 import os,sys
 sys.path.append('@CONFIG_PY_DIR@')
-import job_stats
+from pickler import job_stats
 from numpy import *
 import subprocess
 

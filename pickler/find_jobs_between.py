@@ -1,9 +1,7 @@
 #!/usr/bin/env python
 import sys
-sys.path.append('@CONFIG_PY_DIR@')
+from pickler_conf import *
 import datetime, glob, os, sge_acct, subprocess, time
-
-execfile('pickles.conf')
 
 prog_name = os.path.basename(sys.argv[0])
 

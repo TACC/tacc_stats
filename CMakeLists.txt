@@ -4,9 +4,10 @@ set(PROJECT_VERSION "1.0.6")
 
 include(CTest)
 
-add_subdirectory(analyze)
 add_subdirectory(monitor)
 add_subdirectory(pickler)
+add_subdirectory(analysis)
+add_subdirectory(site)
 
 # add a target to generate API documentation with Doxygen
 find_package(Doxygen)

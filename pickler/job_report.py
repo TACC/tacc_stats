@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 import sys
-sys.path.append('@CONFIG_PY_DIR@')
+from pickler import *
 import human, job_stats, numpy, signal, string
 
 if __name__ == '__main__':
