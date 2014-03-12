@@ -11,54 +11,58 @@
 #include "string1.h"
 #include "lustre_obd_to_mnt.h"
 
-#define OBD_IOC_GETNAME 0xC0086683
+/* 
+This function grabs the super block address from 
+each Lustre OBD names and allows it to be used a dictionary ref.
+The key will be the lov name without the super block address.  
+*/
 
 struct dict sb_dict;
 
 __attribute__((constructor))
 static void sb_dict_init(void)
 {
-  const char *me_path = "/proc/mounts";
-  FILE *me_file = NULL;
+  char path[80];
+  FILE *file= NULL;
+  char file_buf[4096];
+  char *line = NULL;
+  size_t line_size = 0;
 
   if (dict_init(&sb_dict, 8) < 0) {
     ERROR("cannot create sb_dict: %m\n");
     goto out;
   }
 
-  me_file = setmntent(me_path, "r");
-  if (me_file == NULL) {
-    ERROR("cannot open `%s': %m\n", me_path);
+  char lov_name[128] = "";
+  char *sb_mnt = NULL;
+  
+  snprintf(path, sizeof(path), "/proc/fs/lustre/devices");
+  file = fopen(path,"r");
+  if (file == NULL) {
+    ERROR("cannot open `%s': %m\n", path);
     goto out;
   }
-
-  struct mntent me;
-  char me_buf[4096];
-  while (getmntent_r(me_file, &me, me_buf, sizeof(me_buf)) != NULL) {
-    int dir_fd = -1;
-    char lov_name[128] = "";
-    char *sb_mnt = NULL;
-
-    if (strcmp(me.mnt_type, "lustre") != 0)
-      goto next;
-
-    dir_fd = open(me.mnt_dir, O_RDONLY);
-    if (dir_fd < 0) {
-      ERROR("cannot open `%s': %m\n", me.mnt_dir);
-      goto next;
-    }
-
-    if (ioctl(dir_fd, OBD_IOC_GETNAME, lov_name) < 0) {
-      ERROR("cannot get lov name for `%s': %m\n", me.mnt_dir);
-      goto next;
-    }
-
+  setvbuf(file, file_buf, _IOFBF, sizeof(file_buf));
+    
+  /* Get lov name and use super block address as dict hash */
+  while (getline(&line, &line_size, file) >= 0) {
+    int num;
+    char status[24];
+    char type[24];
+    
+    sscanf(line,"%d %s %s %s",&num,status,type,lov_name);
+    
+    if (strcmp(type,"lov") != 0)
+      continue;
+    
+    TRACE("num %d status %s type %s name %s\n",num,status,type,lov_name);
+    
     /* lov_name is of the form `work-clilov-ffff8102658ec800'. */
     if (strlen(lov_name) < 16) {
       ERROR("invalid lov name `%s'\n", lov_name);
       goto next;
     }
-
+    
     /* Get superblock address (the `ffff8102658ec800' part). */
     const char *sb = lov_name + strlen(lov_name) - 16;
     hash_t hash = dict_strhash(sb);
@@ -67,34 +71,37 @@ static void sb_dict_init(void)
       TRACE("multiple filesystems with super block `%s'\n", sb);
       goto next;
     }
+    
+    /* Get name of lov w/ superblock address stripped */
+    char *p;
+    p = lov_name + strlen(lov_name) - 16 - 1;
+    *p = '\0';
 
-    sb_mnt = malloc(16 + 1 + strlen(me.mnt_dir) + 1);
+    sb_mnt = malloc(16 + 1 + strlen(lov_name) + 1);
     if (sb_mnt == NULL) {
       ERROR("cannot allocate sb_mnt: %m\n");
       goto next;
     }
-
+    
     strcpy(sb_mnt, sb);
-    strcpy(sb_mnt + 16 + 1, me.mnt_dir);
-
+    strcpy(sb_mnt + 16 + 1, lov_name);
+    
     if (dict_entry_set(&sb_dict, de, hash, sb_mnt) < 0) {
       ERROR("cannot set sb_dict entry: %m\n");
       free(sb_mnt);
       goto next;
     }
 
-    TRACE("fsname `%s', dir `%s', type `%s', lov_uuid `%s', sb `%s'\n",
-          me.mnt_fsname, me.mnt_dir, me.mnt_type, lov_name, sb);
-
   next:
-    if (dir_fd >= 0)
-      close(dir_fd);
+    continue;
   }
 
  out:
-  if (me_file != NULL)
-    endmntent(me_file);
 
+  free(line);
+  if(file != NULL)
+    fclose(file);
+  
   TRACE("found %zu lustre filesystems\n", sb_dict.d_count);
 
 #ifdef DEBUG
