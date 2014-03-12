@@ -170,7 +170,8 @@ reset and freeze the counters.
 #define CAS_READS           MBOX_PERF_EVENT(0x04, 0x03)
 #define CAS_WRITES          MBOX_PERF_EVENT(0x04, 0x0C)
 #define ACT_COUNT           MBOX_PERF_EVENT(0x01, 0x00)
-#define PRE_COUNT_ALL       MBOX_PERF_EVENT(0x02, 0x01)
+#define PRE_COUNT_ALL       MBOX_PERF_EVENT(0x02, 0x03)
+#define PRE_COUNT_MISS       MBOX_PERF_EVENT(0x02, 0x01)
 //@}
 
 static int intel_snb_imc_begin_dev(char *bus_dev, uint32_t *events, size_t nr_events)
@@ -250,10 +251,10 @@ static int intel_snb_imc_begin(struct stats_type *type)
   int nr = 0;
   
   uint32_t imc_events[4][4] = {
-    { CAS_READS, CAS_WRITES, ACT_COUNT, PRE_COUNT_ALL,},
-    { CAS_READS, CAS_WRITES, ACT_COUNT, PRE_COUNT_ALL,},
-    { CAS_READS, CAS_WRITES, ACT_COUNT, PRE_COUNT_ALL,},
-    { CAS_READS, CAS_WRITES, ACT_COUNT, PRE_COUNT_ALL,},
+    { CAS_READS, CAS_WRITES, ACT_COUNT, PRE_COUNT_MISS,},
+    { CAS_READS, CAS_WRITES, ACT_COUNT, PRE_COUNT_MISS,},
+    { CAS_READS, CAS_WRITES, ACT_COUNT, PRE_COUNT_MISS,},
+    { CAS_READS, CAS_WRITES, ACT_COUNT, PRE_COUNT_MISS,},
   };
 
   /* 2 buses and 4 devices per bus */

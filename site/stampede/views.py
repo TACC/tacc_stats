@@ -12,7 +12,10 @@ import os,sys
 import analysis
 from analysis.gen import tspl, lariat_utils
 from analysis.plot import plots as plt
-import job_stats as data
+from pickler import job_stats, batch_acct
+# Compatibility with old pickle versions
+sys.modules['job_stats'] = job_stats
+sys.modules['batch_acct'] = batch_acct
 import cPickle as pickle 
 import time
    
