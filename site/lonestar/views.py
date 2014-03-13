@@ -7,8 +7,9 @@ import matplotlib.pyplot as plt
 from pylab import figure, hist, plot
 
 from lonestar.models import LS4Job, LS4JobForm
-import sys_path_append
 import os,sys
+sys.path.append('../lib')
+import sys_conf
 import analysis
 from analysis.gen import tspl, lariat_utils
 from analysis.plot import plots as plt
@@ -22,12 +23,8 @@ import numpy as np
 
 from django.core.cache import cache,get_cache 
 
-path = sys_path_append.pickles_dir
-
 def ls4_update(meta = None):
     if not meta: return
-
-    #LS4Job.objects.all().delete()
 
     # Only need to populate lariat cache once
     jobid = meta.json.keys()[0]
@@ -39,7 +36,7 @@ def ls4_update(meta = None):
         if LS4Job.objects.filter(id = jobid).exists(): continue  
         ld = ld.set_job(jobid,
                         end_epoch = meta.json[jobid]['end_epoch'],
-                        directory = sys_path_append.lariat_path,
+                        directory = sys_conf.lariat_path,
                         daysback = 2)
 
         if json['exit_status'] != 0: json['status'] = 'TIMEOUT/CANCELLED'
@@ -82,7 +79,7 @@ def ls4_update(meta = None):
 
 def dates(request):
     
-    date_list = os.listdir(path)
+    date_list = os.listdir(sys_conf.pickles_dir)
     date_list = sorted(date_list, key=lambda d: map(int, d.split('-')))
 
     month_dict ={}
@@ -192,10 +189,8 @@ def hist_summary(request, date = None, project = None, user = None, exe = None):
 
 
 def figure_to_response(f):
-    response = HttpResponse(content_type='image/svg+xml')
-    f.savefig(response, format='svg')
-    plt.close(f)
-    f.clear()
+    response = HttpResponse(content_type='image/png')
+    f.savefig(response, format='png')
     return response
 
 def get_data(pk):
@@ -210,60 +205,19 @@ def get_data(pk):
 
 def master_plot(request, pk):
     data = get_data(pk)
-    
-    fig, fname = mp.master_plot(None,header=None,mintime=60,wayness=int(data.acct['granted_pe'].rstrip('way')),lariat_dict="pass",job_stats=data)
-    return figure_to_response(fig)
+    mp = plt.MasterPlot(ld="pass")
+    mp.plot(pk,job_data=data)
+    return figure_to_response(mp.fig)
 
 def heat_map(request, pk):
     
     data = get_data(pk)
-
-    k1 = {'intel' : ['intel_pmc3']}
-
-    k2 = {'intel': ['MEM_LOAD_RETIRED_L1D_HIT']}
-    #k2 = {'intel': ['INSTRUCTIONS_RETIRED']}
-    ts0 = tspl.TSPLBase(None,k1,k2,job_stats = data)
-
-    k2 = {'intel': ['CLOCKS_UNHALTED_CORE']}
-    ts1 = tspl.TSPLBase(None,k1,k2,job_stats = data)
-
-    cpi = np.array([])
-    hosts = []
-    for v in ts0.data[0]:
-        hosts.append(v)
-        ncores = len(ts0.data[0][v])
-        for k in range(ncores):
-            i = np.array(ts0.data[0][v][k],dtype=np.float)
-            c = np.array(ts1.data[0][v][k],dtype=np.float)
-            ratio = np.divide(np.diff(i),np.diff(c))
-            if not cpi.size: cpi = np.array([ratio])
-            else: cpi = np.vstack((cpi,ratio))
-    cpi_min, cpi_max = cpi.min(), cpi.max()
-
-    fig,ax=plt.subplots(1,1,figsize=(8,12),dpi=110)
-
-    ycore = np.arange(cpi.shape[0]+1)
-    time = ts0.t/3600.
-
-    yhost=np.arange(len(hosts)+1)*ncores + ncores    
-
-    fontsize = 10
-
-    if len(yhost) > 80:
-        fontsize /= 0.5*np.log(len(yhost))
-        
-    plt.yticks(yhost - ncores/2.,hosts,size=fontsize) 
-    plt.pcolormesh(time, ycore, cpi, vmin=cpi_min, vmax=cpi_max)
-    plt.axis([time.min(),time.max(),ycore.min(),ycore.max()])
-
-    plt.title('L1D Load Hits per Core Clock Cycle')
-    plt.colorbar()
-
-    ax.set_xlabel('Time (hrs)')
-
-    plt.close()
-
-    return figure_to_response(fig)
+    hm = plt.HeatMap({'intel' : ['intel_pmc3','intel_pmc3']},
+                     {'intel' : ['CLOCKS_UNHALTED_REF',
+                                 'INSTRUCTIONS_RETIRED']},
+                     lariat_data="pass")
+    hm.plot(pk,job_data=data)
+    return figure_to_response(hm.fig)
 
 def build_schema(data,name):
     schema = []
@@ -307,20 +261,8 @@ def type_plot(request, pk, type_name):
     k1 = {'intel' : [type_name]*len(schema)}
     k2 = {'intel': schema}
 
-    ts = tspl.TSPLSum(None,k1,k2,job_stats=data)
-    
-    nr_events = len(schema)
-    fig, axarr = plt.subplots(nr_events, sharex=True, figsize=(8,nr_events*2), dpi=80)
-    do_rate = True
-    for i in range(nr_events):
-        if type_name == 'mem': do_rate = False
-
-        mp.plot_lines(axarr[i], ts, [i], 3600., do_rate = do_rate)
-        axarr[i].set_ylabel(schema[i],size='small')
-    axarr[-1].set_xlabel("Time (hr)")
-    fig.subplots_adjust(hspace=0.0)
-    fig.tight_layout()
-
+    tp = plt.DevPlot(k1,k2,lariat_data='pass')
+    tp.plot(pk,job_data=data)
     return figure_to_response(fig)
 
 
@@ -332,10 +274,11 @@ def type_detail(request, pk, type_name):
     raw_stats = data.aggregate_stats(type_name)[0]  
 
     stats = []
+    scale = 1.0
     for t in range(len(raw_stats)):
         temp = []
         for event in range(len(raw_stats[t])):
-            temp.append(raw_stats[t,event])
+            temp.append(raw_stats[t,event]*scale)
         stats.append((data.times[t],temp))
 
 

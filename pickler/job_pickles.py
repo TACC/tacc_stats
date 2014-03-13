@@ -1,8 +1,8 @@
 #!/usr/bin/env python
 import os,sys
-from pickler import batch_acct,job_stats,pickler_conf
-if os.path.isfile("pickler_conf.py"):
-    import pickler_conf
+import sys_conf
+sys.path.append(sys_conf.tacc_stats_lib)
+from pickler import batch_acct,job_stats
 import datetime, subprocess, time
 import cPickle as pickle
 import multiprocessing, functools
@@ -41,7 +41,7 @@ def job_pickler(acct, pickle_dir = '.', batch = None):
         print acct['id'] + " exists, don't reprocess"
         return
 
-    job = job_stats.from_acct(acct, pickler_conf.tacc_stats_home, pickler_conf.host_list_dir, batch)
+    job = job_stats.from_acct(acct, sys_conf.tacc_stats_home, sys_conf.host_list_dir, batch)
     pickle_path = os.path.join(pickle_dir, job.id)
     pickle_file = open(pickle_path, 'wb')
     pickle.dump(job, pickle_file, pickle_prot)
@@ -58,10 +58,10 @@ def main():
     end = getdate(sys.argv[3])
 
     pool = multiprocessing.Pool(processes = 1)
-    a=batch_acct.factory(pickler_conf.batch_system, pickler_conf.acct_path, pickler_conf.host_name_ext)
+    a=batch_acct.factory(sys_conf.batch_system, sys_conf.acct_path, sys_conf.host_name_ext)
 
     partial_pickler = functools.partial(job_pickler, pickle_dir = pickle_dir, batch = a)
-    pool.imap_unordered(partial_pickler, a.reader(start_time=start,end_time=end,seek=pickler_conf.seek),100)
+    pool.imap_unordered(partial_pickler, a.reader(start_time=start,end_time=end,seek=sys_conf.seek),100)
     pool.close()
     pool.join()
 

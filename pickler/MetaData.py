@@ -2,9 +2,9 @@ import os, sys
 from datetime import datetime
 import pytz
 import cPickle as pickle
-import job_stats
-import lariat_utils
-import analyze_conf
+from analysis import job_stats
+sys.modules['job_stats'] = job_stats
+sys.modules['batch_acct'] = batch_acct
 
 utc = pytz.utc
 pickle_prot = pickle.HIGHEST_PROTOCOL

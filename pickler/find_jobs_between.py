@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 import sys
-from pickler_conf import *
+from sys_conf import *
 import datetime, glob, os, sge_acct, subprocess, time
 
 prog_name = os.path.basename(sys.argv[0])

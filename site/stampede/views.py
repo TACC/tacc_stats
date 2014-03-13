@@ -7,8 +7,8 @@ import matplotlib.pyplot as plt
 from pylab import figure, hist, plot
 
 from stampede.models import Job, JobForm
-import sys_path_append
 import os,sys
+import sys_conf
 import analysis
 from analysis.gen import tspl, lariat_utils
 from analysis.plot import plots as plt
@@ -23,12 +23,8 @@ import numpy as np
 
 from django.core.cache import cache,get_cache 
 
-path = sys_path_append.pickles_dir
-
 def update(meta = None):
     if not meta: return
-
-    #Job.objects.all().delete()
 
     # Only need to populate lariat cache once
     jobid = meta.json.keys()[0]
@@ -41,7 +37,7 @@ def update(meta = None):
         
         ld = ld.set_job(jobid,
                         end_epoch = meta.json[jobid]['end_epoch'],
-                        directory = sys_path_append.lariat_path,
+                        directory = sys_conf.lariat_path,
                         daysback = 2)
 
         json['user'] = ld.user
@@ -57,7 +53,7 @@ def update(meta = None):
 
 def dates(request):
     
-    date_list = os.listdir(path)
+    date_list = os.listdir(sys_conf.pickles_dir)
     date_list = sorted(date_list, key=lambda d: map(int, d.split('-')))
 
     month_dict ={}
@@ -187,18 +183,27 @@ def get_data(pk):
 
 def master_plot(request, pk):
     data = get_data(pk)
-    mp = plt.MasterPlot()
-    fig = mp.plot(pk,ld="pass",mintime=60,job_data=data)
-    return figure_to_response(fig)
+    mp = plt.MasterPlot(lariat_data="pass")
+    mp.plot(pk,job_data=data)
+    return figure_to_response(mp.fig)
 
 def heat_map(request, pk):
     
     data = get_data(pk)
-    hm = plt.HeatMap(['intel_snb','intel_snb'],
-                     ['CLOCKS_UNHALTED_REF',
-                      'INSTRUCTIONS_RETIRED'])
-    fig = hm.plot(pk,ld="pass",job_data=data)
-    return figure_to_response(fig)
+    hm = plt.HeatMap({'intel_snb' : ['intel_snb','intel_snb']},
+                     {'intel_snb' : ['CLOCKS_UNHALTED_REF',
+                                     'INSTRUCTIONS_RETIRED']},
+                     lariat_data="pass")
+    hm.plot(pk,job_data=data)
+    return figure_to_response(hm.fig)
+
+def build_schema(data,name):
+    schema = []
+    for key,value in data.get_schema(name).iteritems():
+        if value.unit:
+            schema.append(value.key + ','+value.unit)
+        else: schema.append(value.key)
+    return schema
 
 class JobDetailView(DetailView):
 
@@ -216,9 +221,7 @@ class JobDetailView(DetailView):
         for host_name, host in data.hosts.iteritems():
             host_list.append(host_name)
         for type_name, type in host.stats.iteritems():
-            schema = data.get_schema(type_name).desc
-            schema = string.replace(schema,',E',' ')
-            schema = string.replace(schema,',',' ')
+            schema = ' '.join(build_schema(data,type_name))
             type_list.append( (type_name, schema) )
 
         type_list = sorted(type_list, key = lambda type_name: type_name[0])
@@ -230,33 +233,25 @@ class JobDetailView(DetailView):
 def type_plot(request, pk, type_name):
     data = get_data(pk)
 
-    schema = data.get_schema(type_name).desc
-    schema = string.replace(schema,',E',' ')
-    schema = string.replace(schema,' ,',',').split()
+    schema = build_schema(data,type_name)
     schema = [x.split(',')[0] for x in schema]
 
     k1 = {'intel_snb' : [type_name]*len(schema)}
     k2 = {'intel_snb': schema}
 
-    tp = plt.DevPlot(k1,k2)
-
-    fig=tp.plot(pk,ld='pass',job_data=data)
-
-    return figure_to_response(fig)
+    tp = plt.DevPlot(k1,k2,lariat_data='pass')
+    tp.plot(pk,job_data=data)
+    return figure_to_response(tp.fig)
 
 
 def type_detail(request, pk, type_name):
     data = get_data(pk)
 
-    schema = data.get_schema(type_name).desc
-    schema = string.replace(schema,',E',' ')
-    schema = string.replace(schema,' ,',',').split()
-
+    schema = build_schema(data,type_name)
     raw_stats = data.aggregate_stats(type_name)[0]  
 
     stats = []
     scale = 1.0
-    if type_name == 'mem': scale=1.0/2**10.
     for t in range(len(raw_stats)):
         temp = []
         for event in range(len(raw_stats[t])):

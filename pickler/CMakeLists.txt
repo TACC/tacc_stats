@@ -1,16 +1,4 @@
-set(PY_INC_PATH ${CMAKE_SOURCE_DIR}/include)
 set(PY_LIB_PATH ${CMAKE_SOURCE_DIR}/lib/pickler)
-set(LARIAT_PATH ${lariat_path})
-
-# Write pickler runtime configuration file
-file(WRITE "${PY_LIB_PATH}/pickler_conf.py")
-file(APPEND "${PY_LIB_PATH}/pickler_conf.py" 
-  tacc_stats_home=\"${tacc_stats_home}\"\n
-  acct_path=\"${acct_path}\"\n
-  host_list_dir=\"${host_list_dir}\"\n
-  host_name_ext=\"${host_name_ext}\"\n
-  batch_system=\"${batch_system}\"\n
-  seek=0\n)
 
 # Setup python scripts and module locations
 # place support modules in PY_LIB_PATH dir

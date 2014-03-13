@@ -1,38 +1,202 @@
 import os, sys, subprocess, glob
-
+sys.path.append('@CMAKE_SOURCE_DIR@/lib')
+from analysis.exam import tests
+from analysis.plot import plots
 ### Test plotters
 
-def test(name, args, outfile):
-    subprocess.call('@CMAKE_CURRENT_SOURCE_DIR@/../' + name + ' ' + args, shell=True)
-    plot_files = glob.glob('@CMAKE_CURRENT_BINARY_DIR@/' + outfile)
-    if not plot_files:
-        print name+' test failed'
-        print False
-        sys.exit()
-    #subprocess.call('rm @CMAKE_CURRENT_BINARY_DIR@/' + outfile, shell=True)
-    
+filelist = ['@TEST_DATA@']
+
+#### MemUsage plotter
+meta_plot = plots.MetaDataRate(outdir='@CMAKE_CURRENT_BINARY_DIR@/python',
+                          prefix='MetaDataRate',
+                          header='Plot Meta Data Rate',lariat_data='pass',
+                          save=True)
+meta_plot.plot(filelist[0])
+
+if os.path.isfile(meta_plot.outdir+'/'+meta_plot.fname+'.png'): pass
+else:
+    print False
+    sys.exit()
+
+#### MemUsage plotter
+mu_plot = plots.MemUsage(outdir='@CMAKE_CURRENT_BINARY_DIR@/python',
+                          prefix='MemUsage',
+                          header='Plot all events for a device',lariat_data='pass',
+                          save=True)
+mu_plot.plot(filelist[0])
+
+if os.path.isfile(mu_plot.outdir+'/'+mu_plot.fname+'.png'): pass
+else:
+    print False
+    sys.exit()
+
+
+#### Test device level plotter
+dev_plot = plots.DevPlot({'intel_snb' : ['mem']}, {'intel_snb' : ['MemUsed']},
+                         outdir='@CMAKE_CURRENT_BINARY_DIR@/python',
+                         prefix='MemUsed',
+                         header='Plot all events for a device',lariat_data='pass',
+                         save=True)
+dev_plot.plot(filelist[0])
+
+if os.path.isfile(dev_plot.outdir+'/'+dev_plot.fname+'.png'): pass
+else:
+    print False
+    sys.exit()
+
+#### Heat Map plotter
+heat_plot = plots.HeatMap({'intel_snb' : ['intel_snb','intel_snb']}, 
+                          {'intel_snb' : ['CLOCKS_UNHALTED_REF','INSTRUCTIONS_RETIRED']},
+                         outdir='@CMAKE_CURRENT_BINARY_DIR@/python',
+                         prefix='CPI',
+                         header='Heat map of CPI',lariat_data='pass',
+                         save=True)
+heat_plot.plot(filelist[0])
+
+if os.path.isfile(heat_plot.outdir+'/'+heat_plot.fname+'.png'): pass
+else:
+    print False
+    sys.exit()
+
+#### Node Imbalance
+print '-----------------'
+print "Imbalance test"
+imb_test = tests.Imbalance(['intel_snb'],['LOAD_L1D_ALL'],
+                           processes=1,threshold=0.01)
+imb_test.run(filelist)
+imb_test.find_top_users()
+
+print "Jobs with imbalances"
+print imb_test.failed()
+if len(imb_test.failed()) == 1: pass
+else: 
+    print False
+    sys.exit()
+plotter = plots.MasterPlot(mode='lines',
+                           outdir='@CMAKE_CURRENT_BINARY_DIR@/python',
+                           threshold=imb_test.threshold,prefix='imbalance',
+                           header='Potentially Imbalanced',lariat_data='pass',
+                           wide=True,save=True)
+plotter.plot(imb_test.failed()[0])
+
+if os.path.isfile(plotter.outdir+'/'+plotter.fname+'.png'): pass
+else:
+    print False
+    sys.exit()
+
+plotter.mode='percentile'
+plotter.header='Potentially Imbalanced (%)'
+plotter.plot(imb_test.failed()[0])
+
+if os.path.isfile(plotter.outdir+'/'+plotter.fname+'.png'): pass
+else:
+    print False
+    sys.exit()
+
+#### Idle
+print '-----------------'
+print "Idle host test"
+idle_test = tests.Idle(processes=1,threshold=1-0.9)
+idle_test.run(filelist)
+
+print 'Failed Jobs List'
+print idle_test.failed()
+
+if imb_test.failed() == idle_test.failed(): pass
+else: 
+    print False
+    sys.exit()
+
+
+#### Catastrophic
+print '-----------------'
+print "Catastrophic test"
+cat_test = tests.Catastrophe(processes=1,threshold=10)
+cat_test.run(filelist)
+
+print 'Failed Jobs List'
+print cat_test.failed()
+if imb_test.failed() == cat_test.failed(): pass
+else: 
+    print False
+    sys.exit()
+
+plotter.mode='lines'
+plotter.prefix='step'
+plotter.header='Step Function Performance'
+plotter.threshold=cat_test.threshold
+plotter.plot(cat_test.failed()[0])
+
+if os.path.isfile(plotter.outdir+'/'+plotter.fname+'.png'): pass
+else:
+    print False
+    sys.exit()
+
+#### Low FLOPS test
+print '-----------------'
+print "Low FLOPS test"
+flops_test = tests.LowFLOPS(processes=1,threshold=1e9)
+flops_test.run(filelist)
+
+print 'Failed Jobs List'
+print flops_test.failed()
+
+if imb_test.failed() == flops_test.failed(): pass
+else: 
+    print False
+    sys.exit()
+
+plotter.mode='lines'
+plotter.prefix='lowflops'
+plotter.header='Measured Low Flops'
+plotter.threshold=flops_test.threshold
+
+plotter.plot(flops_test.failed()[0])
+
+if os.path.isfile(plotter.outdir+'/'+plotter.fname+'.png'): pass
+else:
+    print False
+    sys.exit()
+
+#### Memory Bandwidth
+print '-----------------'
+print "Memory BW test"
+bw_test = tests.MemBw(processes=1,threshold=0.1)
+bw_test.run(filelist)
+
+print 'Failed Jobs List'
+print bw_test.failed()
+if imb_test.failed() == bw_test.failed(): pass
+else: 
+    print False
+    sys.exit()
+
+#### Metadata Rate
+print '-----------------'
+print "MetaDataRate test"
+md_test = tests.MemBw(processes=1,threshold=0.1)
+md_test.run(filelist)
+
+print 'Failed Jobs List'
+print md_test.failed()
+if imb_test.failed() == md_test.failed(): pass
+else: 
+    print False
+    sys.exit()
+
+
 programs = [
     ['adjust.py','intel_snb SSE_D_ALL @TEST_DATA@','graph*adjust.*'],
     ['aggregate_jobs.py', '-f @TEST_DATA@ -k1 intel_snb -k2 SSE_D_ALL -p 1', 'bar.*'],
-    #['catastrophe.py', '-o @CMAKE_CURRENT_BINARY_DIR@ @TEST_DATA@','*step*master*'],
     ['corr.py','-p 1 @TEST_DATA@','msr_v_mem*.*'],
     ['dump_csv_weijia.py', '-p 1 @TEST_DATA@', 'dump.csv'],
-    #['idlehost.py','@TEST_DATE@',],
-    ['imbalance.py','0.01 intel_snb SSE_D_ALL @TEST_DATA@','graph*imbalance*.*'],
-    ['lowflops.py','-t 1000 -o @CMAKE_CURRENT_BINARY_DIR@ @TEST_DATA@','lowflops*master*.*'],
-    ['masterplot.py', '@TEST_DATA@ -m lines -p 1 -s 1 -o @CMAKE_CURRENT_BINARY_DIR@', 'graph*master.*'],
-    ['membw.py', '-t 0.01 @TEST_DATA@ -o @CMAKE_CURRENT_BINARY_DIR@','high*master.*'],
     ['mempercore.py', '@TEST_DATA@', 'mempercore*.*'],
     ['memusage.py', '@TEST_DATA@', 'graph*mem*Mem*.*'],
-    ['metadata_rate.py','-t 0.01 @TEST_DATA@','metadata*.*'],
     ['phase.py','intel_snb SSE_D_ALL @TEST_DATA@','graph*phase*.*'],
     ['plot.py','@TEST_DATA@','plot_*'],
     ['plotkey.py','intel_snb SSE_D_ALL @TEST_DATA@ -m','graph*heatmap*.*'],
     ['uncorrelated.py','1 intel_snb SSE_D_ALL intel_snb STALLS @TEST_DATA@','graph*vs*.*'],
     ['userplot.py','-p 1 -o @CMAKE_CURRENT_BINARY_DIR@ @TEST_DATA@ -u r_tsyshe', 'r_tsyshe.*']
     ]
-for program, arg, outfile in programs:
-    print 'Test '+program
-    test(program, arg, outfile)
 
 print True

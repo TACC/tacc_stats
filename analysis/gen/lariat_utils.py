@@ -60,13 +60,7 @@ class LariatData:
 
   def __init__(self):
     # Initialize to invalid/empty states
-    self.id=0
     self.ld=dict()
-    self.user='nobody'
-    self.exc='unknown'
-    self.cwd='unknown'
-    self.threads=1
-    self.wayness=-1
   def set_job(self,jobid,end_epoch=-1,directory=None,daysback=0):
     # Find the set of JSON files matching the end_epoch date
     # Initialize to invalid/empty states
@@ -93,8 +87,8 @@ class LariatData:
             json_str = open(m).read()
             json_str = re.sub(r'\\','',json_str)
             self.ld.update(json.loads(json_str))
-      else:
-        print 'File for ' + jobid + ' not found in ' + directory
+      #else:
+      #  print 'File for ' + jobid + ' not found in ' + directory
 
     try:
       self.ld[jobid].sort(key=lambda ibr: int(ibr['startEpoch']))
@@ -107,8 +101,8 @@ class LariatData:
       self.threads=self.ld[jobid][0]['numThreads']
       self.wayness=int(self.ld[jobid][0]['numCores'])/int(self.ld[jobid][0]['numNodes'])
     except KeyError:
-      print str(jobid) + ' did not call ibrun' + \
-            ' or has no lariat data for some other reason'
+      #print str(jobid) + ' did not call ibrun' + \
+      #      ' or has no lariat data for some other reason'
       self.ld[jobid]=None
     except: pass
 

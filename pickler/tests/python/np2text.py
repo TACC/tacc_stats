@@ -2,6 +2,8 @@
 import cPickle as pickle
 import os,sys
 sys.path.append('@CONFIG_PY_DIR@')
+import sys_conf
+sys.path.append(sys_conf.tacc_stats_lib)
 from pickler import job_stats
 from numpy import *
 import subprocess

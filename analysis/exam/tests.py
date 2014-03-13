@@ -6,9 +6,8 @@ import operator
 from scipy.stats import tmean,tstd
 import multiprocessing
 
-from analyze_conf import lariat_path
-from plot import plots
-from gen import lariat_utils,tspl,tspl_utils
+from sys_conf import lariat_path
+from ..gen import lariat_utils,tspl,tspl_utils
 
 def unwrap(arg,**kwarg):
   return arg[0].test(*arg[1:],**kwarg)
@@ -22,40 +21,15 @@ class Test(object):
   def k2(self): pass
 
   ts = None
-  ld = None
-  aggregate = None
-  plot = None
-  thresh=None
 
-  def __init__(self,processes=1,threshold='0.5',aggregate=True,plot=False):
+  def __init__(self,processes=1,**kwargs):
     self.processes=processes
-    self.ld=lariat_utils.LariatData()
-
-    self.thresh=threshold
-    self.aggregate=aggregate
-    self.plot=plot
+    self.threshold=kwargs.get('threshold',None)
+    self.aggregate=kwargs.get('aggregate',True)
 
     manager=multiprocessing.Manager()
     self.ratios=manager.dict()
     self.results=manager.dict()
-
-  def run(self,filelist):
-    if not filelist: return 
-    pool=multiprocessing.Pool(processes=self.processes) 
-    pool.map(unwrap,zip([self]*len(filelist),filelist))
-    pool.close()
-    pool.join()
-
-  def comp2thresh(self,jobid,val,func='>'):
-    comp = {'>': operator.gt, '>=': operator.ge,
-                '<': operator.le, '<=': operator.le,
-                '==': operator.eq}
-
-    if comp[func](val, self.thresh):
-      self.results[jobid] = True
-    else:
-      self.results[jobid] = False
-    return
 
   def setup(self,jobid):
     self.exception=False
@@ -72,9 +46,24 @@ class Test(object):
       print 'End of file found reading: ' + jobid
       return
 
+  def run(self,filelist):
+    if not filelist: return 
+    pool=multiprocessing.Pool(processes=self.processes) 
+    pool.map(unwrap,zip([self]*len(filelist),filelist))
+
+  def comp2thresh(self,jobid,val,func='>'):
+    comp = {'>': operator.gt, '>=': operator.ge,
+                '<': operator.le, '<=': operator.le,
+                '==': operator.eq}
+
+    if comp[func](val, self.threshold):
+      self.results[jobid] = True
+    else:
+      self.results[jobid] = False
+    return
+
   def failed(self):
     results=self.results
-
     jobs=[]
     for i in results.keys():
       if results[i]:
@@ -86,7 +75,7 @@ class Test(object):
     """Run the test for a single job"""
     return
 
-class Mem_bw(Test):
+class MemBw(Test):
 
   k1=['intel_snb_imc', 'intel_snb_imc']
   k2=['CAS_READS', 'CAS_WRITES']
@@ -108,12 +97,7 @@ class Mem_bw(Test):
     mdr=tmean(gdramrate)/self.ts.numhosts
     self.comp2thresh(jobid,mdr/peak)
 
-    if self.results[jobid] and self.plot:
-      plotter = plots.MasterPlot(self)
-      plotter.plot(jobid,threshhold=thresh,prefix='highmembw',
-                   header='High Memory Bandwidth',save=True)
-
-      return
+    return
 
 class Idle(Test):
   k1={'amd64' : ['amd64_core','amd64_sock','cpu'],
@@ -150,49 +134,18 @@ class Idle(Test):
     val = max(sums)
     self.comp2thresh(jobid,val)
 
-    if self.results[jobid] and self.plot:
-
-      plotter = plots.MasterPlot()
-
-      self.ld.set_job(self.ts.j.id,
-                      end_epoch=self.ts.j.end_time,
-                      directory=lariat_path,daysback=3)
-
-      plotter = plots.MasterPlot()
-      plotter.plot(jobid,prefix='idle_host',header='Idle Host',
-                   threshold=self.thresh,ld=self.ld,wide=True,save=True)
-
     return
-
-
-class FindJobs(Test):
-  k1=['cpu']
-  k2=['user']
-
-  def __init__(self,processes=1,keyword=None):
-    self.keyword=keyword
-    super(FindJobs,self).__init__(processes=processes)
-                                   
-  def test(self,jobid):
-    self.setup(jobid)
-    if self.exception: return
-    self.ld.set_job(self.ts.j.id,
-                    end_epoch=self.ts.j.end_time,
-                    directory=lariat_path,daysback=3)
-    if self.keyword in self.ld.ld: print jobid,self.ld.ld
-
 
 class Imbalance(Test):
   k1=None
   k2=None
 
-  def __init__(self,k1,k2,processes=1,threshold=1.0,aggregate=True,
-               plot=False):
+  def __init__(self,k1,k2,processes=1,threshold=1.0,aggregate=True):
     self.k1=k1
     self.k2=k2
     super(Imbalance,self).__init__(processes=processes,
                                    threshold=threshold,
-                                   aggregate=aggregate,plot=plot)
+                                   aggregate=aggregate)
 
   def test(self,jobid):
 
@@ -239,29 +192,7 @@ class Imbalance(Test):
     # mean of ratios is the threshold statistic
     var=tmean(self.ratio) 
     self.ratios[self.ts.j.id]=[var,self.ts.owner]
-    #print self.ts.j.id+': ' +str(var)
     self.comp2thresh(jobid,abs(var))
-
-    if self.results[jobid] and self.plot:
-      #plotter = plots.RatioPlot(self)
-      #plotter.plot(jobid,save=True)
-
-      plotter = plots.MasterPlot()
-
-      self.ld.set_job(self.ts.j.id,
-                      end_epoch=self.ts.j.end_time,
-                      directory=lariat_path,daysback=3)
-
-      plotter.plot(jobid,mode='lines',ld=self.ld,
-                   threshold=self.thresh,prefix='imbalance',
-                   header='Potentially Imbalanced',
-                   wide=True,save=True)
-      
-      plotter.plot(jobid,mode='percentile',ld=self.ld,
-                   threshold=self.thresh,prefix='imbalance',
-                   header='Potentially Imbalanced (%)',
-                   wide=True,save=True)
-
 
   def find_top_users(self):
     users={}
@@ -339,18 +270,8 @@ class Catastrophe(Test):
 
     for (ind,ratio) in r:
       self.comp2thresh(jobid,ratio,'<')
-      #if self.results[jobid]: print jobid+': '+str(r)
       if self.results[jobid]: break
 
-    if self.results[jobid] and self.plot:
-      plotter = plots.MasterPlot()
-      self.ld.set_job(self.ts.j.id,
-                      end_epoch=self.ts.j.end_time,
-                      directory=lariat_path,daysback=3)
-
-      plotter.plot(jobid,prefix='step',header='Step Function Performance',
-                   ld=self.ld,wayness=[x+1 for x in range(16)],mintime=1,
-                   threshold=self.thresh,wide=True,save=True)
     return
 
 class LowFLOPS(Test):
@@ -394,15 +315,6 @@ class LowFLOPS(Test):
       self.comp2thresh(jobid,(mfr/self.peak[ts.pmc_type][0])/(mdr/self.peak[ts.pmc_type][1]),'<')
     else: self.results[jobid]=False
 
-    if self.results[jobid] and self.plot:
-      plotter = plots.MasterPlot()
-      self.ld.set_job(self.ts.j.id,
-                      end_epoch=self.ts.j.end_time,
-                      directory=lariat_path,daysback=3)
-
-      plotter.plot(jobid,save=True,threshold=self.thresh,prefix='lowflops',
-                   ld=self.ld,header='Measured Low Flops',wide=True)
-
     return
 
 
@@ -435,12 +347,6 @@ class MetaDataRate(Test):
     meta_rate  /= float(ts.numhosts)
     
     self.comp2thresh(jobid,numpy.max(meta_rate))
-    if self.results[jobid] and self.plot:
-      self.ld.set_job(self.ts.j.id,
-                      end_epoch=self.ts.j.end_time,
-                      directory=lariat_path,daysback=3)
-      plotter = plots.MetaDataRate(self)
-      plotter.plot(jobid,save=True)
 
     return  
     

@@ -1,12 +1,16 @@
 set(TEST_DATA ${CMAKE_CURRENT_SOURCE_DIR}/data)
 # Write pickler runtime configuration file for testing           
-file(WRITE "${CMAKE_CURRENT_BINARY_DIR}/pickler_conf.py")
-file(APPEND "${CMAKE_CURRENT_BINARY_DIR}/pickler_conf.py"
+file(WRITE "${CMAKE_CURRENT_BINARY_DIR}/sys_conf.py")
+set(PY_LIB_PATH ${CMAKE_SOURCE_DIR}/lib)
+file(APPEND "${CMAKE_CURRENT_BINARY_DIR}/sys_conf.py"
   tacc_stats_home=\"${TEST_DATA}\"\n
   acct_path=\"${TEST_DATA}/tacc_jobs_completed\"\n
   host_list_dir=\"${TEST_DATA}\"\n
   host_name_ext=\"platform.extension\"\n
   batch_system=\"SLURM\"\n
+  lariat_path=\"${lariat_path}\"\n	
+   pickles_dir=\"${pickles_dir}\"\n
+  tacc_stats_lib="${PY_LIB_PATH}"\n
   seek=0\n)
 
 file(COPY ${CMAKE_SOURCE_DIR}/bin/job_pickles.py 

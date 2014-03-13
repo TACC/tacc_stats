@@ -4,6 +4,20 @@ set(PROJECT_VERSION "1.0.6")
 
 include(CTest)
 
+# Write runtime configuration file for all modules
+set(PY_LIB_PATH ${CMAKE_SOURCE_DIR}/lib)
+file(WRITE "${PY_LIB_PATH}/sys_conf.py")
+file(APPEND "${PY_LIB_PATH}/sys_conf.py" 
+  tacc_stats_home=\"${tacc_stats_home}\"\n
+  acct_path=\"${acct_path}\"\n
+  host_list_dir=\"${host_list_dir}\"\n
+  host_name_ext=\"${host_name_ext}\"\n
+  batch_system=\"${batch_system}\"\n
+  lariat_path=\"${lariat_path}\"\n
+  pickles_dir=\"${pickles_dir}\"\n
+  tacc_stats_lib="${PY_LIB_PATH}"\n
+  seek=0\n)
+
 add_subdirectory(monitor)
 add_subdirectory(pickler)
 add_subdirectory(analysis)

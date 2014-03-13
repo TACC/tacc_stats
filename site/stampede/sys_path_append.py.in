@@ -1,6 +1,0 @@
-import sys,os
-sys.path.append('@PY_INC_PATH@')
-sys.path.append('@PY_PROCESS_PICKLES_PATH@')
-sys.path.append(os.path.dirname(__file__)+'/../../lib')
-pickles_dir = '@PICKLES_DIR@'
-lariat_path='@LARIAT_PATH@'
