@@ -1,17 +1,16 @@
 ## @package plot
 #
 # Plot generation tools for job analysis
-
 import os
 import abc
 import math
 import numpy
 import multiprocessing
 import matplotlib
+matplotlib.use('Agg')
 from scipy.stats import scoreatpercentile as score
-if not matplotlib:
-  matplotlib.use('pdf',warn=False)
-import matplotlib.pyplot as plt
+from matplotlib.figure import Figure
+from matplotlib.backends.backend_agg import FigureCanvasAgg as FigureCanvas
 from sys_conf import lariat_path
 from ..gen import tspl,tspl_utils,lariat_utils,my_utils
 
@@ -30,7 +29,9 @@ def unwrap(arg):
 class Plot(object):
   __metaclass__ = abc.ABCMeta
 
-  fig=None
+  fig = Figure()
+  canvas = FigureCanvas(fig)
+
   ts=None
 
   ## Default constructor
@@ -43,24 +44,40 @@ class Plot(object):
     self.header=kwargs.get('header',None)
     self.wide=kwargs.get('wide',False)
     self.save=kwargs.get('save',False)
-    self.lariat_data=kwargs.get('ld',lariat_utils.LariatData())
+    self.lariat_data=kwargs.get('lariat_data',
+                                lariat_utils.LariatData(directory=lariat_path,
+                                                        daysback=2))
     self.aggregate=kwargs.get('aggregate',True)
 
-  def setup(self,jobid,k1,k2,job_data=None):
-    if self.aggregate:
-      self.ts=tspl.TSPLSum(jobid,self.k1,self.k2,job_data=job_data)
-    else:
-      self.ts=tspl.TSPLBase(jobid,self.k1,self.k2,job_data=job_data)
+  def setup(self,jobid,job_data=None):
+    try:
+      if self.aggregate:
+        self.ts=tspl.TSPLSum(jobid,self.k1,self.k2,job_data=job_data)
+      else:
+        self.ts=tspl.TSPLBase(jobid,self.k1,self.k2,job_data=job_data)
+    except tspl.TSPLException as e:
+      return False
+    except EOFError as e:
+      print 'End of file found reading: ' + jobid
+      return False
+
     if self.lariat_data != 'pass':
-      self.lariat_data.set_job(self.ts.j.id,
-                               end_epoch=self.ts.j.end_time,
-                               directory=lariat_path,daysback=3)
+      self.lariat_data.set_job(self.ts)
+
+    return True
 
   ## Plot the list of files using multiprocessing
   def run(self,filelist,**kwargs):
     if not filelist: return 
+
+    # Cache the Lariat Data Dict
+    self.setup(filelist[0])
+    self.setup(filelist[-1])
+
     pool=multiprocessing.Pool(processes=self.processes) 
     pool.map(unwrap,zip([self]*len(filelist),filelist,[kwargs]*len(filelist)))
+    pool.close()
+    pool.join()
 
   ## Set the x and y axis labels for a plot
   def setlabels(self,ax,index,xlabel,ylabel,yscale):
@@ -164,21 +181,23 @@ class Plot(object):
 
   def output(self,file_suffix):    
     if self.wide:
-      left_text=self.header+'\n'+my_utils.summary_text(self.lariat_data,self.ts)
+      if self.lariat_data != 'pass':
+        left_text=self.header+'\n'+my_utils.summary_text(self.lariat_data,self.ts)
+      else: left_text=self.header
       text_len=len(left_text.split('\n'))
       fontsize=self.ax[0].yaxis.label.get_size()
       linespacing=1.2
       fontrate=float(fontsize*linespacing)/72./15.5
       yloc=.8-fontrate*(text_len-1) # this doesn't quite work. fontrate is too
                                     # small by a small amount
-      plt.figtext(.05,yloc,left_text,linespacing=linespacing)
+      self.fig.figtext(.05,yloc,left_text,linespacing=linespacing)
       self.fname='_'.join([self.prefix,self.ts.j.id,self.ts.owner,'wide_'+file_suffix])
     elif self.header != None:
       title=self.header+'\n'+self.ts.title
       if self.threshold:
         title+=', V: %(v)-6.1f' % {'v': self.threshold}
       title += '\n' + self.lariat_data.title()
-      plt.suptitle(title)
+      self.fig.suptitle(title)
       self.fname='_'.join([self.prefix,self.ts.j.id,self.ts.owner,file_suffix])
     else:
       self.fname='_'.join([self.prefix,self.ts.j.id,self.ts.owner,file_suffix])
@@ -187,7 +206,11 @@ class Plot(object):
       self.fname+='_hist'
     elif self.mode == 'percentile':
       self.fname+='_perc'
-    if self.save: self.fig.savefig(os.path.join(self.outdir,self.fname))
+    if self.save: 
+      self.canvas.print_figure(os.path.join(self.outdir,self.fname))
+      #self.fig.savefig(os.path.join(self.outdir,self.fname))
+    #plt.clf()
+    #plt.close()
 
   @abc.abstractmethod
   def plot(self,jobid,job_data=None):
@@ -220,15 +243,16 @@ class MasterPlot(Plot):
   fname='master'
 
   def plot(self,jobid,job_data=None):
-    self.setup(jobid,self.k1,self.k2,job_data=job_data)
+    if not self.setup(jobid,job_data=job_data): return
     
     wayness=self.ts.wayness
     if self.lariat_data != 'pass':
       if self.lariat_data.wayness != -1 and self.lariat_data.wayness < self.ts.wayness:
         wayness=self.lariat_data.wayness
-      
+    
     if self.wide:
-      self.fig,self.ax=plt.subplots(6,2,figsize=(15.5,12),dpi=110)
+      self.fig = Figure(figsize=(15.5,12),dpi=110)
+      self.ax=self.fig.add_subplot(6,2,1)
 
       # Make 2-d array into 1-d, and reorder so that the left side is blank
       self.ax=my_utils.flatten(self.ax)
@@ -239,7 +263,8 @@ class MasterPlot(Plot):
       for a in ax_even:
         a.axis('off')
     else:
-      self.fig,self.ax=plt.subplots(6,1,figsize=(8,12),dpi=110)
+      self.fig = Figure(figsize=(8,12),dpi=110)
+      self.ax=self.fig.subplots(6,1,1)
 
     if self.mode == 'hist':
       plot=self.plot_thist
@@ -298,7 +323,7 @@ class MasterPlot(Plot):
          xlabel='Time (hr)',
          ylabel='Total cpu user\nfraction')
 
-    plt.subplots_adjust(hspace=0.35)
+    fig.subplots_adjust(hspace=0.35)
     self.output('master')
 
 class MemUsage(Plot):
@@ -307,9 +332,9 @@ class MemUsage(Plot):
   
   def plot(self,jobid,job_data=None):
 
-    data=self.setup(jobid,self.k1,self.k2,job_data=job_data)
-
-    self.fig,self.ax=plt.subplots(1,1,figsize=(8,8),dpi=80)
+    self.setup(jobid,job_data=job_data)
+    self.fig=Figure(figsize=(8,8),dpi=80)
+    self.ax=self.fig.add_subplot(1,1,1)
     self.ax = [self.ax]
 
     for k in self.ts.j.hosts.keys():
@@ -341,13 +366,13 @@ class RatioPlot(Plot):
     ymax=max(numpy.maximum(imb.ratio,imb.ratio2))
     ymin,ymax=tspl_utils.expand_range(ymin,ymax,0.1)
 
-    fig,ax=plt.subplots(2,1,figsize=(8,8),dpi=80)
+    self.ax=self.fig.subplots(2,1,figsize=(8,8),dpi=80)
 
-    ax[0].plot(imb.tmid/3600,imb.ratio)
-    ax[0].hold=True
-    ax[0].plot(imb.tmid/3600,imb.ratio2)
-    ax[0].legend(('Std Dev','Max Diff'), loc=4)
-    ax[1].hold=True
+    self.ax[0].plot(imb.tmid/3600,imb.ratio)
+    self.ax[0].hold=True
+    self.ax[0].plot(imb.tmid/3600,imb.ratio2)
+    self.ax[0].legend(('Std Dev','Max Diff'), loc=4)
+    self.ax[1].hold=True
 
     ymin1=0. # This is wrong in general, but we don't want the min to be > 0.
     ymax1=0.
@@ -355,15 +380,15 @@ class RatioPlot(Plot):
     for v in imb.rate:
       ymin1=min(ymin1,min(v))
       ymax1=max(ymax1,max(v))
-      ax[1].plot(imb.tmid/3600,v)
+      self.ax[1].plot(imb.tmid/3600,v)
 
     ymin1,ymax1=tspl_utils.expand_range(ymin1,ymax1,0.1)
     
     title=imb.ts.title
-    if imb.ld.exc != 'unknown':
-      title += ', E: ' + imb.ld.exc.split('/')[-1]
+    if imb.lariat_data.exc != 'unknown':
+      title += ', E: ' + imb.lariat_data.exc.split('/')[-1]
     title += ', V: %(V)-8.3g' % {'V' : imb.var}
-    plt.suptitle(title)
+    self.fig.suptitle(title)
     ax[0].set_xlabel('Time (hr)')
     ax[0].set_ylabel('Imbalance Ratios')
     ax[1].set_xlabel('Time (hr)')
@@ -391,19 +416,13 @@ class MetaDataRate(Plot):
       'rmdir','mknod','rename',]
 
   def plot(self,jobid,job_data=None):
-    self.setup(jobid,self.k1,self.k2,job_data=job_data)
+    self.setup(jobid,job_data=job_data)
 
-    ld = self.lariat_data
     ts = self.ts
-
-    title=ts.title
-    if ld.exc != 'unknown':
-      title += ', E: ' + ld.exc.split('/')[-1]
-
-    self.fig,self.ax=plt.subplots(1,1,figsize=(10,8),dpi=80)
+    self.fig = Figure(figsize=(10,8),dpi=80)
+    self.ax=self.fig.add_subplot(1,1,1)
     self.ax=[self.ax]
-    plt.subplots_adjust(hspace=0.35)
-    plt.suptitle(title)
+    self.fig.subplots_adjust(hspace=0.35)
 
     markers = ('o','x','+','^','s','8','p',
                  'h','*','D','<','>','v','d','.')
@@ -448,7 +467,7 @@ class HeatMap(Plot):
     super(HeatMap,self).__init__(processes=processes,**kwargs)
 
   def plot(self,jobid,job_data=None):
-    self.setup(jobid,self.k1,self.k2,job_data=job_data)
+    self.setup(jobid,job_data=job_data)
     ts=self.ts
 
     cpi = numpy.array([])
@@ -464,7 +483,8 @@ class HeatMap(Plot):
             else: cpi = numpy.vstack((cpi,ratio))
     cpi_min, cpi_max = cpi.min(), cpi.max()
 
-    self.fig,self.ax=plt.subplots(1,1,figsize=(8,12),dpi=110)
+    self.fig = Figure(figsize=(8,12),dpi=110)
+    self.ax=self.fig.add_subplot(1,1,1)
     self.ax=[self.ax]
     ycore = numpy.arange(cpi.shape[0]+1)
     time = ts.t/3600.
@@ -474,13 +494,14 @@ class HeatMap(Plot):
 
     if len(yhost) > 80:
         fontsize /= 0.5*numpy.log(len(yhost))
+        #yhost - ncores/2.,
+    self.fig.add_axes(yticklabels=hosts,xlim=[time.min(),time.max()],
+                      ylim=[ycore.min(),ycore.max()],size=fontsize)
 
-    plt.yticks(yhost - ncores/2.,hosts,size=fontsize)
-    plt.pcolormesh(time, ycore, cpi, vmin=cpi_min, vmax=cpi_max)
-    plt.axis([time.min(),time.max(),ycore.min(),ycore.max()])
+    pcm = self.ax[0].pcolormesh(time, ycore, cpi, vmin=cpi_min, vmax=cpi_max)
 
-    plt.title(self.k2[ts.pmc_type][0] +'/'+self.k2[ts.pmc_type][1])
-    plt.colorbar()
+    #self.ax[0].title(self.k2[ts.pmc_type][0] +'/'+self.k2[ts.pmc_type][1])
+    self.fig.colorbar(pcm)
     self.ax[0].set_xlabel('Time (hrs)')
     self.output('heatmap')
 
@@ -492,7 +513,7 @@ class DevPlot(Plot):
     super(DevPlot,self).__init__(processes=processes,**kwargs)
 
   def plot(self,jobid,job_data=None):
-    self.setup(jobid,self.k1,self.k2,job_data=job_data)
+    self.setup(jobid,job_data=job_data)
     cpu_name = self.ts.pmc_type
     type_name=self.k1[cpu_name][0]
     events = self.k2[cpu_name]
@@ -500,7 +521,9 @@ class DevPlot(Plot):
     ts=self.ts
 
     n_events = len(events)
-    self.fig, self.ax = plt.subplots(n_events, sharex=True, figsize=(8,n_events*2), dpi=80)
+    self.fig = Figure(figsize=(8,n_events*2),dpi=80)
+    self.ax = self.fig.add_subplot(n_events,1,1)
+
     try: len(self.ax)
     except: self.ax=[self.ax]
     do_rate = True
@@ -520,14 +543,3 @@ class DevPlot(Plot):
 
     self.output('devices')
 
-
-
-
-class DevPlotAdjusted(Plot):
-  def __init__(self,k1,k2):
-    self.k1 = k1
-    self.k2 = k2
-
-  def plot(self,jobid,job_data=None):
-    self.setup(jobid,self.k1,self.k2,job_data=job_data)
-    

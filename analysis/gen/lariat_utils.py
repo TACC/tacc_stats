@@ -58,10 +58,20 @@ class LariatData:
     r'^c37b1'  : 'CHARMM*',
     }
 
-  def __init__(self):
+  def __init__(self,directory=None,daysback=0):
     # Initialize to invalid/empty states
     self.ld=dict()
-  def set_job(self,jobid,end_epoch=-1,directory=None,daysback=0):
+    self.json_list = []
+    self.directory = directory
+    self.daysback = daysback
+
+  # Can accept ts object or jobid and end_epoch
+  def set_job(self,ts,end_epoch=None):
+    if not end_epoch:
+      jobid = ts.j.id
+      end_epoch = ts.j.end_time
+    else: jobid=ts
+
     # Find the set of JSON files matching the end_epoch date
     # Initialize to invalid/empty states
     self.id=0
@@ -71,25 +81,33 @@ class LariatData:
     self.threads=1
     self.wayness=-1
 
-    if jobid not in self.ld: 
-      if end_epoch > 0 and directory != None:
-        matches=[]
-      for day in range(daysback+1):
+    # Find the json file the job should be in
+    if end_epoch > 0 and self.directory != None:
+      matches=[]
+      for day in range(self.daysback+1):
         ds=make_date_string(end_epoch-day*24*3600)
-        for root, dirnames, filenames in os.walk(directory):
+        for root, dirnames, filenames in os.walk(self.directory):
           for fn in fnmatch.filter(filenames,'*'+ds+'.json'):
             matches.append(os.path.join(root,fn))
+
       if len(matches) != 0:
         for m in matches:
+          if jobid in self.ld: continue
+          if m in self.json_list: continue
+          else: self.json_list.append(m)
+
+          print 'Load lariat data for job',jobid,'from',m
+          print self.json_list
           try:
             self.ld.update(json.load(open(m))) # Should be only one match
           except:
             json_str = open(m).read()
             json_str = re.sub(r'\\','',json_str)
             self.ld.update(json.loads(json_str))
-      #else:
-      #  print 'File for ' + jobid + ' not found in ' + directory
+      else:
+        print 'Json file for ' + jobid + ' not found in ' + directory
 
+    # Check if job is in json
     try:
       self.ld[jobid].sort(key=lambda ibr: int(ibr['startEpoch']))
       self.id=self.ld[jobid][0]['jobID']
@@ -101,9 +119,8 @@ class LariatData:
       self.threads=self.ld[jobid][0]['numThreads']
       self.wayness=int(self.ld[jobid][0]['numCores'])/int(self.ld[jobid][0]['numNodes'])
     except KeyError:
-      #print str(jobid) + ' did not call ibrun' + \
-      #      ' or has no lariat data for some other reason'
-      self.ld[jobid]=None
+      print str(jobid) + ' did not call ibrun' + \
+          ' or has no lariat data for some other reason'
     except: pass
 
   def title(self):

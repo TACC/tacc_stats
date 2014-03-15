@@ -1,10 +1,6 @@
 from django.http import HttpResponse, HttpResponseRedirect
 from django.shortcuts import render_to_response, render
 from django.views.generic import DetailView, ListView
-import matplotlib, string
-matplotlib.use('Agg')
-import matplotlib.pyplot as plt
-from pylab import figure, hist, plot
 
 from stampede.models import Job, JobForm
 import os,sys
@@ -20,7 +16,7 @@ import cPickle as pickle
 import time
    
 import numpy as np
-
+from pylab import figure, hist
 from django.core.cache import cache,get_cache 
 
 def update(meta = None):
@@ -29,16 +25,15 @@ def update(meta = None):
     # Only need to populate lariat cache once
     jobid = meta.json.keys()[0]
 
-    ld = lariat_utils.LariatData()
+    ld = lariat_utils.LariatData(directory = sys_conf.lariat_path,
+                                 daysback = 2)
         
     for jobid, json in meta.json.iteritems():
 
         if Job.objects.filter(id = jobid).exists(): continue  
         
         ld = ld.set_job(jobid,
-                        end_epoch = meta.json[jobid]['end_epoch'],
-                        directory = sys_conf.lariat_path,
-                        daysback = 2)
+                        end_epoch = meta.json[jobid]['end_epoch'])
 
         json['user'] = ld.user
         json['exe'] = ld.exc.split('/')[-1]
@@ -169,6 +164,7 @@ def hist_summary(request, date = None, uid = None, project = None, user = None, 
 def figure_to_response(f):
     response = HttpResponse(content_type='image/png')
     f.savefig(response, format='png')
+    f.clf()
     return response
 
 def get_data(pk):

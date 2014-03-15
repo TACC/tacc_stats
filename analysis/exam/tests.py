@@ -5,12 +5,16 @@ import numpy
 import operator
 from scipy.stats import tmean,tstd
 import multiprocessing
-
+from pickler import job_stats, batch_acct
+sys.modules['job_stats'] = job_stats
+sys.modules['batch_acct'] = batch_acct
 from sys_conf import lariat_path
 from ..gen import lariat_utils,tspl,tspl_utils
 
 def unwrap(arg,**kwarg):
-  return arg[0].test(*arg[1:],**kwarg)
+  try:
+    return arg[0].test(*arg[1:],**kwarg)
+  except: pass
 
 class Test(object):
   __metaclass__ = abc.ABCMeta
@@ -26,30 +30,42 @@ class Test(object):
     self.processes=processes
     self.threshold=kwargs.get('threshold',None)
     self.aggregate=kwargs.get('aggregate',True)
+    self.min_time=kwargs.get('min_time',3600)
+    self.min_hosts=kwargs.get('min_hosts',1)    
+    self.ignore_qs=kwargs.get('ignore_qs',['gpu','gpudev','vis',
+                                           'visdev','development'])
+    self.waynesses=kwargs.get('waynesses',[x+1 for x in range(32)])
 
     manager=multiprocessing.Manager()
     self.ratios=manager.dict()
     self.results=manager.dict()
 
   def setup(self,jobid):
-    self.exception=False
     try:
       if self.aggregate:
         self.ts=tspl.TSPLSum(jobid,self.k1,self.k2)
       else:
         self.ts=tspl.TSPLBase(jobid,self.k1,self.k2)
     except tspl.TSPLException as e:
-      self.exception=True
-      return
+      return False
     except EOFError as e:
-      self.exception=True
       print 'End of file found reading: ' + jobid
-      return
+      return False
+
+    if not tspl_utils.checkjob(self.ts,self.min_time,
+                               self.waynesses,self.ignore_qs):
+      return False
+    elif self.ts.numhosts < self.min_hosts:
+      return False
+    else: 
+      return True
 
   def run(self,filelist):
     if not filelist: return 
     pool=multiprocessing.Pool(processes=self.processes) 
     pool.map(unwrap,zip([self]*len(filelist),filelist))
+    pool.close()
+    pool.join()
 
   def comp2thresh(self,jobid,val,func='>'):
     comp = {'>': operator.gt, '>=': operator.ge,
@@ -81,12 +97,7 @@ class MemBw(Test):
   k2=['CAS_READS', 'CAS_WRITES']
 
   def test(self,jobid):
-    
-    self.setup(jobid)
-    if self.exception: return
-    ignore_qs=['gpu','gpudev','vis','visdev']
-    if not tspl_utils.checkjob(self.ts,3600,range(1,33),ignore_qs):
-      return
+    if not self.setup(jobid): return
 
     peak = 76.*1.e9
     gdramrate = numpy.zeros(len(self.ts.t)-1)
@@ -106,15 +117,7 @@ class Idle(Test):
       'intel_snb' : ['SIMD_D_256','LOAD_L1D_ALL','user'],}
 
   def test(self,jobid):
-    self.setup(jobid)
-    if self.exception: return
-
-    ignore_qs=['gpu','gpudev','vis','visdev']
-    if not tspl_utils.checkjob(self.ts,3600,range(1,33),ignore_qs):
-      return
-    elif self.ts.numhosts < 2: # At least 2 hosts   
-      #print self.ts.j.id + ': 1 host'
-      return
+    if not self.setup(jobid): return
 
     mr=[]
     for i in range(len(self.k1)):
@@ -139,35 +142,28 @@ class Idle(Test):
 class Imbalance(Test):
   k1=None
   k2=None
-
-  def __init__(self,k1,k2,processes=1,threshold=1.0,aggregate=True):
+  def __init__(self,k1,k2,processes=1,aggregate=False,**kwargs):
     self.k1=k1
     self.k2=k2
-    super(Imbalance,self).__init__(processes=processes,
-                                   threshold=threshold,
-                                   aggregate=aggregate)
+
+    if aggregate:
+      kwargs['min_hosts'] = 2
+    kwargs['aggregate'] = aggregate
+    kwargs['waynesses']=16
+    super(Imbalance,self).__init__(processes=processes,**kwargs)
 
   def test(self,jobid):
-
-    self.setup(jobid)
-    if self.exception: return
-
-    ignore_qs=['gpu','gpudev','vis','visdev']
-    if not tspl_utils.checkjob(self.ts,3600,16,ignore_qs): # 1 hour, 16way only
-      return
-    elif self.ts.numhosts < 2: # At least 2 hosts   
-      #print self.ts.j.id + ': 1 host'
-      return
+    
+    if not self.setup(jobid): return
 
     tmid=(self.ts.t[:-1]+self.ts.t[1:])/2.0
     rng=range(1,len(tmid)) # Throw out first and last
     self.tmid=tmid[rng]         
-
+    
     maxval=numpy.zeros(len(rng))
     minval=numpy.ones(len(rng))*1e100
 
     self.rate=[]
-
     for v in self.ts:
       self.rate.append(numpy.divide(numpy.diff(v)[rng],
                                     numpy.diff(self.ts.t)[rng]))
@@ -237,17 +233,11 @@ class Catastrophe(Test):
     return fit   
 
   def test(self,jobid):
-    self.setup(jobid)
-    if self.exception: return
-    ignore_qs=['gpu','gpudev','vis','visdev']
-    if not tspl_utils.checkjob(self.ts,3600,range(1,33),ignore_qs):
-      return
-    elif self.ts.numhosts < 2: pass # At least 2 hosts
-      #print self.ts.j.id + ': 1 host'
+    if not self.setup(jobid): return 
 
     bad_hosts=tspl_utils.lost_data(self.ts)
     if len(bad_hosts) > 0:
-      #print self.ts.j.id, ': Detected hosts with bad data: ', bad_hosts
+      print self.ts.j.id, ': Detected hosts with bad data: ', bad_hosts
       return
 
     vals=[]
@@ -284,14 +274,7 @@ class LowFLOPS(Test):
         'intel_snb' : [ 16*2.7e9*2, 16*2.7e9/2.*64., 1.],}
   
   def test(self,jobid):
-    self.setup(jobid)
-    if self.exception: return    
-    ignore_qs=['gpu','gpudev','vis','visdev']
-    if not tspl_utils.checkjob(self.ts,3600,range(1,33),ignore_qs):
-      return
-    elif self.ts.numhosts < 2: # At least 2 hosts   
-      #print self.ts.j.id + ': 1 host'
-      return
+    if not self.setup(jobid): return
 
     ts=self.ts
     gfloprate = numpy.zeros(len(ts.t)-1)
@@ -332,11 +315,10 @@ class MetaDataRate(Test):
       'rmdir','mknod','rename',]
 
   def test(self,jobid):
-    self.setup(jobid)
-    if self.exception: return
+    if not self.setup(jobid): return
     ts = self.ts
 
-    if not tspl_utils.checkjob(ts,3600.,range(1,33)): return
+    if not tspl_utils.checkjob(ts,self.min_time,range(1,33)): return
     tmid=(ts.t[:-1]+ts.t[1:])/2.0
 
     meta_rate = numpy.zeros_like(tmid)

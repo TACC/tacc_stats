@@ -1,5 +1,11 @@
 set(PY_LIB_PATH ${CMAKE_SOURCE_DIR}/lib/analysis)
 
+
+# Setup cron script for analysis
+set(PICKLES_DIR ${pickles_dir})
+configure_file(${CMAKE_CURRENT_SOURCE_DIR}/nightly.sh.in 
+		${CMAKE_CURRENT_SOURCE_DIR}/nightly.sh @ONLY)
+
 file(COPY __init__.py exam gen plot DESTINATION ${PY_LIB_PATH})
 file(COPY nightly.py nightly.sh DESTINATION ${CMAKE_SOURCE_DIR}/bin
   FILE_PERMISSIONS OWNER_READ OWNER_WRITE OWNER_EXECUTE GROUP_READ

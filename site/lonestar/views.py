@@ -1,10 +1,6 @@
 from django.http import HttpResponse, HttpResponseRedirect
 from django.shortcuts import render_to_response, render
 from django.views.generic import DetailView, ListView
-import matplotlib, string
-matplotlib.use('Agg')
-import matplotlib.pyplot as plt
-from pylab import figure, hist, plot
 
 from lonestar.models import LS4Job, LS4JobForm
 import os,sys
@@ -20,7 +16,7 @@ import cPickle as pickle
 import time
    
 import numpy as np
-
+from pylab import figure, hist
 from django.core.cache import cache,get_cache 
 
 def ls4_update(meta = None):
@@ -205,7 +201,7 @@ def get_data(pk):
 
 def master_plot(request, pk):
     data = get_data(pk)
-    mp = plt.MasterPlot(ld="pass")
+    mp = plt.MasterPlot(lariat_data="pass")
     mp.plot(pk,job_data=data)
     return figure_to_response(mp.fig)
 
@@ -263,7 +259,7 @@ def type_plot(request, pk, type_name):
 
     tp = plt.DevPlot(k1,k2,lariat_data='pass')
     tp.plot(pk,job_data=data)
-    return figure_to_response(fig)
+    return figure_to_response(tp.fig)
 
 
 def type_detail(request, pk, type_name):
