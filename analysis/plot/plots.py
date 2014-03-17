@@ -30,7 +30,6 @@ class Plot(object):
   __metaclass__ = abc.ABCMeta
 
   fig = Figure()
-  canvas = FigureCanvas(fig)
 
   ts=None
 
@@ -183,20 +182,20 @@ class Plot(object):
     if self.wide:
       if self.lariat_data != 'pass':
         left_text=self.header+'\n'+my_utils.summary_text(self.lariat_data,self.ts)
-      else: left_text=self.header
+      else: left_text=self.header + '\n' + self.ts.title
       text_len=len(left_text.split('\n'))
-      fontsize=self.ax[0].yaxis.label.get_size()
+      fontsize=self.ax.yaxis.label.get_size()
       linespacing=1.2
       fontrate=float(fontsize*linespacing)/72./15.5
       yloc=.8-fontrate*(text_len-1) # this doesn't quite work. fontrate is too
                                     # small by a small amount
-      self.fig.figtext(.05,yloc,left_text,linespacing=linespacing)
+      self.fig.text(.05,yloc,left_text,linespacing=linespacing)
       self.fname='_'.join([self.prefix,self.ts.j.id,self.ts.owner,'wide_'+file_suffix])
     elif self.header != None:
       title=self.header+'\n'+self.ts.title
       if self.threshold:
         title+=', V: %(v)-6.1f' % {'v': self.threshold}
-      title += '\n' + self.lariat_data.title()
+      if self.lariat_data != 'pass': title += '\n' + self.lariat_data.title()
       self.fig.suptitle(title)
       self.fname='_'.join([self.prefix,self.ts.j.id,self.ts.owner,file_suffix])
     else:
@@ -206,11 +205,9 @@ class Plot(object):
       self.fname+='_hist'
     elif self.mode == 'percentile':
       self.fname+='_perc'
+    self.canvas = FigureCanvas(self.fig)
     if self.save: 
-      self.canvas.print_figure(os.path.join(self.outdir,self.fname))
-      #self.fig.savefig(os.path.join(self.outdir,self.fname))
-    #plt.clf()
-    #plt.close()
+      self.fig.savefig(os.path.join(self.outdir,self.fname))
 
   @abc.abstractmethod
   def plot(self,jobid,job_data=None):
@@ -252,20 +249,14 @@ class MasterPlot(Plot):
     
     if self.wide:
       self.fig = Figure(figsize=(15.5,12),dpi=110)
-      self.ax=self.fig.add_subplot(6,2,1)
-
-      # Make 2-d array into 1-d, and reorder so that the left side is blank
-      self.ax=my_utils.flatten(self.ax)
-      ax_even=self.ax[0:12:2]
-      ax_odd =self.ax[1:12:2]
-      self.ax=ax_odd + ax_even
-
-      for a in ax_even:
-        a.axis('off')
+      self.ax=self.fig.add_subplot(6,2,2)
+      cols = 2
+      shift = 2
     else:
       self.fig = Figure(figsize=(8,12),dpi=110)
-      self.ax=self.fig.subplots(6,1,1)
-
+      self.ax=self.fig.add_subplot(6,1,1)
+      cols = 1
+      shift = 1
     if self.mode == 'hist':
       plot=self.plot_thist
     elif self.mode == 'percentile':
@@ -280,16 +271,16 @@ class MasterPlot(Plot):
       # Plot key 1
       idx0=k2_tmp.index('SSE_D_ALL')
       idx1=k2_tmp.index('SIMD_D_256')
-      plot(self.ax[0],[idx0,idx1],3600.,1e9,
+      plot(self.fig.add_subplot(6,cols,1*shift),[idx0,idx1],3600.,1e9,
            ylabel='Total AVX +\nSSE Ginst/s')
 
       # Plot key 2
       idx0=k2_tmp.index('CAS_READS')
       idx1=k2_tmp.index('CAS_WRITES')
-      plot(self.ax[1], [idx0,idx1], 3600., 1.0/64.0*1024.*1024.*1024., ylabel='Total Mem BW GB/s')
+      plot(self.fig.add_subplot(6,cols,2*shift), [idx0,idx1], 3600., 1.0/64.0*1024.*1024.*1024., ylabel='Total Mem BW GB/s')
     elif self.ts.pmc_type == 'intel':
       idx0=k2_tmp.index('FP_COMP_OPS_EXE_X87')
-      plot(self.ax[0], [idx0], 3600., 1e9, ylabel='FP Ginst/s')
+      plot(self.fig.add_subplot(6,cols,2*shift), [idx0], 3600., 1e9, ylabel='FP Ginst/s')
     else: 
       #Fix this to support the old amd plots
       print self.ts.pmc_type + ' not supported'
@@ -298,13 +289,13 @@ class MasterPlot(Plot):
     #Plot key 3
     idx0=k2_tmp.index('MemUsed')
     idx1=k2_tmp.index('AnonPages')
-    plot(self.ax[2], [idx0,-idx1], 3600.,2.**30.0, ylabel='Memory Usage GB',do_rate=False)
+    plot(self.fig.add_subplot(6,cols,3*shift), [idx0,-idx1], 3600.,2.**30.0, ylabel='Memory Usage GB',do_rate=False)
 
     # Plot lnet sum rate
     idx0=k1_tmp.index('lnet')
     idx1=idx0 + k1_tmp[idx0+1:].index('lnet') + 1
 
-    plot(self.ax[3], [idx0,idx1], 3600., 1024.**2, ylabel='Total lnet MB/s')
+    plot(self.fig.add_subplot(6,cols,4*shift), [idx0,idx1], 3600., 1024.**2, ylabel='Total lnet MB/s')
 
     # Plot remaining IB sum rate
     if self.ts.pmc_type == 'intel_snb' :
@@ -314,16 +305,16 @@ class MasterPlot(Plot):
       idx2=k1_tmp.index('ib_ext')
       idx3=idx2 + k1_tmp[idx2+1:].index('ib_ext') + 1
 
-    plot(self.ax[4],[idx2,idx3,-idx0,-idx1],3600.,2.**20,
+    plot(self.fig.add_subplot(6,cols,5*shift),[idx2,idx3,-idx0,-idx1],3600.,2.**20,
          ylabel='Total (ib-lnet) MB/s') 
 
     #Plot CPU user time
     idx0=k2_tmp.index('user')
-    plot(self.ax[5],[idx0],3600.,wayness*100.,
+    plot(self.fig.add_subplot(6,cols,6*shift),[idx0],3600.,wayness*100.,
          xlabel='Time (hr)',
          ylabel='Total cpu user\nfraction')
 
-    fig.subplots_adjust(hspace=0.35)
+    self.fig.subplots_adjust(hspace=0.35)
     self.output('master')
 
 class MemUsage(Plot):
@@ -460,11 +451,11 @@ class MetaDataRate(Plot):
 
 class HeatMap(Plot):
 
-  def __init__(self,k1,k2,processes=1,**kwargs):
-    self.aggregate = False
+  def __init__(self,k1,k2,processes=1,aggregate=False,**kwargs):
+    #self.aggregate = False
     self.k1 = k1
     self.k2 = k2
-    super(HeatMap,self).__init__(processes=processes,**kwargs)
+    super(HeatMap,self).__init__(processes=processes,aggregate=aggregate,**kwargs)
 
   def plot(self,jobid,job_data=None):
     self.setup(jobid,job_data=job_data)
@@ -483,9 +474,11 @@ class HeatMap(Plot):
             else: cpi = numpy.vstack((cpi,ratio))
     cpi_min, cpi_max = cpi.min(), cpi.max()
 
+    mean_cpi = numpy.mean(cpi)
+
     self.fig = Figure(figsize=(8,12),dpi=110)
     self.ax=self.fig.add_subplot(1,1,1)
-    self.ax=[self.ax]
+
     ycore = numpy.arange(cpi.shape[0]+1)
     time = ts.t/3600.
     yhost=numpy.arange(len(hosts)+1)*ncores + ncores
@@ -494,15 +487,16 @@ class HeatMap(Plot):
 
     if len(yhost) > 80:
         fontsize /= 0.5*numpy.log(len(yhost))
-        #yhost - ncores/2.,
-    self.fig.add_axes(yticklabels=hosts,xlim=[time.min(),time.max()],
-                      ylim=[ycore.min(),ycore.max()],size=fontsize)
+    self.ax.set_ylim(bottom=ycore.min(),top=ycore.max())
+    self.ax.set_yticks(yhost[0:-1]-ncores/2.)
+    self.ax.set_yticklabels(hosts)#,va='center')
+    self.ax.set_xlim(left=time.min(),right=time.max())
 
-    pcm = self.ax[0].pcolormesh(time, ycore, cpi, vmin=cpi_min, vmax=cpi_max)
+    pcm = self.ax.pcolormesh(time, ycore, cpi)#, vmin=cpi_min, vmax=cpi_max)
 
-    #self.ax[0].title(self.k2[ts.pmc_type][0] +'/'+self.k2[ts.pmc_type][1])
+    self.ax.set_title(self.k2[ts.pmc_type][0] +'/'+self.k2[ts.pmc_type][1] + '\n'+ r'$\bar{Mean}$='+str(mean_cpi))
     self.fig.colorbar(pcm)
-    self.ax[0].set_xlabel('Time (hrs)')
+    self.ax.set_xlabel('Time (hrs)')
     self.output('heatmap')
 
 class DevPlot(Plot):
@@ -522,10 +516,7 @@ class DevPlot(Plot):
 
     n_events = len(events)
     self.fig = Figure(figsize=(8,n_events*2),dpi=80)
-    self.ax = self.fig.add_subplot(n_events,1,1)
 
-    try: len(self.ax)
-    except: self.ax=[self.ax]
     do_rate = True
     scale = 1.0
     if type_name == 'mem': 
@@ -535,9 +526,10 @@ class DevPlot(Plot):
       scale=ts.wayness*100.0
 
     for i in range(n_events):
-      self.plot_lines(self.ax[i], [i], 3600., yscale=scale, do_rate = do_rate)
-      self.ax[i].set_ylabel(events[i],size='small')
-    self.ax[-1].set_xlabel("Time (hr)")
+      self.ax = self.fig.add_subplot(n_events,1,i+1)
+      self.plot_lines(self.ax, [i], 3600., yscale=scale, do_rate = do_rate)
+      self.ax.set_ylabel(events[i],size='small')
+    self.ax.set_xlabel("Time (hr)")
     self.fig.subplots_adjust(hspace=0.0)
     self.fig.tight_layout()
 
