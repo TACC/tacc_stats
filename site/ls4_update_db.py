@@ -11,11 +11,11 @@ import settings
 setup_environ(settings)
 
 import lonestar.views as views
-import lonestar.sys_path_append as sys_path_append
-import MetaData
+sys.path.append('../lib')
+from pickler import MetaData
 import datetime
 
-path = sys_path_append.pickles_dir
+path = "../../lonestar/pickles/"
 
 
 p = Popen(["date --date " + sys.argv[1] + ' +%Y-%m-%d'], stdout = PIPE, 

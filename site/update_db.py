@@ -4,6 +4,8 @@ import os,sys
 from subprocess import Popen, PIPE
 
 sys.path.append(os.path.join(os.path.dirname(__file__), 
+                             '../lib'))
+sys.path.append(os.path.join(os.path.dirname(__file__), 
                              'tacc_stats_site'))
 sys.path.append(os.path.join(os.path.dirname(__file__), 
                              'stampede'))
@@ -11,11 +13,11 @@ import settings
 setup_environ(settings)
 
 import stampede.views as views
-import stampede.sys_path_append as sys_path_append
-import MetaData
+import sys_conf
+from pickler import MetaData
 import datetime
 
-path = sys_path_append.pickles_dir
+path = sys_conf.pickles_dir
 
 p = Popen(["date --date " + sys.argv[1] + ' +%Y-%m-%d'], stdout = PIPE, 
                    shell = True) 

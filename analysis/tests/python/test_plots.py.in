@@ -6,6 +6,12 @@ from analysis.plot import plots
 
 filelist = ['@TEST_DATA@']
 
+#### CPI Test
+print '-----------------'
+print "CPI Test"
+cpi_test = tests.HighCPI(processes=1,threshold=10.)
+cpi_test.test(filelist[0])
+
 #### MemUsage plotter
 meta_plot = plots.MetaDataRate(outdir='@CMAKE_CURRENT_BINARY_DIR@/python',
                           prefix='MetaDataRate',

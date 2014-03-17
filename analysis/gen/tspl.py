@@ -121,8 +121,11 @@ class TSPLBase:
     else:
       raise TSPLException('Input types must match and be lists or dicts: ' +
                           str(type(k1)) + ' ' + str(type(k2)))
+    try:
+      self.t=(self.j.times-self.j.times[0])
+    except:
+      raise TSPLException('Time series is '+str(self.j.times))
 
-    self.t=(self.j.times-self.j.times[0])
 
     if len(self.t) == 0:
       raise TSPLException('Time range is 0')

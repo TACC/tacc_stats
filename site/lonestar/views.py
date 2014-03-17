@@ -4,8 +4,8 @@ from django.views.generic import DetailView, ListView
 
 from lonestar.models import LS4Job, LS4JobForm
 import os,sys
-sys.path.append('../lib')
-import sys_conf
+sys.path.append(os.path.join(os.path.dirname(__file__),'../../lib'))
+
 import analysis
 from analysis.gen import tspl, lariat_utils
 from analysis.plot import plots as plt
@@ -16,7 +16,8 @@ import cPickle as pickle
 import time
    
 import numpy as np
-from pylab import figure, hist
+from matplotlib.figure import Figure
+from matplotlib.backends.backend_agg import FigureCanvasAgg as FigureCanvas
 from django.core.cache import cache,get_cache 
 
 def ls4_update(meta = None):
@@ -25,16 +26,15 @@ def ls4_update(meta = None):
     # Only need to populate lariat cache once
     jobid = meta.json.keys()[0]
 
-    ld = lariat_utils.LariatData()
-        
+    ld = lariat_utils.LariatData(directory = '/hpc/tacc_stats_site/lonestar/lariatData',
+                                 daysback = 2)
+    
     for jobid, json in meta.json.iteritems():
 
         if LS4Job.objects.filter(id = jobid).exists(): continue  
         ld = ld.set_job(jobid,
-                        end_epoch = meta.json[jobid]['end_epoch'],
-                        directory = sys_conf.lariat_path,
-                        daysback = 2)
-
+                        end_epoch = meta.json[jobid]['end_epoch'])
+        
         if json['exit_status'] != 0: json['status'] = 'TIMEOUT/CANCELLED'
         else: json['status'] = 'COMPLETED'
         if json['failed'] != 0: json['status'] = 'FAILED'
@@ -75,7 +75,7 @@ def ls4_update(meta = None):
 
 def dates(request):
     
-    date_list = os.listdir(sys_conf.pickles_dir)
+    date_list = os.listdir('/hpc/tacc_stats_site/lonestar/pickles')
     date_list = sorted(date_list, key=lambda d: map(int, d.split('-')))
 
     month_dict ={}
@@ -162,7 +162,7 @@ def hist_summary(request, date = None, project = None, user = None, exe = None):
     field['status'] = 'COMPLETED'
 
     job_list = LS4Job.objects.filter(**field)
-    fig = figure(figsize=(16,6))
+    fig = Figure(figsize=(16,6))
 
     # Run times
     job_times = np.array([job.run_time for job in job_list])/3600.
@@ -180,7 +180,7 @@ def hist_summary(request, date = None, project = None, user = None, exe = None):
     ax.set_xlim((0,max(job_size)+1))
     ax.set_title('Run Sizes for Completed Jobs')
     ax.set_xlabel('# cores')
-
+    canvas = FigureCanvas(fig)
     return figure_to_response(fig)
 
 
@@ -245,6 +245,16 @@ class LS4JobDetailView(DetailView):
         type_list = sorted(type_list, key = lambda type_name: type_name[0])
         context['type_list'] = type_list
         context['host_list'] = host_list
+
+        urlstring="https://scribe.tacc.utexas.edu:8000/en-US/app/search/search?q=search%20"
+        urlstring+="%20host%3D"+host_list[0]+".ls4.tacc.utexas.edu"
+
+        for host in host_list[1:]:
+            urlstring+="%20OR%20%20host%3D"+host+".ls4.tacc.utexas.edu"
+            
+            urlstring+="&earliest="+str(job.start_epoch)+"&latest="+str(job.end_epoch)+"&display.prefs.events.count=50"
+            
+        context['splunk_url'] = urlstring
 
         return context
 

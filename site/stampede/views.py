@@ -4,6 +4,8 @@ from django.views.generic import DetailView, ListView
 
 from stampede.models import Job, JobForm
 import os,sys
+sys.path.append(os.path.join(os.path.dirname(__file__), 
+                             '../../lib'))
 import sys_conf
 import analysis
 from analysis.gen import tspl, lariat_utils
@@ -165,7 +167,6 @@ def hist_summary(request, date = None, uid = None, project = None, user = None, 
 def figure_to_response(f):
     response = HttpResponse(content_type='image/png')
     f.savefig(response, format='png')
-    f.clf()
     return response
 
 def get_data(pk):
@@ -188,7 +189,7 @@ def heat_map(request, pk):
     
     data = get_data(pk)
     hm = plt.HeatMap({'intel_snb' : ['intel_snb','intel_snb']},
-                     {'intel_snb' : ['CLOCKS_UNHALTED_REF',
+                     {'intel_snb' : ['CLOCKS_UNHALTED_CORE',
                                      'INSTRUCTIONS_RETIRED']},
                      lariat_data="pass")
     hm.plot(pk,job_data=data)
@@ -224,6 +225,16 @@ class JobDetailView(DetailView):
         type_list = sorted(type_list, key = lambda type_name: type_name[0])
         context['type_list'] = type_list
         context['host_list'] = host_list
+
+        urlstring="https://scribe.tacc.utexas.edu:8000/en-US/app/search/search?q=search%20kernel:"
+        urlstring+="%20host%3D"+host_list[0]
+
+        for host in host_list[1:]:
+            urlstring+="%20OR%20%20host%3D"+host
+
+        urlstring+="&earliest="+str(job.start_epoch)+"&latest="+str(job.end_epoch)+"&display.prefs.events.count=50"
+
+        context['splunk_url'] = urlstring
 
         return context
 

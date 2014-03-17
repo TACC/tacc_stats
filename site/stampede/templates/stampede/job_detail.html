@@ -20,6 +20,7 @@
 	  <th> status </th>	    
 	  <th> cores </th>
 	  <th> nodes </th>
+	  <th> threads/task </th>
 	</tr>
         <tr bgcolor="{{job.color}}">
 	  <td><a href="{% url 'stampede:job'  job.id %}">{{ job.id }}</a>
@@ -35,9 +36,10 @@
           <td align=right>{{ job.status }}</td>
           <td align=right>{{ job.cores }}</td>
           <td align=right>{{ job.nodes }}</td>
+          <td align=right>{{ job.threads }}</td>
         </tr>
    </table>
-   <p><font size="5">Working Directory: {{job.cwd}} </font></p>
+   <p><font size="5">Working Directory: {{job.cwd}}</font></p><p> <a href={{ splunk_url }}> Splunk URL</a></p>
    <hr>
 <p><center>     <font size="6"> Snapshot Plots </font></p>
     <table>
