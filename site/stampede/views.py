@@ -16,7 +16,8 @@ import cPickle as pickle
 import time
    
 import numpy as np
-from pylab import figure, hist
+from matplotlib.figure import Figure
+from matplotlib.backends.backend_agg import FigureCanvasAgg as FigureCanvas
 from django.core.cache import cache,get_cache 
 
 def update(meta = None):
@@ -139,7 +140,7 @@ def hist_summary(request, date = None, uid = None, project = None, user = None, 
     field['status'] = 'COMPLETED'
 
     job_list = Job.objects.filter(**field)
-    fig = figure(figsize=(16,6))
+    fig = Figure(figsize=(16,6))
 
     # Run times
     job_times = np.array([job.run_time for job in job_list])/3600.
@@ -157,7 +158,7 @@ def hist_summary(request, date = None, uid = None, project = None, user = None, 
     ax.set_xlim((0,max(job_size)+1))
     ax.set_title('Run Sizes for Completed Jobs')
     ax.set_xlabel('# cores')
-
+    canvas = FigureCanvas(fig)
     return figure_to_response(fig)
 
 
