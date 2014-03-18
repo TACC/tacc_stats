@@ -52,8 +52,9 @@ class Test(object):
     except EOFError as e:
       print 'End of file found reading: ' + jobid
       return False
+
     if not tspl_utils.checkjob(self.ts,self.min_time,
-                               self.waynesses,self.ignore_qs):
+                               self.waynesses,skip_queues=self.ignore_qs):
       return False
     elif self.ts.numhosts < self.min_hosts:
       return False

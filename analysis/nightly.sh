@@ -1,5 +1,5 @@
 #!/bin/bash
-wd='/home/rtevans/tacc_stats/bin'
+wd='/home1/02561/rtevans/tacc_stats/bin'
 
 if [ "$1" == "" ]; then
   y=`date -d yesterday +%Y-%m-%d`
@@ -7,7 +7,7 @@ else
   y=$1
 fi
 
-tsd='/hpc/tacc_stats_site/stampede/pickles/'
+tsd='/scratch/projects/tacc_stats/pickles/'
 od=${wd}/nightlies/${y}
 
 if [ ! -d $od ]; then
@@ -17,7 +17,7 @@ else
 fi
 
 export PYTHONUNBUFFERED=yes
-export PYTHONPATH='/home/rtevans/tacc_stats/lib':${PYTHONPATH}
+export PYTHONPATH='/home1/02561/rtevans/tacc_stats/lib':${PYTHONPATH}
 cd ${od}
 
 ${wd}/job_sweeper.py -p 2 -start ${y} -end ${y} -t 1.0   -test Imbalance        -o ${od} > ${od}/imbalance-${y}.log 2>&1
