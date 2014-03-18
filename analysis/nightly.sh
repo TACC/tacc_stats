@@ -20,9 +20,7 @@ export PYTHONUNBUFFERED=yes
 export PYTHONPATH='/home/rtevans/tacc_stats/lib':${PYTHONPATH}
 cd ${od}
 
-#${wd}/nightly.py -p 2 ${tsd}/${y} > ${od}/${y}.log 2>&1
-#${wd}/job_sweeper.py -p 2 -start ${y} -end ${y} -t 1.0 -test HighCPI
-${wd}/job_sweeper.py -p 2 -start ${y} -end ${y} -t 1.0 -test Imbalance
-${wd}/job_sweeper.py -p 2 -start ${y} -end ${y} -t 0.999 -test Idle
-${wd}/job_sweeper.py -p 2 -start ${y} -end ${y} -t 0.001 -test LowFLOPS
-${wd}/job_sweeper.py -p 2 -start ${y} -end ${y} -t 0.001 -N 2 -test Catastrophe
+${wd}/job_sweeper.py -p 2 -start ${y} -end ${y} -t 1.0   -test Imbalance        -o ${od} > ${od}/imbalance-${y}.log 2>&1
+${wd}/job_sweeper.py -p 2 -start ${y} -end ${y} -t 0.999 -test Idle             -o ${od} > ${od}/idle-${y}.log 2>&1
+${wd}/job_sweeper.py -p 2 -start ${y} -end ${y} -t 0.001 -test LowFLOPS         -o ${od} > ${od}/lowflops-${y}.log 2>&1
+${wd}/job_sweeper.py -p 2 -start ${y} -end ${y} -t 0.001 -test Catastrophe -N 2 -o ${od} > ${od}/catastrophe-${y}.log 2>&1

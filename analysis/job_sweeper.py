@@ -24,7 +24,7 @@ def sweep(test,start,end):
         print '>>>',date
         files = os.path.join(path,date)
         filelist=tspl_utils.getfilelist(files)
-        test.run(filelist[0:100])
+        test.run(filelist)
 
     print 'Failed jobs'
     print test.top_jobs()    
