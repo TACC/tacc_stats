@@ -34,11 +34,14 @@ class Job(models.Model):
         return dt
     """    
     def color(self):
-        ret_val = "silver"
-        if self.status != 'COMPLETED':
-            ret_val = "red"
-        elif self.run_time > 600:
+
+        if self.status == 'COMPLETED': 
             ret_val = "lightblue"
+        elif self.status == 'FAILED':
+            ret_val = "red"
+        else:
+            ret_val = "silver"
+
         return ret_val
 
 
