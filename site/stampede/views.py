@@ -3,7 +3,7 @@ from django.shortcuts import render_to_response, render
 from django.views.generic import DetailView, ListView
 
 from stampede.models import Job, JobForm
-import os,sys
+import os,sys,pwd
 sys.path.append(os.path.join(os.path.dirname(__file__), 
                              '../../lib'))
 import sys_conf
@@ -33,17 +33,23 @@ def update(meta = None):
         
     for jobid, json in meta.json.iteritems():
 
-        if Job.objects.filter(id = jobid).exists(): continue  
+        #if Job.objects.filter(id = jobid).exists(): continue  
         
         ld.set_job(jobid,
                    end_epoch = meta.json[jobid]['end_epoch'])
 
-        json['user'] = ld.user
+        try:
+            json['user']=pwd.getpwuid(int(json['uid']))[0]
+            print json['user']
+        except:
+            json['user'] = ld.user
+
         json['exe'] = ld.exc.split('/')[-1]
         json['cwd'] = ld.cwd[0:128]
         json['run_time'] = meta.json[jobid]['end_epoch'] - meta.json[jobid]['start_epoch']
         json['threads'] = ld.threads
         try:
+            Job.objects.filter(id = jobid).delete()
             job_model, created = Job.objects.get_or_create(**json) 
         except:
             print "Something wrong with json",json
