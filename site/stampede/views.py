@@ -35,8 +35,8 @@ def update(meta = None):
 
         if Job.objects.filter(id = jobid).exists(): continue  
         
-        ld = ld.set_job(jobid,
-                        end_epoch = meta.json[jobid]['end_epoch'])
+        ld.set_job(jobid,
+                   end_epoch = meta.json[jobid]['end_epoch'])
 
         json['user'] = ld.user
         json['exe'] = ld.exc.split('/')[-1]

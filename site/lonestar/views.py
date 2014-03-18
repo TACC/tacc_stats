@@ -32,8 +32,8 @@ def ls4_update(meta = None):
     for jobid, json in meta.json.iteritems():
 
         if LS4Job.objects.filter(id = jobid).exists(): continue  
-        ld = ld.set_job(jobid,
-                        end_epoch = meta.json[jobid]['end_epoch'])
+        ld.set_job(jobid,
+                   end_epoch = meta.json[jobid]['end_epoch'])
         
         if json['exit_status'] != 0: json['status'] = 'TIMEOUT/CANCELLED'
         else: json['status'] = 'COMPLETED'

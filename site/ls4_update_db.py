@@ -7,16 +7,16 @@ sys.path.append(os.path.join(os.path.dirname(__file__),
                              'tacc_stats_site'))
 sys.path.append(os.path.join(os.path.dirname(__file__), 
                              'lonestar'))
+
 import settings
 setup_environ(settings)
 
 import lonestar.views as views
-sys.path.append('../lib')
+
 from pickler import MetaData
 import datetime
 
-path = "../../lonestar/pickles/"
-
+path = os.path.join(os.path.dirname(__file__),'../../lonestar/pickles')
 
 p = Popen(["date --date " + sys.argv[1] + ' +%Y-%m-%d'], stdout = PIPE, 
                    shell = True) 
