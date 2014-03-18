@@ -166,7 +166,7 @@ class Idle(Test):
 class Imbalance(Test):
   k1=None
   k2=None
-  def __init__(self,k1,k2,processes=1,aggregate=False,**kwargs):
+  def __init__(self,k1=['intel_snb'],k2=['LOAD_L1D_ALL'],processes=1,aggregate=False,**kwargs):
     self.k1=k1
     self.k2=k2
 
