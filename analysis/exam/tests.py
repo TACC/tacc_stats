@@ -39,6 +39,7 @@ class Test(object):
     manager=multiprocessing.Manager()
     self.ratios=manager.dict()
     self.results=manager.dict()
+    self.su=manager.dict()
 
   def setup(self,jobid):
     try:
@@ -51,13 +52,12 @@ class Test(object):
     except EOFError as e:
       print 'End of file found reading: ' + jobid
       return False
-
     if not tspl_utils.checkjob(self.ts,self.min_time,
                                self.waynesses,self.ignore_qs):
       return False
     elif self.ts.numhosts < self.min_hosts:
       return False
-    else: 
+    else:
       return True
 
   def run(self,filelist):
@@ -71,7 +71,7 @@ class Test(object):
     comp = {'>': operator.gt, '>=': operator.ge,
                 '<': operator.le, '<=': operator.le,
                 '==': operator.eq}
-
+    self.su[self.ts.j.id] = (self.ts.owner,self.ts.su,val)
     if comp[func](val, self.threshold):
       self.results[jobid] = True
     else:
@@ -85,6 +85,30 @@ class Test(object):
       if results[i]:
         jobs.append(i)
     return jobs
+
+  def top_jobs(self, failed=True):
+    jobs = {}
+    if failed: jobs_list = self.failed()
+    else: job_list = self.results.keys()
+
+    total = {}
+
+    for jobid in jobs_list:
+      jobid = jobid.split('/')[-1]
+      data = self.su[jobid]        
+      if not data[0] in jobs: 
+        jobs[data[0]] = []
+        total[data[0]] = 0
+      jobs[data[0]].append((jobid,data[1],data[2]))
+      total[data[0]] += data[1]
+
+    sorted_totals = sorted(total.iteritems(),key=operator.itemgetter(1))
+
+    sorted_jobs = []
+    for x in sorted_totals[::-1]:
+      sorted_jobs.append((x,jobs[x[0]]))
+
+    return sorted_jobs
 
   @abc.abstractmethod
   def test(self,jobid):
@@ -339,7 +363,7 @@ class HighCPI(Test):
   def test(self,jobid):
     if not self.setup(jobid): return
     ts = self.ts
-    
+
     if "FAIL" in ts.status: return
     if "CANCELLED" in ts.status: return  
 
@@ -351,6 +375,6 @@ class HighCPI(Test):
       instr_rate += numpy.diff(ts.assemble([1],k,0))/numpy.diff(ts.t)
 
     cpi = tmean(clock_rate/instr_rate)
-        
+
     self.comp2thresh(jobid,cpi)
        

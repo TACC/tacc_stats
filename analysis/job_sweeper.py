@@ -21,7 +21,7 @@ def sweep(test,start,end):
         except: continue
         if not datetime.date(s[0],s[1],s[2]) <= datetime.date(d[0],d[1],d[2]) <= datetime.date(e[0],e[1],e[2]): 
             continue
-        print 'Run analysis for',date
+        print '>>>for',date
         files = os.path.join(path,date)
         filelist=tspl_utils.getfilelist(files)
         test.run(filelist)
@@ -51,7 +51,7 @@ def main():
         if hasattr(obj,"__bases__") and tests.Test in obj.__bases__:
             if args.test[0] in obj.__name__:
                 test = obj(processes=args.p[0], threshold=args.t[0], min_time=args.s[0])
-                print 'Test: '+ obj.__name__
+                print 'Run test: '+ obj.__name__
                 sweep(test,args.start[0],args.end[0])
                 
 if __name__ == '__main__':
