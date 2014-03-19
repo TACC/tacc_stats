@@ -33,7 +33,7 @@ def update(meta = None):
         
     for jobid, json in meta.json.iteritems():
 
-        if Job.objects.filter(id = jobid).exists(): continue  
+        #if Job.objects.filter(id = jobid).exists(): continue  
         
         ld.set_job(jobid,
                    end_epoch = meta.json[jobid]['end_epoch'])
@@ -48,6 +48,7 @@ def update(meta = None):
         json['run_time'] = meta.json[jobid]['end_epoch'] - meta.json[jobid]['start_epoch']
         json['threads'] = ld.threads
         try:
+            Job.objects.filter(id = jobid).delete()
             job_model, created = Job.objects.get_or_create(**json) 
         except:
             print "Something wrong with json",json

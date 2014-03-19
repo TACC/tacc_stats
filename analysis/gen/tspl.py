@@ -85,7 +85,7 @@ class TSPLBase:
       
     self.numhosts=len(self.j.hosts.keys())
 
-    if self.numhosts == 0 and VERBOSE:
+    if self.numhosts == 0:
       raise TSPLException('No hosts in job '+ str(self.j.id))
 
     self.su=float(self.j.acct['end_time'] - self.j.acct['start_time'])* \
@@ -99,7 +99,7 @@ class TSPLBase:
         self.pmc_type='intel'
       elif 'intel_snb' in self.j.hosts.values()[0].stats:
         self.pmc_type='intel_snb'
-        
+      
       if self.pmc_type in k1:
         self.k1=k1[self.pmc_type]
         self.k2=k2[self.pmc_type]

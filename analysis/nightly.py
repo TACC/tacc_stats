@@ -22,9 +22,9 @@ def main():
   args=parser.parse_args()
   filelist=tspl_utils.getfilelist(args.files)
 
-  plotter = plots.MasterPlot(outdir=args.o[0],processes=args.p[0],                             
+  plotter = plots.MasterPlot(outdir=args.o[0],processes=args.p[0],            
                              wide=args.w,save=True)
-
+  
 
   ### Node Imbalance
   print '-----------------'
