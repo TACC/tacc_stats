@@ -165,8 +165,8 @@ def hist_summary(request, date = None, uid = None, project = None, user = None, 
     ax.set_xlim((0,max(job_size)+1))
     ax.set_title('Run Sizes for Completed Jobs')
     ax.set_xlabel('# cores')
-    canvas = FigureCanvas(fig)
 
+    canvas = FigureCanvas(fig)
     response = HttpResponse(content_type='image/png')
     response['Content-Disposition'] = "attachment; filename="+"histogram"+".png"
     fig.savefig(response, format='png')
