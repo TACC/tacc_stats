@@ -1,5 +1,8 @@
 #!/bin/bash
+
 wd='@CMAKE_SOURCE_DIR@/bin'
+prog_dir=$(readlink -f $(dirname $0))
+export PATH=@PYTHON_PATH@:$prog_dir:$PATH
 
 if [ "$1" == "" ]; then
   y=`date -d yesterday +%Y-%m-%d`
