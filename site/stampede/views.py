@@ -3,7 +3,7 @@ from django.shortcuts import render_to_response, render
 from django.views.generic import DetailView, ListView
 
 from stampede.models import Job, JobForm
-import os,sys
+import os,sys,pwd
 sys.path.append(os.path.join(os.path.dirname(__file__), 
                              '../../lib'))
 import sys_conf
@@ -38,7 +38,11 @@ def update(meta = None):
         ld.set_job(jobid,
                    end_epoch = meta.json[jobid]['end_epoch'])
 
-        json['user'] = ld.user
+        try:
+            json['user']=pwd.getpwuid(int(json['uid']))[0]
+        except:
+            json['user'] = ld.user
+
         json['exe'] = ld.exc.split('/')[-1]
         json['cwd'] = ld.cwd[0:128]
         json['run_time'] = meta.json[jobid]['end_epoch'] - meta.json[jobid]['start_epoch']
@@ -163,10 +167,10 @@ def hist_summary(request, date = None, uid = None, project = None, user = None, 
     canvas = FigureCanvas(fig)
     return figure_to_response(fig)
 
-
-def figure_to_response(f):
+def figure_to_response(p):
     response = HttpResponse(content_type='image/png')
-    f.savefig(response, format='png')
+    response['Content-Disposition'] = "attachment; filename="+p.fname+".png"
+    p.fig.savefig(response, format='png')
     return response
 
 def get_data(pk):
@@ -183,17 +187,16 @@ def master_plot(request, pk):
     data = get_data(pk)
     mp = plt.MasterPlot(lariat_data="pass")
     mp.plot(pk,job_data=data)
-    return figure_to_response(mp.fig)
+    return figure_to_response(mp)
 
-def heat_map(request, pk):
-    
+def heat_map(request, pk):    
     data = get_data(pk)
     hm = plt.HeatMap({'intel_snb' : ['intel_snb','intel_snb']},
                      {'intel_snb' : ['CLOCKS_UNHALTED_CORE',
                                      'INSTRUCTIONS_RETIRED']},
                      lariat_data="pass")
     hm.plot(pk,job_data=data)
-    return figure_to_response(hm.fig)
+    return figure_to_response(hm)
 
 def build_schema(data,name):
     schema = []
@@ -249,7 +252,7 @@ def type_plot(request, pk, type_name):
 
     tp = plt.DevPlot(k1,k2,lariat_data='pass')
     tp.plot(pk,job_data=data)
-    return figure_to_response(tp.fig)
+    return figure_to_response(tp)
 
 
 def type_detail(request, pk, type_name):
