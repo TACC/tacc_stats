@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 import argparse,os,sys
 from subprocess import Popen, PIPE, call
-
+from collections import Counter
 import datetime
 sys.path.append(os.path.join(os.path.dirname(__file__),
                              '../lib'))
@@ -26,8 +26,17 @@ def sweep(test,start,end):
         filelist=tspl_utils.getfilelist(files)
         test.run(filelist)
 
+        c = Counter(test.results.values())
+        print "---------------------------------------------"
+        try: 
+            print "Jobs tested:",c[True]+c[False]
+            print "Percentage of jobs failed:",100*c[True]/float(c[True]+c[False])
+        except ZeroDivisionError: 
+            print "No jobs failed."
+            return
     print 'Failed jobs'
-    print test.top_jobs()    
+    for x in test.top_jobs():
+        print x[0],x[1]
     return test.failed()
 
 def main():
@@ -53,11 +62,12 @@ def main():
 
     parser.add_argument('-o', help='Output directory',
                         nargs=1, type=str, default=['.'], metavar='output_dir')
-    parser.add_argument('-wide', help='Set wide plot format',default=True)
-    parser.add_argument('-plot', help='Generate a plot',default=True)
-    parser.add_argument('-save', help='Save a plot',default=True)
+    parser.add_argument('-wide', help='Set wide plot format',
+                        action="store_true")
+    parser.add_argument('-plot', help='Generate a plot',action="store_true")
+    parser.add_argument('-save', help='Save a plot',action="store_true")
     args=parser.parse_args()
-
+    print args
     import inspect
     for name, obj in inspect.getmembers(tests):
         if hasattr(obj,"__bases__") and tests.Test in obj.__bases__:            
@@ -67,7 +77,6 @@ def main():
                            waynesses=args.waynesses, aggregate=args.a)
                 print 'Run test '+ obj.__name__+' for date >>>' 
                 failed = sweep(test,args.start[0],args.end[0])
-                print failed
                 if args.plot:
                     plotter = plots.MasterPlot(header='Failed test: '+ obj.__name__,
                                                prefix=obj.__name__,outdir=args.o[0],
