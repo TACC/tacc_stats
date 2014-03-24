@@ -40,7 +40,6 @@ def update(meta = None):
 
         try:
             json['user']=pwd.getpwuid(int(json['uid']))[0]
-            print json['user']
         except:
             json['user'] = ld.user
 
@@ -167,12 +166,17 @@ def hist_summary(request, date = None, uid = None, project = None, user = None, 
     ax.set_title('Run Sizes for Completed Jobs')
     ax.set_xlabel('# cores')
     canvas = FigureCanvas(fig)
-    return figure_to_response(fig)
 
-
-def figure_to_response(f):
     response = HttpResponse(content_type='image/png')
-    f.savefig(response, format='png')
+    response['Content-Disposition'] = "attachment; filename="+"histogram"+".png"
+    fig.savefig(response, format='png')
+
+    return response
+
+def figure_to_response(p):
+    response = HttpResponse(content_type='image/png')
+    response['Content-Disposition'] = "attachment; filename="+p.fname+".png"
+    p.fig.savefig(response, format='png')
     return response
 
 def get_data(pk):
@@ -189,17 +193,16 @@ def master_plot(request, pk):
     data = get_data(pk)
     mp = plt.MasterPlot(lariat_data="pass")
     mp.plot(pk,job_data=data)
-    return figure_to_response(mp.fig)
+    return figure_to_response(mp)
 
-def heat_map(request, pk):
-    
+def heat_map(request, pk):    
     data = get_data(pk)
     hm = plt.HeatMap({'intel_snb' : ['intel_snb','intel_snb']},
                      {'intel_snb' : ['CLOCKS_UNHALTED_CORE',
                                      'INSTRUCTIONS_RETIRED']},
                      lariat_data="pass")
     hm.plot(pk,job_data=data)
-    return figure_to_response(hm.fig)
+    return figure_to_response(hm)
 
 def build_schema(data,name):
     schema = []
@@ -255,7 +258,7 @@ def type_plot(request, pk, type_name):
 
     tp = plt.DevPlot(k1,k2,lariat_data='pass')
     tp.plot(pk,job_data=data)
-    return figure_to_response(tp.fig)
+    return figure_to_response(tp)
 
 
 def type_detail(request, pk, type_name):
