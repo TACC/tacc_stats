@@ -4,7 +4,7 @@ import sys
 # if running multiple sites in the same mod_wsgi process. To fix this, use
 # mod_wsgi daemon mode with each site in its own daemon process, or use
 # os.environ["DJANGO_SETTINGS_MODULE"] = "tacc_stats_site.settings"
-sys.path.append('/hpc/tacc_stats_site/tacc_stats/site')
+sys.path.append(os.path.join(os.path.dirname(__file__),"../"))
 os.environ.setdefault("MPLCONFIGDIR","/tmp/")
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "tacc_stats_site.settings")
 

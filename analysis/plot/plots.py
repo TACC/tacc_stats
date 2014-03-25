@@ -40,7 +40,7 @@ class Plot(object):
     self.threshold=kwargs.get('threshold',None)
     self.outdir=kwargs.get('outdir','.')
     self.prefix=kwargs.get('prefix','')
-    self.header=kwargs.get('header','')
+    self.header=kwargs.get('header',None)
     self.wide=kwargs.get('wide',False)
     self.save=kwargs.get('save',False)
     self.lariat_data=kwargs.get('lariat_data',

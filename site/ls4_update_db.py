@@ -16,7 +16,7 @@ import lonestar.views as views
 from pickler import MetaData
 import datetime
 
-path = os.path.join(os.path.dirname(__file__),'../../lonestar/pickles')
+path = "/hpc/tacc_stats_site/lonestar/pickles"
 
 p = Popen(["date --date " + sys.argv[1] + ' +%Y-%m-%d'], stdout = PIPE, 
                    shell = True) 
