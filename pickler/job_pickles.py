@@ -1,5 +1,7 @@
 #!/usr/bin/env python
 import os,sys
+sys.path.append(os.path.join(os.path.dirname(__file__),
+                             '../lib'))
 import sys_conf
 sys.path.append(sys_conf.tacc_stats_lib)
 from pickler import batch_acct,job_stats

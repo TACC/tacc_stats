@@ -15,3 +15,4 @@ sys_path_append.py
 analyze_conf.py
 *.out.*
 *.err.*
+analysis/*.sh
