@@ -5,7 +5,7 @@
 <body>
 {% if job %}
    <h2> Job Summary    </h2>
- <table border="1" cellpadding="5">
+ <table border="1" cellpadding="5" style=font-family:"arial">
         <tr>
 	  <th> Job ID </th>
 	  <th> UID </th>
@@ -58,7 +58,7 @@
 </center>
 <hr>
 <center><h2> Schema Summary: Choose Type Name below to access plots and counts of Performance Events. </h2></center>
-    <table border="1" cellpadding="5"
+    <table border="1" cellpadding="5"  style=font-family:"arial">
       <tr><th>Type Name</th><th>Recorded Performance Events</th></tr>
          {% for type_name, schema in type_list %}
             <tr><td><a href="{{ type_name }}/">{{ type_name }}</a></td><<td>{{ schema }}</td></tr>

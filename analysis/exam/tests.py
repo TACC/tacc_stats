@@ -372,8 +372,8 @@ class HighCPI(Test):
     clock_rate = numpy.zeros_like(tmid)
     instr_rate = numpy.zeros_like(tmid)
     for k in ts.j.hosts.keys():
-      clock_rate += numpy.diff(ts.assemble([0],k,0))/numpy.diff(ts.t)
-      instr_rate += numpy.diff(ts.assemble([1],k,0))/numpy.diff(ts.t)
+      clock_rate += numpy.diff(ts.data[0][k][0])
+      instr_rate += numpy.diff(ts.data[1][k][0])
 
     cpi = tmean(clock_rate/instr_rate)
 

@@ -271,9 +271,10 @@ def type_detail(request, pk, type_name):
     scale = 1.0
     for t in range(len(raw_stats)):
         temp = []
+        times = data.times-data.times[0]
         for event in range(len(raw_stats[t])):
             temp.append(raw_stats[t,event]*scale)
-        stats.append((data.times[t],temp))
+        stats.append((times[t],temp))
 
 
     return render_to_response("stampede/type_detail.html",{"type_name" : type_name, "jobid" : pk, "stats_data" : stats, "schema" : schema})
