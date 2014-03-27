@@ -198,7 +198,7 @@ def master_plot(request, pk):
 def heat_map(request, pk):    
     data = get_data(pk)
     hm = plt.HeatMap({'intel_snb' : ['intel_snb','intel_snb']},
-                     {'intel_snb' : ['CLOCKS_UNHALTED_CORE',
+                     {'intel_snb' : ['CLOCKS_UNHALTED_REF',
                                      'INSTRUCTIONS_RETIRED']},
                      lariat_data="pass")
     hm.plot(pk,job_data=data)
