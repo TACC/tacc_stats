@@ -185,7 +185,7 @@ class TSPLBase:
   def data_init(self):
     return []
   def data_assign(self,d,v):
-    d.append(v)
+    d.append(numpy.array(v,dtype=numpy.float))
 
   # Generate a label for title strings
   def label(self,k1,k2,mod=1.):

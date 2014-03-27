@@ -8,8 +8,10 @@ sys.path.append(os.path.join(os.path.dirname(__file__),
 import analysis.exam.tests as tests
 import analysis.plot.plots as plots
 import analysis.gen.tspl_utils as tspl_utils
+from matplotlib.figure import Figure
+from matplotlib.backends.backend_agg import FigureCanvasAgg as FigureCanvas
 import sys_conf
-
+from numpy import log,isnan
 path = sys_conf.pickles_dir
 
 def sweep(test,start,end):
@@ -26,17 +28,18 @@ def sweep(test,start,end):
         filelist=tspl_utils.getfilelist(files)
         test.run(filelist)
 
-        c = Counter(test.results.values())
-        print "---------------------------------------------"
-        try: 
-            print "Jobs tested:",c[True]+c[False]
-            print "Percentage of jobs failed:",100*c[True]/float(c[True]+c[False])
-        except ZeroDivisionError: 
-            print "No jobs failed."
-            return
+    c = Counter(test.results.values())
+    print "---------------------------------------------"
+    try: 
+        print "Jobs tested:",c[True]+c[False]
+        print "Percentage of jobs failed:",100*c[True]/float(c[True]+c[False])
+    except ZeroDivisionError: 
+        print "No jobs failed."
+        return
     print 'Failed jobs'
     for x in test.top_jobs():
         print x[0],x[1]
+
     return test.failed()
 
 def main():
@@ -65,7 +68,7 @@ def main():
     parser.add_argument('-wide', help='Set wide plot format',
                         action="store_true")
     parser.add_argument('-plot', help='Generate a plot',action="store_true")
-    parser.add_argument('-save', help='Save a plot',action="store_true")
+
     args=parser.parse_args()
     print args
     import inspect
@@ -81,8 +84,18 @@ def main():
                     plotter = plots.MasterPlot(header='Failed test: '+ obj.__name__,
                                                prefix=obj.__name__,outdir=args.o[0],
                                                processes=args.p[0],threshold=args.t[0],
-                                               wide=args.wide,save=args.save)
+                                               wide=args.wide,save=True)
                     plotter.run(failed)
+
+                vals = [v[2] for j,v in test.su.items()]
+                vals = [val for val in vals if not isnan(val)]
+                fig = Figure()
+                ax = fig.add_subplot(1,1,1)
+                ax.hist(vals,max(5,5*log(len(vals))))
+                ax.set_title("Histogram for test: " + obj.__name__)
+                canvas = FigureCanvas(fig)
+                fig.savefig("histogram-"+obj.__name__+"-"+args.start[0]+"."+args.end[0]+".png")
+
 
 if __name__ == '__main__':
     main()

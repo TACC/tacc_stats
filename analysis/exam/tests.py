@@ -359,7 +359,29 @@ class MetaDataRate(Test):
     
 class HighCPI(Test):
   k1 = ['intel_snb', 'intel_snb']      
-  k2 = ['CLOCKS_UNHALTED_CORE','INSTRUCTIONS_RETIRED' ]
+  k2 = ['CLOCKS_UNHALTED_REF','INSTRUCTIONS_RETIRED' ]
+
+  def test(self,jobid):
+    if not self.setup(jobid): return
+    ts = self.ts
+
+    if "FAIL" in ts.status: return
+    if "CANCELLED" in ts.status: return  
+
+    tmid=(ts.t[:-1]+ts.t[1:])/2.0       
+    clock_rate = numpy.zeros_like(tmid)
+    instr_rate = numpy.zeros_like(tmid)
+    for k in ts.j.hosts.keys():
+      clock_rate += numpy.diff(ts.assemble([0],k,0))/numpy.diff(ts.t)
+      instr_rate += numpy.diff(ts.assemble([1],k,0))/numpy.diff(ts.t)
+
+    cpi = tmean(clock_rate/instr_rate)
+
+    self.comp2thresh(jobid,cpi)
+
+class HighCPLD(Test):
+  k1 = ['intel_snb', 'intel_snb']      
+  k2 = ['CLOCKS_UNHALTED_REF','LOAD_L1D_ALL' ]
 
   def test(self,jobid):
     if not self.setup(jobid): return

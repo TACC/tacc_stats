@@ -23,7 +23,8 @@ export PYTHONUNBUFFERED=yes
 export PYTHONPATH='@CMAKE_SOURCE_DIR@/lib':${PYTHONPATH}
 cd ${od}
 
-${wd}/job_sweeper.py -p 2 -start ${y} -end ${y} -t 1.0   -plot -save -wide -test Imbalance        -o ${od} > ${od}/imbalance-${y}.log 2>&1
-${wd}/job_sweeper.py -p 2 -start ${y} -end ${y} -t 0.999 -plot -save -wide -test Idle             -o ${od} > ${od}/idle-${y}.log 2>&1
-${wd}/job_sweeper.py -p 2 -start ${y} -end ${y} -t 0.001 -plot -save -wide -test LowFLOPS         -o ${od} > ${od}/lowflops-${y}.log 2>&1
-${wd}/job_sweeper.py -p 2 -start ${y} -end ${y} -t 0.001 -plot -save -wide -test Catastrophe -N 2 -o ${od} > ${od}/catastrophe-${y}.log 2>&1
+${wd}/job_sweeper.py -p 2 -start ${y} -end ${y} -t 1.0   -plot -wide -test Imbalance        -o ${od} > ${od}/imbalance-${y}.log 2>&1
+${wd}/job_sweeper.py -p 2 -start ${y} -end ${y} -t 1.0   -plot -wide -test HighCPI          -o ${od} > ${od}/highcpi-${y}.log 2>&1
+${wd}/job_sweeper.py -p 2 -start ${y} -end ${y} -t 0.999 -plot -wide -test Idle             -o ${od} > ${od}/idle-${y}.log 2>&1
+${wd}/job_sweeper.py -p 2 -start ${y} -end ${y} -t 0.001 -plot -wide -test LowFLOPS         -o ${od} > ${od}/lowflops-${y}.log 2>&1
+${wd}/job_sweeper.py -p 2 -start ${y} -end ${y} -t 0.001 -plot -wide -test Catastrophe -N 2 -o ${od} > ${od}/catastrophe-${y}.log 2>&1

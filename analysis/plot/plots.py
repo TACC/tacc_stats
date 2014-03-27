@@ -75,8 +75,6 @@ class Plot(object):
 
     pool=multiprocessing.Pool(processes=self.processes) 
     pool.map(unwrap,zip([self]*len(filelist),filelist,[kwargs]*len(filelist)))
-    pool.close()
-    pool.join()
 
   ## Set the x and y axis labels for a plot
   def setlabels(self,ax,index,xlabel,ylabel,yscale):
@@ -451,7 +449,9 @@ class MetaDataRate(Plot):
 
 class HeatMap(Plot):
 
-  def __init__(self,k1,k2,processes=1,aggregate=False,**kwargs):
+  def __init__(self,k1=['intel_snb','intel_snb'],
+               k2=['CLOCKS_UNHALTED_REF','INSTRUCTIONS_RETIRED'],
+               processes=1,aggregate=False,**kwargs):
     #self.aggregate = False
     self.k1 = k1
     self.k2 = k2
@@ -461,21 +461,21 @@ class HeatMap(Plot):
     self.setup(jobid,job_data=job_data)
     ts=self.ts
 
-    cpi = numpy.array([])
     hosts = []
     for v in ts.data[0]:
         hosts.append(v)
         ncores = len(ts.data[0][v])
         for k in range(ncores):
-            i = numpy.array(ts.data[0][v][k],dtype=numpy.float)
-            c = numpy.array(ts.data[1][v][k],dtype=numpy.float)
-            ratio = numpy.divide(numpy.diff(i),numpy.diff(c))
-            if not cpi.size: cpi = numpy.array([ratio])
-            else: cpi = numpy.vstack((cpi,ratio))
+          num = numpy.array(numpy.diff(ts.data[0][v][k]),dtype=numpy.float64)
+          den = numpy.array(numpy.diff(ts.data[1][v][k]),dtype=numpy.float64)
+          ratio = numpy.divide(num,den)
+          try: cpi = numpy.vstack((cpi,ratio))
+          except: cpi = numpy.array([ratio]) 
+
     cpi_min, cpi_max = cpi.min(), cpi.max()
 
     mean_cpi = numpy.mean(cpi)
-
+    var_cpi  = numpy.var(cpi)
     self.fig = Figure(figsize=(8,12),dpi=110)
     self.ax=self.fig.add_subplot(1,1,1)
 
@@ -492,9 +492,10 @@ class HeatMap(Plot):
     self.ax.set_yticklabels(hosts)#,va='center')
     self.ax.set_xlim(left=time.min(),right=time.max())
 
-    pcm = self.ax.pcolormesh(time, ycore, cpi)#, vmin=cpi_min, vmax=cpi_max)
-
-    self.ax.set_title(self.k2[ts.pmc_type][0] +'/'+self.k2[ts.pmc_type][1] + '\n'+ r'$\bar{Mean}$='+str(mean_cpi))
+    pcm = self.ax.pcolormesh(time, ycore, cpi)
+    numpy.set_printoptions(precision=4)
+    try: self.ax.set_title(self.k2[ts.pmc_type][0] +'/'+self.k2[ts.pmc_type][1] + '\n'+ r'$\bar{Mean}=$'+'{0:.2f}'.format(mean_cpi)+' '+r'$Var=$' +  '{0:.2f}'.format(var_cpi))
+    except: self.ax.set_title(self.k2[0] +'/'+self.k2[1] + '\n'+ r'$\bar{Mean}$='+'{0:.2f}'.format(mean_cpi)+' '+r'$Var=$' +  '{0:.2f}'.format(var_cpi))
     self.fig.colorbar(pcm)
     self.ax.set_xlabel('Time (hrs)')
     self.output('heatmap')
@@ -534,4 +535,17 @@ class DevPlot(Plot):
     self.fig.tight_layout()
 
     self.output('devices')
+"""
+class HistPlot(Plot):
 
+  def __init__(self,k1,k2,processes=1,**kwargs):
+    self.k1 = k1
+    self.k2 = k2
+    super(HistPlot,self).__init__(processes=processes,**kwargs)
+
+  def plot(self,jobid,job_data=None):
+    self.setup(jobid,job_data=job_data)
+
+
+    ts=self.ts
+"""
