@@ -9,6 +9,7 @@ sys.path.append(os.path.join(os.path.dirname(__file__),
 import sys_conf
 import analysis
 from analysis.gen import tspl, lariat_utils
+from analysis.exam import tests
 from analysis.plot import plots as plt
 from pickler import job_stats, batch_acct
 # Compatibility with old pickle versions
@@ -30,13 +31,15 @@ def update(meta = None):
 
     ld = lariat_utils.LariatData(directory = sys_conf.lariat_path,
                                  daysback = 2)
-        
+
+    cpi_test = tests.HighCPI(threshold=1.0)        
     for jobid, json in meta.json.iteritems():
 
         #if Job.objects.filter(id = jobid).exists(): continue  
-        
-        ld.set_job(jobid,
-                   end_epoch = meta.json[jobid]['end_epoch'])
+        cpi_test.test(json['path'])
+        print cpi_test.metric
+        if np.isnan(cpi_test.metric): print "NaN"
+        ld.set_job(jobid,end_epoch = json['end_epoch'])
 
         try:
             json['user']=pwd.getpwuid(int(json['uid']))[0]
@@ -45,7 +48,7 @@ def update(meta = None):
 
         json['exe'] = ld.exc.split('/')[-1]
         json['cwd'] = ld.cwd[0:128]
-        json['run_time'] = meta.json[jobid]['end_epoch'] - meta.json[jobid]['start_epoch']
+        json['run_time'] = json['end_epoch'] - json['start_epoch']
         json['threads'] = ld.threads
         try:
             Job.objects.filter(id = jobid).delete()

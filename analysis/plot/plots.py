@@ -469,6 +469,7 @@ class HeatMap(Plot):
           num = numpy.array(numpy.diff(ts.data[0][v][k]),dtype=numpy.float64)
           den = numpy.array(numpy.diff(ts.data[1][v][k]),dtype=numpy.float64)
           ratio = numpy.divide(num,den)
+          ratio = numpy.nan_to_num(ratio)
           try: cpi = numpy.vstack((cpi,ratio))
           except: cpi = numpy.array([ratio]) 
 

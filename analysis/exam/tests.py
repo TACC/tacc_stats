@@ -25,7 +25,7 @@ class Test(object):
   def k2(self): pass
 
   ts = None
-
+  metric = float("nan")
   def __init__(self,processes=1,**kwargs):
     self.processes=processes
     self.threshold=kwargs.get('threshold',None)
@@ -53,6 +53,9 @@ class Test(object):
       print 'End of file found reading: ' + jobid
       return False
 
+    if "FAIL" in self.ts.status: return False
+    if "CANCELLED" in self.ts.status: return False 
+
     if not tspl_utils.checkjob(self.ts,self.min_time,
                                self.waynesses,skip_queues=self.ignore_qs):
       return False
@@ -72,6 +75,7 @@ class Test(object):
     comp = {'>': operator.gt, '>=': operator.ge,
                 '<': operator.le, '<=': operator.le,
                 '==': operator.eq}
+    self.metric = val
     self.su[self.ts.j.id] = (self.ts.owner,self.ts.su,val)
     if comp[func](val, self.threshold):
       self.results[jobid] = True

@@ -85,7 +85,8 @@ def main():
                                                prefix=obj.__name__,outdir=args.o[0],
                                                processes=args.p[0],threshold=args.t[0],
                                                wide=args.wide,save=True)
-                    plotter.run(failed)
+                    for f in failed:
+                        plotter.plot(f)
 
                 vals = [v[2] for j,v in test.su.items()]
                 vals = [val for val in vals if not isnan(val)]
