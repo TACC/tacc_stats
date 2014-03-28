@@ -1,55 +1,71 @@
 import csv, os, subprocess, datetime, glob
+import time,calendar
 
 def factory(kind,acct_file,host_name_ext=''):
   if kind == 'SGE':
     return SGEAcct(acct_file,host_name_ext)
   elif kind == 'SLURM':
     return SLURMAcct(acct_file,host_name_ext)
+  elif kind == 'SLURMNative':
+    return SLURMNativeAcct(acct_file,host_name_ext)
 
 class BatchAcct(object):
 
-  def __init__(self,batch_kind,acct_file,host_name_ext):
+  def __init__(self,batch_kind,acct_file,host_name_ext,delimiter=":"):
     self.batch_kind=batch_kind
     self.acct_file=acct_file
     self.field_names = [tup[0] for tup in self.fields]
     self.name_ext = '.'+host_name_ext
+    self.delimiter = delimiter 
 
   def reader(self,start_time=0, end_time=9223372036854775807L, seek=0):
     """reader(start_time=0, end_time=9223372036854775807L, seek=0)
     Return an iterator for all jobs that finished between start_time and end_time.
     """
-    file = open(self.acct_file)
-    if seek:
-      file.seek(seek, os.SEEK_SET)
+    filelist = []
+    if os.path.isdir(self.acct_file):
+        for dir_name, subdir_list, file_list in os.walk(self.acct_file):
+            for fname in file_list:
+                filelist.append( os.path.join(self.acct_file,dir_name,fname) )
+    else:
+        filelist = [ self.acct_file ]
 
-    for d in csv.DictReader(file, delimiter=':', fieldnames=self.field_names):
-      try:
-        for n, t, x in self.fields:
-          d[n] = t(d[n])
-      except:
-        pass
+    for fname in filelist:
+        file = open(fname)
+        if seek:
+            file.seek(seek, os.SEEK_SET)
 
-      ## Clean up when colons exist in job name
-      if None in d:
-        #print 'before',d
-        num_cols = len(d[None])
-        for cols in range(num_cols):
-          d['name'] = d['name']+':'+d['status']        
-          d['status'] = str(d['nodes'])
-          d['nodes'] = d['cores']
-          d['cores'] = d[None][0]
-          del d[None][0]
-        d['nodes'] = int(d['nodes'])
-        d['cores'] = int(d['cores'])
-        del d[None]
-        #print 'after',d
-      # Accounting records with pe_taskid != NONE are generated for
-      # sub_tasks of a tightly integrated job and should be ignored.
-      if start_time <= d['end_time'] and d['end_time'] < end_time:
-        if self.batch_kind=='SGE' and d['pe_taskid'] == 'NONE':
-          yield d
-        elif self.batch_kind=='SLURM':
-          yield d
+        for d in csv.DictReader(file, delimiter=self.delimiter, fieldnames=self.field_names):
+          try:
+            for n, t, x in self.fields:
+              d[n] = t(d[n])
+          except Exception as e:
+            #print e
+            pass
+
+          ## Clean up when colons exist in job name
+          if None in d:
+            #print 'before',d
+            num_cols = len(d[None])
+            for cols in range(num_cols):
+              d['name'] = d['name']+':'+d['status']        
+              d['status'] = str(d['nodes'])
+              d['nodes'] = d['cores']
+              d['cores'] = d[None][0]
+              del d[None][0]
+            d['nodes'] = int(d['nodes'])
+            d['cores'] = int(d['cores'])
+            del d[None]
+            #print 'after',d
+          # Accounting records with pe_taskid != NONE are generated for
+          # sub_tasks of a tightly integrated job and should be ignored.
+          if start_time <= d['end_time'] and d['end_time'] < end_time:
+            if self.batch_kind=='SGE' and d['pe_taskid'] == 'NONE':
+              yield d
+            elif self.batch_kind=='SLURM':
+              yield d
+
+        file.close()
 
 
   def from_id_with_file_1(self, id, seek=0):
@@ -108,9 +124,9 @@ class SGEAcct(BatchAcct):
       ('arid',            int, 'Advance reservation identifier. If the job used resources of an advance reservation then this field contains a positive integer identifier otherwise the value is 0.'),
       ('ar_submission_time', int, 'If the job used resources of an advance reservation then this field contains the submission time (GMT unix time stamp) of the advance reservation, otherwise the value is 0.'),
       )
-
-    BatchAcct.__init__(self,'SGE',acct_file,host_name_ext)
     
+    BatchAcct.__init__(self,'SGE',acct_file,host_name_ext)
+
   def keymap(key): # Batch account keywords are based on SGE names for
                    # historical reasons
     return key
@@ -163,3 +179,39 @@ class SLURMAcct(BatchAcct):
       for path in glob.iglob(full_glob):
         return path
     return None
+
+def isodate(s):
+    """ Return the unix timestamp for a date represented in the LOCAL timezone """
+    """ Note that it is strongly recommended to store dates with their timezone """
+    """ information. The absence of the timezone means that some dates are ambigous """
+    return int(time.mktime(time.strptime(s,'%Y-%m-%dT%H:%M:%S')))
+
+class SLURMNativeAcct(BatchAcct):
+  """ Process accounting data produced by the sacct command with the following """
+  """ flags. """
+  """ sacct --allusers --parsable2 --noheader --allocations --allclusters      """
+  """     --format jobid,cluster,partition,account,group,user,submit,eligible,start,end,exitcode,nnodes,ncpus,nodelist,jobname """
+  """     --state CA,CD,F,NF,TO """
+
+  def __init__(self,acct_file,host_name_ext):
+
+    self.fields = (
+      ('id',                          int, 'Job identifier'),
+      ('cluster',                     str, 'Job cluster'),
+      ('partition',                   str, 'Job partition'),
+      ('account',                     str, 'Job account'),
+      ('group',                       str, 'Group name of the job owner'),
+      ('user',                        str, 'User that is running the job'),
+      ('submit',                      isodate, 'Time the job was submitted'),
+      ('eligible',                    isodate, 'Time job was eligible to run (unix time stamp)'),
+      ('start_time',                  isodate, 'Time job started to run (unix time stamp)'),
+      ('end_time',                    isodate, 'Time job ended (unix time stamp)'),
+      ('exit_code',                   str, 'Exit status of job'),
+      ('nnodes',                      int, 'Number of nodes'),
+      ('ncpus',                       int, 'Number of cpus'),
+      ('node_list',                   str, 'Nodes used in job'),
+      ('jobname',                     str, 'Job name')
+      )
+
+    BatchAcct.__init__(self,'SLURM',acct_file,host_name_ext,"|")
+
