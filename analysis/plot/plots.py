@@ -4,7 +4,7 @@
 import os
 import abc
 import math
-import numpy
+import numpy,traceback
 import multiprocessing
 import matplotlib
 matplotlib.use('Agg')
@@ -20,9 +20,11 @@ from ..gen import tspl,tspl_utils,lariat_utils,my_utils
 # This unwrapper accepts a Plot class and extracts the
 # class method plot.
 def unwrap(arg):
-  kwarg = arg[2]
-  return arg[0].plot(arg[1],**kwarg)
-
+  try:
+    kwarg = arg[2]
+    return arg[0].plot(arg[1],**kwarg)
+  except:
+    traceback.format_exc()
 ## Plot Class
 #
 # This is an abstract base class for plotting.

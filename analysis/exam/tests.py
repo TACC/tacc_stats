@@ -2,7 +2,7 @@ import os,sys
 import abc
 import math
 import numpy
-import operator
+import operator,traceback
 from scipy.stats import tmean,tstd
 import multiprocessing
 from pickler import job_stats, batch_acct
@@ -14,7 +14,9 @@ from ..gen import lariat_utils,tspl,tspl_utils
 def unwrap(arg,**kwarg):
   try:
     return arg[0].test(*arg[1:],**kwarg)
-  except: pass
+  except:
+    print traceback.format_exc()
+    pass
 
 class Test(object):
   __metaclass__ = abc.ABCMeta

@@ -151,7 +151,7 @@ def index(request, date = None, uid = None, project = None, user = None, exe = N
     if project:
         field['project'] = project
     if exe:
-        field['exe__contains'] = exe
+        field['exe__icontains'] = exe
     
     field['run_time__gte'] = 60 
 
@@ -173,7 +173,7 @@ def hist_summary(request, date = None, uid = None, project = None, user = None, 
     if project:
         field['project'] = project
     if exe:
-        field['exe__contains'] = exe
+        field['exe__icontains'] = exe
     
     field['run_time__gte'] = 60 
     field['status'] = 'COMPLETED'
@@ -206,11 +206,11 @@ def hist_summary(request, date = None, uid = None, project = None, user = None, 
                 if not np.isnan(job.cpi): job_cpi.append(job.cpi)
             except: pass                
         ax = fig.add_subplot(223)
-        job_cpi = numpy.array(job_cpi)
-        #numpy.clip(job_cpi,0,4.0,out=job_cpi)
+        job_cpi = np.array(job_cpi)
+        np.clip(job_cpi,0,4.0,out=job_cpi)
         
         ax.hist(job_cpi, max(5, 5*np.log(len(job_list))))
-        ax.set_xlim(0,job_cpi.max()+1)
+        #ax.set_xlim(0,job_cpi.max()+1)
         ax.set_ylabel('# of jobs')
         ax.set_title('CPI for Completed Jobs')
         ax.set_xlabel('CPI')
