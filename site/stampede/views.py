@@ -16,46 +16,75 @@ from pickler import job_stats, batch_acct
 sys.modules['job_stats'] = job_stats
 sys.modules['batch_acct'] = batch_acct
 import cPickle as pickle 
-import time
-   
+import time,pytz
+from datetime import datetime
+
 import numpy as np
 from matplotlib.figure import Figure
 from matplotlib.backends.backend_agg import FigureCanvasAgg as FigureCanvas
 from django.core.cache import cache,get_cache 
 
-def update(meta = None):
-    if not meta: return
+from pympler.asizeof import asizeof
 
-    # Only need to populate lariat cache once
-    jobid = meta.json.keys()[0]
+def update(date):
 
     ld = lariat_utils.LariatData(directory = sys_conf.lariat_path,
                                  daysback = 2)
-
     cpi_test = tests.HighCPI(threshold=1.0)        
-    for jobid, json in meta.json.iteritems():
+    tz = pytz.timezone('US/Central')
 
-        #if Job.objects.filter(id = jobid).exists(): continue  
-        cpi_test.test(json['path'])
-        print cpi_test.metric
-        if np.isnan(cpi_test.metric): print "NaN"
-        ld.set_job(jobid,end_epoch = json['end_epoch'])
+    pickle_dir = os.path.join(sys_conf.pickles_dir,date)
 
-        try:
+    objects = []
+    nf = len(os.listdir(pickle_dir))
+    ctr = 0
+    print "Number of pickle files =",nf
+    Job.objects.filter(date = date).delete()
+    for pickle_file in os.listdir(pickle_dir):
+        ctr += 1
+        pickle_path = os.path.join(pickle_dir,pickle_file)
+
+        try: 
+            if Job.objects.filter(id = pickle_file).exists(): 
+                #Job.objects.filter(id = pickle_file).delete()
+                continue
+
+            f = open(pickle_path, 'rb')
+            data = pickle.load(f)
+            cpi_test.test(pickle_path,job_data=data)
+            json = data.acct
+            del json['yesno'], json['unknown'], data
+            f.close()
+
+            json['path'] = pickle_path
+            json['start_epoch'] = json['start_time']
+            json['end_epoch'] = json['end_time']
+            json['run_time'] = json['end_epoch'] - json['start_epoch']
+            
+            utc_start = datetime.utcfromtimestamp(json['start_time']).replace(tzinfo=pytz.utc)
+            utc_end = datetime.utcfromtimestamp(json['end_time']).replace(tzinfo=pytz.utc)
+            
+            json['start_time'] = utc_start.astimezone(tz)
+            json['end_time'] =  utc_end.astimezone(tz)
+            json['date'] = json['end_time'].date()
+            json['cpi'] = cpi_test.metric
             json['user']=pwd.getpwuid(int(json['uid']))[0]
-        except:
-            json['user'] = ld.user
 
-        json['exe'] = ld.exc.split('/')[-1]
-        json['cwd'] = ld.cwd[0:128]
-        json['run_time'] = json['end_epoch'] - json['start_epoch']
-        json['threads'] = ld.threads
-        try:
-            Job.objects.filter(id = jobid).delete()
-            job_model, created = Job.objects.get_or_create(**json) 
-        except:
-            print "Something wrong with json",json
-    return 
+            ld.set_job(pickle_file,end_epoch = json['end_epoch'])       
+            json['exe'] = ld.exc.split('/')[-1]
+            json['cwd'] = ld.cwd[0:128]
+            json['threads'] = ld.threads
+
+            objects.append(Job(**json))            
+        except: 
+            print pickle_file,'failed'
+            continue
+
+        if len(objects) > 200:
+            Job.objects.bulk_create(objects)
+            objects = []
+
+        print "Percentage Completed =",100*float(ctr)/nf
 
 def dates(request):
     
@@ -154,7 +183,7 @@ def hist_summary(request, date = None, uid = None, project = None, user = None, 
 
     # Run times
     job_times = np.array([job.run_time for job in job_list])/3600.
-    ax = fig.add_subplot(121)
+    ax = fig.add_subplot(221)
     ax.hist(job_times, max(5, 5*np.log(len(job_list))))
     ax.set_xlim((0,max(job_times)+1))
     ax.set_ylabel('# of jobs')
@@ -163,11 +192,31 @@ def hist_summary(request, date = None, uid = None, project = None, user = None, 
 
     # Number of cores
     job_size = [job.cores for job in job_list]
-    ax = fig.add_subplot(122)
+    ax = fig.add_subplot(222)
     ax.hist(job_size, max(5, 5*np.log(len(job_list))))
     ax.set_xlim((0,max(job_size)+1))
     ax.set_title('Run Sizes for Completed Jobs')
     ax.set_xlabel('# cores')
+
+    # CPI
+    try:
+        job_cpi = []
+        for job in job_list:
+            try: 
+                if not np.isnan(job.cpi): job_cpi.append(job.cpi)
+            except: pass                
+        ax = fig.add_subplot(223)
+        job_cpi = numpy.array(job_cpi)
+        #numpy.clip(job_cpi,0,4.0,out=job_cpi)
+        
+        ax.hist(job_cpi, max(5, 5*np.log(len(job_list))))
+        ax.set_xlim(0,job_cpi.max()+1)
+        ax.set_ylabel('# of jobs')
+        ax.set_title('CPI for Completed Jobs')
+        ax.set_xlabel('CPI')
+        fig.subplots_adjust(hspace=0.5)
+    except: pass
+
     canvas = FigureCanvas(fig)
 
     response = HttpResponse(content_type='image/png')

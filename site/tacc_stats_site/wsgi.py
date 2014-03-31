@@ -5,6 +5,7 @@ import sys
 # mod_wsgi daemon mode with each site in its own daemon process, or use
 # os.environ["DJANGO_SETTINGS_MODULE"] = "tacc_stats_site.settings"
 sys.path.append(os.path.join(os.path.dirname(__file__),"../"))
+sys.path.append('/home/rtevans/tacc_stats/site')
 os.environ.setdefault("MPLCONFIGDIR","/tmp/")
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "tacc_stats_site.settings")
 

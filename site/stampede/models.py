@@ -25,14 +25,11 @@ class Job(models.Model):
     cwd = models.CharField(max_length=128, null=True)
     threads = models.BigIntegerField(null=True)
 
+    cpi = models.FloatField(default=float("nan"))
+
     def __unicode__(self):
         return str(self.id)
-    """
-    @property
-    def timespent(self):
-        dt = self.end_epoch-self.start_epoch
-        return dt
-    """    
+
     def color(self):
 
         if self.status == 'COMPLETED': 

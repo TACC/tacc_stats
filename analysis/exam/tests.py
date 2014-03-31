@@ -25,7 +25,7 @@ class Test(object):
   def k2(self): pass
 
   ts = None
-  metric = float("nan")
+
   def __init__(self,processes=1,**kwargs):
     self.processes=processes
     self.threshold=kwargs.get('threshold',None)
@@ -41,12 +41,13 @@ class Test(object):
     self.results=manager.dict()
     self.su=manager.dict()
 
-  def setup(self,jobid):
+  def setup(self,jobid,job_data=None):
+    self.metric = float("nan")
     try:
       if self.aggregate:
-        self.ts=tspl.TSPLSum(jobid,self.k1,self.k2)
+        self.ts=tspl.TSPLSum(jobid,self.k1,self.k2,job_data=job_data)
       else:
-        self.ts=tspl.TSPLBase(jobid,self.k1,self.k2)
+        self.ts=tspl.TSPLBase(jobid,self.k1,self.k2,job_data=job_data)
     except tspl.TSPLException as e:
       return False
     except EOFError as e:
@@ -67,7 +68,7 @@ class Test(object):
   def run(self,filelist):
     if not filelist: return 
     pool=multiprocessing.Pool(processes=self.processes) 
-    pool.map(unwrap,zip([self]*len(filelist),filelist))
+    pool.map_async(unwrap,zip([self]*len(filelist),filelist))
     pool.close()
     pool.join()
 
@@ -116,7 +117,7 @@ class Test(object):
     return sorted_jobs
 
   @abc.abstractmethod
-  def test(self,jobid):
+  def test(self,jobid,job_data=None):
     """Run the test for a single job"""
     return
 
@@ -125,8 +126,8 @@ class MemBw(Test):
   k1=['intel_snb_imc', 'intel_snb_imc']
   k2=['CAS_READS', 'CAS_WRITES']
 
-  def test(self,jobid):
-    if not self.setup(jobid): return
+  def test(self,jobid,job_data=None):
+    if not self.setup(jobid,job_data=job_data): return
 
     peak = 76.*1.e9
     gdramrate = numpy.zeros(len(self.ts.t)-1)
@@ -145,8 +146,8 @@ class Idle(Test):
   k2={'amd64' : ['SSE_FLOPS', 'DRAM',      'user'],
       'intel_snb' : ['SIMD_D_256','LOAD_L1D_ALL','user'],}
 
-  def test(self,jobid):
-    if not self.setup(jobid): return
+  def test(self,jobid,job_data=None):
+    if not self.setup(jobid,job_data=job_data): return
 
     mr=[]
     for i in range(len(self.k1)):
@@ -181,9 +182,9 @@ class Imbalance(Test):
     kwargs['waynesses']=16
     super(Imbalance,self).__init__(processes=processes,**kwargs)
 
-  def test(self,jobid):
+  def test(self,jobid,job_data=None):
     
-    if not self.setup(jobid): return
+    if not self.setup(jobid,job_data=job_data): return
 
     tmid=(self.ts.t[:-1]+self.ts.t[1:])/2.0
     rng=range(1,len(tmid)) # Throw out first and last
@@ -261,8 +262,8 @@ class Catastrophe(Test):
       fit.append((a,b))      
     return fit   
 
-  def test(self,jobid):
-    if not self.setup(jobid): return 
+  def test(self,jobid,job_data=None):
+    if not self.setup(jobid,job_data=job_data): return 
 
     bad_hosts=tspl_utils.lost_data(self.ts)
     if len(bad_hosts) > 0:
@@ -302,8 +303,8 @@ class LowFLOPS(Test):
   peak={'amd64' : [2.3e9*16*2, 24e9, 1.],
         'intel_snb' : [ 16*2.7e9*2, 16*2.7e9/2.*64., 1.],}
   
-  def test(self,jobid):
-    if not self.setup(jobid): return
+  def test(self,jobid,job_data=None):
+    if not self.setup(jobid,job_data=job_data): return
 
     ts=self.ts
     gfloprate = numpy.zeros(len(ts.t)-1)
@@ -343,8 +344,8 @@ class MetaDataRate(Test):
       'create','lookup','link','unlink','symlink','mkdir',
       'rmdir','mknod','rename',]
 
-  def test(self,jobid):
-    if not self.setup(jobid): return
+  def test(self,jobid,job_data=None):
+    if not self.setup(jobid,job_data=job_data): return
     ts = self.ts
 
     if not tspl_utils.checkjob(ts,self.min_time,range(1,33)): return
@@ -365,8 +366,8 @@ class HighCPI(Test):
   k1 = ['intel_snb', 'intel_snb']      
   k2 = ['CLOCKS_UNHALTED_REF','INSTRUCTIONS_RETIRED' ]
 
-  def test(self,jobid):
-    if not self.setup(jobid): return
+  def test(self,jobid,job_data=None):
+    if not self.setup(jobid,job_data=job_data): return
     ts = self.ts
 
     if "FAIL" in ts.status: return
@@ -387,8 +388,8 @@ class HighCPLD(Test):
   k1 = ['intel_snb', 'intel_snb']      
   k2 = ['CLOCKS_UNHALTED_REF','LOAD_L1D_ALL' ]
 
-  def test(self,jobid):
-    if not self.setup(jobid): return
+  def test(self,jobid,job_data=None):
+    if not self.setup(jobid,job_data=job_data): return
     ts = self.ts
 
     if "FAIL" in ts.status: return

@@ -14,7 +14,6 @@ setup_environ(settings)
 
 import stampede.views as views
 import sys_conf
-from pickler import MetaData
 import datetime
 
 path = sys_conf.pickles_dir
@@ -36,8 +35,4 @@ for date in os.listdir(path):
     if not datetime.date(s[0],s[1],s[2]) <= datetime.date(d[0],d[1],d[2]) <= datetime.date(e[0],e[1],e[2]): continue
     
     print 'Run update for',date
-    meta = MetaData.MetaData(os.path.join(path,date))
-    meta.load_update()
-    print 'Number of pickle files to upload into DB',len(meta.json.keys())
-    views.update(meta = meta)
-
+    views.update(date)
