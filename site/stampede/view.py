@@ -23,7 +23,7 @@ import numpy as np
 from matplotlib.figure import Figure
 from matplotlib.backends.backend_agg import FigureCanvasAgg as FigureCanvas
 from django.core.cache import cache,get_cache 
-import traceback
+import gc
 #from pympler.asizeof import asizeof
 
 def update(date):
@@ -39,39 +39,28 @@ def update(date):
     nf = len(os.listdir(pickle_dir))
     ctr = 0
     print "Number of pickle files =",nf
-
+    #Job.objects.filter(date = date).delete()
     for pickle_file in os.listdir(pickle_dir):
         ctr += 1
         pickle_path = os.path.join(pickle_dir,pickle_file)
 
         try: 
-            # Update job row if it exists
             if Job.objects.filter(id = pickle_file).exists():
-                job = Job.objects.get(id = pickle_file)
-
-                if job.queue in cpi_test.ignore_qs or \
-                        job.run_time < cpi_test.min_time: continue
-
-                cpi_test.test(pickle_path)
-                job.cpi = cpi_test.metric
-                job.save()
+                if np.isnan(Job(id = pickle_file).cpi) 
+                #Job.objects.filter(id = pickle_file).delete()
                 continue
-
-            # Create job row if it exists
-            with open(pickle_path, 'rb') as f:
-                data = pickle.load(f)
-                json = data.acct
-                del json['yesno'], json['unknown']
-                json['run_time'] = json['end_time'] - json['start_time']
-            
-                if json['run_time'] >= cpi_test.min_time and \
-                        not json['queue'] in cpi_test.ignore_qs:
-                    cpi_test.test(pickle_path,job_data=data)
-                    json['cpi'] = cpi_test.metric
+            print pickle_file,Job(id = pickle_file).cpi 
+            f = open(pickle_path, 'rb')
+            data = pickle.load(f)
+            cpi_test.test(pickle_path,job_data=data)
+            json = data.acct
+            del json['yesno'], json['unknown'], data
+            f.close()
 
             json['path'] = pickle_path
             json['start_epoch'] = json['start_time']
             json['end_epoch'] = json['end_time']
+            json['run_time'] = json['end_epoch'] - json['start_epoch']
             
             utc_start = datetime.utcfromtimestamp(json['start_time']).replace(tzinfo=pytz.utc)
             utc_end = datetime.utcfromtimestamp(json['end_time']).replace(tzinfo=pytz.utc)
@@ -79,20 +68,26 @@ def update(date):
             json['start_time'] = utc_start.astimezone(tz)
             json['end_time'] =  utc_end.astimezone(tz)
             json['date'] = json['end_time'].date()
-
+            json['cpi'] = cpi_test.metric
             json['user']=pwd.getpwuid(int(json['uid']))[0]
 
             ld.set_job(pickle_file,end_epoch = json['end_epoch'])       
             json['exe'] = ld.exc.split('/')[-1]
             json['cwd'] = ld.cwd[0:128]
             json['threads'] = ld.threads
-            Job.objects.get_or_create(**json)
+
+            objects.append(Job(**json))            
         except: 
             print pickle_file,'failed'
-            print traceback.format_exc()
             continue
 
+        if len(objects) > 200:
+            Job.objects.bulk_create(objects)
+            objects = []
         print "Percentage Completed =",100*float(ctr)/nf
+
+    Job.objects.bulk_create(objects)
+    gc.collect()
 
 def dates(request):
     

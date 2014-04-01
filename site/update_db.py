@@ -3,12 +3,11 @@ from django.core.management import setup_environ
 import os,sys
 from subprocess import Popen, PIPE
 
-sys.path.append(os.path.join(os.path.dirname(__file__), 
-                             '../lib'))
-sys.path.append(os.path.join(os.path.dirname(__file__), 
-                             'tacc_stats_site'))
-sys.path.append(os.path.join(os.path.dirname(__file__), 
-                             'stampede'))
+cwd = os.path.dirname(os.path.abspath(__file__))
+sys.path.append(os.path.join(cwd,'../lib'))
+sys.path.append(os.path.join(cwd,'tacc_stats_site'))
+sys.path.append(os.path.join(cwd,'stampede'))
+
 import settings
 setup_environ(settings)
 
@@ -35,4 +34,7 @@ for date in os.listdir(path):
     if not datetime.date(s[0],s[1],s[2]) <= datetime.date(d[0],d[1],d[2]) <= datetime.date(e[0],e[1],e[2]): continue
     
     print 'Run update for',date
-    views.update(date)
+
+    p = Popen(["python",os.path.join(cwd,"update.py"),date])
+    p.communicate()
+    

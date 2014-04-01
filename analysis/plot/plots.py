@@ -454,7 +454,7 @@ class HeatMap(Plot):
   def __init__(self,k1=['intel_snb','intel_snb'],
                k2=['CLOCKS_UNHALTED_REF','INSTRUCTIONS_RETIRED'],
                processes=1,aggregate=False,**kwargs):
-    #self.aggregate = False
+
     self.k1 = k1
     self.k2 = k2
     super(HeatMap,self).__init__(processes=processes,aggregate=aggregate,**kwargs)
