@@ -381,8 +381,8 @@ class HighCPI(Test):
     for k in ts.j.hosts.keys():
       clock_rate += numpy.diff(ts.data[0][k][0])
       instr_rate += numpy.diff(ts.data[1][k][0])
-
-    cpi = tmean(clock_rate/instr_rate)
+      
+    cpi = tmean(numpy.nan_to_num(clock_rate/instr_rate))
 
     self.comp2thresh(jobid,cpi)
 

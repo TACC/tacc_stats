@@ -1,7 +1,7 @@
 from django.http import HttpResponse, HttpResponseRedirect
 from django.shortcuts import render_to_response, render
 from django.views.generic import DetailView, ListView
-
+from django.db.models import Q
 from stampede.models import Job, JobForm
 import os,sys,pwd
 sys.path.append(os.path.join(os.path.dirname(__file__), 
@@ -24,75 +24,85 @@ from matplotlib.figure import Figure
 from matplotlib.backends.backend_agg import FigureCanvasAgg as FigureCanvas
 from django.core.cache import cache,get_cache 
 import traceback
-#from pympler.asizeof import asizeof
+
 
 def update(date):
 
     ld = lariat_utils.LariatData(directory = sys_conf.lariat_path,
                                  daysback = 2)
-    cpi_test = tests.HighCPI(threshold=1.0)        
+
     tz = pytz.timezone('US/Central')
 
     pickle_dir = os.path.join(sys_conf.pickles_dir,date)
+    date_objects = Job.objects.filter(date=date)
 
-    objects = []
     nf = len(os.listdir(pickle_dir))
     ctr = 0
     print "Number of pickle files =",nf
 
     for pickle_file in os.listdir(pickle_dir):
         ctr += 1
-        pickle_path = os.path.join(pickle_dir,pickle_file)
+        
+        try: obj, created = Job.objects.get_or_create(id = pickle_file)
+        except: pass
 
-        try: 
-            # Update job row if it exists
-            if Job.objects.filter(id = pickle_file).exists():
-                job = Job.objects.get(id = pickle_file)
+        if created:
+            try:
+                pickle_path = os.path.join(pickle_dir,pickle_file)
+                # Create job row if it doesn't exists
+                with open(pickle_path, 'rb') as f:
+                    data = pickle.load(f)
+                    json = data.acct
+                    del json['yesno'], json['unknown']
+                    json['run_time'] = json['end_time'] - json['start_time']
 
-                if job.queue in cpi_test.ignore_qs or \
-                        job.run_time < cpi_test.min_time: continue
+                    json['path'] = pickle_path
+                    json['start_epoch'] = json['start_time']
+                    json['end_epoch'] = json['end_time']
+                    
+                    utc_start = datetime.utcfromtimestamp(json['start_time']).replace(tzinfo=pytz.utc)
+                    utc_end = datetime.utcfromtimestamp(json['end_time']).replace(tzinfo=pytz.utc)
+                    
+                    json['start_time'] = utc_start.astimezone(tz)
+                    json['end_time'] =  utc_end.astimezone(tz)
+                    json['date'] = json['end_time'].date()
+                    
+                    ld.set_job(pickle_file,end_epoch = json['end_epoch'])       
+                    json['exe'] = ld.exc.split('/')[-1]
+                    json['cwd'] = ld.cwd[0:128]
+                    json['threads'] = ld.threads
+                    try: json['user']=pwd.getpwuid(int(json['uid']))[0]
+                    except: json['user']=ld.user
+                    print json
+                    obj = Job(**json)
+                    obj.save()
+            except: 
+                print pickle_file,'failed'
+                print traceback.format_exc()
+                print date
+    print "Percentage Completed =",100*float(ctr)/nf
 
-                cpi_test.test(pickle_path)
-                job.cpi = cpi_test.metric
-                job.save()
-                continue
+    cpi_test = tests.HighCPI(threshold=1.0,processes=2)        
+    update_test_field(date,cpi_test,'cpi')
 
-            # Create job row if it exists
-            with open(pickle_path, 'rb') as f:
-                data = pickle.load(f)
-                json = data.acct
-                del json['yesno'], json['unknown']
-                json['run_time'] = json['end_time'] - json['start_time']
-            
-                if json['run_time'] >= cpi_test.min_time and \
-                        not json['queue'] in cpi_test.ignore_qs:
-                    cpi_test.test(pickle_path,job_data=data)
-                    json['cpi'] = cpi_test.metric
+def update_test_field(date,test,metric,rerun=False):
+    print "Run",test.__class__.__name__,"test for",date
+    
+    kwargs = { 'date' : date, 
+               'run_time__gte' : test.min_time,
+               'nodes__gte' : test.min_hosts,
+               'status__in' : ['COMPLETED','TIMEOUT']}
+    
+    jobs_list = Job.objects.filter(**kwargs).exclude(queue__in=test.ignore_qs)
+    
+    if not rerun:
+        jobs_list = jobs_list.filter(Q(**{metric : None}) | Q(**{metric : float('nan')}))
+    for e in jobs_list: print e.id,e.nodes,e.run_time,e.queue,e.status,e.cpi
 
-            json['path'] = pickle_path
-            json['start_epoch'] = json['start_time']
-            json['end_epoch'] = json['end_time']
-            
-            utc_start = datetime.utcfromtimestamp(json['start_time']).replace(tzinfo=pytz.utc)
-            utc_end = datetime.utcfromtimestamp(json['end_time']).replace(tzinfo=pytz.utc)
-            
-            json['start_time'] = utc_start.astimezone(tz)
-            json['end_time'] =  utc_end.astimezone(tz)
-            json['date'] = json['end_time'].date()
-
-            json['user']=pwd.getpwuid(int(json['uid']))[0]
-
-            ld.set_job(pickle_file,end_epoch = json['end_epoch'])       
-            json['exe'] = ld.exc.split('/')[-1]
-            json['cwd'] = ld.cwd[0:128]
-            json['threads'] = ld.threads
-            Job.objects.get_or_create(**json)
-        except: 
-            print pickle_file,'failed'
-            print traceback.format_exc()
-            continue
-
-        print "Percentage Completed =",100*float(ctr)/nf
+    print '# Jobs to be tested:',len(jobs_list)
+    test.run(jobs_list.values_list('path',flat=True))
+    for jid in test.su.keys(): 
+        jobs_list.filter(id = jid).update(**{metric : test.su[jid][2]})
 
 def dates(request):
     
@@ -146,9 +156,8 @@ def search(request):
 
     return render(request, 'stampede/dates.html', {'error' : True})
 
-
-def index(request, date = None, uid = None, project = None, user = None, exe = None):
-
+def index(request, date = None, uid = None, project = None, user = None, exe = None, report=None):
+    
     field = {}
     if date:
         field['date'] = date
@@ -167,6 +176,8 @@ def index(request, date = None, uid = None, project = None, user = None, exe = N
     field['job_list'] = job_list
     field['nj'] = len(job_list)
 
+    #if report: return render_to_pdf("stampede/index.html", field)
+    #else: 
     return render_to_response("stampede/index.html", field)
 
 def hist_summary(request, date = None, uid = None, project = None, user = None, exe = None):
@@ -190,7 +201,7 @@ def hist_summary(request, date = None, uid = None, project = None, user = None, 
     fig = Figure(figsize=(16,6))
 
     # Run times
-    job_times = np.array([job.run_time for job in job_list])/3600.
+    job_times = np.array(job_list.values_list('run_time',flat=True))/3600.
     ax = fig.add_subplot(221)
     ax.hist(job_times, max(5, 5*np.log(len(job_list))))
     ax.set_xlim((0,max(job_times)+1))
@@ -199,7 +210,7 @@ def hist_summary(request, date = None, uid = None, project = None, user = None, 
     ax.set_title('Run Times for Completed Jobs')
 
     # Number of cores
-    job_size = [job.cores for job in job_list]
+    job_size =  np.array(job_list.values_list('cores',flat=True))
     ax = fig.add_subplot(222)
     ax.hist(job_size, max(5, 5*np.log(len(job_list))))
     ax.set_xlim((0,max(job_size)+1))
@@ -207,26 +218,16 @@ def hist_summary(request, date = None, uid = None, project = None, user = None, 
     ax.set_xlabel('# cores')
 
     # CPI
-    try:
-        job_cpi = []
-        for job in job_list:
-            try: 
-                if not np.isnan(job.cpi): job_cpi.append(job.cpi)
-            except: pass                
-        ax = fig.add_subplot(223)
-        job_cpi = np.array(job_cpi)
-        np.clip(job_cpi,0,4.0,out=job_cpi)
-        
-        ax.hist(job_cpi, max(5, 5*np.log(len(job_list))))
-        #ax.set_xlim(0,job_cpi.max()+1)
-        ax.set_ylabel('# of jobs')
-        ax.set_title('CPI for Completed Jobs')
-        ax.set_xlabel('CPI')
-        fig.subplots_adjust(hspace=0.5)
-    except: pass
+    job_cpi = np.array(job_list.exclude(cpi=float('nan')).values_list('cpi',flat=True))
+    ax = fig.add_subplot(223)        
+    ax.hist(job_cpi, max(5, 5*np.log(len(job_list))))
+    ax.set_xlim(0,min(job_cpi.max(),4.0))
+    ax.set_ylabel('# of jobs')
+    ax.set_title('CPI for Completed Jobs')
+    ax.set_xlabel('CPI')
 
+    fig.subplots_adjust(hspace=0.5)      
     canvas = FigureCanvas(fig)
-
     response = HttpResponse(content_type='image/png')
     response['Content-Disposition'] = "attachment; filename="+"histogram"+".png"
     fig.savefig(response, format='png')
@@ -336,6 +337,29 @@ def type_detail(request, pk, type_name):
             temp.append(raw_stats[t,event]*scale)
         stats.append((times[t],temp))
 
-
     return render_to_response("stampede/type_detail.html",{"type_name" : type_name, "jobid" : pk, "stats_data" : stats, "schema" : schema})
+
+
+from django.template.loader import get_template
+from django.template import Context
+import ho.pisa as pisa
+import cStringIO as StringIO
+import cgi
+
+def render_to_pdf(template_src, context_dict):
+    template = get_template(template_src)
+    context = Context(context_dict)
+    html  = template.render(context)
     
+    result = StringIO.StringIO()
+    
+    pdf = pisa.pisaDocument(StringIO.StringIO(
+            html.encode("UTF-8")), result)
+    
+    #if not pdf.err:
+    response = HttpResponse(result.getvalue(), \
+                                mimetype='application/pdf',)
+    response['Content-Disposition'] = 'attachment; filename="test.pdf"'
+    return response
+
+

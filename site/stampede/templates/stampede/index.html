@@ -32,6 +32,7 @@
 <h1>For exe: {{ exe__icontains }}</h1>
 <h2> Charts at a glance </h2>
 <img src="{% url 'stampede:exe_summary' exe__icontains %}" />
+<a href="{% url 'stampede:exe_view' exe__icontains 1 %}" >Dump {{ exe__icontains }} </a>
 {% endif %}
 <h1># Jobs over 1 mn in run time = {{nj}}</h1>
 <hr>
@@ -53,6 +54,7 @@
 	  <th> status </th>	    
 	  <th> cores </th>
 	  <th> nodes </th>
+	  <th> cpi </th>
 	</tr>
     {% for job in job_list %}
         <tr bgcolor="{{job.color}}">
@@ -70,6 +72,7 @@
             <td align=right>{{ job.status }}</td>
             <td align=right>{{ job.cores }}</td>
             <td align=right>{{ job.nodes }}</td>
+            <td align=right>{{ job.cpi }}</td>
         </tr>
     {% endfor %} 
     </table>

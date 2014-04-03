@@ -42,5 +42,9 @@ urlpatterns = patterns('',
                        url(r'^exe/(?P<exe>.*)/$',
                            index, name='exe_view'),
 
+                       url(r'^exe/(?P<exe>.*)/report/(?P<report>.*)/$',
+                           index, name='exe_view'),
+
+
                        url(r'^search/$',search, name='search'),
 )
