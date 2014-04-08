@@ -73,7 +73,7 @@ def update(date):
                     json['threads'] = ld.threads
                     try: json['user']=pwd.getpwuid(int(json['uid']))[0]
                     except: json['user']=ld.user
-                    print json
+                    #print json
                     obj = Job(**json)
                     obj.save()
             except: 
@@ -85,6 +85,9 @@ def update(date):
     cpi_test = tests.HighCPI(threshold=1.0,processes=2)        
     update_test_field(date,cpi_test,'cpi')
 
+    mbw_test = tests.MemBw(threshold=0.5,processes=2)        
+    update_test_field(date,mbw_test,'mbw')
+
 def update_test_field(date,test,metric,rerun=False):
     print "Run",test.__class__.__name__,"test for",date
     
@@ -94,10 +97,10 @@ def update_test_field(date,test,metric,rerun=False):
                'status__in' : ['COMPLETED','TIMEOUT']}
     
     jobs_list = Job.objects.filter(**kwargs).exclude(queue__in=test.ignore_qs)
-    
+    #for e in jobs_list: print e.id,e.nodes,e.run_time,e.queue,e.status,e.mbw    
     if not rerun:
         jobs_list = jobs_list.filter(Q(**{metric : None}) | Q(**{metric : float('nan')}))
-    for e in jobs_list: print e.id,e.nodes,e.run_time,e.queue,e.status,e.cpi
+
 
     print '# Jobs to be tested:',len(jobs_list)
     test.run(jobs_list.values_list('path',flat=True))
@@ -159,45 +162,58 @@ def search(request):
 def index(request, date = None, uid = None, project = None, user = None, exe = None, report=None):
     
     field = {}
+    name = ''
     if date:
+        name+=date+'-'
         field['date'] = date
     if uid:
+        name+=uid+'-'
         field['uid'] = uid
     if user:
+        name+=user+'-'
         field['user'] = user
     if project:
+        name+=project+'-'
         field['project'] = project
     if exe:
+        name+=exe+'-'
         field['exe__icontains'] = exe
-    
+
     field['run_time__gte'] = 60 
 
     job_list = Job.objects.filter(**field).order_by('-id')
     field['job_list'] = job_list
     field['nj'] = len(job_list)
+    
+    if report: 
+        field['report'] = report 
+        field['name'] = name 
+        return render_to_pdf("stampede/index.html", field)
+    else:  return render_to_response("stampede/index.html", field)
 
-    #if report: return render_to_pdf("stampede/index.html", field)
-    #else: 
-    return render_to_response("stampede/index.html", field)
-
-def hist_summary(request, date = None, uid = None, project = None, user = None, exe = None):
+def hist_summary(request, date = None, uid = None, project = None, user = None, exe = None, report = None):
 
     field = {}
+    name = ''
     if date:
         field['date'] = date
+        name+=date+'-'
     if uid:
         field['uid'] = uid
+        name+=uid+'-'
     if user:
         field['user'] = user
+        name+=user+'-'
     if project:
         field['project'] = project
+        name+=project+'-'
     if exe:
         field['exe__icontains'] = exe
-    
-    field['run_time__gte'] = 60 
-    field['status'] = 'COMPLETED'
+        name+=exe+'-'
 
-    job_list = Job.objects.filter(**field)
+    field['run_time__gte'] = 60 
+
+    job_list = Job.objects.filter(**field).exclude(status__in=['CANCELLED,FAILED'])
     fig = Figure(figsize=(16,6))
 
     # Run times
@@ -217,20 +233,38 @@ def hist_summary(request, date = None, uid = None, project = None, user = None, 
     ax.set_title('Run Sizes for Completed Jobs')
     ax.set_xlabel('# cores')
 
-    # CPI
-    job_cpi = np.array(job_list.exclude(cpi=float('nan')).values_list('cpi',flat=True))
-    ax = fig.add_subplot(223)        
-    ax.hist(job_cpi, max(5, 5*np.log(len(job_list))))
-    ax.set_xlim(0,min(job_cpi.max(),4.0))
-    ax.set_ylabel('# of jobs')
-    ax.set_title('CPI for Completed Jobs')
-    ax.set_xlabel('CPI')
-
+    try:
+        # CPI
+        job_cpi = np.array(job_list.exclude(Q(**{'cpi' : None}) | Q(**{'cpi' : float('nan')})).values_list('cpi',flat=True))
+        ax = fig.add_subplot(223)
+        job_cpi = job_cpi[job_cpi<4.0]
+        ax.hist(job_cpi, max(5, 5*np.log(len(job_list))))
+        #ax.set_xlim(0,min(job_cpi.max(),4.0))
+        ax.set_ylabel('# of jobs')
+        ax.set_title('CPI for Successful Jobs over 1 hr')
+        ax.set_xlabel('CPI')
+    except: pass
+    try:
+        # MBW
+        job_mbw = np.array(job_list.exclude(Q(**{'mbw' : None}) | Q(**{'mbw' : float('nan')})).values_list('mbw',flat=True))
+        ax = fig.add_subplot(224)        
+        ax.hist(job_mbw, max(5, 5*np.log(len(job_list))))
+        ax.set_xlim(0,job_mbw.max())
+        ax.set_ylabel('# of jobs')
+        ax.set_title('MBW for Successful Jobs over 1 hr')
+        ax.set_xlabel('MBW')
+    except: pass
     fig.subplots_adjust(hspace=0.5)      
     canvas = FigureCanvas(fig)
-    response = HttpResponse(content_type='image/png')
-    response['Content-Disposition'] = "attachment; filename="+"histogram"+".png"
-    fig.savefig(response, format='png')
+    
+    if report:
+        response = HttpResponse(content_type='image/pdf')
+        response['Content-Disposition'] = "attachment; filename="+name+"hist.pdf"
+        fig.savefig(response, format='pdf')
+    else:
+        response = HttpResponse(content_type='image/png')
+        response['Content-Disposition'] = "attachment; filename="+name+"hist.png"
+        fig.savefig(response, format='png')
 
     return response
 
@@ -288,7 +322,8 @@ class JobDetailView(DetailView):
 
         for host_name, host in data.hosts.iteritems():
             host_list.append(host_name)
-        for type_name, type in host.stats.iteritems():
+        host0=data.hosts.values()[0]
+        for type_name, type in host0.stats.iteritems():
             schema = ' '.join(build_schema(data,type_name))
             type_list.append( (type_name, schema) )
 
@@ -353,13 +388,12 @@ def render_to_pdf(template_src, context_dict):
     
     result = StringIO.StringIO()
     
-    pdf = pisa.pisaDocument(StringIO.StringIO(
-            html.encode("UTF-8")), result)
+    pdf = pisa.pisaDocument(StringIO.StringIO(html.encode("UTF-8")), dest=result)
     
-    #if not pdf.err:
     response = HttpResponse(result.getvalue(), \
                                 mimetype='application/pdf',)
-    response['Content-Disposition'] = 'attachment; filename="test.pdf"'
-    return response
+    
+    response['Content-Disposition'] = "attachment; filename="+context_dict['name']+"report.pdf"
 
+    return response
 

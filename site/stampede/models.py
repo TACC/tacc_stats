@@ -25,7 +25,8 @@ class Job(models.Model):
     cwd = models.CharField(max_length=128, null=True)
     threads = models.BigIntegerField(null=True)
 
-    cpi = models.FloatField(default=float("nan"))
+    cpi = models.FloatField(null=True)
+    mbw = models.FloatField(null=True)
 
     def __unicode__(self):
         return str(self.id)

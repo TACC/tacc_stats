@@ -8,31 +8,38 @@
 <h1>For date: {{ date }}</h1>
 <h2> Charts at a glance </h2>
 <img src="{% url 'stampede:date_summary' date %}" />
+<a href="{% url 'stampede:date_view' date 1 %}" >Dump {{ date }} data</a>
 {% endif %}
 
 {% if uid %}
-<h1>For user: {{ uid }}</h1>
+<h1>For uid: {{ uid }}</h1>
 <h2> Charts at a glance </h2>
 <img src="{% url 'stampede:uid_summary' uid %}" />
+<a href="{% url 'stampede:uid_view' uid 1 %}" >Dump {{ uid }} data</a>
 {% endif %}
 
 {% if user %}
 <h1>For user: {{ user }}</h1>
 <h2> Charts at a glance </h2>
 <img src="{% url 'stampede:user_summary' user %}" />
+<a href="{% url 'stampede:user_view' user 1 %}" >Dump {{ user }} data</a>
 {% endif %}
 
 {% if project %}
 <h1>For project: {{ project }}</h1>
 <h2> Charts at a glance </h2>
 <img src="{% url 'stampede:project_summary' project %}" />
+<a href="{% url 'stampede:project_view' project 1 %}" >Dump {{ project }} data</a>
 {% endif %}
 
 {% if exe__icontains %}
 <h1>For exe: {{ exe__icontains }}</h1>
 <h2> Charts at a glance </h2>
 <img src="{% url 'stampede:exe_summary' exe__icontains %}" />
-<a href="{% url 'stampede:exe_view' exe__icontains 1 %}" >Dump {{ exe__icontains }} </a>
+{% if report %}
+<img src="{% url 'stampede:exe_summary' exe__icontains 1 %}" />
+{% endif %}
+<a href="{% url 'stampede:exe_view' exe__icontains 1 %}" >Dump {{ exe__icontains }} data</a>
 {% endif %}
 <h1># Jobs over 1 mn in run time = {{nj}}</h1>
 <hr>
@@ -60,7 +67,7 @@
         <tr bgcolor="{{job.color}}">
             <td><a href="{% url 'stampede:job'  job.id %}">{{ job.id }}</a>
             <td><a href="{% url 'stampede:uid_view' job.uid %}" >{{ job.uid }}</td>
-            <td><a href="{% url 'stampede:uid_view' job.uid %}" >{{ job.user }}</td> 
+            <td><a href="{% url 'stampede:user_view' job.user %}" >{{ job.user }}</td> 
            <td align=right><a href="{% url 'stampede:project_view' job.project %}" >{{ job.project }}</td>
             <td align=right><a href="{% url 'stampede:exe_view' job.exe %}" >{{ job.exe }}</td>
 

@@ -32,17 +32,33 @@ urlpatterns = patterns('',
                            hist_summary, name = 'project_summary' ),
                        url(r'^exe_summary/(?P<exe>.*)/$', 
                            hist_summary, name = 'exe_summary' ),
+                       url(r'^exe_summary/(?P<exe>.+?)/(?P<report>[1])$', 
+                           hist_summary, name = 'exe_summary' ),
+
 
                        url(r'^date/(?P<date>\d{4}-\d{2}-\d{2})/$', 
                            index, name='date_view'),
-                       url(r'^uid/(?P<uid>\d+)/$',
-                           index, name='uid_view'),
-                       url(r'^project/(?P<project>.*)/$',
-                           index, name='project_view'),
-                       url(r'^exe/(?P<exe>.*)/$',
-                           index, name='exe_view'),
+                       url(r'^date/(?P<date>\d{4}-\d{2}-\d{2})/(?P<report>[1])$', 
+                           index, name='date_view'),
 
-                       url(r'^exe/(?P<exe>.*)/report/(?P<report>.*)/$',
+                       url(r'^uid/(?P<uid>\d+?)/$',
+                           index, name='uid_view'),
+                       url(r'^uid/(?P<uid>\d+?)/(?P<report>[1])$',
+                           index, name='uid_view'),
+
+                       url(r'^user/(?P<user>\w+?)/$',
+                           index, name='user_view'),
+                       url(r'^user/(?P<user>\w+?)/(?P<report>[1])$',
+                           index, name='user_view'),
+
+                       url(r'^project/(?P<project>.+?)/$',
+                           index, name='project_view'),
+                       url(r'^project/(?P<project>.+?)/(?P<report>[1])$',
+                           index, name='project_view'),
+
+                       url(r'^exe/(?P<exe>.+?)/$',
+                           index, name='exe_view'),
+                       url(r'^exe/(?P<exe>.+?)/(?P<report>[1])$',
                            index, name='exe_view'),
 
 
