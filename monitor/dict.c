@@ -251,7 +251,7 @@ int dict_set(struct dict *dict, char *key)
   struct dict_entry *ent = dict_entry_ref(dict, hash, key);
 
   if (ent->d_key != NULL) {
-    TRACE("overwriting old key `%s', hash %zu, with new key `%s' hash %zu\n",
+    TRACE("overwriting old key `%s', hash %lu, with new key `%s' hash %lu\n",
           ent->d_key, ent->d_hash, key, hash);
     ent->d_key = key;
     return 0;
