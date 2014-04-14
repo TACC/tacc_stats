@@ -4,7 +4,7 @@
  */
 
 //! Get CPU signature
-static void get_cpuid_signature(int cpuid_file, char* signature)
+static void get_cpuid_signature(int cpuid_file, char* signature, size_t sigbuflen)
 {
   int ebx = 0, ecx = 0, edx = 0, eax = 1;
   __asm__ ("cpuid": "=b" (ebx), "=c" (ecx), "=d" (edx), "=a" (eax):"a" (eax));
@@ -14,7 +14,7 @@ static void get_cpuid_signature(int cpuid_file, char* signature)
   int family_code = (eax & 0xF00) >> 8;
   int extended_family_code = (eax & 0xFF00000) >> 16;
 
-  snprintf(signature,sizeof(signature),"%02x_%x", extended_family_code | family_code, extended_model | model);
+  snprintf(signature,sigbuflen,"%02x_%x", extended_family_code | family_code, extended_model | model);
 
 }
 
@@ -47,7 +47,7 @@ static int cpu_is_sandybridge(char *cpu)
   if (strncmp((char*) buf + 4, "GenuineIntel", 12) != 0)
     goto out; /* CentaurHauls? */
 
-  get_cpuid_signature(cpuid_fd,signature);
+  get_cpuid_signature(cpuid_fd,signature,sizeof(signature));
   TRACE("cpu%s, CPUID Signature %s\n", cpu, signature);
   if (strncmp(signature, "06_2a", 5) !=0 && strncmp(signature, "06_2d", 5) !=0)
     goto out;
