@@ -5,20 +5,49 @@ import re
 
 class TaccProcParser:
     def __init__(self):
-        self.processes={}
+        self.uidprocs= dict()
 
     def __str__(self):
-        # Return all of the names of the unique processes
-        # If multiple processes have the same name then it will appear
-        # multiple times.
-        return str(self.processes.values())
+        return str(self.getproclist())
+
+    def getproclist(self, uid=None):
+        if uid != None:
+            if uid in self.uidprocs:
+                return list(self.uidprocs[uid])
+
+        allprocs = set()
+        for procs in self.uidprocs.itervalues():
+            allprocs.update(procs)
+
+        return list(allprocs)
+
+    def blacklisted(self, procname):
+        # TODO proper storage of pid blacklist (ie not just in this file)
+        prefixes = [ "/usr/sbin/nrpe",
+                "/usr/bin/rsync",
+                "CROND",
+                "ssh ",
+                "/bin/sh ",
+                "/bin/bash ",
+                "srun ",
+                "sleep ",
+                "/usr/bin/time "]
+
+        for prefix in prefixes:
+            if procname.startswith(prefix):
+                return True
+
+        return False
+
 
     def parse(self,indata):
 
-        (START, STATUS_LEN, STATUS_NAME, CMDLINE_LEN, CMDLINE_NAME) = range(5)
+        (START, STATUS_LEN, STATUS_NAME, UIDSEARCH, CMDLINE_LEN, CMDLINE_NAME) = range(6)
 
         state = START
         pid = -1
+        uidpids = dict()
+        processes = dict()
 
         for line in indata:
             if state == START:
@@ -38,18 +67,38 @@ class TaccProcParser:
                 state = STATUS_NAME
                 continue
             if state == STATUS_NAME:
-                if pid not in self.processes:
-                    self.processes[pid] = line.split()[1]
-                state = START
+                if pid not in processes:
+                    processes[pid] = line.split()[1]
+                state = UIDSEARCH
+                continue
+            if state == UIDSEARCH:
+                if line.startswith("Uid:"):
+                    m = re.search("^Uid:\t+([0-9]+).*", line)
+                    if m:
+                        uid = m.group(1)
+                        if uid not in uidpids:
+                            uidpids[uid] = set()
+                        uidpids[uid].add(pid)
+                    state = START
                 continue
             if state == CMDLINE_LEN:
                 state = CMDLINE_NAME
                 continue
             if state == CMDLINE_NAME:
-                self.processes[pid] = line.replace("\0", " ").rstrip()
+                processes[pid] = line.replace("\0", " ").rstrip()
                 state = START
                 continue
 
+        # post process
+        for uid,pids in uidpids.iteritems():
+            tmp = set()
+            for pid in pids:
+                procname = processes[pid]
+                if not self.blacklisted(procname):
+                    tmp.add(procname)
+
+            if len(tmp) > 0:
+                self.uidprocs[uid] = tmp
 
 def getProcdumpData( filename, jid ):
 
