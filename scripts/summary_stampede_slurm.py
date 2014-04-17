@@ -20,8 +20,51 @@ from scipy import stats
 #ignore warnings from numpy
 numpy.seterr(all='ignore')
 
-#LARIAT_DATA_PATH = '/data/scratch/Lonestar/lariatData'
-LARIAT_DATA_PATH = sys.argv[2]
+class LariatManager:
+    def __init__(self, lariatpath):
+        self.lariatpath = lariatpath
+        self.lariatdata = dict()
+        self.filesprocessed = []
+        self.errors = dict()
+
+    def find(self, jobid, jobstarttime):
+
+        if jobid in self.lariatdata:
+            return self.lariatdata[jobid]
+
+        for days in (0, -1, 1):
+            searchday = datetime.datetime.utcfromtimestamp(jobstarttime) + datetime.timedelta(days)
+            lfilename = os.path.join(self.lariatpath, searchday.strftime('%Y'), searchday.strftime('%m'), searchday.strftime('lariatData-sgeT-%Y-%m-%d.json'))
+            self.loadlariat(lfilename)
+
+            if jobid in self.lariatdata:
+                return self.lariatdata[jobid]
+
+        return None
+
+    def loadlariat(self, filename):
+
+        if filename in self.filesprocessed:
+            # No need to reparse file. If the job data was in the file, then this search
+            # function would not have been called.
+            return
+
+        try:
+            with open(filename, "rb") as fp:
+
+                # Unfortunately, the lariat data is not in valid json
+                # This workaround converts the illegal \' into valid quotes
+                content = fp.read().replace("\\'", "'")
+                lariatJson = json.loads(content)
+
+                for k,v in lariatJson.iteritems():
+                    self.lariatdata[k] = v[0]
+
+                self.filesprocessed.append(filename)
+
+        except Exception as e:
+            self.errors[filename] = "Error processing {}. Error was {}.".format(filename, e)
+
 
 def calculate_stats(v):
   res = {
@@ -60,11 +103,46 @@ def calculate_stats(v):
 
 def main():
   
-  summaryDict = {}
-
   path = sys.argv[1]
-  listing = os.listdir(path)
-  os.chdir(path)
+
+  if len(sys.argv) > 2:
+      lariatcache = LariatManager(sys.argv[2])
+  else:
+      lariatcache = None
+
+  if len(sys.argv) > 3:
+    outdir = sys.argv[3]
+  else:
+    outdir = None
+
+  if os.path.isfile(path):
+    listing = [path]
+  else:
+    listing = [ os.path.join(path, x) for x in os.listdir(path) ]
+    
+  if outdir:
+    # Batch processing mode - each input file gets its own output json file
+    for fname in listing:
+      if os.path.isfile(fname):
+        outfile = os.path.join(outdir, os.path.basename(fname) + ".json")
+        summarise([fname], outfile, lariatcache)
+  else:
+    # Single-shot mode - all input files get process and the combined
+    # result goes to stdout
+    summarise(listing, "/dev/stdout", lariatcache)
+
+  return
+
+def summarise(listing, outputfilename, lariatcache):
+  
+  if outputfilename != "/dev/stdout":
+    if os.path.exists(outputfilename):
+      sys.stderr.write("Output file {} already exists. Skipping\n".format(outputfilename))
+      return
+
+  summaryDict = {}
+  summaryDict['Error'] = []
+
 
   j = None
   metrics = None
@@ -73,8 +151,8 @@ def main():
     
     f = open(infile, 'r')
     j = pickle.load(f)
-    sys.stderr.write( '\nID: '+str(j.acct['id'])+' \n' )
-    db_key = {'Jobid': j.acct['id']}
+    f.close()
+    sys.stderr.write( "{} ID: {}\n".format( datetime.datetime.utcnow().isoformat(), j.acct['id'] ) )
 
     walltime = max(j.end_time - j.start_time, 0)
     
@@ -91,12 +169,12 @@ def main():
       pass
     else:
       summaryDict['nHosts'] = 0
-      summaryDict['Error'] = 'No Host Data'
+      summaryDict['Error'].append('No Host Data')
       sys.stderr.write( 'ERROR: No Host Data\n' )
       continue
 
     if 0 == walltime:
-      summaryDict['Error'] = 'Walltime is 0'
+      summaryDict['Error'].append('Walltime is 0')
       sys.stderr.write( 'ERROR: Walltime is 0\n' )
       continue
 
@@ -140,7 +218,7 @@ def main():
           sys.stderr.write( 'ERROR: summary metric ' + str(l) + ' not in the schema\n' )
           sys.stderr.write( 'ERROR: %s\n' % sys.exc_info()[0] )
           sys.stderr.write( '%s\n' % traceback.format_exc() )
-          summaryDict['Error'] = 'summary metric ' + str(l) + ' not in the schema'
+          summaryDict['Error'].append('summary metric ' + str(l) + ' not in the schema')
         sums[k][l] = {}
         series[k][l] = {}
 
@@ -185,8 +263,7 @@ def main():
               v = []
               for n in range(nIntervals + 1):
                 v.append(sum(j.hosts[i].stats['cpu'][interface][n]))
-              rates = [(v[n] - v[n - 1]) * reciprocals[n - 1] for n in
-                       range(1, len(v))]
+              rates = numpy.diff(v) * reciprocals
               series['cpu']['all'][interface].extend(rates)
 
             for l in indices[k].keys():
@@ -219,14 +296,17 @@ def main():
 
       if 'intel_snb' in sums.keys():
 
-        s1 = 0
-        s2 = 0
-        v = []
-        for l in sums['intel_snb']['SSE_D_ALL'].keys():
-          # iterate all CPU cores
-          s1 += sums['intel_snb']['SSE_D_ALL'][l]
-          s2 += sums['intel_snb']['SIMD_D_256'][l]
-          summaryDict['FLOPS'] = ( 2 * ( s1/nCores_allhosts ) ) + ( 4 * ( s2/nCores_allhosts ) )
+        if 'SSE_D_ALL' in sums['intel_snb'] and 'SIMD_D_256' in sums['intel_snb']:
+          s1 = 0
+          s2 = 0
+          v = []
+          for l in sums['intel_snb']['SSE_D_ALL'].keys():
+            # iterate all CPU cores
+            s1 += sums['intel_snb']['SSE_D_ALL'][l]
+            s2 += sums['intel_snb']['SIMD_D_256'][l]
+            summaryDict['FLOPS'] = ( 2 * ( s1/nCores_allhosts ) ) + ( 4 * ( s2/nCores_allhosts ) )
+        else:
+          summaryDict['FLOPS'] = { 'error': 'unavailable' }
 
       elif 'intel_pmc3' in sums.keys():
 
@@ -299,25 +379,12 @@ def main():
           summaryDict[l + '.' + i + '.' + k] = v
   
   # add in lariat data
-  endTimestamp = j.acct['end_time']
-  endDateObj = datetime.datetime.fromtimestamp(endTimestamp)
-  lariatDataDatePath = os.path.join(LARIAT_DATA_PATH, endDateObj.strftime('%Y'), endDateObj.strftime('%m'), endDateObj.strftime('lariatData-sgeT-%Y-%m-%d.json'))
-  try:
-    if os.path.isfile(lariatDataDatePath):
-      lariatDataFile = open(lariatDataDatePath, 'r')
-      lariatDataString = lariatDataFile.read()
-      lariatDataString = lariatDataString.replace("\\'", "'")
-      lariatJson = json.loads(lariatDataString)
-      for k in lariatJson.keys():
-        if str(j.acct['id']) == str(k):
-          summaryDict['lariat'] = lariatJson[k][0]
-          continue
-      lariatDataFile.close()
-  except:
-    sys.stderr.write( 'ERROR CAUGHT: %s\n' % sys.exc_info()[0] )
-    sys.stderr.write( 'ERROR CAUGHT: lariat data will not be in summary\n')
-    sys.stderr.write( '%s\n' % traceback.format_exc() )
-    summaryDict['Error'] = "Lariat data not found"
+  if lariatcache != None:
+      lariatdata = lariatcache.find(j.id, j.acct['start_time'])
+      if lariatdata != None:
+          summaryDict['lariat'] = lariatdata
+      else:
+          summaryDict['Error'].append("Lariat data not found")
 
   # add hosts
   summaryDict['hosts'] = []
@@ -340,10 +407,19 @@ def main():
     if (summaryDict['nHosts'] != 0):
       sys.stderr.write( 'ERROR: %s\n' % sys.exc_info()[0] )
       sys.stderr.write( '%s\n' % traceback.format_exc() )
-      summaryDict['Error'] = "schema data not found"
+      summaryDict['Error'].append("schema data not found")
+
+  summaryDict['summary_version'] = "0.9.1"
+
+  if len(summaryDict['Error']) == 0:
+    del summaryDict['Error']
 
   # print out json to stdout
-  print json.dumps(summaryDict, indent=2)
+  try:
+      with open(outputfilename, "wb") as fp:
+        json.dump(summaryDict, fp, indent=2)
+  except Exception as e:
+      print json.dumps(summaryDict, indent=2)
 
 if __name__ == '__main__':
   main()
