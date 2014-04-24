@@ -139,10 +139,15 @@ class reformat_counters:
         self.fix_registers = []
 
         # Just need the first hosts schema
+        stats = None
         for host in job.hosts.itervalues():
-            if name not in host.stats: return
-            stats = host.stats[name]
-            break
+            if name in host.stats:
+                stats = host.stats[name]
+                break
+
+        if stats == None:
+            return
+
 
         schema_desc = job.schemas.get(self.name).desc
         registers = schema_desc.split()
@@ -161,7 +166,13 @@ class reformat_counters:
         dev_schema = []
         for dev, array in stats.iteritems():
             for j in self.ctl_registers:
-                dev_schema.append(event_map.get(array[0,j],str(array[0,j])))
+                settings = array[:,j]
+                if settings.min() != settings.max():
+                    # The control settings for this device changed during the run
+                    # mark as the error metric
+                    dev_schema.append("ERROR,E")
+                else:
+                    dev_schema.append(event_map.get(array[0,j],str(array[0,j])))
             break
 
 
