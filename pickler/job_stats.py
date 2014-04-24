@@ -2,6 +2,9 @@
 import datetime, errno, glob, numpy, os, sys, time, gzip
 from subprocess import Popen, PIPE
 import amd64_pmc, intel_snb, batch_acct
+import re
+import procdump
+import string
 
 if sys.version.startswith("3"):
     import io
@@ -37,6 +40,50 @@ SF_DEVICES_CHAR = '@'
 SF_COMMENT_CHAR = '#'
 SF_PROPERTY_CHAR = '$'
 SF_MARK_CHAR = '%'
+
+def schema_fixup(type_name, desc):
+    """ This function implements a workaround for a known issue with incorrect schema """
+    """ definitions for irq, block and sched tacc_stats metrics. """
+
+    if type_name == "irq":
+        # All of the irq metrics are 32 bits wide
+        res = ""
+        for token in desc.split():
+            res += token.strip() + ",W=32 "
+        return res
+
+    elif type_name == "sched":
+        # Most sched counters are 32 bits wide with 3 exceptions
+        res = ""
+        sixtyfourbitcounters = [ "running_time,E,U=ms", "waiting_time,E,U=ms", "pcount,E" ]
+        for token in desc.split():
+            if token in sixtyfourbitcounters:
+                res += token.strip() + " "
+            else:
+                res += token.strip() + ",W=32 "
+        return res
+    elif type_name == "block":
+        # Most block counters are 64bits wide with a few exceptions
+        res = ""
+        thirtytwobitcounters = [ "rd_ticks,E,U=ms", "wr_ticks,E,U=ms", "in_flight", "io_ticks,E,U=ms", "time_in_queue,E,U=ms" ]
+        for token in desc.split():
+            if token in thirtytwobitcounters:
+                res += token.strip() + ",W=32 "
+            else:
+                res += token.strip() + " "
+        return res
+    elif type_name == "panfs":
+        # The syscall_*_(n+)s stats are not events
+        res = ""
+        for token in desc.split():
+            token = token.strip()
+            if token.startswith("syscall_") and ( token.endswith("_s,E,U=s") or token.endswith("_ns,E,U=ns")):
+                res += string.replace(token, "E,", "") + " "
+            else:
+                res += token + " "
+        return res
+
+    return desc
 
 class SchemaEntry(object):
     __slots__ = ('key', 'index', 'is_control', 'is_event', 'width', 'mult', 'unit')
@@ -184,6 +231,7 @@ class Host(object):
         self.marks = {}
         self.raw_stats = {}
         self.raw_stats_dir=raw_stats_dir
+        self.procdump = procdump.ProcDump()
 
     def trace(self, fmt, *args):
         self.job.trace('%s: ' + fmt, self.name, *args)
@@ -201,6 +249,9 @@ class Host(object):
                 base, dot, ext = ent.partition(".")
                 if not base.isdigit():
                     continue
+                # Support for filenames of the form %Y%m%d
+                if re.match('^[0-9]{4}[0-1][0-9][0-3][0-9]$', base):
+                    base = (datetime.datetime.strptime(base,"%Y%m%d") - datetime.datetime(1970,1,1)).total_seconds()
                 # Prune to files that might overlap with job.
                 ent_start = long(base)
                 ent_end = ent_start + 2*RAW_STATS_TIME_MAX
@@ -265,17 +316,26 @@ class Host(object):
         if not file_schemas:
             self.trace("file `%s' bad header\n", file.name)
             return
+        rec_jobid = set()
         # Scan file for records belonging to JOBID.
         for line in file:
             try:
                 c = line[0]
                 if c.isdigit():
-                    str_time, rec_jobid = line.split()
+                    str_time, str_jobid = line.split()
                     rec_time = long(str_time)
-                    if rec_jobid == self.job.id:
+                    rec_jobid = set(str_jobid.split(','))
+                    if self.job.id in rec_jobid:
                         self.trace("file `%s' rec_time %d, rec_jobid `%s'\n",
                                    file.name, rec_time, rec_jobid)
                         self.times.append(rec_time)
+                        break
+                elif line.startswith('% begin'):
+                    rec_jobid.add(line.split()[2])
+                    if self.job.id in rec_jobid:
+                        self.times.append(rec_time)
+                        mark = line[1:].strip()
+                        self.marks[mark] = True
                         break
             except Exception as exc:
                 self.trace("file `%s', caught `%s', discarding `%s'\n",
@@ -287,21 +347,42 @@ class Host(object):
             self.trace("file `%s' has no records belonging to job\n", file.name)
             return
         # OK, we found a record belonging to JOBID.
+        skip = False
         for line in file:
             try:
                 c = line[0]
                 if c.isdigit():
-                    str_time, rec_jobid = line.split()
+                    skip = False
+                    str_time, str_jobid = line.split()
                     rec_time = long(str_time)
-                    if rec_jobid != self.job.id:                        
-                        return
+                    rec_jobid = set(str_jobid.split(','))
+                    if self.job.id not in rec_jobid:
+                        line = file.next()
+                        if line.startswith('%'): 
+                            tokens = line[1:].split(" ")
+                            if len(tokens) > 1 and tokens[0].strip() == "end":
+                                rec_jobid.add( tokens[1].strip() )
+                            else:
+                                self.trace("file '%s' syntax error '%s'\n", file.name, line)
+                        if self.job.id not in rec_jobid:
+                            return
                     self.trace("file `%s' rec_time %d, rec_jobid `%s'\n",
                                file.name, rec_time, rec_jobid)
                     self.times.append(rec_time)
                 elif c.isalpha():
-                    self.parse_stats(rec_time, line, file_schemas, file)            
+                    if False == skip:
+                        self.parse_stats(rec_time, line, file_schemas, file)            
+                elif line.startswith('% procdump'):
+                    if False == skip:
+                        self.procdump.parse(line)
                 elif c == SF_MARK_CHAR:
                     mark = line[1:].strip()
+                    actions = mark.split()
+                    if actions[1].strip() != self.job.id:
+                        self.times.pop()
+                        skip = True
+                    else:
+                        skip = False
                     self.marks[mark] = True
                 #elif c == SF_COMMENT_CHAR:
                     #pass        
@@ -370,24 +451,28 @@ class Job(object):
     def get_schema(self, type_name, desc=None):
         schema = self.schemas.get(type_name)
         if schema:
-            if desc and schema.desc != desc:
+            if desc and schema.desc != schema_fixup(type_name,desc):
                 # ...
                 return None
         elif desc:
+            desc = schema_fixup(type_name, desc)
             schema = self.schemas[type_name] = Schema(desc)
         return schema
 
     def gather_stats(self):
-        path = self.batch_acct.get_host_list_path(self.acct, self.host_list_dir)
-        if not path:
-            self.error("no host list found\n")
-            return False
-        try:
-            with open(path) as file:
-                host_list = [host for line in file for host in line.split()]
-        except IOError as (err, str):
-            self.error("cannot open host list `%s': %s\n", path, str)
-            return False
+        if "host_list" in self.acct:
+            host_list = self.acct['host_list']
+        else:
+            path = self.batch_acct.get_host_list_path(self.acct, self.host_list_dir)
+            if not path:
+                self.error("no host list found\n")
+                return False
+            try:
+                with open(path) as file:
+                    host_list = [host for line in file for host in line.split()]
+            except IOError as (err, str):
+                self.error("cannot open host list `%s': %s\n", path, str)
+                return False
         if len(host_list) == 0:
             self.error("empty host list\n")
             return False
@@ -450,6 +535,9 @@ class Job(object):
             t = self.times[i]
             while k + 1 < len(raw) and abs(raw[k + 1][0] - t) <= abs(raw[k][0] - t):
                 k += 1
+            jitter = abs(raw[k][0] - t)
+            if jitter > 60:
+                self.trace("Warning - high jitter for host {} job {} Actual time {}, Thunked to {} (Delta {})".format(host.name, self.id, raw[k][0], t, jitter))
             A[i] = raw[k][1]
         # OK, we fit the raw values into A.  Now fixup rollover and
         # convert units.
