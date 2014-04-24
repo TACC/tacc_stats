@@ -15,7 +15,10 @@ class BatchAcct(object):
     self.batch_kind=batch_kind
     self.acct_file=acct_file
     self.field_names = [tup[0] for tup in self.fields]
-    self.name_ext = '.'+host_name_ext
+    if len(host_name_ext) > 0:
+        self.name_ext = '.'+host_name_ext
+    else:
+        self.name_ext = ""
     self.delimiter = delimiter 
 
   def reader(self,start_time=0, end_time=9223372036854775807L, seek=0):
@@ -172,10 +175,9 @@ class SLURMAcct(BatchAcct):
     """Return the path of the host list written during the prolog."""
     start_date = datetime.date.fromtimestamp(acct['start_time'])
     base_glob = 'hostlist.' + acct['id']
-    for days in (0, -2, 2):
+    for days in (0, -1, 1):
       yyyy_mm_dd = (start_date + datetime.timedelta(days)).strftime("%Y/%m/%d")
       full_glob = os.path.join(host_list_dir, yyyy_mm_dd, base_glob)
-      print 'host list paths', full_glob
       for path in glob.iglob(full_glob):
         return path
     return None
@@ -196,7 +198,7 @@ class SLURMNativeAcct(BatchAcct):
   def __init__(self,acct_file,host_name_ext):
 
     self.fields = (
-      ('id',                          int, 'Job identifier'),
+      ('id',                          str, 'Job identifier'),
       ('cluster',                     str, 'Job cluster'),
       ('partition',                   str, 'Job partition'),
       ('account',                     str, 'Job account'),
@@ -215,3 +217,51 @@ class SLURMNativeAcct(BatchAcct):
 
     BatchAcct.__init__(self,'SLURM',acct_file,host_name_ext,"|")
 
+  def get_host_list_path(self,acct,host_list_dir):
+    return None
+
+  def get_host_list(self, nodelist):
+    
+    open_brace_flag = False
+    close_brace_flag = False
+    host_list = []
+    tmp_host = ""
+    # get a list of all the nodes and store them in host_host
+    for c in nodelist:
+        if c == '[':
+            open_brace_flag = True
+        elif c == ']':
+            close_brace_flag = True
+        if ( c == ',' and not close_brace_flag and not open_brace_flag ) or (c == ',' and close_brace_flag):
+            host_list.append(tmp_host)
+            tmp_host = ""
+            close_brace_flag = False
+            open_brace_flag = False
+        else:
+            tmp_host += c
+    if tmp_host:
+        host_list.append(tmp_host)
+
+    # parse through host_list and expand the hostnames
+    host_list_expanded = []
+    for h in host_list:
+        if '[' in h:
+            node_head = h.split('[')[0]
+            node_tail = h.split('[')[1][:-1].split(',')
+            for n in node_tail:
+                if '-' in n:
+                    num = n.split('-')
+                    for x in range(int(num[0]), int(num[1])+1):
+                        host_list_expanded.append(node_head + str("%02d" % x))
+                else:
+                    host_list_expanded.append(node_head + n)
+        else:
+            host_list_expanded.append(h)
+
+    return host_list_expanded
+
+  def reader(self,start_time=0, end_time=9223372036854775807L, seek=0):
+      for a in super(SLURMNativeAcct,self).reader(start_time, end_time, seek):
+          a['host_list'] = self.get_host_list(a['node_list'])
+          a['hostname'] = a['host_list'][0]
+          yield a
