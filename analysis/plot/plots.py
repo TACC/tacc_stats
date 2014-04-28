@@ -11,6 +11,7 @@ matplotlib.use('Agg')
 from scipy.stats import scoreatpercentile as score
 from matplotlib.figure import Figure
 from matplotlib.backends.backend_agg import FigureCanvasAgg as FigureCanvas
+from matplotlib.backends.backend_pdf import FigureCanvasPdf as FigureCanvasPdf
 from sys_conf import lariat_path
 from ..gen import tspl,tspl_utils,lariat_utils,my_utils
 
@@ -24,7 +25,7 @@ def unwrap(arg):
     kwarg = arg[2]
     return arg[0].plot(arg[1],**kwarg)
   except:
-    traceback.format_exc()
+    print traceback.format_exc()
 ## Plot Class
 #
 # This is an abstract base class for plotting.
@@ -205,8 +206,10 @@ class Plot(object):
       self.fname+='_hist'
     elif self.mode == 'percentile':
       self.fname+='_perc'
-    self.canvas = FigureCanvas(self.fig)
-    if self.save: 
+    if not self.save:
+      self.canvas = FigureCanvas(self.fig)
+    else: 
+      self.canvas = FigureCanvasPdf(self.fig)
       self.fig.savefig(os.path.join(self.outdir,self.fname))
 
   @abc.abstractmethod
@@ -505,7 +508,7 @@ class HeatMap(Plot):
 
 class DevPlot(Plot):
 
-  def __init__(self,k1,k2,processes=1,**kwargs):
+  def __init__(self,k1={'intel_snb' : ['intel_snb','intel_snb','intel_snb']},k2={'intel_snb':['LOAD_1D_ALL','INSTRUCTIONS_RETIRED','LOAD_OPS_ALL']},processes=1,**kwargs):
     self.k1 = k1
     self.k2 = k2
     super(DevPlot,self).__init__(processes=processes,**kwargs)
@@ -519,7 +522,7 @@ class DevPlot(Plot):
     ts=self.ts
 
     n_events = len(events)
-    self.fig = Figure(figsize=(8,n_events*2),dpi=80)
+    self.fig = Figure(figsize=(8,n_events*2+3),dpi=110)
 
     do_rate = True
     scale = 1.0
@@ -534,8 +537,8 @@ class DevPlot(Plot):
       self.plot_lines(self.ax, [i], 3600., yscale=scale, do_rate = do_rate)
       self.ax.set_ylabel(events[i],size='small')
     self.ax.set_xlabel("Time (hr)")
-    self.fig.subplots_adjust(hspace=0.0)
-    self.fig.tight_layout()
+    self.fig.subplots_adjust(hspace=0.5)
+    #self.fig.tight_layout()
 
     self.output('devices')
 """

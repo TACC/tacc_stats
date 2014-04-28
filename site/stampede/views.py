@@ -25,7 +25,8 @@ from matplotlib.backends.backend_agg import FigureCanvasAgg as FigureCanvas
 from django.core.cache import cache,get_cache 
 import traceback
 
-
+#import memory_profiler
+#@profile
 def update(date):
 
     ld = lariat_utils.LariatData(directory = sys_conf.lariat_path,
@@ -39,54 +40,68 @@ def update(date):
     nf = len(os.listdir(pickle_dir))
     ctr = 0
     print "Number of pickle files =",nf
+    for root, directory, pickle_files in os.walk(pickle_dir):
 
-    for pickle_file in os.listdir(pickle_dir):
-        ctr += 1
-        
-        try: obj, created = Job.objects.get_or_create(id = pickle_file)
-        except: pass
+        for pickle_file in pickle_files:
+            ctr += 1
 
-        if created:
-            try:
-                pickle_path = os.path.join(pickle_dir,pickle_file)
-                # Create job row if it doesn't exists
-                with open(pickle_path, 'rb') as f:
-                    data = pickle.load(f)
-                    json = data.acct
-                    del json['yesno'], json['unknown']
-                    json['run_time'] = json['end_time'] - json['start_time']
-
-                    json['path'] = pickle_path
-                    json['start_epoch'] = json['start_time']
-                    json['end_epoch'] = json['end_time']
-                    
-                    utc_start = datetime.utcfromtimestamp(json['start_time']).replace(tzinfo=pytz.utc)
-                    utc_end = datetime.utcfromtimestamp(json['end_time']).replace(tzinfo=pytz.utc)
-                    
-                    json['start_time'] = utc_start.astimezone(tz)
-                    json['end_time'] =  utc_end.astimezone(tz)
-                    json['date'] = json['end_time'].date()
-                    
-                    ld.set_job(pickle_file,end_epoch = json['end_epoch'])       
-                    json['exe'] = ld.exc.split('/')[-1]
-                    json['cwd'] = ld.cwd[0:128]
-                    json['threads'] = ld.threads
-                    try: json['user']=pwd.getpwuid(int(json['uid']))[0]
-                    except: json['user']=ld.user
-                    #print json
-                    obj = Job(**json)
-                    obj.save()
+            try: obj, created = date_objects.get_or_create(id = pickle_file)
             except: 
-                print pickle_file,'failed'
                 print traceback.format_exc()
-                print date
-    print "Percentage Completed =",100*float(ctr)/nf
+                pass
+            """
+            if obj.wayness: continue
+            try:
+                pickle_path = os.path.join(root,str(pickle_file))
+                with open(pickle_path, 'rb') as f:
+                    data = np.load(f,mmap_mode='r')
+                    json = data.acct
+                    ld.set_job(pickle_file,end_epoch = json['end_time'])
+                    if ld.wayness:
+                        wayness = ld.wayness                    
+                        obj.wayness=wayness
+                        obj.save()
+            except: print traceback.format_exc()
+            """
+            if created:
+                try:
+                    pickle_path = os.path.join(root,str(pickle_file))
+                    # Create job row if it doesn't exists
+                    with open(pickle_path, 'rb') as f:
+                        data = np.load(f,mmap_mode='r')
+                        json = data.acct
+                        del data
+                        del json['yesno'], json['unknown']
+                        json['run_time'] = json['end_time'] - json['start_time']
 
-    cpi_test = tests.HighCPI(threshold=1.0,processes=2)        
-    update_test_field(date,cpi_test,'cpi')
+                        json['path'] = pickle_path
+                        json['start_epoch'] = json['start_time']
+                        json['end_epoch'] = json['end_time']
+                        
+                        utc_start = datetime.utcfromtimestamp(json['start_time']).replace(tzinfo=pytz.utc)
+                        utc_end = datetime.utcfromtimestamp(json['end_time']).replace(tzinfo=pytz.utc)
+                        
+                        json['start_time'] = utc_start.astimezone(tz)
+                        json['end_time'] =  utc_end.astimezone(tz)
+                        json['date'] = json['end_time'].date()
+                        
+                        ld.set_job(pickle_file,end_epoch = json['end_epoch'])       
+                        json['exe'] = ld.exc.split('/')[-1]
+                        json['cwd'] = ld.cwd[0:128]
+                        json['threads'] = ld.threads
+                        if ld.wayness:
+                            json['wayness'] = ld.wayness
 
-    mbw_test = tests.MemBw(threshold=0.5,processes=2)        
-    update_test_field(date,mbw_test,'mbw')
+                        try: json['user']=pwd.getpwuid(int(json['uid']))[0]
+                        except: json['user']=ld.user
+
+                        obj = Job(**json)
+                        obj.save()
+                except: 
+                    print pickle_file,'failed'
+                    print traceback.format_exc()
+                    print date
+            print "Percentage Completed =",100*float(ctr)/nf
 
 def update_test_field(date,test,metric,rerun=False):
     print "Run",test.__class__.__name__,"test for",date
@@ -237,19 +252,22 @@ def hist_summary(request, date = None, uid = None, project = None, user = None, 
         # CPI
         job_cpi = np.array(job_list.exclude(Q(**{'cpi' : None}) | Q(**{'cpi' : float('nan')})).values_list('cpi',flat=True))
         ax = fig.add_subplot(223)
+        mean_cpi = job_cpi.mean()
+        var_cpi = job_cpi.var()
         job_cpi = job_cpi[job_cpi<4.0]
         ax.hist(job_cpi, max(5, 5*np.log(len(job_list))))
         #ax.set_xlim(0,min(job_cpi.max(),4.0))
         ax.set_ylabel('# of jobs')
-        ax.set_title('CPI for Successful Jobs over 1 hr')
+        ax.set_title('CPI for Successful Jobs over 1 hr '+r'$\bar{Mean}=$'+'{0:.2f}'.format(mean_cpi)+' '+r'$Var=$' +  '{0:.2f}'.format(var_cpi))
         ax.set_xlabel('CPI')
     except: pass
     try:
         # MBW
         job_mbw = np.array(job_list.exclude(Q(**{'mbw' : None}) | Q(**{'mbw' : float('nan')})).values_list('mbw',flat=True))
         ax = fig.add_subplot(224)        
+        job_mbw = job_mbw[job_mbw < 1.0]
         ax.hist(job_mbw, max(5, 5*np.log(len(job_list))))
-        ax.set_xlim(0,job_mbw.max())
+        #ax.set_xlim(0,job_mbw.max())
         ax.set_ylabel('# of jobs')
         ax.set_title('MBW for Successful Jobs over 1 hr')
         ax.set_xlabel('MBW')
@@ -292,9 +310,9 @@ def master_plot(request, pk):
 
 def heat_map(request, pk):    
     data = get_data(pk)
-    hm = plt.HeatMap(['intel_snb','intel_snb'],
-                     ['CLOCKS_UNHALTED_REF',
-                      'INSTRUCTIONS_RETIRED'],
+    hm = plt.HeatMap(k1=['intel_snb','intel_snb'],
+                     k2=['CLOCKS_UNHALTED_REF',
+                         'INSTRUCTIONS_RETIRED'],
                      lariat_data="pass")
     hm.plot(pk,job_data=data)
     return figure_to_response(hm)
@@ -352,7 +370,7 @@ def type_plot(request, pk, type_name):
     k1 = {'intel_snb' : [type_name]*len(schema)}
     k2 = {'intel_snb': schema}
 
-    tp = plt.DevPlot(k1,k2,lariat_data='pass')
+    tp = plt.DevPlot(k1=k1,k2=k2,lariat_data='pass')
     tp.plot(pk,job_data=data)
     return figure_to_response(tp)
 

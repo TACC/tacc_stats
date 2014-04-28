@@ -18,6 +18,7 @@ class Job(models.Model):
     status = models.CharField(max_length=16, null=True)
     nodes = models.PositiveIntegerField(null=True)
     cores = models.PositiveIntegerField(null=True)
+    wayness = models.PositiveIntegerField(null=True)
     path =  models.FilePathField(max_length=128, null=True)
     date = models.DateField(db_index=True,null=True)
     user = models.CharField(max_length=128, null=True)

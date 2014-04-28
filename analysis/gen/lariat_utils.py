@@ -2,7 +2,6 @@ import json
 import time, os, fnmatch
 import re
 import textwrap
-
 def make_date_string(t):
   lt=time.localtime(t)
   return '%(y)04d-%(m)02d-%(d)02d' % { 'y' : lt.tm_year, 'm' : lt.tm_mon,
@@ -79,7 +78,9 @@ class LariatData:
     self.exc='unknown'
     self.cwd='unknown'
     self.threads=1
-    self.wayness=-1
+    self.cores=None
+    self.nodes=None
+    self.wayness=None
 
     # Find the json file the job should be in
     if end_epoch > 0 and self.directory != None:
@@ -109,15 +110,17 @@ class LariatData:
 
     # Check if job is in json
     try:
-      self.ld[jobid].sort(key=lambda ibr: int(ibr['startEpoch']))
       self.id=self.ld[jobid][0]['jobID']
       self.user=self.ld[jobid][0]['user']
       self.exc=replace_and_shorten_path_bits(self.ld[jobid][0]['exec'],
                                              self.user,60)
       self.cwd=replace_and_shorten_path_bits(self.ld[jobid][0]['cwd'],
                                              self.user,60)
-      self.threads=self.ld[jobid][0]['numThreads']
-      self.wayness=int(self.ld[jobid][0]['numCores'])/int(self.ld[jobid][0]['numNodes'])
+      self.threads=int(self.ld[jobid][0]['numThreads'])
+      self.cores=int(self.ld[jobid][0]['numCores'])
+      self.nodes=int(self.ld[jobid][0]['numNodes'])
+      self.wayness=int(float(self.cores)/self.nodes)
+
     except KeyError:
       print str(jobid) + ' did not call ibrun' + \
           ' or has no lariat data for some other reason'

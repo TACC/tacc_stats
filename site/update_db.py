@@ -5,13 +5,11 @@ from subprocess import Popen, PIPE
 
 cwd = os.path.dirname(os.path.abspath(__file__))
 sys.path.append(os.path.join(cwd,'../lib'))
-sys.path.append(os.path.join(cwd,'tacc_stats_site'))
-sys.path.append(os.path.join(cwd,'stampede'))
 
-import settings
+
+from tacc_stats_site import settings
 setup_environ(settings)
-
-import stampede.views as views
+from stampede import views
 import sys_conf
 import datetime
 
@@ -35,6 +33,8 @@ for date in os.listdir(path):
     
     print 'Run update for',date
 
-    p = Popen(["python",os.path.join(cwd,"update.py"),date])
-    p.communicate()
-    
+    views.update(date)
+    cpi_test = views.tests.HighCPI(threshold=1.0,processes=1)
+    views.update_test_field(date,cpi_test,'cpi')
+    mbw_test = views.tests.MemBw(threshold=0.5,processes=1)               
+    views.update_test_field(date,mbw_test,'mbw')   
