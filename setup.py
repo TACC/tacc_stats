@@ -120,15 +120,23 @@ short_version = '%s'
 if write_version:
     write_version_py()
 
-def read_site_cfg(cfg_filename=None):
+def read_site_cfg():
     config = ConfigParser.ConfigParser(allow_no_value=True)
-    import socket
-    filename = socket.gethostname()
-    config.read(socket.gethostname()+'.cfg')
-    try: 
-        config.read(socket.gethostname()+'.cfg')
-    except:
-        print 'Specify filename (hostname + .cfg)'
+
+    cfg_filename = None
+
+    for arg in sys.argv:
+        if arg.split('.')[-1] == 'cfg': 
+            cfg_filename = arg
+    if not cfg_filename:
+        import socket
+        cfg_filename = socket.gethostname()    
+
+    print 'Read configure file ' + cfg_filename + '.cfg'    
+    if cfg_filename:
+        config.read(cfg_filename+'.cfg')
+    else:
+        print 'Specify a filename e.g. (hostname + .cfg)'
         sys.exit()
 
     paths = dict(config.items('PATHS'))
