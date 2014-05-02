@@ -130,11 +130,11 @@ def read_site_cfg():
             cfg_filename = arg
     if not cfg_filename:
         import socket
-        cfg_filename = socket.gethostname()    
+        cfg_filename = socket.gethostname() + '.cfg'   
 
     print 'Read configure file ' + cfg_filename + '.cfg'    
     if cfg_filename:
-        config.read(cfg_filename+'.cfg')
+        config.read(cfg_filename)
     else:
         print 'Specify a filename e.g. (hostname + .cfg)'
         sys.exit()

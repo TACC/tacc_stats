@@ -21,3 +21,4 @@ analyze_conf.py
 *.out.*
 *.err.*
 analysis/*.sh
+tacc_stats/version.py
