@@ -128,11 +128,12 @@ def read_site_cfg():
     for arg in sys.argv:
         if arg.split('.')[-1] == 'cfg': 
             cfg_filename = arg
+            sys.argv.remove(arg)
     if not cfg_filename:
         import socket
         cfg_filename = socket.gethostname() + '.cfg'   
 
-    print 'Read configure file ' + cfg_filename + '.cfg'    
+    print 'Read configure file ' + cfg_filename    
     if cfg_filename:
         config.read(cfg_filename)
     else:
