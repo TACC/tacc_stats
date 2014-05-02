@@ -1,0 +1,56 @@
+$tacc_stats 1.0.6
+$hostname tacc-stats
+$uname Linux x86_64 2.6.32-431.5.1.el6.x86_64 #1 SMP Wed Feb 12 00:41:43 UTC 2014
+$uptime 6574013
+!intel_snb_r2pci CTL0,C CTL1,C CTL2,C CTL3,C CTR0,E,W=44 CTR1,E,W=44 CTR2,E,W=44 CTR3,E,W=44
+!vm pgpgin,E,U=KB pgpgout,E,U=KB pswpin,E pswpout,E pgalloc_normal,E pgfree,E pgactivate,E pgdeactivate,E pgfault,E pgmajfault,E pgrefill_normal,E pgsteal_normal,E pgscan_kswapd_normal,E pgscan_direct_normal,E pginodesteal,E slabs_scanned,E kswapd_steal,E kswapd_inodesteal,E pageoutrun,E allocstall,E pgrotated,E
+!intel_wtm FIXED_CTR0,E,W=48 FIXED_CTR1,E,W=48 FIXED_CTR2,E,W=48 CTL0,C CTL1,C CTL2,C CTL3,C CTR0,E,W=48 CTR1,E,W=48 CTR2,E,W=48 CTR3,E,W=48
+!ps ctxt,E processes,E load_1 load_5 load_15 nr_running nr_threads
+!intel_snb_imc CTL0,C CTL1,C CTL2,C CTL3,C CTR0,E,W=48 CTR1,E,W=48 CTR2,E,W=48 CTR3,E,W=48 FIXED_CTR,E,W=48
+!amd64_pmc CTL0,C CTL1,C CTL2,C CTL3,C CTR0,E,W=48 CTR1,E,W=48 CTR2,E,W=48 CTR3,E,W=48
+!net collisions,E multicast,E rx_bytes,E,U=B rx_compressed,E rx_crc_errors,E rx_dropped,E rx_errors,E rx_fifo_errors,E rx_frame_errors,E rx_length_errors,E rx_missed_errors,E rx_over_errors,E rx_packets,E tx_aborted_errors,E tx_bytes,E,U=B tx_carrier_errors,E tx_compressed,E tx_dropped,E tx_errors,E tx_fifo_errors,E tx_heartbeat_errors,E tx_packets,E tx_window_errors,E
+!intel_snb_cbo CTL0,C CTL1,C CTL2,C CTL3,C CTR0,E,W=44 CTR1,E,W=44 CTR2,E,W=44 CTR3,E,W=44
+!mem MemTotal,U=KB MemFree,U=KB MemUsed,U=KB Active,U=KB Inactive,U=KB Dirty,U=KB Writeback,U=KB FilePages,U=KB Mapped,U=KB AnonPages,U=KB PageTables,U=KB NFS_Unstable,U=KB Bounce,U=KB Slab,U=KB HugePages_Total HugePages_Free
+!intel_uncore PERF_GLOBAL_CTRL,C PERF_GLOBAL_STATUS,C PERF_GLOBAL_OVF_CTRL,C FIXED_CTR0,E,W=48 FIXED_CTR_CTRL,C ADDR_OPCODE_MATCH,C PMC0,E,W=48 PMC1,E,W=48 PMC2,E,W=48 PMC3,E,W=48 PMC4,E,W=48 PMC5,E,W=48 PMC6,E,W=48 PMC7,E,W=48 PERFEVTSEL0,C PERFEVTSEL1,C PERFEVTSEL2,C PERFEVTSEL3,C PERFEVTSEL4,C PERFEVTSEL5,C PERFEVTSEL6,C PERFEVTSEL7,C
+!intel_snb_pcu CTL0,C CTL1,C CTL2,C CTL3,C CTR0,E,W=48 CTR1,E,W=48 CTR2,E,W=48 CTR3,E,W=48 FIXED_CTR0,E,W=48 FIXED_CTR1,E,W=48
+!intel_snb_hau CTL0,C CTL1,C CTL2,C CTL3,C CTR0,E,W=48 CTR1,E,W=48 CTR2,E,W=48 CTR3,E,W=48
+!numa numa_hit,E numa_miss,E numa_foreign,E interleave_hit,E local_node,E other_node,E
+!intel_nhm FIXED_CTR0,E,W=48 FIXED_CTR1,E,W=48 FIXED_CTR2,E,W=48 CTL0,C CTL1,C CTL2,C CTL3,C CTR0,E,W=48 CTR1,E,W=48 CTR2,E,W=48 CTR3,E,W=48
+!tmpfs bytes_used,U=B files_used
+!intel_snb CTL0,C CTL1,C CTL2,C CTL3,C CTL4,C CTL5,C CTL6,C CTL7,C CTR0,E,W=48 CTR1,E,W=48 CTR2,E,W=48 CTR3,E,W=48 CTR4,E,W=48 CTR5,E,W=48 CTR6,E,W=48 CTR7,E,W=48 FIXED_CTR0,E,W=48 FIXED_CTR1,E,W=48 FIXED_CTR2,E,W=48
+!intel_snb_qpi CTL0,C CTL1,C CTL2,C CTL3,C CTR0,E,U=flt,W=48 CTR1,E,U=flt,W=48 CTR2,E,U=flt,W=48 CTR3,E,U=flt,W=48
+!sysv_shm mem_used,U=B segs_used
+!nfs inode_revalidate,E dentry_revalidate,E data_invalidate,E attr_invalidate,E vfs_open,E vfs_lookup,E vfs_access,E vfs_updatepage,E vfs_readpage,E vfs_readpages,E vfs_writepage,E vfs_writepages,E vfs_getdents,E vfs_setattr,E vfs_flush,E vfs_fsync,E vfs_lock,E vfs_release,E congestion_wait,E setattr_trunc,E extend_write,E silly_rename,E short_read,E short_write,E delay,E normal_read,E,U=B normal_write,E,U=B direct_read,E,U=B direct_write,E,U=B server_read,E,U=B server_write,E,U=B read_page,E write_page,E xprt_sends,E xprt_recvs,E xprt_bad_xids,E xprt_req_u,E xprt_bklog_u,E ACCESS_ops,E ACCESS_ntrans,E ACCESS_timeouts,E ACCESS_bytes_sent,E,U=B ACCESS_bytes_recv,E,U=B ACCESS_queue,E,U=ms ACCESS_rtt,E,U=ms ACCESS_execute,E,U=ms COMMIT_ops,E COMMIT_ntrans,E COMMIT_timeouts,E COMMIT_bytes_sent,E,U=B COMMIT_bytes_recv,E,U=B COMMIT_queue,E,U=ms COMMIT_rtt,E,U=ms COMMIT_execute,E,U=ms CREATE_ops,E CREATE_ntrans,E CREATE_timeouts,E CREATE_bytes_sent,E,U=B CREATE_bytes_recv,E,U=B CREATE_queue,E,U=ms CREATE_rtt,E,U=ms CREATE_execute,E,U=ms FSINFO_ops,E FSINFO_ntrans,E FSINFO_timeouts,E FSINFO_bytes_sent,E,U=B FSINFO_bytes_recv,E,U=B FSINFO_queue,E,U=ms FSINFO_rtt,E,U=ms FSINFO_execute,E,U=ms FSSTAT_ops,E FSSTAT_ntrans,E FSSTAT_timeouts,E FSSTAT_bytes_sent,E,U=B FSSTAT_bytes_recv,E,U=B FSSTAT_queue,E,U=ms FSSTAT_rtt,E,U=ms FSSTAT_execute,E,U=ms GETATTR_ops,E GETATTR_ntrans,E GETATTR_timeouts,E GETATTR_bytes_sent,E,U=B GETATTR_bytes_recv,E,U=B GETATTR_queue,E,U=ms GETATTR_rtt,E,U=ms GETATTR_execute,E,U=ms LINK_ops,E LINK_ntrans,E LINK_timeouts,E LINK_bytes_sent,E,U=B LINK_bytes_recv,E,U=B LINK_queue,E,U=ms LINK_rtt,E,U=ms LINK_execute,E,U=ms LOOKUP_ops,E LOOKUP_ntrans,E LOOKUP_timeouts,E LOOKUP_bytes_sent,E,U=B LOOKUP_bytes_recv,E,U=B LOOKUP_queue,E,U=ms LOOKUP_rtt,E,U=ms LOOKUP_execute,E,U=ms MKDIR_ops,E MKDIR_ntrans,E MKDIR_timeouts,E MKDIR_bytes_sent,E,U=B MKDIR_bytes_recv,E,U=B MKDIR_queue,E,U=ms MKDIR_rtt,E,U=ms MKDIR_execute,E,U=ms MKNOD_ops,E MKNOD_ntrans,E MKNOD_timeouts,E MKNOD_bytes_sent,E,U=B MKNOD_bytes_recv,E,U=B MKNOD_queue,E,U=ms MKNOD_rtt,E,U=ms MKNOD_execute,E,U=ms PATHCONF_ops,E PATHCONF_ntrans,E PATHCONF_timeouts,E PATHCONF_bytes_sent,E,U=B PATHCONF_bytes_recv,E,U=B PATHCONF_queue,E,U=ms PATHCONF_rtt,E,U=ms PATHCONF_execute,E,U=ms READ_ops,E READ_ntrans,E READ_timeouts,E READ_bytes_sent,E,U=B READ_bytes_recv,E,U=B READ_queue,E,U=ms READ_rtt,E,U=ms READ_execute,E,U=ms READDIR_ops,E READDIR_ntrans,E READDIR_timeouts,E READDIR_bytes_sent,E,U=B READDIR_bytes_recv,E,U=B READDIR_queue,E,U=ms READDIR_rtt,E,U=ms READDIR_execute,E,U=ms READDIRPLUS_ops,E READDIRPLUS_ntrans,E READDIRPLUS_timeouts,E READDIRPLUS_bytes_sent,E,U=B READDIRPLUS_bytes_recv,E,U=B READDIRPLUS_queue,E,U=ms READDIRPLUS_rtt,E,U=ms READDIRPLUS_execute,E,U=ms READLINK_ops,E READLINK_ntrans,E READLINK_timeouts,E READLINK_bytes_sent,E,U=B READLINK_bytes_recv,E,U=B READLINK_queue,E,U=ms READLINK_rtt,E,U=ms READLINK_execute,E,U=ms REMOVE_ops,E REMOVE_ntrans,E REMOVE_timeouts,E REMOVE_bytes_sent,E,U=B REMOVE_bytes_recv,E,U=B REMOVE_queue,E,U=ms REMOVE_rtt,E,U=ms REMOVE_execute,E,U=ms RENAME_ops,E RENAME_ntrans,E RENAME_timeouts,E RENAME_bytes_sent,E,U=B RENAME_bytes_recv,E,U=B RENAME_queue,E,U=ms RENAME_rtt,E,U=ms RENAME_execute,E,U=ms RMDIR_ops,E RMDIR_ntrans,E RMDIR_timeouts,E RMDIR_bytes_sent,E,U=B RMDIR_bytes_recv,E,U=B RMDIR_queue,E,U=ms RMDIR_rtt,E,U=ms RMDIR_execute,E,U=ms SETATTR_ops,E SETATTR_ntrans,E SETATTR_timeouts,E SETATTR_bytes_sent,E,U=B SETATTR_bytes_recv,E,U=B SETATTR_queue,E,U=ms SETATTR_rtt,E,U=ms SETATTR_execute,E,U=ms SYMLINK_ops,E SYMLINK_ntrans,E SYMLINK_timeouts,E SYMLINK_bytes_sent,E,U=B SYMLINK_bytes_recv,E,U=B SYMLINK_queue,E,U=ms SYMLINK_rtt,E,U=ms SYMLINK_execute,E,U=ms WRITE_ops,E WRITE_ntrans,E WRITE_timeouts,E WRITE_bytes_sent,E,U=B WRITE_bytes_recv,E,U=B WRITE_queue,E,U=ms WRITE_rtt,E,U=ms WRITE_execute,E,U=ms
+!vfs dentry_use file_use inode_use
+!cpu user,E,U=cs nice,E,U=cs system,E,U=cs idle,E,U=cs iowait,E,U=cs irq,E,U=cs softirq,E,U=cs
+!block rd_ios,E rd_merges,E rd_sectors,E,U=512B rd_ticks,E,U=ms wr_ios,E wr_merges,E wr_sectors,E,U=512B wr_ticks,E,U=ms in_flight io_ticks,E,U=ms time_in_queue,E,U=ms
+
+1398875868 0
+%begin 0
+vm - 427744065 249378470 16602612 22492689 3040451221 7712269147 121553604 152388981 2732965438 4015452 65681228 982579266 980540755 36456221 2919976 66524160 2750287749 55911876 31193253 2035898 24643269
+ps - 2849184987 2466996 18 41 24 1 226
+net lo 0 0 8406869345 0 0 0 0 0 0 0 0 0 2285085 0 8406869345 0 0 0 0 0 0 2285085 0
+net eth0 0 0 8145446876812 0 0 5073 0 0 0 0 0 0 1432377431 0 3597168382977 0 0 0 0 0 0 1127938146 0
+intel_snb_cbo 0/6 0 0 0 0 0 0 0 0
+intel_snb_cbo 0/7 0 0 0 0 0 0 0 0
+intel_snb_cbo 0/4 0 0 0 0 0 0 0 0
+intel_snb_cbo 0/5 0 0 0 0 0 0 0 0
+intel_snb_cbo 0/2 0 0 0 0 0 0 0 0
+intel_snb_cbo 0/3 0 0 0 0 0 0 0 0
+intel_snb_cbo 0/0 0 0 0 0 0 0 0 0
+intel_snb_cbo 0/1 0 0 0 0 0 0 0 0
+mem 0 4193788 279972 3913816 514848 2915668 1800 0 2486368 28644 708984 47172 0 0 117364 0 0
+intel_snb_pcu 0 0 0 0 0 0 0 0 0 0 0
+numa 0 7310503495 0 0 17151 7310503495 0
+tmpfs /dev/shm 0 1
+intel_snb 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0
+intel_snb 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0
+sysv_shm - 37879808 1
+nfs /hpc 108803740 25314880272 341309 114965885 92573942 10836043 25446056762 1141114858 2724 23937676 846335360 16315612 173613841 2009289 1897331 1898220 0 5777561 0 9752 1141108050 6374 0 0 0 8424247787155 3462885055400 0 0 7997686333429 3462889557758 1954273987 846335360 490180279 490175066 122 2102904721841 0 7578643 7581641 3200 1019253692 909434944 8137582811 5980515 25747884517 1778733 1778733 0 254960436 227677824 160005 944136 1130992 3216317 3216317 0 500984604 711812424 15613 3267629 3321583 2 2 0 176 160 0 0 0 11 11 0 1380 924 0 9 9 108803725 108804509 1712 14048371720 12186015688 1365998541 51754019 1419086435 133 133 0 28244 30856 0 96 101 8253919 8253918 0 1225196096 1984282140 86586 14694605 14965266 706 706 0 122064 176460 2 8199 8213 0 0 0 0 0 0 0 0 1 1 0 88 56 0 0 0 246428117 246429681 672 34957586860 8029124236728 173220368 1488272292 1708999372 79812 79812 0 11972116 329951432 383 144967 146537 695649 695659 4 107241900 2459742992 787448 3171217 3970576 21280 21280 0 2772504 3802300 223 35800 36297 1453839 1453845 3 209580556 174460680 547533 2046325 2608212 11810 11810 0 2527316 3069220 44 15073 15228 685 685 0 99196 82200 1 1029 1036 3876604 3876606 1 655189064 558230976 202406 3225821 3474793 889 889 0 204008 245364 5 51598 51623 107922831 107922946 0 3479242384396 14677505016 31038231487 1284647648 32325770227
+vfs - 7717 5984 17389
+cpu 1 12072777 12591 3342114 629802507 10668785 3968 589004
+cpu 0 11957872 10125 3205266 631355030 9419754 3826 489641
+block sr0 0 0 0 0 0 0 0 0 0 0 0
+block dm-0 12200098 0 722417586 88126248 39844559 0 318756472 348335613 0 44769346 436466572
+block sda 3113065 13495240 133060528 20224451 2789119 19709186 180000468 78490999 0 11441726 98746600
+block sdb 9811503 2326852 722421162 51527089 13582219 26261359 318756472 22272604 0 44744089 73785141

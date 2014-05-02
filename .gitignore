@@ -1,4 +1,9 @@
+dist/
+tacc_stats.egg-info/
 *.pyc
+*.o
+*.so
+*.d
 .project
 .pydevproject
 stats.x
