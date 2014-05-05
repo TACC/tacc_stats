@@ -3,12 +3,10 @@ import argparse,os,sys
 from subprocess import Popen, PIPE, call
 from collections import Counter
 import datetime
-sys.path.append(os.path.join(os.path.dirname(__file__),
-                             '../lib'))
-import analysis.exam.tests as tests
-import analysis.plot.plots as plots
-import analysis.gen.tspl_utils as tspl_utils
-import sys_conf
+
+import tacc_stats.analysis.exam.tests as tests
+import tacc_stats.analysis.plot.plots as plots
+import tacc.stats.analysis.gen.tspl_utils as tspl_utils
 
 def main():
 

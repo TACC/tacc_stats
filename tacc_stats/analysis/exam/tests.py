@@ -8,8 +8,8 @@ import multiprocessing
 from pickler import job_stats, batch_acct
 sys.modules['job_stats'] = job_stats
 sys.modules['batch_acct'] = batch_acct
-from sys_conf import lariat_path
-from ..gen import lariat_utils,tspl,tspl_utils
+from tacc_stats.cfg import lariat_path
+from tacc_stats.analysis.gen import lariat_utils,tspl,tspl_utils
 
 def unwrap(arg,**kwarg):
   try:

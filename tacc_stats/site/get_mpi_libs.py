@@ -4,15 +4,13 @@ import os,sys,fnmatch,re,json
 from subprocess import Popen, PIPE
 
 cwd = os.path.dirname(os.path.abspath(__file__))
-sys.path.append(os.path.join(cwd,'../lib'))
-
 
 from tacc_stats_site import settings
 setup_environ(settings)
 from stampede import views
-import sys_conf
+import tacc_stats.cfg as cfg
 import datetime
-from analysis.gen import tspl, lariat_utils
+from tacc_stats.analysis.gen import tspl, lariat_utils
 
 path = sys_conf.pickles_dir
 

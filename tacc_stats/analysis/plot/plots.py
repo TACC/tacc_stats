@@ -12,8 +12,8 @@ from scipy.stats import scoreatpercentile as score
 from matplotlib.figure import Figure
 from matplotlib.backends.backend_agg import FigureCanvasAgg as FigureCanvas
 from matplotlib.backends.backend_pdf import FigureCanvasPdf as FigureCanvasPdf
-from sys_conf import lariat_path
-from ..gen import tspl,tspl_utils,lariat_utils,my_utils
+from tacc_stats.cfg import lariat_path
+from tacc_stats.analysis.gen import tspl,tspl_utils,lariat_utils,my_utils
 
 ## Multiprocessing Unwrapper
 #

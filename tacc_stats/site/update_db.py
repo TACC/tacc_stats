@@ -4,16 +4,14 @@ import os,sys
 from subprocess import Popen, PIPE
 
 cwd = os.path.dirname(os.path.abspath(__file__))
-sys.path.append(os.path.join(cwd,'../lib'))
-
 
 from tacc_stats_site import settings
 setup_environ(settings)
 from stampede import views
-import sys_conf
+import tacc_stats.cfg as cfg
 import datetime
 
-path = sys_conf.pickles_dir
+path = cfg.pickles_dir
 
 p = Popen(["date --date " + sys.argv[1] + ' +%Y-%m-%d'], stdout = PIPE, 
                    shell = True) 

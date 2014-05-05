@@ -3,16 +3,15 @@ import argparse,os,sys
 from subprocess import Popen, PIPE, call
 from collections import Counter
 import datetime
-sys.path.append(os.path.join(os.path.dirname(__file__),
-                             '../lib'))
-import analysis.exam.tests as tests
-import analysis.plot.plots as plots
-import analysis.gen.tspl_utils as tspl_utils
+
+import tacc_stats.analysis.exam.tests as tests
+import tacc_stats.analysis.plot.plots as plots
+import tacc_stats.analysis.gen.tspl_utils as tspl_utils
 from matplotlib.figure import Figure
 from matplotlib.backends.backend_agg import FigureCanvasAgg as FigureCanvas
-import sys_conf
+import tacc_stats.cfg as cfg
 from numpy import log,isnan
-path = sys_conf.pickles_dir
+path = cfg.pickles_dir
 
 def sweep(test,start,end):
     for date in os.listdir(path):
