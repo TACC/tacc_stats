@@ -1,7 +1,13 @@
 #!/usr/bin/env python
 import os,sys
-import tacc_stats.cfg as sys_conf
-from pickler import batch_acct,job_stats
+
+try: 
+    sys.path.append(os.getcwd())
+    import cfg
+except: 
+    from tacc_stats.cfg import cfg
+
+from tacc_stats.pickler import batch_acct,job_stats
 import datetime, subprocess, time
 import cPickle as pickle
 import multiprocessing, functools
@@ -29,9 +35,6 @@ def getdate(date_str):
 def short_host_name(str):
     return str.split('.')[0]
 
-if len(sys.argv) != 4:
-    USAGE("DIR START_DATE END_DATE");
-
 def job_pickler(acct, pickle_dir = '.', batch = None):
 
     if acct['end_time'] == 0:
@@ -40,7 +43,7 @@ def job_pickler(acct, pickle_dir = '.', batch = None):
         print acct['id'] + " exists, don't reprocess"
         return
 
-    job = job_stats.from_acct(acct, sys_conf.tacc_stats_home, sys_conf.host_list_dir, batch)
+    job = job_stats.from_acct(acct, cfg.tacc_stats_home, cfg.host_list_dir, batch)
     pickle_path = os.path.join(pickle_dir, job.id)
     pickle_file = open(pickle_path, 'wb')
     pickle.dump(job, pickle_file, pickle_prot)
@@ -48,20 +51,24 @@ def job_pickler(acct, pickle_dir = '.', batch = None):
 
 pickle_prot = pickle.HIGHEST_PROTOCOL
 
-def main():
+def main(args,processes=1):
 
-    prog_name = os.path.basename(sys.argv[0])
+    if len(args) < 4:
+        USAGE("DIR START_DATE END_DATE PROCESSES");
 
-    pickle_dir = sys.argv[1]
-    start = getdate(sys.argv[2])
-    end = getdate(sys.argv[3])
+    prog_name = os.path.basename(args[0])
 
-    pool = multiprocessing.Pool(processes = 1)
-    a=batch_acct.factory(sys_conf.batch_system, sys_conf.acct_path, sys_conf.host_name_ext)
+    pickle_dir = args[1]
+    start = getdate(args[2])
+    end = getdate(args[3])
 
+    pool = multiprocessing.Pool(processes = processes)
+    a=batch_acct.factory(cfg.batch_system, cfg.acct_path, cfg.host_name_ext)
     partial_pickler = functools.partial(job_pickler, pickle_dir = pickle_dir, batch = a)
-    pool.imap_unordered(partial_pickler, a.reader(start_time=start,end_time=end,seek=sys_conf.seek),100)
+    pool.imap_unordered(partial_pickler, a.reader(start_time=start,end_time=end,seek=cfg.seek),100)
     pool.close()
     pool.join()
 
-if __name__ == '__main__': main()
+
+if __name__ == '__main__':
+    main(sys.argv)

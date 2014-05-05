@@ -9,8 +9,7 @@ if sys.version.startswith("3"):
 else:
     import cStringIO
     io_method = cStringIO.StringIO
-    #import io
-    #io.BufferedIOBase
+
 verbose = os.getenv('TACC_STATS_VERBOSE')
 
 if not verbose:
