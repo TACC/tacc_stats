@@ -160,6 +160,21 @@ def write_stats_x():
 
 write_stats_x()
 
+def write_cfg_file():
+    
+    filename = os.path.join(
+        os.path.dirname(__file__), 'tacc_stats', 'cfg.py')
+    a = open(filename, 'w')
+    
+    try:
+        for name,path in paths.iteritems():
+            a.write(name + " = " + "\"" + path + "\"" + "\n")
+        a.write("seek = 0\n")
+    finally:
+        a.close()
+
+write_cfg_file()
+
 class CleanCommand(Command):
     """Custom distutils command to clean the .so and .pyc files."""
 
@@ -287,8 +302,7 @@ setup(name=DISTNAME,
       package_dir={'':'.'},
       packages=find_packages(),
       include_package_data = True,
-      package_data={'' : ['*.html']
-                    },
+      package_data={'' : ['*.html']},
       scripts=['build/bin/monitor','tacc_stats/analysis/job_sweeper.py','tacc_stats/analysis/job_plotter.py'],
       ext_modules=extensions,
       maintainer_email=EMAIL,
