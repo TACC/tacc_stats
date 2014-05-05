@@ -256,7 +256,7 @@ ext_data=dict(sources=[pjoin(root,'main.c')]+sources,
               )
 
 extensions = []
-extensions.append(Extension("tacc_stats.monitor", **ext_data))
+cmd = {}
 
 # The build cache system does string matching below this point.
 # if you change something, be careful.
@@ -295,6 +295,10 @@ class MyBuildExt(build_ext):
             extra_postargs=extra_args,
             target_lang=language)
 
+if not os.path.isfile(pjoin(os.path.dirname(__file__),'build/bin/monitor')):
+    extensions.append(Extension("tacc_stats.monitor", **ext_data))
+    cmd = {'build_ext' : MyBuildExt}
+
 
 setup(name=DISTNAME,
       version=FULLVERSION,
@@ -307,6 +311,7 @@ setup(name=DISTNAME,
       ext_modules=extensions,
       maintainer_email=EMAIL,
       description=DESCRIPTION,
+      zip_safe=False,
       license=LICENSE,
       cmdclass={'build_ext' : MyBuildExt},
       url=URL,
