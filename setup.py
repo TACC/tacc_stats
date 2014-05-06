@@ -156,6 +156,7 @@ def write_stats_x():
         for t in types:
             a.write('X('+t+') ')
     finally:
+        a.write('\n')
         a.close()
 
 write_stats_x()
