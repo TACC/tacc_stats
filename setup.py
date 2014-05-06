@@ -178,14 +178,10 @@ def cfg_sh(filename_in):
     f = open(filename_in, 'r').read()
     for name,path in paths.iteritems():
         f = f.replace(name,path)
-    a = open(pjoin('build','bin',os.path.basename(filename_in.split('.in')[0])), 'w')
+    a = open(pjoin(os.path.dirname(__file__),'tacc_stats',
+                   os.path.basename(filename_in.split('.in')[0])), 'w')
     a.write(f)
     a.close()
-
-cfg_sh(pjoin(os.path.dirname(__file__), 'tacc_stats',
-                     'analysis','nightly.sh.in'))
-cfg_sh(pjoin(os.path.dirname(__file__), 'tacc_stats',
-                     'pickler','do_job_pickles_cron.sh.in'))
 
 class CleanCommand(Command):
     """Custom distutils command to clean the .so and .pyc files."""
@@ -311,7 +307,10 @@ if not os.path.isfile(pjoin(os.path.dirname(__file__),'build/bin/monitor')):
     extensions.append(Extension("tacc_stats.monitor", **ext_data))
     cmd = {'build_ext' : MyBuildExt}
 
-
+cfg_sh(pjoin(os.path.dirname(__file__), 'tacc_stats',
+                     'analysis','exams_cron.sh.in'))
+cfg_sh(pjoin(os.path.dirname(__file__), 'tacc_stats',
+                     'pickler','do_job_pickles_cron.sh.in'))
 
 setup(name=DISTNAME,
       version=FULLVERSION,
@@ -321,7 +320,8 @@ setup(name=DISTNAME,
       include_package_data = True,
       package_data={'' : ['*.html']},
       scripts=['build/bin/monitor','tacc_stats/analysis/job_sweeper.py',
-               'tacc_stats/analysis/job_plotter.py','build/bin/nightly.sh'],
+               'tacc_stats/analysis/job_plotter.py','tacc_stats/exams_cron.sh',
+               'tacc_stats/do_job_pickles_cron.sh'],
       ext_modules=extensions,
       setup_requires=['nose>=1.0'],
       test_suite = 'nose.collector',

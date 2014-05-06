@@ -2,6 +2,7 @@ dist/
 tacc_stats.egg-info/
 *.pyc
 *.o
+*.sh
 *.so
 *.d
 .project
