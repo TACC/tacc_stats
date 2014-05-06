@@ -1,6 +1,5 @@
-## @package plot
-#
 # Plot generation tools for job analysis
+from __future__ import print_function
 import os
 import abc
 import math
@@ -25,7 +24,7 @@ def unwrap(arg):
     kwarg = arg[2]
     return arg[0].plot(arg[1],**kwarg)
   except:
-    print traceback.format_exc()
+    print(traceback.format_exc())
 ## Plot Class
 #
 # This is an abstract base class for plotting.
@@ -60,7 +59,7 @@ class Plot(object):
     except tspl.TSPLException as e:
       return False
     except EOFError as e:
-      print 'End of file found reading: ' + jobid
+      print('End of file found reading: ' + jobid)
       return False
 
     if self.lariat_data != 'pass':
@@ -247,7 +246,7 @@ class MasterPlot(Plot):
     
     wayness=self.ts.wayness
     if self.lariat_data != 'pass':
-      if self.lariat_data.wayness != -1 and self.lariat_data.wayness < self.ts.wayness:
+      if self.lariat_data.wayness and self.lariat_data.wayness < self.ts.wayness:
         wayness=self.lariat_data.wayness
     
     if self.wide:
@@ -286,7 +285,7 @@ class MasterPlot(Plot):
       plot(self.fig.add_subplot(6,cols,2*shift), [idx0], 3600., 1e9, ylabel='FP Ginst/s')
     else: 
       #Fix this to support the old amd plots
-      print self.ts.pmc_type + ' not supported'
+      print(self.ts.pmc_type + ' not supported')
       return 
 
     #Plot key 3
@@ -350,7 +349,7 @@ class RatioPlot(Plot):
 
   def plot(self,jobid,job_data=None):
     if not self.imbalance: 
-      print "Generate ratio data using Imbalance test first for job",jobid
+      print("Generate ratio data using Imbalance test first for job",jobid)
       return
 
     imb = self.imbalance

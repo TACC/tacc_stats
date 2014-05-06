@@ -6,6 +6,8 @@ import tspl_utils
 import math
 import logging, multiprocessing
 from tacc_stats.pickler import job_stats, batch_acct
+sys.modules['job_stats'] = job_stats
+sys.modules['batch_acct'] = batch_acct
 sys.modules['pickler.job_stats'] = job_stats
 sys.modules['pickler.batch_acct'] = batch_acct
 

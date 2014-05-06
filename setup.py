@@ -174,20 +174,18 @@ def write_cfg_file():
 
 write_cfg_file()
 
-def cfg_nightly_sh():
-    filename_in = pjoin(os.path.dirname(__file__), 'tacc_stats',
-                        'analysis','nightly.sh.in')
+def cfg_sh(filename_in):
     f = open(filename_in, 'r').read()
-    print f
     for name,path in paths.iteritems():
         f = f.replace(name,path)
-    print f
-    sys.exit()
     a = open(pjoin('build','bin',os.path.basename(filename_in.split('.in')[0])), 'w')
     a.write(f)
     a.close()
-    
-cfg_nightly_sh()
+
+cfg_sh(pjoin(os.path.dirname(__file__), 'tacc_stats',
+                     'analysis','nightly.sh.in'))
+cfg_sh(pjoin(os.path.dirname(__file__), 'tacc_stats',
+                     'pickler','do_job_pickles_cron.sh.in'))
 
 class CleanCommand(Command):
     """Custom distutils command to clean the .so and .pyc files."""
@@ -323,7 +321,7 @@ setup(name=DISTNAME,
       include_package_data = True,
       package_data={'' : ['*.html']},
       scripts=['build/bin/monitor','tacc_stats/analysis/job_sweeper.py',
-               'tacc_stats/analysis/job_plotter.py'],
+               'tacc_stats/analysis/job_plotter.py','build/bin/nightly.sh'],
       ext_modules=extensions,
       setup_requires=['nose>=1.0'],
       test_suite = 'nose.collector',

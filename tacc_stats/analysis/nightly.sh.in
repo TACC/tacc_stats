@@ -1,7 +1,7 @@
 #!/bin/bash
 
 prog_dir=$(readlink -f $(dirname $0))
-wd = ${prog_dir}
+wd=${prog_dir}
 
 export PATH=python_path:$prog_dir:$PATH
 

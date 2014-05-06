@@ -6,7 +6,7 @@ import datetime
 
 import tacc_stats.analysis.exam.tests as tests
 import tacc_stats.analysis.plot.plots as plots
-import tacc.stats.analysis.gen.tspl_utils as tspl_utils
+import tacc_stats.analysis.gen.tspl_utils as tspl_utils
 
 def main():
 
@@ -41,7 +41,8 @@ def main():
                            aggregate=(not args.full),save=True)
 
                 filelist=tspl_utils.getfilelist(args.files)
-                plot.run(filelist)
+                for f in filelist:
+                    plot.plot(f)
 
 if __name__ == '__main__':
     main()

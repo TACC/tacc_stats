@@ -10,7 +10,6 @@ import multiprocessing
 from tacc_stats.analysis.gen import tspl,tspl_utils
 
 def unwrap(arg,**kwarg):
-  print('unwrap')
   try:
     return arg[0].test(*arg[1:],**kwarg)
   except:

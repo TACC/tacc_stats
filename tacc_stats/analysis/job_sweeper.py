@@ -4,7 +4,7 @@ from subprocess import Popen, PIPE, call
 from collections import Counter
 import datetime
 
-import tacc_stats.analysis.exam.tests as tests
+import tacc_stats.analysis.exam.exams as tests
 import tacc_stats.analysis.plot.plots as plots
 import tacc_stats.analysis.gen.tspl_utils as tspl_utils
 from matplotlib.figure import Figure

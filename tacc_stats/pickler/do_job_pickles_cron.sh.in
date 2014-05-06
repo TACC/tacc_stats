@@ -4,26 +4,16 @@ set -eu
 prog=$(basename $0)
 prog_dir=$(readlink -f $(dirname $0))
 
-export PATH=@PYTHON_PATH@:$prog_dir:$PATH
+export PATH=python_path:$prog_dir:$PATH
 
 tmp_dir=${tmp_dir:-/dev/shm/}
-dst_dir=${dst_dir:-@PICKLES_DIR@}
+dst_dir=${dst_dir:-pickles_dir}
 
-start0=$(date --date="$(date --date=yesterday +%F) +0 hour")
-end0=$(date --date="$(date --date=yesterday +%F) +6 hour")
+start=$(date --date="$(date --date=yesterday +%F) +0 hour")
+end=$(date --date="$(date --date=yesterday +%F) +24 hour")
 
-start1=$(date --date="$(date --date=yesterday +%F) +6 hour")
-end1=$(date --date="$(date --date=yesterday +%F) +12 hour")
-
-start2=$(date --date="$(date --date=yesterday +%F) +12 hour")
-end2=$(date --date="$(date --date=yesterday +%F) +18 hour")
-
-start3=$(date --date="$(date --date=yesterday +%F) +18 hour")
-end3=$(date --date="$(date --date=yesterday +%F) +24 hour")
-
-
-label_start=$(date --date="${start0}" +%F)
-label_end=$(date --date="${end3}" +%F)
+label_start=$(date --date="${start}" +%F)
+label_end=$(date --date="${end}" +%F)
 
 
 exec 0< /dev/null
@@ -33,12 +23,7 @@ exec 2> $tmp_dir/$prog.err.$label_start.$label_end
 set -x
 
 mkdir $tmp_dir/$label_start
-$prog_dir/job_pickles.py $tmp_dir/$label_start "$start0" "$end3"
-#($prog_dir/job_pickles.py $tmp_dir/$label_start "$start0" "$end0") &
-#($prog_dir/job_pickles.py $tmp_dir/$label_start "$start1" "$end1") &
-#($prog_dir/job_pickles.py $tmp_dir/$label_start "$start2" "$end2") &
-#($prog_dir/job_pickles.py $tmp_dir/$label_start "$start3" "$end3") &
-
+$prog_dir/job_pickles.py $tmp_dir/$label_start "$start" "$end"
 
 tar -C $tmp_dir -czf $dst_dir/$label_start.tar.gz $label_start
 rm -r $tmp_dir/$label_start
