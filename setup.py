@@ -336,3 +336,7 @@ setup(name=DISTNAME,
       classifiers=CLASSIFIERS,
       platforms='any',
       **setuptools_kwargs)
+
+for name,path in paths.iteritems():
+    if os.path.exists(path): print ">>>", path, 'exists'
+    else: print ">>>", path, 'does not exist'
