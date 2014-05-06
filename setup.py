@@ -149,7 +149,7 @@ paths,types = read_site_cfg()
 def write_stats_x():
 
     filename = os.path.join(
-        os.path.dirname(__file__), 'tacc_stats/src/monitor', 'stats.x')
+        os.path.dirname(__file__), 'tacc_stats','src','monitor', 'stats.x')
     a = open(filename, 'w')
     
     try:
@@ -162,10 +162,9 @@ write_stats_x()
 
 def write_cfg_file():
     
-    filename = os.path.join(
-        os.path.dirname(__file__), 'tacc_stats', 'cfg.py')
-    a = open(filename, 'w')
-    
+    filename = pjoin(os.path.dirname(__file__), 'tacc_stats', 
+                     'cfg.py')
+    a = open(filename, 'w')    
     try:
         for name,path in paths.iteritems():
             a.write(name + " = " + "\"" + path + "\"" + "\n")
@@ -174,6 +173,21 @@ def write_cfg_file():
         a.close()
 
 write_cfg_file()
+
+def cfg_nightly_sh():
+    filename_in = pjoin(os.path.dirname(__file__), 'tacc_stats',
+                        'analysis','nightly.sh.in')
+    f = open(filename_in, 'r').read()
+    print f
+    for name,path in paths.iteritems():
+        f = f.replace(name,path)
+    print f
+    sys.exit()
+    a = open(pjoin('build','bin',os.path.basename(filename_in.split('.in')[0])), 'w')
+    a.write(f)
+    a.close()
+    
+cfg_nightly_sh()
 
 class CleanCommand(Command):
     """Custom distutils command to clean the .so and .pyc files."""

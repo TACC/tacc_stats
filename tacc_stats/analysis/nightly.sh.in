@@ -1,8 +1,9 @@
 #!/bin/bash
 
-wd='@CMAKE_SOURCE_DIR@/bin'
 prog_dir=$(readlink -f $(dirname $0))
-export PATH=@PYTHON_PATH@:$prog_dir:$PATH
+wd = ${prog_dir}
+
+export PATH=python_path:$prog_dir:$PATH
 
 if [ "$1" == "" ]; then
   y=`date -d yesterday +%Y-%m-%d`
@@ -10,7 +11,7 @@ else
   y=$1
 fi
 
-tsd='@PICKLES_DIR@'
+tsd=pickles_dir
 od=${wd}/nightlies/${y}
 
 if [ ! -d $od ]; then
@@ -20,7 +21,7 @@ else
 fi
 
 export PYTHONUNBUFFERED=yes
-export PYTHONPATH='@CMAKE_SOURCE_DIR@/lib':${PYTHONPATH}
+export PYTHONPATH=${prog_dir}../lib:${PYTHONPATH}
 cd ${od}
 
 ${wd}/job_sweeper.py -p 2 -start ${y} -end ${y} -t 1.0   -plot -wide -test Imbalance        -o ${od} > ${od}/imbalance-${y}.log 2>&1
