@@ -2,10 +2,9 @@
 import os,sys
 
 try: 
-    sys.path.append(os.getcwd())
-    import cfg
+    import tacc_stats.pickler.tests.cfg as cfg
 except: 
-    from tacc_stats.cfg import cfg
+    import tacc_stats.cfg as cfg
 
 from tacc_stats.pickler import batch_acct,job_stats
 import datetime, subprocess, time

@@ -3,10 +3,11 @@ import os, sys
 from nose import with_setup
 import cPickle as pickle
 
-data_dir = os.path.dirname(__file__) + '/data'
+path = os.path.dirname(os.path.abspath(__file__))
+data_dir = os.path.join(path, 'data')
 
 def setup_func():
-    a = open("cfg.py","w")
+    a = open(os.path.join(path,"cfg.py"),"w")
     a.write('tacc_stats_home = \"' + data_dir + '\"\n'
             'acct_path = \"'+ data_dir +'/tacc_jobs_completed\"\n'
             'host_list_dir= \"' + data_dir + '\"\n'
@@ -18,12 +19,8 @@ def setup_func():
     print("Write cfg.py")
 
 def teardown_func():
-    os.remove("cfg.py")
-    for f in os.listdir('.'):
-        if '.pyc' in f: os.remove(f)
-    for f in os.listdir('..'):
-        if '.pyc' in f: os.remove('../'+f)
-    os.remove("1835740")
+    os.remove(os.path.join(path,"cfg.py"))
+    os.remove(os.path.join(path,"1835740"))
 
 @with_setup(setup_func, teardown_func)
 def test():
@@ -32,13 +29,13 @@ def test():
     sys.modules['pickler.job_stats'] = job_stats
     sys.modules['pickler.batch_acct'] = batch_acct
     
-    job_pickles.main(['job_pickles.py','.', '2013-10-01', '2013-10-02'])
+    job_pickles.main(['job_pickles.py',path, '2013-10-01', '2013-10-02'])
 
-    assert os.path.isfile('1835740') == True
+    assert os.path.isfile(os.path.join(path,'1835740')) == True
     print ("Pickle file generated.")
 
-    old = pickle.load(open('1835740_ref'))
-    new = pickle.load(open('1835740'))
+    old = pickle.load(open(os.path.join(path,'1835740_ref')))
+    new = pickle.load(open(os.path.join(path,'1835740')))
 
     assert new.id == old.id
     for i in range(len(old.times)):
