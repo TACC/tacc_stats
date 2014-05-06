@@ -1,3 +1,4 @@
+from __future__ import print_function
 import os,sys
 import abc
 import math
@@ -5,17 +6,15 @@ import numpy
 import operator,traceback
 from scipy.stats import tmean,tstd
 import multiprocessing
-from pickler import job_stats, batch_acct
-sys.modules['job_stats'] = job_stats
-sys.modules['batch_acct'] = batch_acct
-from tacc_stats.cfg import lariat_path
-from tacc_stats.analysis.gen import lariat_utils,tspl,tspl_utils
+
+from tacc_stats.analysis.gen import tspl,tspl_utils
 
 def unwrap(arg,**kwarg):
+  print('unwrap')
   try:
     return arg[0].test(*arg[1:],**kwarg)
   except:
-    print traceback.format_exc()
+    print(traceback.format_exc())
     pass
 
 class Test(object):
@@ -53,7 +52,7 @@ class Test(object):
     except tspl.TSPLException as e:
       return False
     except EOFError as e:
-      print 'End of file found reading: ' + jobid
+      print('End of file found reading: ' + jobid)
       return False
 
     if "FAIL" in self.ts.status: return False
@@ -70,7 +69,7 @@ class Test(object):
   def run(self,filelist):
     if not filelist: return 
     pool=multiprocessing.Pool(processes=self.processes) 
-    pool.map_async(unwrap,zip([self]*len(filelist),filelist))
+    pool.map(unwrap,zip([self]*len(filelist),filelist))
     pool.close()
     pool.join()
 
@@ -239,9 +238,9 @@ class Imbalance(Test):
                              key=operator.itemgetter(1), reverse=True) ]
     maxi=len(a)+1
     maxi=min(10,maxi)
-    print '---------top 10----------'
+    print('---------top 10----------')
     for u in a[0:maxi]:
-      print u + ' ' + str(users[u][0]) + ' ' + ' '.join(users[u][1])
+      print(u + ' ' + str(users[u][0]) + ' ' + ' '.join(users[u][1]))
     return users
 
 class Catastrophe(Test):
@@ -269,7 +268,7 @@ class Catastrophe(Test):
 
     bad_hosts=tspl_utils.lost_data(self.ts)
     if len(bad_hosts) > 0:
-      print self.ts.j.id, ': Detected hosts with bad data: ', bad_hosts
+      print(self.ts.j.id, ': Detected hosts with bad data: ', bad_hosts)
       return
 
     vals=[]

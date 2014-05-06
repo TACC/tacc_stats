@@ -300,6 +300,7 @@ if not os.path.isfile(pjoin(os.path.dirname(__file__),'build/bin/monitor')):
     cmd = {'build_ext' : MyBuildExt}
 
 
+
 setup(name=DISTNAME,
       version=FULLVERSION,
       maintainer=AUTHOR,
@@ -310,6 +311,8 @@ setup(name=DISTNAME,
       scripts=['build/bin/monitor','tacc_stats/analysis/job_sweeper.py',
                'tacc_stats/analysis/job_plotter.py'],
       ext_modules=extensions,
+      setup_requires=['nose>=1.0'],
+      test_suite = 'nose.collector',
       maintainer_email=EMAIL,
       description=DESCRIPTION,
       zip_safe=False,

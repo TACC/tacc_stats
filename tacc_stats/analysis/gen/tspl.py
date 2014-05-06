@@ -5,6 +5,10 @@ import re
 import tspl_utils
 import math
 import logging, multiprocessing
+from tacc_stats.pickler import job_stats, batch_acct
+sys.modules['pickler.job_stats'] = job_stats
+sys.modules['pickler.batch_acct'] = batch_acct
+
 VERBOSE=False
 class TSPLException(Exception):
   def __init__(self,arg):
