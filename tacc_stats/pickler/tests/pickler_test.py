@@ -29,11 +29,11 @@ def test():
     sys.modules['pickler.job_stats'] = job_stats
     sys.modules['pickler.batch_acct'] = batch_acct
     
-    job_pickles.main(['job_pickles.py',path, '2013-10-01', '2013-10-02'])
+    job_pickles.main(path, '2013-10-01', '2013-10-02',1)
 
     assert os.path.isfile(os.path.join(path,'1835740')) == True
-    print ("Pickle file generated.")
-
+    print("Pickle file generated.")
+    print(path)
     old = pickle.load(open(os.path.join(path,'1835740_ref')))
     new = pickle.load(open(os.path.join(path,'1835740')))
 

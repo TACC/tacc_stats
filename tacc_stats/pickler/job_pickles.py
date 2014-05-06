@@ -1,5 +1,5 @@
 #!/usr/bin/env python
-import os,sys
+import argparse,os,sys
 
 try: 
     import tacc_stats.pickler.tests.cfg as cfg
@@ -33,7 +33,7 @@ def getdate(date_str):
 
 def short_host_name(str):
     return str.split('.')[0]
-
+pickle_prot = pickle.HIGHEST_PROTOCOL
 def job_pickler(acct, pickle_dir = '.', batch = None):
 
     if acct['end_time'] == 0:
@@ -41,33 +41,37 @@ def job_pickler(acct, pickle_dir = '.', batch = None):
     if os.path.exists(os.path.join(pickle_dir, acct['id'])): 
         print acct['id'] + " exists, don't reprocess"
         return
-
+    
     job = job_stats.from_acct(acct, cfg.tacc_stats_home, cfg.host_list_dir, batch)
     pickle_path = os.path.join(pickle_dir, job.id)
     pickle_file = open(pickle_path, 'wb')
     pickle.dump(job, pickle_file, pickle_prot)
     pickle_file.close()
 
-pickle_prot = pickle.HIGHEST_PROTOCOL
-
-def main(args,processes=1):
-
-    if len(args) < 4:
-        USAGE("DIR START_DATE END_DATE PROCESSES");
-
-    prog_name = os.path.basename(args[0])
-
-    pickle_dir = args[1]
-    start = getdate(args[2])
-    end = getdate(args[3])
-
+def main(pickle_dir,start,end,processes):
     pool = multiprocessing.Pool(processes = processes)
     a=batch_acct.factory(cfg.batch_system, cfg.acct_path, cfg.host_name_ext)
     partial_pickler = functools.partial(job_pickler, pickle_dir = pickle_dir, batch = a)
-    pool.imap_unordered(partial_pickler, a.reader(start_time=start,end_time=end,seek=cfg.seek),100)
+    pool.imap_unordered(partial_pickler, a.reader(start_time=getdate(start),end_time=getdate(end),seek=cfg.seek),100)
     pool.close()
     pool.join()
 
-
 if __name__ == '__main__':
-    main(sys.argv)
+    parser = argparse.ArgumentParser(description='Run pickler for jobs')
+
+    parser.add_argument('-dir', help='Directory to store data',
+                        nargs=1, type=str)
+    parser.add_argument('-start', help='Start date',
+                        nargs=1, type=str)
+    parser.add_argument('-end', help='End date',
+                        nargs=1, type=str)
+    parser.add_argument('-p', help='Set number of processes',
+                        nargs=1, type=int, default=[1])
+    args = parser.parse_args()
+
+    pickle_dir = args.dir[0]
+    start = args.start[0]
+    end = args.end[0]
+    processes = args.p[0]
+
+    main(pickle_dir,start,end,processes)
