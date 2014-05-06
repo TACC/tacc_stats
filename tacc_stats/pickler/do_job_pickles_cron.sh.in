@@ -22,9 +22,9 @@ exec 2> $tmp_dir/$prog.err.$label_start.$label_end
 
 set -x
 
-mkdir $tmp_dir/$label_start
-$prog_dir/job_pickles.py -dir $tmp_dir/$label_start -start "$start" -end "$end" -p 2
+mkdir $dest_dir/$label_start
+$prog_dir/job_pickles.py -dir $dest_dir/$label_start -start "$start" -end "$end" -p 2
 
-tar -C $tmp_dir -czf $dst_dir/$label_start.tar.gz $label_start
-rm -r $tmp_dir/$label_start
+#tar -C $tmp_dir -czf $dst_dir/$label_start.tar.gz $label_start
+#rm -r $tmp_dir/$label_start
 
