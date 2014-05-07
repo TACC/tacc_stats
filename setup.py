@@ -12,7 +12,7 @@ import shutil
 import warnings
 import re
 import ConfigParser
-
+import multiprocessing
 
 from setuptools import setup, Command, find_packages
 from setuptools.command.build_ext import build_ext
@@ -146,9 +146,8 @@ def write_stats_x(types):
     a = open(filename, 'w')
     
     try:
-        for t,val in types.iteritems():
+        for t,val in types.iteritems():            
             if val == 'True':
-                print t
                 a.write('X('+t+') ')
     finally:
         a.write('\n')
