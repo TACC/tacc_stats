@@ -2,14 +2,14 @@ from django.http import HttpResponse, HttpResponseRedirect
 from django.shortcuts import render_to_response, render
 from django.views.generic import DetailView, ListView
 
-from lonestar.models import LS4Job, LS4JobForm
+from tacc_stats.site.lonestar.models import LS4Job, LS4JobForm
 import os,sys
-sys.path.append(os.path.join(os.path.dirname(__file__),'../../lib'))
 
-import analysis
-from analysis.gen import tspl, lariat_utils
-from analysis.plot import plots as plt
-from pickler import job_stats, batch_acct
+from tacc_stats.analysis.gen import tspl, lariat_utils
+from tacc_stats.analysis.plot import plots as plt
+from tacc_stats.pickler import job_stats, batch_acct
+sys.modules['pickler.job_stats'] = job_stats
+sys.modules['pickler.batch_acct'] = batch_acct
 sys.modules['job_stats'] = job_stats
 sys.modules['batch_acct'] = batch_acct
 import cPickle as pickle 

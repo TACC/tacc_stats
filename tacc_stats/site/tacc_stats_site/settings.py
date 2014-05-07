@@ -135,8 +135,8 @@ INSTALLED_APPS = (
     #'django_pdf',
     # Uncomment the next line to enable admin documentation:
     # 'django.contrib.admindocs',
-    'stampede',
-    'lonestar',
+    'tacc_stats.site.stampede',
+    'tacc_stats.site.lonestar',
 )
 """
 TEMPLATE_CONTEXT_PROCESSORS=(

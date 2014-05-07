@@ -11,9 +11,9 @@ sys.path.append(os.path.join(os.path.dirname(__file__),
 import settings
 setup_environ(settings)
 
-import lonestar.views as views
+import tacc_stats.site.lonestar.views as views
 
-from pickler import MetaData
+from tacc_stats.pickler import MetaData as MetaData
 import datetime
 
 path = "/hpc/tacc_stats_site/lonestar/pickles"

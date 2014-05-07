@@ -2,19 +2,22 @@ from django.http import HttpResponse, HttpResponseRedirect
 from django.shortcuts import render_to_response, render
 from django.views.generic import DetailView, ListView
 from django.db.models import Q
-from stampede.models import Job, JobForm
+
 import os,sys,pwd
-sys.path.append(os.path.join(os.path.dirname(__file__), 
-                             '../../lib'))
-import sys_conf
-import analysis
-from analysis.gen import tspl, lariat_utils
-from analysis.exam import tests
-from analysis.plot import plots as plt
-from pickler import job_stats, batch_acct
+
+from tacc_stats.site.stampede.models import Job, JobForm
+import tacc_stats.cfg as cfg
+from tacc_stats.analysis.gen import tspl, lariat_utils
+from tacc_stats.analysis.exam import exams as exams
+from tacc_stats.analysis.plot import plots as plots
+
+from tacc_stats.pickler import job_stats, batch_acct
 # Compatibility with old pickle versions
+sys.modules['pickler.job_stats'] = job_stats
+sys.modules['pickler.batch_acct'] = batch_acct
 sys.modules['job_stats'] = job_stats
 sys.modules['batch_acct'] = batch_acct
+
 import cPickle as pickle 
 import time,pytz
 from datetime import datetime
@@ -29,12 +32,12 @@ import traceback
 #@profile
 def update(date):
 
-    ld = lariat_utils.LariatData(directory = sys_conf.lariat_path,
+    ld = lariat_utils.LariatData(directory = cfg.lariat_path,
                                  daysback = 2)
 
     tz = pytz.timezone('US/Central')
 
-    pickle_dir = os.path.join(sys_conf.pickles_dir,date)
+    pickle_dir = os.path.join(cfg.pickles_dir,date)
     date_objects = Job.objects.filter(date=date)
 
     nf = len(os.listdir(pickle_dir))
@@ -49,20 +52,7 @@ def update(date):
             except: 
                 print traceback.format_exc()
                 pass
-            """
-            if obj.wayness: continue
-            try:
-                pickle_path = os.path.join(root,str(pickle_file))
-                with open(pickle_path, 'rb') as f:
-                    data = np.load(f,mmap_mode='r')
-                    json = data.acct
-                    ld.set_job(pickle_file,end_epoch = json['end_time'])
-                    if ld.wayness:
-                        wayness = ld.wayness                    
-                        obj.wayness=wayness
-                        obj.save()
-            except: print traceback.format_exc()
-            """
+
             if created:
                 try:
                     pickle_path = os.path.join(root,str(pickle_file))
@@ -124,7 +114,7 @@ def update_test_field(date,test,metric,rerun=False):
 
 def dates(request):
     
-    date_list = os.listdir(sys_conf.pickles_dir)
+    date_list = os.listdir(cfg.pickles_dir)
     date_list = sorted(date_list, key=lambda d: map(int, d.split('-')))
 
     month_dict ={}
@@ -304,13 +294,13 @@ def get_data(pk):
 
 def master_plot(request, pk):
     data = get_data(pk)
-    mp = plt.MasterPlot(lariat_data="pass")
+    mp = plots.MasterPlot(lariat_data="pass")
     mp.plot(pk,job_data=data)
     return figure_to_response(mp)
 
 def heat_map(request, pk):    
     data = get_data(pk)
-    hm = plt.HeatMap(k1=['intel_snb','intel_snb'],
+    hm = plots.HeatMap(k1=['intel_snb','intel_snb'],
                      k2=['CLOCKS_UNHALTED_REF',
                          'INSTRUCTIONS_RETIRED'],
                      lariat_data="pass")
@@ -370,7 +360,7 @@ def type_plot(request, pk, type_name):
     k1 = {'intel_snb' : [type_name]*len(schema)}
     k2 = {'intel_snb': schema}
 
-    tp = plt.DevPlot(k1=k1,k2=k2,lariat_data='pass')
+    tp = plots.DevPlot(k1=k1,k2=k2,lariat_data='pass')
     tp.plot(pk,job_data=data)
     return figure_to_response(tp)
 

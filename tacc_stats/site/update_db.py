@@ -3,11 +3,10 @@ from django.core.management import setup_environ
 import os,sys
 from subprocess import Popen, PIPE
 
-cwd = os.path.dirname(os.path.abspath(__file__))
-
-from tacc_stats_site import settings
+from tacc_stats.site.tacc_stats_site import settings
 setup_environ(settings)
-from stampede import views
+
+from tacc_stats.site.stampede import views
 import tacc_stats.cfg as cfg
 import datetime
 
@@ -32,7 +31,7 @@ for date in os.listdir(path):
     print 'Run update for',date
 
     views.update(date)
-    cpi_test = views.tests.HighCPI(threshold=1.0,processes=1)
+    cpi_test = views.exams.HighCPI(threshold=1.0,processes=1)
     views.update_test_field(date,cpi_test,'cpi')
-    mbw_test = views.tests.MemBw(threshold=0.5,processes=1)               
+    mbw_test = views.exams.MemBw(threshold=0.5,processes=1)               
     views.update_test_field(date,mbw_test,'mbw')   
