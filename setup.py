@@ -25,8 +25,10 @@ from distutils.command.sdist import sdist
 
 from os.path import join as pjoin
 
-DESCRIPTION = ("")
+DESCRIPTION = ("A job-level performance monitoring and analysis package for \
+High Performance Computing Platforms")
 LONG_DESCRIPTION = """
+TACC Stats unifies and extends the measurements taken by Linux monitoring utilities such as systat/SAR, iostat, etc.~and resolves measurements by job and hardware device so that individual job/applications can be analyzed separately.  It also provides a set of analysis and reporting tools which analyze TACC Stats resource use data and report jobs/applications with low resource use efficiency. TACC Stats initializes at the beginning of a job and collects data at specified intervals during job execution and at the end of a job. When executed at the default interval (every 10 minutes), the overhead is less than 0.1\%. This low overhead enables TACC Stats to be active on all nodes at all times. This data can then be used to generate analyses and reports such as average cycles per instruction (CPI), average and peak memory use, average and peak memory bandwidth use, and more on each job and over arbitrary sets of jobs.   These reports enable systematic identification of jobs or application codes which could benefit from architectural adaptation and performance tuning or catch user mistakes such as allocating multiple nodes to a single-node shared-memory parallelized application.
 """
 
 DISTNAME = 'tacc_stats'
@@ -121,17 +123,9 @@ if write_version:
     write_version_py()
 
 def read_site_cfg():
-    config = ConfigParser.ConfigParser(allow_no_value=True)
+    config = ConfigParser.ConfigParser()
 
-    cfg_filename = None
-
-    for arg in sys.argv:
-        if arg.split('.')[-1] == 'cfg': 
-            cfg_filename = arg
-            sys.argv.remove(arg)
-    if not cfg_filename:
-        import socket
-        cfg_filename = socket.gethostname() + '.cfg'   
+    cfg_filename = os.path.abspath('setup.cfg')
 
     print 'Read configure file ' + cfg_filename    
     if cfg_filename:
@@ -139,29 +133,28 @@ def read_site_cfg():
     else:
         print 'Specify a filename e.g. (hostname + .cfg)'
         sys.exit()
-
+        
     paths = dict(config.items('PATHS'))
-    types = dict(config.items('TYPES')).keys()
+    types = dict(config.items('TYPES'))
+
     return paths,types
 
-paths,types = read_site_cfg()
-
-def write_stats_x():
+def write_stats_x(types):
 
     filename = os.path.join(
         os.path.dirname(__file__), 'tacc_stats','src','monitor', 'stats.x')
     a = open(filename, 'w')
     
     try:
-        for t in types:
-            a.write('X('+t+') ')
+        for t,val in types.iteritems():
+            if val == 'True':
+                print t
+                a.write('X('+t+') ')
     finally:
         a.write('\n')
         a.close()
 
-write_stats_x()
-
-def write_cfg_file():
+def write_cfg_file(paths):
     
     filename = pjoin(os.path.dirname(__file__), 'tacc_stats', 
                      'cfg.py')
@@ -173,9 +166,7 @@ def write_cfg_file():
     finally:
         a.close()
 
-write_cfg_file()
-
-def cfg_sh(filename_in):
+def cfg_sh(filename_in,paths):
     f = open(filename_in, 'r').read()
     for name,path in paths.iteritems():
         f = f.replace(name,path)
@@ -184,11 +175,12 @@ def cfg_sh(filename_in):
     a.write(f)
     a.close()
 
+
 class CleanCommand(Command):
     """Custom distutils command to clean the .so and .pyc files."""
 
     user_options = [("all", "a", "")]
-
+    print 'cleaning'
     def initialize_options(self):
         self.all = True
         self._clean_me = []
@@ -227,13 +219,18 @@ class CleanCommand(Command):
             except Exception:
                 pass
 
+paths,types = read_site_cfg()
+write_stats_x(types)
+write_cfg_file(paths)
+
+
 root='tacc_stats/src/monitor/'
 sources=[pjoin(root,'schema.c'),pjoin(root,'dict.c'),pjoin(root,'stats.c'),pjoin(root,'collect.c'),pjoin(root,'stats_file.c')]
 
 for root,dirs,files in os.walk('tacc_stats/src/monitor/'):
     for f in files:
         name,ext = os.path.splitext(f)        
-        if ext == '.c' and name in types: 
+        if ext == '.c' and name in types.keys(): 
             sources.append(pjoin(root,f))
 
 include_dirs = []
@@ -308,20 +305,20 @@ if not os.path.isfile(pjoin(os.path.dirname(__file__),'build/bin/monitor')):
     extensions.append(Extension("tacc_stats.monitor", **ext_data))
     cmd = {'build_ext' : MyBuildExt}
 
+    
 cfg_sh(pjoin(os.path.dirname(__file__), 'tacc_stats',
-                     'analysis','exams_cron.sh.in'))
+             'analysis','exams_cron.sh.in'),paths)
 cfg_sh(pjoin(os.path.dirname(__file__), 'tacc_stats',
-                     'pickler','do_job_pickles_cron.sh.in'))
+             'pickler','do_job_pickles_cron.sh.in'),paths)
 cfg_sh(pjoin(os.path.dirname(__file__), 'tacc_stats',
-                     'site','update_cron.sh.in'))
+             'site','update_cron.sh.in'),paths)
 
 setup(name=DISTNAME,
       version=FULLVERSION,
       maintainer=AUTHOR,
       package_dir={'':'.'},
       packages=find_packages(),
-      include_package_data = True,
-      package_data={'' : ['*.html']},
+      package_data = {'' : ['*.sh.in','*.cfg'] },
       scripts=['build/bin/monitor',
                'tacc_stats/analysis/job_sweeper.py',
                'tacc_stats/analysis/job_plotter.py',
