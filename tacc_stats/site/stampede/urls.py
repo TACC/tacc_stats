@@ -1,7 +1,7 @@
 from django.conf.urls import patterns, url
 from django.views.generic import DetailView, ListView
-from stampede.models import Job
-from stampede.views import *
+from tacc_stats.site.stampede.models import Job
+from tacc_stats.site.stampede.views import *
 
 urlpatterns = patterns('',
                        url(r'^$',dates, name='dates'),

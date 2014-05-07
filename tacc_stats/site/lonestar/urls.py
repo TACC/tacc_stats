@@ -1,7 +1,7 @@
 from django.conf.urls import patterns, url
 from django.views.generic import DetailView, ListView
-from lonestar.models import LS4Job
-from lonestar.views import *
+from tacc_stats.site.lonestar.models import LS4Job
+from tacc_stats.site.lonestar.views import *
 
 urlpatterns = patterns('',
                        url(r'^$',dates, name='dates'),

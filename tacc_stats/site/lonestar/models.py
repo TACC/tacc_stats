@@ -16,6 +16,7 @@ class LS4Job(models.Model):
     status = models.CharField(max_length=16, null=True)
     nodes = models.PositiveIntegerField(null=True)
     cores = models.PositiveIntegerField(null=True)
+    wayness = models.PositiveIntegerField(null=True)
     path =  models.FilePathField(max_length=128, null=True)
     date = models.DateField(db_index=True,null=True)
     user = models.CharField(max_length=128, null=True)
@@ -23,15 +24,21 @@ class LS4Job(models.Model):
     cwd = models.CharField(max_length=128, null=True)
     threads = models.BigIntegerField(null=True)
 
+    cpi = models.FloatField(null=True)
+    mbw = models.FloatField(null=True)
+
     def __unicode__(self):
         return str(self.id)
 
     def color(self):
-        ret_val = "silver"
-        if self.status != 'COMPLETED':
-            ret_val = "red"
-        elif self.run_time > 600:
+
+        if self.status == 'COMPLETED': 
             ret_val = "lightblue"
+        elif self.status == 'FAILED':
+            ret_val = "red"
+        else:
+            ret_val = "silver"
+
         return ret_val
 
 
