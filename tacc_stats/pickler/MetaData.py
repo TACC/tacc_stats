@@ -2,7 +2,9 @@ import os, sys
 from datetime import datetime
 import pytz
 import cPickle as pickle
-from pickler import job_stats,batch_acct
+from tacc_stats.pickler import job_stats,batch_acct
+sys.modules['pickler.job_stats'] = job_stats
+sys.modules['pickler.batch_acct'] = batch_acct
 sys.modules['job_stats'] = job_stats
 sys.modules['batch_acct'] = batch_acct
 

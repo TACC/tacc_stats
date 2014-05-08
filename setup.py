@@ -224,23 +224,26 @@ write_cfg_file(paths)
 
 
 root='tacc_stats/src/monitor/'
-sources=[pjoin(root,'schema.c'),pjoin(root,'dict.c'),pjoin(root,'stats.c'),pjoin(root,'collect.c'),pjoin(root,'stats_file.c')]
+sources=[pjoin(root,'schema.c'),pjoin(root,'dict.c'),pjoin(root,'stats.c'),pjoin(root,'collect.c'),pjoin(root,'stats_file.c'),pjoin(root,'monitor.c')]
 
 for root,dirs,files in os.walk('tacc_stats/src/monitor/'):
     for f in files:
         name,ext = os.path.splitext(f)        
-        if ext == '.c' and name in types.keys(): 
-            sources.append(pjoin(root,f))
+        if ext == '.c' and name in types.keys():
+            if types[name] == 'True':
+                sources.append(pjoin(root,f))
 
 include_dirs = []
 library_dirs = []
 libraries = []
-if 'ib' in types:
+
+if types['ib'] == 'True' or types['ib_sw'] == 'True' or types['ib_ext'] == 'True':    
     include_dirs=['/opt/ofed/include']
     library_dirs=['/opt/ofed/lib64']
     libraries=['ibmad']
 
-if 'llite' in types or 'lnet' in types or 'mdc' in types or 'osc' in types:
+if types['llite'] == 'True' or types ['lnet'] == 'True' or \
+        types['mdc'] == 'True' or types['osc'] == 'True':
     sources.append('tacc_stats/src/monitor/lustre_obd_to_mnt.c')
 
 define_macros=[('STATS_DIR_PATH','\"'+paths['stats_dir']+'\"'),
@@ -268,11 +271,16 @@ cmd = {}
 
 class MyBuildExt(build_ext):
     def build_extension(self,ext):
+        
         sources = ext.sources
         sources = list(sources)
         ext_path = self.get_ext_fullpath(ext.name)
         depends = sources + ext.depends
         extra_args = ext.extra_compile_args or []
+
+        if os.path.isfile(pjoin('build','bin','monitor')) and \
+                os.path.isfile(pjoin(ext_path)):
+            return
 
         macros = ext.define_macros[:]
         for undef in ext.undef_macros:
@@ -292,17 +300,34 @@ class MyBuildExt(build_ext):
 
         language = ext.language or self.compiler.detect_language(sources)
         
+        compiler_objects = objects
+        compiler_objects.remove(pjoin(self.build_temp,'tacc_stats','src',
+                                      'monitor','monitor.o'))
         self.compiler.link_executable(
-            objects, 'build/bin/monitor',
+            compiler_objects, 'build/bin/monitor',
             libraries=ext.libraries,
             library_dirs=ext.library_dirs,
             runtime_library_dirs=ext.runtime_library_dirs,
             extra_postargs=extra_args,
             target_lang=language)
+        shutil.copyfile('tacc_stats/src/monitor/archive.sh','build/bin/archive.sh')
 
-if not os.path.isfile(pjoin(os.path.dirname(__file__),'build/bin/monitor')):
-    extensions.append(Extension("tacc_stats.monitor", **ext_data))
-    cmd = {'build_ext' : MyBuildExt}
+        objects.remove(pjoin(self.build_temp,'tacc_stats','src',
+                             'monitor','main.o'))
+        self.compiler.link_shared_object(
+            objects, ext_path,
+            libraries=self.get_libraries(ext),
+            library_dirs=ext.library_dirs,
+            runtime_library_dirs=ext.runtime_library_dirs,
+            extra_postargs=extra_args,
+            export_symbols=self.get_export_symbols(ext),
+            debug=self.debug,
+            build_temp=self.build_temp,
+            target_lang=language)
+        
+
+extensions.append(Extension("tacc_stats.monitor", **ext_data))
+cmd = {'build_ext' : MyBuildExt}
 
     
 cfg_sh(pjoin(os.path.dirname(__file__), 'tacc_stats',

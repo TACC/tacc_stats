@@ -8,7 +8,7 @@ sys.path.append(os.path.join(os.path.dirname(__file__),
 sys.path.append(os.path.join(os.path.dirname(__file__), 
                              'lonestar'))
 
-import settings
+from tacc_stats.site.tacc_stats_site import settings
 setup_environ(settings)
 
 import tacc_stats.site.lonestar.views as views
