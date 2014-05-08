@@ -144,9 +144,9 @@ def write_stats_x(types):
     filename = os.path.join(
         os.path.dirname(__file__), 'tacc_stats','src','monitor', 'stats.x')
     a = open(filename, 'w')
-    
+    import operator
     try:
-        for t,val in types.iteritems():            
+        for t,val in sorted(types.iteritems(), key=operator.itemgetter(0)):            
             if val == 'True':
                 a.write('X('+t+') ')
     finally:
@@ -224,7 +224,7 @@ write_cfg_file(paths)
 
 
 root='tacc_stats/src/monitor/'
-sources=[pjoin(root,'schema.c'),pjoin(root,'dict.c'),pjoin(root,'stats.c'),pjoin(root,'collect.c'),pjoin(root,'stats_file.c'),pjoin(root,'monitor.c')]
+sources=[pjoin(root,'schema.c'),pjoin(root,'dict.c'),pjoin(root,'collect.c'),pjoin(root,'stats_file.c'),pjoin(root,'monitor.c'),pjoin(root,'main.c'),pjoin(root,'stats.c')]
 
 for root,dirs,files in os.walk('tacc_stats/src/monitor/'):
     for f in files:
@@ -254,7 +254,7 @@ define_macros=[('STATS_DIR_PATH','\"'+paths['stats_dir']+'\"'),
              
 flags = ['-D_GNU_SOURCE','-DDEBUG',
          '-O3','-Werror','-Wall','-g']
-ext_data=dict(sources=[pjoin(root,'main.c')]+sources,
+ext_data=dict(sources=sources,
               include_dirs=['tacc_stats/src/monitor/'] + include_dirs,
               library_dirs=library_dirs,
               runtime_library_dirs=library_dirs,
@@ -324,7 +324,6 @@ class MyBuildExt(build_ext):
             debug=self.debug,
             build_temp=self.build_temp,
             target_lang=language)
-        
 
 extensions.append(Extension("tacc_stats.monitor", **ext_data))
 cmd = {'build_ext' : MyBuildExt}

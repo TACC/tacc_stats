@@ -1,0 +1,7 @@
+llite read_bytes,E,U=B write_bytes,E,U=B direct_read,E,U=B direct_write,E,U=B dirty_pages_hits,E dirty_pages_misses,E ioctl,E open,E close,E mmap,E seek,E fsync,E setattr,E truncate,E flock,E getattr,E statfs,E alloc_inode,E setxattr,E getxattr,E listxattr,E removexattr,E inode_permission,E readdir,E create,E lookup,E link,E unlink,E symlink,E mkdir,E rmdir,E mknod,E rename,E
+numa numa_hit,E numa_miss,E numa_foreign,E interleave_hit,E local_node,E other_node,E
+ps ctxt,E processes,E load_1, load_5, load_15, nr_running, nr_threads,
+sysv_shm mem_used,U=B segs_used,
+tmpfs bytes_used,U=B files_used,
+vfs dentry_use, file_use, inode_use,
+vm pgpgin,E,U=KB pgpgout,E,U=KB pswpin,E pswpout,E pgalloc_normal,E pgfree,E pgactivate,E pgdeactivate,E pgfault,E pgmajfault,E pgrefill_normal,E pgsteal_normal,E pgscan_kswapd_normal,E pgscan_direct_normal,E pginodesteal,E slabs_scanned,E kswapd_steal,E kswapd_inodesteal,E pageoutrun,E allocstall,E pgrotated,E
