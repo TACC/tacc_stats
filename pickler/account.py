@@ -5,6 +5,7 @@ import os.path
 import batch_acct
 import json
 import sys
+import time
 
 VERSION_NUMBER = 1
 
@@ -117,7 +118,7 @@ def getconfig(configfilename = "config.json"):
 
     return config
 
-def ingest(config):
+def ingest(config, end_time):
 
     dbconf = config['accountdatabase']
     dbif = DbInterface(dbconf["dbhost"], dbconf["dbname"], dbconf["tablename"] )
@@ -130,7 +131,7 @@ def ingest(config):
 
         acctreader = batch_acct.factory( resource['batch_system'], resource['acct_path'], resource['host_name_ext'])
 
-        for acct in acctreader.reader(start_time):
+        for acct in acctreader.reader(start_time, end_time):
 
             record = []
             record.append( resource['resource_id'] )
@@ -156,4 +157,9 @@ if __name__ == "__main__":
     else:
         config = getconfig()
 
-    ingest(config)
+    if len(sys.argv) > 2:
+        end_time = sys.argv[2]
+    else:
+        end_time = int(time.time() - 2*24*60*60)
+
+    ingest(config, end_time)
