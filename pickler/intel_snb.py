@@ -166,14 +166,21 @@ class reformat_counters:
         dev_schema = []
         for dev, array in stats.iteritems():
             for j in self.ctl_registers:
+                dev_schema.append(event_map.get(array[0,j],str(array[0,j])))
+            break
+
+        # Now check:
+        # all devices have the same control settings
+        # all devices control setting remain the same during the job
+        for dev, array in stats.iteritems():
+            devidx = 0
+            for j in self.ctl_registers:
                 settings = array[:,j]
-                if settings.min() != settings.max():
+                if event_map.get(settings[0],str(settings[0])) != dev_schema[devidx] or settings.min() != settings.max():
                     # The control settings for this device changed during the run
                     # mark as the error metric
-                    dev_schema.append("ERROR,E")
-                else:
-                    dev_schema.append(event_map.get(array[0,j],str(array[0,j])))
-            break
+                    dev_schema[devidx] = "ERROR,E"
+                devidx += 1
 
 
 
@@ -197,6 +204,7 @@ class reformat_counters:
         for dev, array in stats.iteritems():
             data = dev_stats[dev]
             idx = 0
+
             for j in self.ctr_registers:                
                 data[:,idx] = numpy.array(array[:,j], numpy.uint64)
                 idx += 1
