@@ -102,6 +102,7 @@ class DbAcct(object):
         if self.totalprocs != None and self.procid != None:
             query += " AND (CRC32(local_job_id) %% %s) = %s"
             data = data + ( self.totalprocs, self.procid )
+        query += " ORDER BY end_time_ts ASC"
 
         cur = self.con.cursor()
         cur.execute(query, data)
