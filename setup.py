@@ -185,8 +185,9 @@ class CleanCommand(Command):
         self._clean_me = []
         self._clean_trees = []
         self._clean_exclude = []
-
+        
         for root, dirs, files in os.walk('tacc_stats'):
+            print root,dirs,files
             for f in files:
                 if f in self._clean_exclude:
                     continue
