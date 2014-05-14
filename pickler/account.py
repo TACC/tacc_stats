@@ -10,9 +10,9 @@ import time
 VERSION_NUMBER = 1
 
 class DbInterface:
-    def __init__(self, dbhost, dbname, tablename):
+    def __init__(self, dbname, tablename, mydefaults):
 
-        self.con = mdb.connect(host=dbhost, db=dbname, read_default_file="~/.my.cnf")
+        self.con = mdb.connect(db=dbname, read_default_file=mydefaults)
         self.tablename = tablename
         self.query = "INSERT INTO " + tablename + " (resource_id,cluster,local_job_id,start_time_ts,end_time_ts,record,ingest_version) VALUES(%s,%s,%s,%s,%s,COMPRESS(%s)," + str(VERSION_NUMBER) + ")"
         self.buffered = 0
@@ -65,8 +65,8 @@ class DbInterface:
         return cur.fetchone()[0]
 
 class DbLogger(object):
-    def __init__(self, dbhost, dbname, tablename):
-        self.con = mdb.connect(host=dbhost, db=dbname, read_default_file="~/.my.cnf")
+    def __init__(self, dbname, tablename, mydefaults):
+        self.con = mdb.connect(db=dbname, read_default_file=mydefaults)
         self.tablename = tablename
 
     def logprocessed(self, acct, resource_id, version):
@@ -81,7 +81,7 @@ class DbLogger(object):
 
 class DbAcct(object):
     def __init__(self, resource_id, dbconf, process_version, totalprocs = None, procid = None):
-        self.con = mdb.connect(host=dbconf['dbhost'], db=dbconf['dbname'], read_default_file="~/.my.cnf")
+        self.con = mdb.connect(db=dbconf['dbname'], read_default_file=dbconf['defaultsfile'])
         self.tablename = dbconf['tablename']
         self.process_version = process_version
         self.resource_id = resource_id
@@ -122,7 +122,7 @@ def getconfig(configfilename = "config.json"):
 def ingest(config, end_time):
 
     dbconf = config['accountdatabase']
-    dbif = DbInterface(dbconf["dbhost"], dbconf["dbname"], dbconf["tablename"] )
+    dbif = DbInterface(dbconf["dbname"], dbconf["tablename"], dbconf["defaultsfile"] )
 
     for resourcename,resource in config['resources'].iteritems():
 

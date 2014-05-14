@@ -358,7 +358,7 @@ class Host(object):
                     rec_jobid = set(str_jobid.split(','))
                     if self.job.id not in rec_jobid:
                         line = file.next()
-                        if line.startswith('%'): 
+                        if line.startswith(SF_MARK_CHAR): 
                             tokens = line[1:].split(" ")
                             if len(tokens) > 1 and tokens[0].strip() == "end":
                                 rec_jobid.add( tokens[1].strip() )
@@ -382,6 +382,15 @@ class Host(object):
                         self.times.pop()
                         skip = True
                     else:
+                        if actions[0] == "begin" and len(self.times) > 1:
+                            # this is a 'begin' record for this job, but have already processed a record
+                            # for this job. This race condition occurs if the job starts very close to the
+                            # normal cron-initiated record.  Tacc_stats resets some performance counters on
+                            # a begin, so it is necessary to discard the records before this one.
+                            self.job.errors.add("BEGIN_IN_MIDDLE {} {} {} discard {} previous".format(self.name, file.name, rec_time, len(self.times)-1 ) )
+                            self.raw_stats = {}
+                            self.times = [ rec_time ]
+
                         skip = False
                     self.marks[mark] = True
                 #elif c == SF_COMMENT_CHAR:
@@ -403,8 +412,12 @@ class Host(object):
         # into lists of tuples in self.raw_stats.  The lists will be
         # converted into numpy arrays below.
         for path, start_time in path_list:
-            with gzip.open(path) as file:
-                self.read_stats_file(file)
+            try:
+                with gzip.open(path) as file:
+                    self.read_stats_file(file)
+            except IOError as ioe:
+                self.error("read error for file %s\n", path)
+
         # begin_mark = 'begin %s' % self.job.id # No '%'.
         # if not begin_mark in self.marks:
         #     self.error("no begin mark found\n")
@@ -427,7 +440,7 @@ class Host(object):
 class Job(object):
     # TODO errors/comments
     __slots__ = ('id', 'start_time', 'end_time', 'acct', 'schemas', 'hosts',
-    'times','stats_home', 'host_list_dir', 'batch_acct', 'edit_flags')
+    'times','stats_home', 'host_list_dir', 'batch_acct', 'edit_flags', 'errors')
 
     def __init__(self, acct, stats_home, host_list_dir, batch_acct):
         self.id = acct['id']
@@ -441,6 +454,7 @@ class Job(object):
         self.host_list_dir=host_list_dir
         self.batch_acct=batch_acct
         self.edit_flags = []
+        self.errors = set()
 
     def trace(self, fmt, *args):
         trace('%s: ' + fmt, self.id, *args)
@@ -494,6 +508,7 @@ class Job(object):
         for host in self.hosts.itervalues():
             times_lis.append(host.times)
             del host.times
+
         times_lis.sort(key=lambda lis: len(lis))
         # Choose times to have median length.
         times = list(times_lis[len(times_lis) / 2])
@@ -501,7 +516,7 @@ class Job(object):
             return False
         times.sort()
         # Ensure that times is sane and monotonically increasing.
-        t_min = self.start_time
+        t_min = 0
         for i in range(0, len(times)): 
             t = max(times[i], t_min)
             times[i] = t
@@ -511,6 +526,8 @@ class Job(object):
         self.trace("job start to first collect %d\n", times[0] - self.start_time)
         self.trace("last collect to job end %d\n", self.end_time - times[-1])
         self.times = numpy.array(times, dtype=numpy.uint64)
+        if len(times_lis[0]) != len(times_lis[-1]):
+            self.errors.add( "Number of records differs between hosts (min {}, max {})".format(len(times_lis[0]), len(times_lis[-1]) ) )
         return True
     
     def process_dev_stats(self, host, type_name, schema, dev_name, raw):
@@ -525,20 +542,22 @@ class Job(object):
         m = len(self.times)
         n = len(schema)
         A = numpy.zeros((m, n), dtype=numpy.uint64) # Output.
-        # First and last of A are first and last from raw.
-        A[0] = raw[0][1]
-        A[m - 1] = raw[-1][1]
+
         k = 0
         # len(raw) may not be equal to m, so we fill out A by choosing values
         # with the closest timestamps.
-        for i in range(1, m - 1):
+        # TODO sort out host times
+        host.times = []
+        for i in xrange(0, m):
             t = self.times[i]
             while k + 1 < len(raw) and abs(raw[k + 1][0] - t) <= abs(raw[k][0] - t):
                 k += 1
             jitter = abs(raw[k][0] - t)
             if jitter > 60:
-                self.trace("Warning - high jitter for host {} job {} Actual time {}, Thunked to {} (Delta {})".format(host.name, self.id, raw[k][0], t, jitter))
+                self.errors.add("Warning - high jitter for host {} job {} Actual time {}, Thunked to {} (Delta {})".format(host.name, self.id, raw[k][0], t, jitter))
             A[i] = raw[k][1]
+            host.times.append(raw[k][0])
+
         # OK, we fit the raw values into A.  Now fixup rollover and
         # convert units.
         for e in schema.itervalues():
@@ -571,6 +590,13 @@ class Job(object):
                             r = 0 # base is now zero
                             self.edit_flags.append("(time %d, host `%s', type `%s', dev `%s', key `%s')" %
                                                    (self.times[i],host.name,type_name,dev_name,e.key))
+
+                        if type_name not in ['ib', 'ib_ext']:
+                            width = e.width if e.width else 64
+                            if ( v - p ) % (2**width) > 2**(width-1):
+                                # This counter rolled more than half of its range
+                                self.errors.add( "OVERFLOW {} {}.{}.{}".format(host.name, type_name, dev_name, e.key) )
+
                     A[i, j] = v - r
                     p = v
             if e.mult:

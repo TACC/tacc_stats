@@ -8,26 +8,38 @@ import time
 import datetime
 from pymongo import MongoClient
 from multiprocessing import Process
+import socket
 
-PROCESS_VERSION = 3
+PROCESS_VERSION = 4
+verbose = False
 
 class RateCalculator:
-    def __init__(self):
+    def __init__(self, procid):
         self.count = 0
+        self.starttime = 0
+        self.rate = 0
+        self.procid = procid
 
     def increment(self):
         if self.count == 0:
             self.starttime = time.time()
+        else:
+            diff = time.time() - self.starttime
+            if diff > 0:
+                self.rate = self.count * 1.0 / diff
+
+                if (self.count % 20) == 0:
+                    sys.stderr.write("{} Instance {} Processed {} records in {} seconds ({} per second)\n".format( 
+                        datetime.datetime.utcnow().isoformat(), self.procid, self.count, diff, self.rate ))
 
         self.count += 1
 
-        if (self.count % 100) == 0:
-            diff = time.time() - self.starttime
-            print "{} Processed {} records in {} seconds ({} per second)".format( 
-                    datetime.datetime.utcnow().isoformat(), self.count, diff, 1.0 * self.count / diff )
-
+    def rate(self):
+        return self.rate
 
 def createsummary(totalprocs, procid):
+
+    sys.stderr.write("{} Processor {} of {} starting\n".format(datetime.datetime.utcnow().isoformat(), procid, totalprocs))
 
     config = account.getconfig()
     dbconf = config['accountdatabase']
@@ -36,9 +48,16 @@ def createsummary(totalprocs, procid):
     outclient = MongoClient(host=outdbconf['dbhost'])
     outdb = outclient[outdbconf['dbname'] ]
 
-    ratecalc = RateCalculator()
+    ratecalc = RateCalculator(procid)
+    timewindows = dict()
 
     for resourcename, settings in config['resources'].iteritems():
+
+        if 'enabled' in settings:
+            if settings['enabled'] == False:
+                continue
+
+        timewindows[resourcename] = { "mintime": 2**64, "maxtime": 0 }
 
         dbreader = account.DbAcct( settings['resource_id'], dbconf, PROCESS_VERSION, totalprocs, procid)
 
@@ -49,9 +68,11 @@ def createsummary(totalprocs, procid):
         else:
             lariat = None
 
-        dbwriter = account.DbLogger( dbconf["dbhost"], dbconf["dbname"], dbconf["tablename"] )
+        dbwriter = account.DbLogger( dbconf["dbname"], dbconf["tablename"], dbconf["defaultsfile"] )
 
-        for acct in dbreader.reader(1361854800):
+        for acct in dbreader.reader():
+            if verbose:
+                sys.stderr.write( "{} local_job_id = {}\n".format(datetime.datetime.utcnow().isoformat(), acct['id']) )
             job = job_stats.from_acct( acct, settings['tacc_stats_home'], settings['host_list_dir'], bacct )
             summary = summarize.summarize(job, lariat)
 
@@ -61,10 +82,37 @@ def createsummary(totalprocs, procid):
             outdb[resourcename].remove( {"_id": summary["acct"]["id"] } )
             #----------------------------------------------------------------------
 
-            outdb[resourcename].update( {"_id": summary["_id"]}, summary, upsert=True )
-            dbwriter.logprocessed( acct, settings['resource_id'], PROCESS_VERSION )
+            # Add empty processed element to data so that the document size does not
+            # need to be changed when the doc is processed by the etl. 
+            summary['processed'] = { "ts": 0.0, "version": 0, "warnings": None, "errors": None }
 
-            ratecalc.increment()
+            outdb[resourcename].update( {"_id": summary["_id"]}, summary, upsert=True )
+
+            if outdb[resourcename].find_one( {"_id": summary["_id"]}, { "_id":1 } ) != None:
+                dbwriter.logprocessed( acct, settings['resource_id'], PROCESS_VERSION )
+                timewindows[resourcename]['mintime'] = min( timewindows[resourcename]['mintime'], summary["acct"]['end_time'] )
+                timewindows[resourcename]['maxtime'] = max( timewindows[resourcename]['maxtime'], summary["acct"]['end_time'] )
+                ratecalc.increment()
+
+    sys.stderr.write("{} Processor {} of {} exiting. Processed {}\n".format(datetime.datetime.utcnow().isoformat(), procid, totalprocs, ratecalc.count))
+
+    if ratecalc.count == 0:
+        # No need to generate a report if no docs were processed
+        return
+
+    proc = { "host": socket.getfqdn(),
+            "instance": procid,
+            "totalinstances": totalprocs,
+            "start_time": ratecalc.starttime,
+            "end_time": time.time() ,
+            "rate": ratecalc.rate,
+            "records": ratecalc.count
+            }
+
+    report = { "proc": proc, "resources": timewindows }
+
+    outdb["journal"].insert( report )
+
 
 def main():
 
@@ -83,7 +131,6 @@ def main():
     else:
         proclist = []
         for procid in xrange(nprocs):
-            print "Creating subprocess {} of {} (index {} of {})".format(procid, nprocs, (instance_id*nprocs) + procid, total_procs)
             p = Process( target=createsummary, args=(total_procs, (instance_id*nprocs) + procid) )
             p.start()
             proclist.append(p)

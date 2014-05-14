@@ -11,6 +11,17 @@ import json
 import traceback
 from scipy import stats
 
+VERBOSE = False
+
+# Max discrepency between walltime and records time
+TIMETHRESHOLD = 60
+
+# Minimum time difference between two consecutive data points
+MINTIMEDELTA = 5
+
+# Compact format
+COMPACT_OUTPUT = True
+
 #ignore warnings from numpy
 numpy.seterr(all='ignore')
 
@@ -117,21 +128,36 @@ def calculate_stats(v):
 
     return res
 
+def addmetrics(summary, metricname, values):
+    key = metricname.replace(".", "-")
+    
+    if COMPACT_OUTPUT and 'overall_avg' in values and values['overall_avg'] == 0.0:
+        summary[key] = { 'overall_avg': 0.0 }
+    else:
+        summary[key] = values
 
 def summarize(j, lariatcache):
 
     summaryDict = {}
-    summaryDict['Error'] = []
+    summaryDict['Error'] = list(j.errors)
 
     metrics = None
     statsOk = True
 
-    aggregates = [ "sched", "intel_pmc3", "intel_uncore", "intel_snb", "intel_snb_cbo", "intel_snb_imc" ]
+    aggregates = [ "sched", "intel_pmc3", "intel_uncore", "intel_snb", "intel_snb_cbo", "intel_snb_imc", "intel_snb_pcu", "intel_snb_hau", "intel_snb_qpi", "intel_snb_r2pci" ]
     conglomerates = [ "irq" ]
 
-    sys.stderr.write( "{} ID: {}\n".format( datetime.datetime.utcnow().isoformat(), j.acct['id'] ) )
+    # The ib and ib_ext counters are known to be incorrect on all tacc_stats systems
+    ignorelist = [ "ib", "ib_ext" ]
+
+    if VERBOSE:
+        sys.stderr.write( "{} ID: {}\n".format( datetime.datetime.utcnow().isoformat(), j.acct['id'] ) )
 
     walltime = max(j.end_time - j.start_time, 0)
+
+    if len(j.times) == 0:
+        summaryDict['Error'].append("No timestamp records")
+        statsOk = False
 
     if j.hosts.keys():
         summaryDict['nHosts'] = len(j.hosts)
@@ -141,7 +167,6 @@ def summarize(j, lariatcache):
 
     if 0 == walltime:
         summaryDict['Error'].append('Walltime is 0')
-        sys.stderr.write( 'ERROR: Walltime is 0\n' )
 
     metrics = {}
     for t in j.schemas.keys():
@@ -171,66 +196,66 @@ def summarize(j, lariatcache):
             sums[k][l] = {}
             series[k][l] = {}
 
-    reciprocals = []
-
-    # get the reciprocals of intervals (of timestamps)
-    # so we can calculate "rates" later
-
-    for n in range(1, len(j.times)):
-        delta = j.times[n] - j.times[n - 1]
-        if 0 < delta:
-            reciprocals.append(1.0 / delta)
-        else:
-            reciprocals.append(0)
-
     nCores_allhosts = 0
     nHosts = 0
-    nIntervals = len(j.times) - 1
 
-    for i in j.hosts.keys():  # for all the hosts present in the file
+    for host in j.hosts.itervalues():  # for all the hosts present in the file
         nHosts += 1
         nCoresPerSocket = 1
 
-        if 'cpu' in j.hosts[i].stats.keys() and 'mem' \
-          in j.hosts[i].stats.keys():
-            nCoresPerSocket = len(j.hosts[i].stats['cpu']) \
-              // len(j.hosts[i].stats['mem'])
+        timedeltas = numpy.diff(host.times)
+        validtimes = [ True if x > MINTIMEDELTA else False for x in timedeltas ]
+        reciprocals = 1.0 / numpy.compress(validtimes, timedeltas)
+        hostwalltime = host.times[-1] - host.times[0]
+
+        if abs(hostwalltime - walltime) > TIMETHRESHOLD:
+            summaryDict['Error'].append("Large discrepency between job account walltime and tacc_stats walltime for {}. {} != {}.".format(host.name, walltime, hostwalltime) )
+
+        if len(reciprocals) == 0:
+            summaryDict['Error'].append("Insufficient data points for host {}. {}".format(host.name, host.times) )
+            continue
+        
+        if 'cpu' in host.stats.keys() and 'mem' \
+          in host.stats.keys():
+            nCoresPerSocket = len(host.stats['cpu']) \
+              // len(host.stats['mem'])
 
         for k in indices.keys():
-            if k in j.hosts[i].stats.keys():
-                for interface in j.hosts[i].stats[k].keys():
+            if k in host.stats.keys() and k not in ignorelist:
+                for interface in host.stats[k].keys():
                     if k == 'cpu':  # special handling for 'cpu'
                         nCores_allhosts = nCores_allhosts + 1
+
                         if interface not in sums['cpu']['all'].keys():
                             sums['cpu']['all'][interface] = 0
                             series['cpu']['all'][interface] = []
-                        sums['cpu']['all'][interface] = sums['cpu']['all'][interface] \
-                          + sum(j.hosts[i].stats['cpu'][interface][nIntervals]) \
-                          / walltime
-                        v = []
-                        for n in range(nIntervals + 1):
-                            v.append(sum(j.hosts[i].stats['cpu'][interface][n]))
-                        deltas = numpy.diff(v)
-                        if 0 in deltas:
-                            summaryDict['Error'].append("host {}, cpu {} unusual halted clock".format(j.hosts[i].name, interface) )
-                            statsOk = False
 
-                        rates = deltas * reciprocals
+                        sums['cpu']['all'][interface] += sum(host.stats['cpu'][interface][-1]) / hostwalltime
+
+                        v = [ sum(x) for x in host.stats['cpu'][interface] ]
+                        deltas = numpy.diff(v)
+                        rates = numpy.compress(validtimes,deltas) * reciprocals
+
+                        if 0.0 in rates:
+                            summaryDict['Error'].append("host {}, cpu {} unusual halted clock".format(host.name, interface) )
+                            statsOk = False
 
                         series['cpu']['all'][interface].extend(rates)
 
                     for l in indices[k].keys():
-                        v = j.hosts[i].stats[k][interface][:, indices[k][l]]
+                        v = host.stats[k][interface][:, indices[k][l]]
                         if interface not in sums[k][l].keys():
-                            sums[k][l][interface] = 0
+                            if j.get_schema(k)[l].is_event:
+                                # Only generate the sums values for events
+                                sums[k][l][interface] = 0
+
                             series[k][l][interface] = []
                         if j.get_schema(k)[l].is_event:
                             # If the datatype is an event then the values are converted to rates.
-                            sums[k][l][interface] = sums[k][l][interface] + (v[-1]
-                                  - v[0]) / walltime  # divide walltime here, to avoid overflow in summation
-                            if len(reciprocals) == len(v) - 1:
-                                rates = numpy.diff(v) * reciprocals
-                                series[k][l][interface].extend(rates.tolist() )
+                            sums[k][l][interface] += (v[-1] - v[0]) / hostwalltime
+
+                            rates = numpy.compress(validtimes, numpy.diff(v)) * reciprocals
+                            series[k][l][interface].extend(rates.tolist() )
                         else:
                             # else the datatype is an instantaneous value such as memory, load ave or disk usage.
                             if 2 < len(v):
@@ -249,7 +274,8 @@ def summarize(j, lariatcache):
 
         if 'intel_snb' in sums.keys():
 
-            if 'SSE_D_ALL' in sums['intel_snb'] and 'SIMD_D_256' in sums['intel_snb']:
+
+            if 'SSE_D_ALL' in sums['intel_snb'] and 'SIMD_D_256' in sums['intel_snb'] and 'ERROR' not in sums['intel_snb']:
                 s1 = 0
                 s2 = 0
                 v = []
@@ -257,13 +283,13 @@ def summarize(j, lariatcache):
                     # iterate all CPU cores
                     s1 += sums['intel_snb']['SSE_D_ALL'][l]
                     s2 += sums['intel_snb']['SIMD_D_256'][l]
-                    summaryDict['FLOPS'] = ( 2 * ( s1/nCores_allhosts ) ) + ( 4 * ( s2/nCores_allhosts ) )
+                    summaryDict['FLOPS'] = { "value": ( 2 * ( s1/nCores_allhosts ) ) + ( 4 * ( s2/nCores_allhosts ) ) }
             else:
-                summaryDict['FLOPS'] = { 'error': 'unavailable' }
+                summaryDict['FLOPS'] = { 'error': 2, "error_msg": 'Counters were reprogrammed during job' }
 
         elif 'intel_pmc3' in sums.keys():
 
-            if 'PMC2' in sums['intel_pmc3']:
+            if 'PMC2' in sums['intel_pmc3'] and 'ERROR' not in sums['intel_pmc3']:
                 s = 0
                 v = []
                 for l in sums['intel_pmc3']['PMC2'].keys():
@@ -288,9 +314,9 @@ def summarize(j, lariatcache):
                         v = calculate_stats(v)
                         if 0 < v['max']:
                             v['overall_avg'] = s / nCores_allhosts
-                        key = device + '-' + interface
-                        summaryDict[ key.replace(".","-") ] = v
+                        addmetrics(summaryDict, device + '-' + interface, v)
                 del sums[device]
+                del series[device]
     
         for device in conglomerates:
             if device in sums.keys():
@@ -308,16 +334,17 @@ def summarize(j, lariatcache):
                         v[index] = calculate_stats(v[index])
                         if 0 < v[index]['max']:
                             v[index]['overall_avg'] = s[index] / nCores_allhosts
-                        key = device + '-' + interface
-                        summaryDict[ key.replace(".","-") ] = v[index]
+                        addmetrics(summaryDict, device + '-' + interface, v[index])
+
                 del sums[device]
+                del series[device]
 
         # memory usage
 
         v = []
         v2 = []
         v3 = []
-        for l in sums['mem']['MemUsed'].keys():
+        for l in series['mem']['MemUsed'].keys():
 
             # iterate all memory sockets
 
@@ -327,10 +354,10 @@ def summarize(j, lariatcache):
         if v:
             res = calculate_stats(v)
             if 0 < res['max']:
-                summaryDict['mem-used'] = res
+                addmetrics(summaryDict, 'mem-used', res)
             res = calculate_stats([a - b - c for (a, b, c) in zip(v, v2, v3)])
             if 0 < res['max']:
-                summaryDict['mem-used_minus_diskcache'] = res
+                addmetrics(summaryDict, 'mem-used_minus_diskcache', res)
 
         # cpu usage
 
@@ -353,22 +380,23 @@ def summarize(j, lariatcache):
                 v2 = calculate_stats( numpy.array(v2) / numpy.array(v) )
                 if 0 < v2['max']:
                     v2['overall_avg'] = s2 / s
-                    summaryDict['cpu-'+l] = v2
+                    addmetrics(summaryDict, 'cpu-'+l, v2)
 
         del sums['cpu']  # we are done with 'cpu'
+        del series['cpu']
         del sums['mem']  # we are done with 'mem'
+        del series['mem']
 
     # deal with general cases
 
     if statsOk:
-        for l in sums.keys():
-            for k in sums[l].keys():
-                for i in sums[l][k].keys():
+        for l in series.keys():
+            for k in series[l].keys():
+                for i in series[l][k].keys():
                     v = calculate_stats(series[l][k][i])
-                    #if 0 < v['max']:
-                    v['overall_avg'] = sums[l][k][i] / nHosts
-                    key = l + '-' + i + '-' + k
-                    summaryDict[key.replace(".","-")] = v
+                    if l in sums and k in sums[l] and i in sums[l][k]:
+                        v['overall_avg'] = sums[l][k][i] / nHosts
+                    addmetrics(summaryDict,l + '-' + i + '-' + k, v)
 
     # add in lariat data
     if lariatcache != None:
@@ -387,22 +415,22 @@ def summarize(j, lariatcache):
     summaryDict['acct'] = j.acct
 
     # add schema outline
-    #if statsOk:
-    #    summaryDict['schema'] = {}
-    #    try:
-    #        for k in metrics:
-    #            for l in metrics[k]:
-    #                if l in j.get_schema(k):
-    #                    if k not in summaryDict['schema']:
-    #                        summaryDict['schema'][k]={}
-    #                    summaryDict['schema'][k][l] = str( j.get_schema(k)[l] )
-    #    except:
-    #        if (summaryDict['nHosts'] != 0):
-    #            sys.stderr.write( 'ERROR: %s\n' % sys.exc_info()[0] )
-    #            sys.stderr.write( '%s\n' % traceback.format_exc() )
-    #            summaryDict['Error'].append("schema data not found")
+    if statsOk and not COMPACT_OUTPUT:
+        summaryDict['schema'] = {}
+        try:
+            for k in metrics:
+                for l in metrics[k]:
+                    if l in j.get_schema(k):
+                        if k not in summaryDict['schema']:
+                            summaryDict['schema'][k]={}
+                        summaryDict['schema'][k][l] = str( j.get_schema(k)[l] )
+        except:
+            if (summaryDict['nHosts'] != 0):
+                sys.stderr.write( 'ERROR: %s\n' % sys.exc_info()[0] )
+                sys.stderr.write( '%s\n' % traceback.format_exc() )
+                summaryDict['Error'].append("schema data not found")
 
-    summaryDict['summary_version'] = "0.9.3"
+    summaryDict['summary_version'] = "0.9.12"
     uniq = str(j.acct['id'])
     if 'cluster' in j.acct:
         uniq += "-" + j.acct['cluster']

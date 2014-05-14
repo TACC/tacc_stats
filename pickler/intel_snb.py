@@ -169,18 +169,20 @@ class reformat_counters:
                 dev_schema.append(event_map.get(array[0,j],str(array[0,j])))
             break
 
-        # Now check:
+        # Now check for all hosts:
         # all devices have the same control settings
         # all devices control setting remain the same during the job
-        for dev, array in stats.iteritems():
-            devidx = 0
-            for j in self.ctl_registers:
-                settings = array[:,j]
-                if event_map.get(settings[0],str(settings[0])) != dev_schema[devidx] or settings.min() != settings.max():
-                    # The control settings for this device changed during the run
-                    # mark as the error metric
-                    dev_schema[devidx] = "ERROR,E"
-                devidx += 1
+        for host in job.hosts.itervalues():
+            if name in host.stats:
+                for dev, array in host.stats[name].iteritems():
+                    devidx = 0
+                    for j in self.ctl_registers:
+                        settings = array[:,j]
+                        if event_map.get(settings[0],str(settings[0])) != dev_schema[devidx] or settings.min() != settings.max():
+                            # The control settings for this device changed during the run
+                            # mark as the error metric
+                            dev_schema[devidx] = "ERROR,E"
+                        devidx += 1
 
 
 
