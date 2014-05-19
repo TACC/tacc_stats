@@ -128,8 +128,26 @@ def calculate_stats(v):
 
     return res
 
-def addmetrics(summary, metricname, values):
-    key = metricname.replace(".", "-")
+def addinstmetrics(summary, overflows, device, interface, instance, values):
+
+    key = (device + "-" + interface + "-" + instance).replace(".", "-")
+
+    if device in overflows and interface in overflows[device] and instance in overflows[device][interface]:
+        summary[key] = { "error": 2048, "error_msg": "Counter overflow on hosts " + str(overflows[device][interface][instance]) }
+        return
+    
+    if COMPACT_OUTPUT and 'overall_avg' in values and values['overall_avg'] == 0.0:
+        summary[key] = { 'overall_avg': 0.0 }
+    else:
+        summary[key] = values
+
+def addmetrics(summary, overflows, device, interface, values):
+
+    key = (device + "-" + interface).replace(".", "-")
+
+    if device in overflows and interface in overflows[device]:
+        summary[key] = { "error": 2048, "error_msg": "Counter overflow on hosts " + str(overflows[device][interface]) }
+        return
     
     if COMPACT_OUTPUT and 'overall_avg' in values and values['overall_avg'] == 0.0:
         summary[key] = { 'overall_avg': 0.0 }
@@ -314,7 +332,7 @@ def summarize(j, lariatcache):
                         v = calculate_stats(v)
                         if 0 < v['max']:
                             v['overall_avg'] = s / nCores_allhosts
-                        addmetrics(summaryDict, device + '-' + interface, v)
+                        addmetrics(summaryDict, j.overflows, device, interface, v)
                 del sums[device]
                 del series[device]
     
@@ -334,7 +352,7 @@ def summarize(j, lariatcache):
                         v[index] = calculate_stats(v[index])
                         if 0 < v[index]['max']:
                             v[index]['overall_avg'] = s[index] / nCores_allhosts
-                        addmetrics(summaryDict, device + '-' + interface, v[index])
+                        addmetrics(summaryDict, j.overflows, device, interface, v[index])
 
                 del sums[device]
                 del series[device]
@@ -354,10 +372,10 @@ def summarize(j, lariatcache):
         if v:
             res = calculate_stats(v)
             if 0 < res['max']:
-                addmetrics(summaryDict, 'mem-used', res)
+                addmetrics(summaryDict, j.overflows, 'mem', 'used', res)
             res = calculate_stats([a - b - c for (a, b, c) in zip(v, v2, v3)])
             if 0 < res['max']:
-                addmetrics(summaryDict, 'mem-used_minus_diskcache', res)
+                addmetrics(summaryDict, j.overflows, 'mem', 'used_minus_diskcache', res)
 
         # cpu usage
 
@@ -380,7 +398,7 @@ def summarize(j, lariatcache):
                 v2 = calculate_stats( numpy.array(v2) / numpy.array(v) )
                 if 0 < v2['max']:
                     v2['overall_avg'] = s2 / s
-                    addmetrics(summaryDict, 'cpu-'+l, v2)
+                    addmetrics(summaryDict, j.overflows, 'cpu', l, v2)
 
         del sums['cpu']  # we are done with 'cpu'
         del series['cpu']
@@ -396,7 +414,7 @@ def summarize(j, lariatcache):
                     v = calculate_stats(series[l][k][i])
                     if l in sums and k in sums[l] and i in sums[l][k]:
                         v['overall_avg'] = sums[l][k][i] / nHosts
-                    addmetrics(summaryDict,l + '-' + i + '-' + k, v)
+                    addinstmetrics(summaryDict,j.overflows, l, i, k, v)
 
     # add in lariat data
     if lariatcache != None:
@@ -430,7 +448,7 @@ def summarize(j, lariatcache):
                 sys.stderr.write( '%s\n' % traceback.format_exc() )
                 summaryDict['Error'].append("schema data not found")
 
-    summaryDict['summary_version'] = "0.9.12"
+    summaryDict['summary_version'] = "0.9.13"
     uniq = str(j.acct['id'])
     if 'cluster' in j.acct:
         uniq += "-" + j.acct['cluster']

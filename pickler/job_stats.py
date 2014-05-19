@@ -440,7 +440,7 @@ class Host(object):
 class Job(object):
     # TODO errors/comments
     __slots__ = ('id', 'start_time', 'end_time', 'acct', 'schemas', 'hosts',
-    'times','stats_home', 'host_list_dir', 'batch_acct', 'edit_flags', 'errors')
+    'times','stats_home', 'host_list_dir', 'batch_acct', 'edit_flags', 'errors', 'overflows')
 
     def __init__(self, acct, stats_home, host_list_dir, batch_acct):
         self.id = acct['id']
@@ -455,6 +455,7 @@ class Job(object):
         self.batch_acct=batch_acct
         self.edit_flags = []
         self.errors = set()
+        self.overflows = dict()
 
     def trace(self, fmt, *args):
         trace('%s: ' + fmt, self.id, *args)
@@ -595,7 +596,7 @@ class Job(object):
                             width = e.width if e.width else 64
                             if ( v - p ) % (2**width) > 2**(width-1):
                                 # This counter rolled more than half of its range
-                                self.errors.add( "OVERFLOW {} {}.{}.{}".format(host.name, type_name, dev_name, e.key) )
+                                self.logoverflow(host.name, type_name, dev_name, e.key)
 
                     A[i, j] = v - r
                     p = v
@@ -603,6 +604,16 @@ class Job(object):
                 for i in range(0, m):
                     A[i, j] *= e.mult
         return A
+
+    def logoverflow(self, host_name, type_name, dev_name, key_name):
+        if type_name not in self.overflows:
+            self.overflows[type_name] = dict()
+        if dev_name not in self.overflows[type_name]:
+            self.overflows[type_name][dev_name] = dict()
+        if key_name not in self.overflows[type_name][dev_name]:
+            self.overflows[type_name][dev_name][key_name] = []
+
+        self.overflows[type_name][dev_name][key_name].append(host_name)
 
     def process_stats(self):
         for host in self.hosts.itervalues():
