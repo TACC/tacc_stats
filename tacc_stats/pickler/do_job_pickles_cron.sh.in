@@ -9,19 +9,23 @@ export PATH=python_path:$prog_dir:$PATH
 tmp_dir=${tmp_dir:-/dev/shm/}
 dst_dir=${dst_dir:-pickles_dir}
 
-start=$(date --date="$(date --date=yesterday +%F) +0 hour")
-end=$(date --date="$(date --date=yesterday +%F) +24 hour")
+if [ "$1" == "" ]; then
+    start=$(date --date="$(date --date=yesterday +%F) +0 hour")
+    end=$(date --date="$(date --date=yesterday +%F) +24 hour")
+else
+    start=$(date --date="$(date --date=$1 +%F) +0 hour")
+    end=$(date --date="$(date --date=$1 +%F) +24 hour")
+fi
 
 label_start=$(date --date="${start}" +%F)
 label_end=$(date --date="${end}" +%F)
-
 
 exec 0< /dev/null
 exec 1> $tmp_dir/$prog.out.$label_start.$label_end
 exec 2> $tmp_dir/$prog.err.$label_start.$label_end
 
 set -x
-
+umask 0022
 mkdir -p $dst_dir/$label_start
 $prog_dir/job_pickles.py -dir $dst_dir/$label_start -start "$start" -end "$end" -p 2
 
