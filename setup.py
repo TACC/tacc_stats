@@ -314,6 +314,9 @@ class MyBuildExt(build_ext):
 
         objects.remove(pjoin(self.build_temp,'tacc_stats','src',
                              'monitor','main.o'))
+        objects.append(pjoin(self.build_temp,'tacc_stats','src',
+                             'monitor','monitor.o'))
+
         self.compiler.link_shared_object(
             objects, ext_path,
             libraries=self.get_libraries(ext),

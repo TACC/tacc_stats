@@ -1,1 +1,2 @@
 include tacc_stats/src/monitor/*.h
+include tacc_stats/src/monitor/archive.sh
