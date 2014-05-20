@@ -179,13 +179,12 @@ class CleanCommand(Command):
     """Custom distutils command to clean the .so and .pyc files."""
 
     user_options = [("all", "a", "")]
-    print 'cleaning'
     def initialize_options(self):
         self.all = True
         self._clean_me = []
         self._clean_trees = []
         self._clean_exclude = []
-        
+
         for root, dirs, files in os.walk('tacc_stats'):
             print root,dirs,files
             for f in files:
@@ -200,7 +199,7 @@ class CleanCommand(Command):
                 if d == '__pycache__':
                     self._clean_trees.append(pjoin(root, d))
 
-        for d in ('build', 'dist'):
+        for d in ('build', 'dist','tacc_stats.egg-info'):
             if os.path.exists(d):
                 self._clean_trees.append(d)
 
@@ -359,7 +358,7 @@ setup(name=DISTNAME,
       description=DESCRIPTION,
       zip_safe=False,
       license=LICENSE,
-      cmdclass={'build_ext' : MyBuildExt},
+      cmdclass={'build_ext' : MyBuildExt, 'clean' : CleanCommand},
       url=URL,
       download_url=DOWNLOAD_URL,
       long_description=LONG_DESCRIPTION,
