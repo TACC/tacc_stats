@@ -75,7 +75,8 @@ def update(date):
                         json['end_time'] =  utc_end.astimezone(tz)
                         json['date'] = json['end_time'].date()
                         
-                        ld.set_job(pickle_file,end_epoch = json['end_epoch'])       
+                        ld.set_job(pickle_file,end_epoch = json['end_epoch'])
+
                         json['exe'] = ld.exc.split('/')[-1]
                         json['cwd'] = ld.cwd[0:128]
                         json['threads'] = ld.threads

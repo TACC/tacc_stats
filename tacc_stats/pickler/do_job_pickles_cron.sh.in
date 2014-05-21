@@ -1,5 +1,5 @@
 #!/bin/bash
-set -eu
+
 
 prog=$(basename $0)
 prog_dir=$(readlink -f $(dirname $0))
@@ -16,7 +16,7 @@ else
     start=$(date --date="$(date --date=$1 +%F) +0 hour")
     end=$(date --date="$(date --date=$1 +%F) +24 hour")
 fi
-
+set -eu
 label_start=$(date --date="${start}" +%F)
 label_end=$(date --date="${end}" +%F)
 

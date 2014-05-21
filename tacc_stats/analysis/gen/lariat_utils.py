@@ -2,6 +2,10 @@ import json
 import time, os, fnmatch
 import re
 import textwrap
+
+#from pympler import tracker
+
+
 def make_date_string(t):
   lt=time.localtime(t)
   return '%(y)04d-%(m)02d-%(d)02d' % { 'y' : lt.tm_year, 'm' : lt.tm_mon,
@@ -63,6 +67,8 @@ class LariatData:
     self.json_list = []
     self.directory = directory
     self.daysback = daysback
+    #self.memory_tracker = tracker.SummaryTracker()
+
 
   # Can accept ts object or jobid and end_epoch
   def set_job(self,ts,end_epoch=None):
@@ -125,7 +131,7 @@ class LariatData:
       print str(jobid) + ' did not call ibrun' + \
           ' or has no lariat data for some other reason'
     except: pass
-
+    #self.memory_tracker.print_diff()
   def title(self):
     title='E: ' + self.exc
     if (self.cwd != 'unknown'):
