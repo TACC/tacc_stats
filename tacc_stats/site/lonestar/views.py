@@ -88,7 +88,7 @@ def dates(request):
         month_dict[key].append(date_pair)
 
     date_list = month_dict
-    return render_to_response("lonestar/dates.html", { 'date_list' : date_list})
+    return render_to_response("lonestar/dates.html", { 'date_list' : sorted(date_list.iteritems())})
 
 def search(request):
 

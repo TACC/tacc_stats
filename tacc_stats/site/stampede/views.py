@@ -28,7 +28,7 @@ from matplotlib.backends.backend_agg import FigureCanvasAgg as FigureCanvas
 from django.core.cache import cache,get_cache 
 import traceback
 
-#import memory_profiler
+#from memory_profiler import profile
 #@profile
 def update(date):
 
@@ -53,8 +53,8 @@ def update(date):
                 print traceback.format_exc()
                 pass
 
-            if created:
-                try:
+            try:
+                if created:
                     pickle_path = os.path.join(root,str(pickle_file))
                     # Create job row if it doesn't exists
                     with open(pickle_path, 'rb') as f:
@@ -88,10 +88,10 @@ def update(date):
 
                         obj = Job(**json)
                         obj.save()
-                except: 
-                    print pickle_file,'failed'
-                    print traceback.format_exc()
-                    print date
+            except: 
+                print pickle_file,'failed'
+                print traceback.format_exc()
+                print date
             print "Percentage Completed =",100*float(ctr)/nf
 
 def update_test_field(date,test,metric,rerun=False):
@@ -117,7 +117,7 @@ def dates(request):
     
     date_list = os.listdir(cfg.pickles_dir)
     date_list = sorted(date_list, key=lambda d: map(int, d.split('-')))
-
+    print date_list
     month_dict ={}
 
     for date in date_list:
@@ -128,7 +128,8 @@ def dates(request):
         month_dict[key].append(date_pair)
 
     date_list = month_dict
-    return render_to_response("stampede/dates.html", { 'date_list' : date_list})
+
+    return render_to_response("stampede/dates.html", { 'date_list' : sorted(date_list.iteritems())})
 
 def search(request):
 

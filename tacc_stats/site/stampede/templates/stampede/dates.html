@@ -83,7 +83,7 @@ Search by Executable
 {% if date_list %}
 
  <table border="1" cellpadding="5">
-{% for month, dates in date_list.iteritems %}
+{% for month, dates in date_list %}
    <tr><th>{{month}}</th>
    {% for date in dates %}
      <th><a href="date/{{date.0}}">{{date.1}}</th>
