@@ -117,7 +117,7 @@ def dates(request):
     
     date_list = os.listdir(cfg.pickles_dir)
     date_list = sorted(date_list, key=lambda d: map(int, d.split('-')))
-    print date_list
+
     month_dict ={}
 
     for date in date_list:
