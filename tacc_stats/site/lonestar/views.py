@@ -252,7 +252,7 @@ class LS4JobDetailView(DetailView):
         for host in host_list[1:]:
             urlstring+="%20OR%20%20host%3D"+host+".ls4.tacc.utexas.edu"
             
-            urlstring+="&earliest="+str(job.start_epoch)+"&latest="+str(job.end_epoch)+"&display.prefs.events.count=50"
+        urlstring+="&earliest="+str(job.start_epoch)+"&latest="+str(job.end_epoch)+"&display.prefs.events.count=50"
             
         context['splunk_url'] = urlstring
 
