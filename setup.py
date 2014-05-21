@@ -338,6 +338,9 @@ cfg_sh(pjoin(os.path.dirname(__file__), 'tacc_stats',
              'pickler','do_job_pickles_cron.sh.in'),paths)
 cfg_sh(pjoin(os.path.dirname(__file__), 'tacc_stats',
              'site','update_cron.sh.in'),paths)
+cfg_sh(pjoin(os.path.dirname(__file__), 'tacc_stats',
+             'src','monitor','archive.sh.in'),paths)
+
 
 setup(name=DISTNAME,
       version=FULLVERSION,

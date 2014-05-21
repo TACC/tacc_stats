@@ -3,7 +3,7 @@
 prog_dir=$(readlink -f $(dirname $0))
 wd=${prog_dir}
 
-export PATH=python_path:$prog_dir:$PATH
+export PATH=$prog_dir:$PATH:python_path
 
 if [ "$1" == "" ]; then
   y=`date -d yesterday +%Y-%m-%d`
