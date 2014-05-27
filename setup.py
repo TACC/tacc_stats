@@ -186,7 +186,6 @@ class CleanCommand(Command):
         self._clean_exclude = []
 
         for root, dirs, files in os.walk('tacc_stats'):
-            print root,dirs,files
             for f in files:
                 if f in self._clean_exclude:
                     continue
@@ -199,7 +198,11 @@ class CleanCommand(Command):
                 if d == '__pycache__':
                     self._clean_trees.append(pjoin(root, d))
 
-        for d in ('build', 'dist','tacc_stats.egg-info'):
+        for d in os.listdir(os.getcwd()):
+            if '.egg' in d:
+                self._clean_trees.append(d)
+
+        for d in ('build', 'dist'):
             if os.path.exists(d):
                 self._clean_trees.append(d)
 
