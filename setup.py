@@ -21,6 +21,7 @@ setuptools_kwargs = {}
 
 from distutils.extension import Extension
 from distutils.command.build import build
+from distutils.command.bdist_rpm import bdist_rpm
 from distutils.command.sdist import sdist
 
 from os.path import join as pjoin
@@ -269,8 +270,71 @@ ext_data=dict(sources=sources,
 extensions = []
 cmd = {}
 
-# The build cache system does string matching below this point.
-# if you change something, be careful.
+class MyBDist_RPM(bdist_rpm):
+
+    def initialize_options(self):
+        bdist_rpm.initialize_options(self)
+        try: os.stat('build')
+        except: os.mkdir('build')
+        self.prep_script = "build/bdist_rpm_prep"
+        open(self.prep_script,"w").write(
+            """
+%define _bindir /opt/%{name}
+%define crontab_file /etc/cron.d/%{name}
+%define stats_dir /var/log/tacc_stats
+%define archive_dir /scratch/projects/%{name}/archive
+%setup -q
+            """
+            )
+
+        self.build_script = None
+
+        self.install_script = "build/bdist_rpm_install"
+        open(self.install_script,"w").write(
+            """
+rm -rf %{buildroot}
+python setup.py install --single-version-externally-managed -O1 --root=$RPM_BUILD_ROOT --record=INSTALLED_FILES
+install -m 0755 -d %{buildroot}/%{_bindir}
+install -m 6755 build/bin/monitor %{buildroot}/%{_bindir}/%{name}
+install -m 0755 tacc_stats/archive.sh %{buildroot}/%{_bindir}/%{name}_archive
+echo %{_bindir}/%{name} >> %{_builddir}/%{name}-%{unmangled_version}/INSTALLED_FILES
+echo %{_bindir}/%{name}_archive >> %{_builddir}/%{name}-%{unmangled_version}/INSTALLED_FILES
+            """
+            )
+
+        self.clean_script = None
+        self.verify_script = None
+
+        self.pre_install = "build/bdist_rpm_preinstall"
+        open(self.pre_install,"w").write(
+            """
+if [ $1 == 0 ]; then
+rm %{crontab_file} || :
+fi
+            """
+            )
+
+        self.post_install = "build/bdist_rpm_postinstall"
+        open(self.post_install,"w").write(
+            """
+(
+ archive_min=$(( ((RANDOM * 60) / 32768) %% 60 ))
+ archive_hour=$(( (RANDOM %% 2) + 2 ))
+
+ echo \"MAILTO=\\"\\"\"
+ echo \"*/10 * * * * root %{_bindir}/%{name} collect\"
+ echo \"55 23 * * * root %{_bindir}/%{name} rotate\"
+ echo \"${archive_min} ${archive_hour} * * * root %{_bindir}/%{name}_archive %{stats_dir} %{archive_dir}\"
+) > %{crontab_file}
+
+/sbin/service crond restart || :
+
+%{_bindir}/%{name} rotate
+            """
+            )
+
+        self.pre_uninstall = None
+        self.post_uninstall = None
 
 class MyBuildExt(build_ext):
     def build_extension(self,ext):
@@ -351,6 +415,7 @@ setup(name=DISTNAME,
       packages=find_packages(),
       package_data = {'' : ['*.sh.in','*.cfg'] },
       scripts=['build/bin/monitor',
+               'tacc_stats/archive.sh',
                'tacc_stats/analysis/job_sweeper.py',
                'tacc_stats/analysis/job_plotter.py',
                'tacc_stats/exams_cron.sh',
@@ -367,7 +432,7 @@ setup(name=DISTNAME,
       description=DESCRIPTION,
       zip_safe=False,
       license=LICENSE,
-      cmdclass={'build_ext' : MyBuildExt, 'clean' : CleanCommand},
+      cmdclass={'build_ext' : MyBuildExt, 'clean' : CleanCommand, 'bdist_rpm' : MyBDist_RPM},
       url=URL,
       download_url=DOWNLOAD_URL,
       long_description=LONG_DESCRIPTION,
