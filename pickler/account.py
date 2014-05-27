@@ -14,7 +14,7 @@ class DbInterface:
 
         self.con = mdb.connect(db=dbname, read_default_file=mydefaults)
         self.tablename = tablename
-        self.query = "INSERT INTO " + tablename + " (resource_id,cluster,local_job_id,start_time_ts,end_time_ts,record,ingest_version) VALUES(%s,%s,%s,%s,%s,COMPRESS(%s)," + str(VERSION_NUMBER) + ")"
+        self.query = "INSERT IGNORE INTO " + tablename + " (resource_id,cluster,local_job_id,start_time_ts,end_time_ts,record,ingest_version) VALUES(%s,%s,%s,%s,%s,COMPRESS(%s)," + str(VERSION_NUMBER) + ")"
         self.buffered = 0
 
     def resettable(self,dropexisting = False):
@@ -119,16 +119,20 @@ def getconfig(configfilename = "config.json"):
 
     return config
 
-def ingest(config, end_time):
+def ingestall(config):
+    ingest(config, 9223372036854775807L, 0) 
+
+def ingest(config, end_time, start_time = None):
 
     dbconf = config['accountdatabase']
     dbif = DbInterface(dbconf["dbname"], dbconf["tablename"], dbconf["defaultsfile"] )
 
     for resourcename,resource in config['resources'].iteritems():
 
-        start_time = dbif.getmostrecent( resource['resource_id'] )
         if start_time == None:
-            start_time = 0
+            start_time = dbif.getmostrecent( resource['resource_id'] ) - (7* 24 * 3600)
+            if start_time == None:
+                start_time = 0
 
         acctreader = batch_acct.factory( resource['batch_system'], resource['acct_path'], resource['host_name_ext'])
 
