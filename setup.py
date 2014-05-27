@@ -272,10 +272,20 @@ cmd = {}
 
 class MyBDist_RPM(bdist_rpm):
 
+    # Just a Python distutils bug fix.  
+    # Very frustrating, rpms cannot build with extensions
+    def run(self):        
+        from distutils.sysconfig import get_python_version
+        import __builtin__
+        __builtin__.get_python_version = get_python_version
+
+        bdist_rpm.run(self)
+
     def initialize_options(self):
         bdist_rpm.initialize_options(self)
         try: os.stat('build')
         except: os.mkdir('build')
+        
         self.prep_script = "build/bdist_rpm_prep"
         open(self.prep_script,"w").write(
             """
@@ -283,10 +293,9 @@ class MyBDist_RPM(bdist_rpm):
 %define crontab_file /etc/cron.d/%{name}
 %define stats_dir /var/log/tacc_stats
 %define archive_dir /scratch/projects/%{name}/archive
-%setup -q
-            """
+%setup -n %{name}-%{unmangled_version}"""
             )
-
+        
         self.build_script = None
 
         self.install_script = "build/bdist_rpm_install"
@@ -305,8 +314,8 @@ echo %{_bindir}/%{name}_archive >> %{_builddir}/%{name}-%{unmangled_version}/INS
         self.clean_script = None
         self.verify_script = None
 
-        self.pre_install = "build/bdist_rpm_preinstall"
-        open(self.pre_install,"w").write(
+        self.pre_uninstall = "build/bdist_rpm_preuninstall"
+        open(self.pre_uninstall,"w").write(
             """
 if [ $1 == 0 ]; then
 rm %{crontab_file} || :
@@ -333,7 +342,7 @@ fi
             """
             )
 
-        self.pre_uninstall = None
+        self.pre_install = None
         self.post_uninstall = None
 
 class MyBuildExt(build_ext):
