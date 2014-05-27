@@ -253,7 +253,7 @@ define_macros=[('STATS_DIR_PATH','\"'+paths['stats_dir']+'\"'),
                ('JOBID_FILE_PATH','\"'+paths['jobid_file']+'\"')]
              
 flags = ['-D_GNU_SOURCE','-DDEBUG',
-         '-O3','-Werror','-Wall','-g']
+         '-O3','-Wall','-g']
 ext_data=dict(sources=sources,
               include_dirs=['tacc_stats/src/monitor/'] + include_dirs,
               library_dirs=library_dirs,
@@ -310,7 +310,6 @@ class MyBuildExt(build_ext):
             runtime_library_dirs=ext.runtime_library_dirs,
             extra_postargs=extra_args,
             target_lang=language)
-        shutil.copyfile('tacc_stats/src/monitor/archive.sh','build/bin/archive.sh')
 
         objects.remove(pjoin(self.build_temp,'tacc_stats','src',
                              'monitor','main.o'))
@@ -359,6 +358,7 @@ setup(name=DISTNAME,
                'tacc_stats/pickler/job_pickles.py'],
       ext_modules=extensions,
       setup_requires=['nose>=1.0'],
+      install_requires=['argparse','numpy','matplotlib','scipy'],
       test_suite = 'nose.collector',
       maintainer_email=EMAIL,
       description=DESCRIPTION,

@@ -28,12 +28,26 @@ def test():
     from tacc_stats.pickler import job_stats, batch_acct
     sys.modules['pickler.job_stats'] = job_stats
     sys.modules['pickler.batch_acct'] = batch_acct
-    
-    job_pickles.main(path, '2013-10-01', '2013-10-02',1)
+    from tacc_stats.pickler.tests import cfg
 
+    pickle_options = { 'processes'       : 1,
+                       'start'           : '2013-10-01',
+                       'end'             : '2013-10-02',
+                       'pickle_dir'      : path,
+                       'batch_system'    : cfg.batch_system,
+                       'acct_path'       : cfg.acct_path,
+                       'tacc_stats_home' : cfg.tacc_stats_home,
+                       'host_list_dir'   : cfg.host_list_dir,
+                       'host_name_ext'   : cfg.host_name_ext,
+                       'seek'            : cfg.seek
+                       }
+
+    pickler = job_pickles.JobPickles(**pickle_options)
+    pickler.run()
+       
     assert os.path.isfile(os.path.join(path,'1835740')) == True
     print("Pickle file generated.")
-    print(path)
+
     old = pickle.load(open(os.path.join(path,'1835740_ref')))
     new = pickle.load(open(os.path.join(path,'1835740')))
 

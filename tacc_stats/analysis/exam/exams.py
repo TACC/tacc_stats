@@ -9,9 +9,9 @@ import multiprocessing
 
 from tacc_stats.analysis.gen import tspl,tspl_utils
 
-def unwrap(arg,**kwarg):
+def unwrap(args):
   try:
-    return arg[0].test(*arg[1:],**kwarg)
+    return args[0].test(args[1],**args[2])
   except:
     print(traceback.format_exc())
     pass
@@ -65,10 +65,10 @@ class Test(object):
     else:
       return True
 
-  def run(self,filelist):
+  def run(self,filelist,**kwargs):
     if not filelist: return 
     pool=multiprocessing.Pool(processes=self.processes) 
-    pool.map(unwrap,zip([self]*len(filelist),filelist))
+    pool.map(unwrap,zip([self]*len(filelist),filelist,[kwargs]*len(filelist)))
     pool.close()
     pool.join()
 

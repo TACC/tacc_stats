@@ -321,8 +321,9 @@ class Host(object):
         # into lists of tuples in self.raw_stats.  The lists will be
         # converted into numpy arrays below.
         for path, start_time in path_list:
-            with gzip.open(path) as file:
-                self.read_stats_file(file)
+            fd = gzip.open(path)
+            self.read_stats_file(fd)
+            fd.close()
         # begin_mark = 'begin %s' % self.job.id # No '%'.
         # if not begin_mark in self.marks:
         #     self.error("no begin mark found\n")
