@@ -57,7 +57,7 @@ def createsummary(totalprocs, procid):
             if settings['enabled'] == False:
                 continue
 
-        timewindows[resourcename] = { "mintime": 2**64, "maxtime": 0 }
+        processtimes = { "mintime": 2**64, "maxtime": 0 }
 
         dbreader = account.DbAcct( settings['resource_id'], dbconf, PROCESS_VERSION, totalprocs, procid)
 
@@ -90,9 +90,12 @@ def createsummary(totalprocs, procid):
 
             if outdb[resourcename].find_one( {"_id": summary["_id"]}, { "_id":1 } ) != None:
                 dbwriter.logprocessed( acct, settings['resource_id'], PROCESS_VERSION )
-                timewindows[resourcename]['mintime'] = min( timewindows[resourcename]['mintime'], summary["acct"]['end_time'] )
-                timewindows[resourcename]['maxtime'] = max( timewindows[resourcename]['maxtime'], summary["acct"]['end_time'] )
+                processtimes['mintime'] = min( processtimes['mintime'], summary["acct"]['end_time'] )
+                processtimes['maxtime'] = max( processtimes['maxtime'], summary["acct"]['end_time'] )
                 ratecalc.increment()
+
+        if processtimes['maxtime'] != 0:
+            timewindows[resourcename] = processtimes
 
     sys.stderr.write("{} Processor {} of {} exiting. Processed {}\n".format(datetime.datetime.utcnow().isoformat(), procid, totalprocs, ratecalc.count))
 
@@ -111,7 +114,10 @@ def createsummary(totalprocs, procid):
 
     report = { "proc": proc, "resources": timewindows }
 
-    outdb["journal"].insert( report )
+    try:
+        outdb["journal"].insert( report )
+    except Exception as e:
+        sys.stderr.write("Error inserting report. Error: {}\n{}\n".format(e, report) )
 
 
 def main():
