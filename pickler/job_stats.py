@@ -359,7 +359,7 @@ class Host(object):
                     if self.job.id not in rec_jobid:
                         line = file.next()
                         if line.startswith(SF_MARK_CHAR): 
-                            tokens = line[1:].split(" ")
+                            tokens = line[1:].strip().split(" ")
                             if len(tokens) > 1 and tokens[0].strip() == "end":
                                 rec_jobid.add( tokens[1].strip() )
                             else:
