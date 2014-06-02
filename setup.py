@@ -54,9 +54,9 @@ CLASSIFIERS = [
 ]
 
 MAJOR = 1
-MINOR = 0
-MICRO = 6
-ISRELEASED = False
+MINOR = 1
+MICRO = 0
+ISRELEASED = True
 VERSION = '%d.%d.%d' % (MAJOR, MINOR, MICRO)
 QUALIFIER = ''
 
@@ -274,13 +274,18 @@ class MyBDist_RPM(bdist_rpm):
 
     # Just a Python distutils bug fix.  
     # Very frustrating, rpms cannot build with extensions
+    # without this hack.
     def run(self):        
-        from distutils.sysconfig import get_python_version
-        import __builtin__
-        __builtin__.get_python_version = get_python_version
-
+        try:            
+            from distutils.sysconfig import get_python_version
+            import __builtin__
+            __builtin__.get_python_version = get_python_version
+        except:
+            # Supposedly corrected in Python3 where __builtin__ -> builtin
+            pass
         bdist_rpm.run(self)
 
+    # Make the spec file my way!
     def initialize_options(self):
         bdist_rpm.initialize_options(self)
         try: os.stat('build')
@@ -345,6 +350,8 @@ fi
         self.pre_install = None
         self.post_uninstall = None
 
+# Make executable and shared library
+# C extensions
 class MyBuildExt(build_ext):
     def build_extension(self,ext):
         

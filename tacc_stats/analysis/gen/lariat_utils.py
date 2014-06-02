@@ -112,7 +112,7 @@ class LariatData:
             json_str = re.sub(r'\\','',json_str)
             self.ld.update(json.loads(json_str))
       else:
-        print 'Json file for ' + jobid + ' not found in ' + directory
+        print 'Json file for ' + jobid + ' not found in ' + self.directory
 
     # Check if job is in json
     try:

@@ -1,2 +1,0 @@
-python setup.py bdist_rpm --prep-script=cfg/prep.inc --install-script=cfg/install.inc --pre-uninstall=cfg/preun.inc --post-install=cfg/post.inc --spec-only
-python setup.py bdist_rpm --prep-script=cfg/prep.inc --install-script=cfg/install.inc --pre-uninstall=cfg/preun.inc --post-install=cfg/post.inc
