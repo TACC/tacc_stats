@@ -1,16 +1,17 @@
 from __future__ import print_function
 import os, sys, subprocess, glob
-from tacc_stats.analysis.plot import plots
+import tacc_stats.analysis as plots
 
 ### Test plotters
 filelist = [os.path.join(os.path.dirname(os.path.abspath(__file__)),'1835740_ref')]
 print(filelist)
 #### MemUsage plotter
 def meta_test():
-    meta_plot = plots.MetaDataRate(outdir='.',
-                                   prefix='MetaDataRate',
-                                   header='Plot Meta Data Rate',lariat_data='pass',
-                                   save=True)
+    meta_plot = plots.MetaDataRatePlot(outdir='.',
+                                       prefix='MetaDataRate',
+                                       header='Plot Meta Data Rate',
+                                       lariat_data='pass',
+                                       save=True)
     meta_plot.plot(filelist[0])
     assert os.path.isfile(meta_plot.outdir+'/'+meta_plot.fname+'.pdf')
     os.remove(meta_plot.fname+'.pdf')

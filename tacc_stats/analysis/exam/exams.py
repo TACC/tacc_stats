@@ -1,13 +1,11 @@
 from __future__ import print_function
 import os,sys
 import abc
-import math
-import numpy
 import operator,traceback
-from scipy.stats import tmean,tstd
 import multiprocessing
-
+from datetime import date
 from tacc_stats.analysis.gen import tspl,tspl_utils
+import tacc_stats.cfg as cfg
 
 def unwrap(args):
   try:
@@ -116,293 +114,44 @@ class Test(object):
 
     return sorted_jobs
 
+  def date_sweep(self,start,end):
+    for date_dir in os.listdir(cfg.pickles_dir):
+
+      try:
+        s = [int(x) for x in start.split('-')]
+        e = [int(x) for x in end.split('-')]
+        d = [int(x) for x in date_dir.split('-')]
+      except: continue
+
+      if not date(s[0],s[1],s[2]) <= date(d[0],d[1],d[2]) <= date(e[0],e[1],e[2]): 
+        continue
+
+      print('>>>',date_dir)
+      files = os.path.join(cfg.pickles_dir,date)
+
+    filelist=tspl_utils.getfilelist(files)
+    self.run(filelist)
+      
+    passed = self.results.values().count(True)
+    failed = self.results.values().count(False)
+    total = passed + failed
+
+    print("---------------------------------------------")
+    try: 
+      print("Jobs tested:",passed+failed)
+      print("Percentage of jobs failed:",100*passed/float(total))
+    except ZeroDivisionError: 
+      print("No jobs failed.")
+      return
+    print('Failed jobs')
+    for x in self.top_jobs():
+      print(x[0],x[1])
+    return self.failed()
+
   @abc.abstractmethod
   def test(self,jobid,job_data=None):
     """Run the test for a single job"""
     return
 
-class MemBw(Test):
 
-  k1=['intel_snb_imc', 'intel_snb_imc']
-  k2=['CAS_READS', 'CAS_WRITES']
-
-  def test(self,jobid,job_data=None):
-    if not self.setup(jobid,job_data=job_data): return
-
-    peak = 76.*1.e9
-    gdramrate = numpy.zeros(len(self.ts.t)-1)
-    for h in self.ts.j.hosts.keys():
-      gdramrate += numpy.divide(numpy.diff(64.*self.ts.assemble([0,1],h,0)),
-                                numpy.diff(self.ts.t))
-
-    mdr=tmean(gdramrate)/self.ts.numhosts
-    self.comp2thresh(jobid,mdr/peak)
-
-    return
-
-class Idle(Test):
-  k1={'amd64' : ['amd64_core','amd64_sock','cpu'],
-      'intel_snb' : [ 'intel_snb', 'intel_snb', 'cpu'],}
-  k2={'amd64' : ['SSE_FLOPS', 'DRAM',      'user'],
-      'intel_snb' : ['SIMD_D_256','LOAD_L1D_ALL','user'],}
-
-  def test(self,jobid,job_data=None):
-    if not self.setup(jobid,job_data=job_data): return
-
-    mr=[]
-    for i in range(len(self.k1)):
-      maxrate=numpy.zeros(len(self.ts.t)-1)
-      for h in self.ts.j.hosts.keys():
-        rate=numpy.divide(numpy.diff(self.ts.data[i][h]),numpy.diff(self.ts.t))
-        maxrate=numpy.maximum(rate,maxrate)
-      mr.append(maxrate)
-
-    sums=[]
-    for i in range(len(self.k1)):
-      for h in self.ts.j.hosts.keys():
-        rate=numpy.divide(numpy.diff(self.ts.data[i][h]),numpy.diff(self.ts.t))
-        sums.append(numpy.sum(numpy.divide(mr[i]-rate,mr[i]))/(len(self.ts.t)-1))
-
-    sums = [0. if math.isnan(x) else x for x in sums]
-    val = max(sums)
-    self.comp2thresh(jobid,val)
-
-    return
-
-class Imbalance(Test):
-  k1=None
-  k2=None
-  def __init__(self,k1=['intel_snb'],k2=['LOAD_L1D_ALL'],processes=1,aggregate=False,**kwargs):
-    self.k1=k1
-    self.k2=k2
-
-    if aggregate:
-      kwargs['min_hosts'] = 2
-    kwargs['aggregate'] = aggregate
-    kwargs['waynesses']=16
-    super(Imbalance,self).__init__(processes=processes,**kwargs)
-
-  def test(self,jobid,job_data=None):
-    
-    if not self.setup(jobid,job_data=job_data): return
-
-    tmid=(self.ts.t[:-1]+self.ts.t[1:])/2.0
-    rng=range(1,len(tmid)) # Throw out first and last
-    self.tmid=tmid[rng]         
-    
-    maxval=numpy.zeros(len(rng))
-    minval=numpy.ones(len(rng))*1e100
-
-    self.rate=[]
-    for v in self.ts:
-      self.rate.append(numpy.divide(numpy.diff(v)[rng],
-                                    numpy.diff(self.ts.t)[rng]))
-      maxval=numpy.maximum(maxval,self.rate[-1])
-      minval=numpy.minimum(minval,self.rate[-1])
-
-    vals=[]
-    mean=[]
-    std=[]
-    for j in range(len(rng)):
-      vals.append([])
-      for v in self.rate:
-        vals[j].append(v[j])
-      mean.append(tmean(vals[j]))
-      std.append(tstd(vals[j]))
-
-    imbl=maxval-minval
-
-    self.ratio=numpy.divide(std,mean)
-    self.ratio2=numpy.divide(imbl,maxval)
-
-    # mean of ratios is the threshold statistic
-    var=tmean(self.ratio) 
-    self.ratios[self.ts.j.id]=[var,self.ts.owner]
-    self.comp2thresh(jobid,abs(var))
-
-  def find_top_users(self):
-    users={}
-
-    for k in self.ratios.keys():
-      u=self.ratios[k][1]
-      if not u in users:
-        users[u]=[]
-        users[u].append(0.)
-        users[u].append([])
-      else:
-        users[u][0]=max(users[u][0],self.ratios[k][0])
-        users[u][1].append(k)
-
-    a=[ x[0] for x in sorted(users.iteritems(),
-                             key=operator.itemgetter(1), reverse=True) ]
-    maxi=len(a)+1
-    maxi=min(10,maxi)
-    print('---------top 10----------')
-    for u in a[0:maxi]:
-      print(u + ' ' + str(users[u][0]) + ' ' + ' '.join(users[u][1]))
-    return users
-
-class Catastrophe(Test):
-
-  # Hash value must be a list
-  k1={'amd64' : ['amd64_sock'],
-      'intel_snb': ['intel_snb']}
-  k2={'amd64' : ['DRAM'],
-      'intel_snb': ['LOAD_L1D_ALL']}
-
-  def compute_fit_params(self,ind):
-    fit=[]
-    for v in self.ts:
-      rate=numpy.divide(numpy.diff(v),numpy.diff(self.ts.t))
-      tmid=(self.ts.t[:-1]+self.ts.t[1:])/2.0
-      r1=range(ind)
-      r2=[x + ind for x in range(len(rate)-ind)]
-      a=numpy.trapz(rate[r1],tmid[r1])/(tmid[ind]-tmid[0])
-      b=numpy.trapz(rate[r2],tmid[r2])/(tmid[-1]-tmid[ind])
-      fit.append((a,b))      
-    return fit   
-
-  def test(self,jobid,job_data=None):
-    if not self.setup(jobid,job_data=job_data): return 
-
-    bad_hosts=tspl_utils.lost_data(self.ts)
-    if len(bad_hosts) > 0:
-      print(self.ts.j.id, ': Detected hosts with bad data: ', bad_hosts)
-      return
-
-    vals=[]
-    for i in [x + 2 for x in range(self.ts.size-4)]:
-      vals.append(self.compute_fit_params(i))
-
-    vals2=[]
-    for v in vals:
-      vals2.append([ b/a for (a,b) in v])
-
-    arr=numpy.array(vals2)
-    brr=numpy.transpose(arr)
-
-    (m,n)=numpy.shape(brr)
-
-    r=[]
-    for i in range(m):
-      jnd=numpy.argmin(brr[i,:])
-      r.append((jnd,brr[i,jnd]))
-
-    for (ind,ratio) in r:
-      self.comp2thresh(jobid,ratio,'<')
-      if self.results[jobid]: break
-
-    return
-
-class LowFLOPS(Test):
-  k1={'amd64' : ['amd64_core','amd64_sock','cpu'],
-      'intel_snb' : [ 'intel_snb', 'intel_snb', 'intel_snb', 'cpu'],}
-  k2={'amd64' : ['SSE_FLOPS', 'DRAM',      'user'],
-      'intel_snb' : ['SIMD_D_256','SSE_D_ALL','LOAD_L1D_ALL','user'],}
-
-  peak={'amd64' : [2.3e9*16*2, 24e9, 1.],
-        'intel_snb' : [ 16*2.7e9*2, 16*2.7e9/2.*64., 1.],}
-  
-  def test(self,jobid,job_data=None):
-    if not self.setup(jobid,job_data=job_data): return
-
-    ts=self.ts
-    gfloprate = numpy.zeros(len(ts.t)-1)
-    gdramrate = numpy.zeros(len(ts.t)-1)
-    gcpurate  = numpy.zeros(len(ts.t)-1)
-    for h in ts.j.hosts.keys():
-      if ts.pmc_type == 'amd64' :
-        gfloprate += numpy.divide(numpy.diff(ts.data[0][h][0]),numpy.diff(ts.t))
-        gdramrate += numpy.divide(numpy.diff(ts.data[1][h][0]),numpy.diff(ts.t))
-        gcpurate  += numpy.divide(numpy.diff(ts.data[2][h][0]),numpy.diff(ts.t))
-      elif ts.pmc_type == 'intel_snb':
-        gfloprate += numpy.divide(numpy.diff(ts.data[0][h][0]),numpy.diff(ts.t))
-        gfloprate += numpy.divide(numpy.diff(ts.data[1][h][0]),numpy.diff(ts.t))
-        gdramrate += numpy.divide(numpy.diff(ts.data[2][h][0]),numpy.diff(ts.t))
-        gcpurate  += numpy.divide(numpy.diff(ts.data[3][h][0]),numpy.diff(ts.t))
-        
-    mfr=tmean(gfloprate)/ts.numhosts
-    mdr=tmean(gdramrate)/ts.numhosts
-    mcr=tmean(gcpurate)/(ts.numhosts*ts.wayness*100.)
-    if (mcr/self.peak[ts.pmc_type][2] > 0.5):
-      self.comp2thresh(jobid,(mfr/self.peak[ts.pmc_type][0])/(mdr/self.peak[ts.pmc_type][1]),'<')
-    else: self.results[jobid]=False
-
-    return
-
-
-class MetaDataRate(Test):
-  k1=['llite', 'llite', 'llite', 'llite', 'llite',
-      'llite', 'llite', 'llite', 'llite', 'llite',
-      'llite', 'llite', 'llite', 'llite', 'llite',
-      'llite', 'llite', 'llite', 'llite', 'llite',
-      'llite', 'llite', 'llite', ]
-  k2=['open','close','mmap','fsync','setattr',
-      'truncate','flock','getattr','statfs','alloc_inode',
-      'setxattr',' listxattr',
-      'removexattr', 'readdir',
-      'create','lookup','link','unlink','symlink','mkdir',
-      'rmdir','mknod','rename',]
-
-  def test(self,jobid,job_data=None):
-    if not self.setup(jobid,job_data=job_data): return
-    ts = self.ts
-
-    if not tspl_utils.checkjob(ts,self.min_time,range(1,33)): return
-    tmid=(ts.t[:-1]+ts.t[1:])/2.0
-
-    meta_rate = numpy.zeros_like(tmid)
-
-    for k in ts.j.hosts.keys():
-      meta_rate+=numpy.diff(ts.assemble(range(0,len(self.k1)),k,0))/numpy.diff(ts.t)
-
-    meta_rate  /= float(ts.numhosts)
-    
-    self.comp2thresh(jobid,numpy.max(meta_rate))
-
-    return  
-    
-class HighCPI(Test):
-  k1 = ['intel_snb', 'intel_snb']      
-  k2 = ['CLOCKS_UNHALTED_REF','INSTRUCTIONS_RETIRED' ]
-
-  def test(self,jobid,job_data=None):
-    if not self.setup(jobid,job_data=job_data): return
-    ts = self.ts
-
-    if "FAIL" in ts.status: return
-    if "CANCELLED" in ts.status: return  
-
-    tmid=(ts.t[:-1]+ts.t[1:])/2.0       
-    clock_rate = numpy.zeros_like(tmid)
-    instr_rate = numpy.zeros_like(tmid)
-    for k in ts.j.hosts.keys():
-      clock_rate += numpy.diff(ts.data[0][k][0])
-      instr_rate += numpy.diff(ts.data[1][k][0])
-      
-    cpi = tmean(numpy.nan_to_num(clock_rate/instr_rate))
-
-    self.comp2thresh(jobid,cpi)
-
-class HighCPLD(Test):
-  k1 = ['intel_snb', 'intel_snb']      
-  k2 = ['CLOCKS_UNHALTED_REF','LOAD_L1D_ALL' ]
-
-  def test(self,jobid,job_data=None):
-    if not self.setup(jobid,job_data=job_data): return
-    ts = self.ts
-
-    if "FAIL" in ts.status: return
-    if "CANCELLED" in ts.status: return  
-
-    tmid=(ts.t[:-1]+ts.t[1:])/2.0       
-    clock_rate = numpy.zeros_like(tmid)
-    instr_rate = numpy.zeros_like(tmid)
-    for k in ts.j.hosts.keys():
-      clock_rate += numpy.diff(ts.assemble([0],k,0))/numpy.diff(ts.t)
-      instr_rate += numpy.diff(ts.assemble([1],k,0))/numpy.diff(ts.t)
-
-    cpi = tmean(clock_rate/instr_rate)
-
-    self.comp2thresh(jobid,cpi)
        

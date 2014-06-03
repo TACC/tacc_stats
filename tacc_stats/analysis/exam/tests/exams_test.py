@@ -1,6 +1,6 @@
 from __future__ import print_function
 import os, sys, subprocess, glob
-from tacc_stats.analysis.exam import exams
+import tacc_stats.analysis as exams
 
 ### Test exams
 filelist = [os.path.join(os.path.dirname(os.path.abspath(__file__)),'1835740_ref')] * 3
@@ -52,7 +52,7 @@ def mbw_test():
 #### Metadata Rate
 def mdr_test():
     print("MetaDataRate test")
-    md_test = exams.MemBw(processes=1,threshold=0.1)
+    md_test = exams.MetaDataRate(processes=1,threshold=0.1)
     md_test.run(filelist)
     assert len(md_test.failed()) == 1
 
