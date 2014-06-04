@@ -128,7 +128,7 @@ INSTALLED_APPS = (
     'django.contrib.sites',
     'django.contrib.messages',
     'django.contrib.staticfiles',
-    'django_extensions',
+    #'django_extensions',
     # Uncomment the next line to enable the admin:
     'django.contrib.admin',
     'south',
@@ -186,8 +186,9 @@ CACHES = {
         'LOCATION': '127.0.0.1:11211',
         },
     'default': { 
-        'BACKEND':'tacc_stats_site.cache.LargeMemcachedCache',
+        'BACKEND':'tacc_stats.site.tacc_stats_site.cache.LargeMemcachedCache',
         'LOCATION': '127.0.0.1:11211',
         'TIMEOUT': None,
         }
     }
+

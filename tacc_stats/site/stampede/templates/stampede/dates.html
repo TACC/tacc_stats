@@ -6,51 +6,16 @@
 <p>
 <font size="8" color="#002868"> TACC</font> <font size="8" color="#bf0a30"> Stats</font> <font color="ffffff" face="comic sans ms" >Stampede</font>
 </p>
-
-<style>
-#container {
-
-float:center;
-
-}
-
-#browse {
-position:absolute;
-bottom:20%;
-left:0;
-font-family:arial;
-}
-
-#search {
-float:left;
-}
-
-#pic {
-position:absolute;
-right:0;
-top:-170%;
-}
-
-#logo {
-position:absolute;
-bottom:0;
-left:75%;
-}
-
-</style>
-
-<div id="container">
-
-<div id="logo">
+<p>
+<img src="/media/stampede.jpg"
 <img width="250" src="/media/TACC_logo.png" />
-</div>
-
+</p>
 
 {% if error %}
    <p style="color: red;">Requested search failed.</p>
 {% endif %}
 <font size="4">
-<div id="search">
+
 Search by Job ID
 <form action="{% url 'stampede:search' %}" method="get">
   <input type="text" name ="q">
@@ -95,12 +60,7 @@ Search by Executable
 {% endif %}   
 </div>
 
-<div id="pic">
-<img src="/media/stampede.jpg"
-</div>
 
-
-</div>
 </body>
 
 </html>

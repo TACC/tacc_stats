@@ -1,5 +1,5 @@
 from __future__ import print_function
-import os, sys, subprocess, glob
+import os, sys
 import tacc_stats.analysis as plots
 
 ### Test plotters

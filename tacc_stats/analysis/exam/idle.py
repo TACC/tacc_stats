@@ -6,9 +6,9 @@ class Idle(Test):
       'intel_snb' : [ 'intel_snb', 'intel_snb', 'cpu'],}
   k2={'amd64' : ['SSE_FLOPS', 'DRAM',      'user'],
       'intel_snb' : ['SIMD_D_256','LOAD_L1D_ALL','user'],}
+  comp_operator = '>'
 
-  def test(self,jobid,job_data=None):
-    if not self.setup(jobid,job_data=job_data): return
+  def compute_metric(self):
 
     mr=[]
     for i in range(len(self.k1)):
@@ -25,7 +25,6 @@ class Idle(Test):
         sums.append(numpy.sum(numpy.divide(mr[i]-rate,mr[i]))/(len(self.ts.t)-1))
 
     sums = [0. if math.isnan(x) else x for x in sums]
-    val = max(sums)
-    self.comp2thresh(jobid,val)
+    self.metric = max(sums)
 
     return

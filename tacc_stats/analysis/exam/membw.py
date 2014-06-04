@@ -6,9 +6,9 @@ class MemBw(Test):
 
   k1=['intel_snb_imc', 'intel_snb_imc']
   k2=['CAS_READS', 'CAS_WRITES']
+  comp_operator = '>'
 
-  def test(self,jobid,job_data=None):
-    if not self.setup(jobid,job_data=job_data): return
+  def compute_metric(self):
 
     peak = 76.*1.e9
     gdramrate = numpy.zeros(len(self.ts.t)-1)
@@ -17,6 +17,6 @@ class MemBw(Test):
                                 numpy.diff(self.ts.t))
 
     mdr=tmean(gdramrate)/self.ts.numhosts
-    self.comp2thresh(jobid,mdr/peak)
+    self.metric = mdr/peak
 
     return

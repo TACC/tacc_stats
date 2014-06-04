@@ -2,15 +2,16 @@
 from __future__ import print_function
 import os
 import abc
-import math
 import numpy,traceback
 import multiprocessing
-import matplotlib
 
 from scipy.stats import scoreatpercentile as score
+
+import matplotlib
 from matplotlib.figure import Figure
-from matplotlib.backends.backend_agg import FigureCanvasAgg as FigureCanvas
-from matplotlib.backends.backend_pdf import FigureCanvasPdf as FigureCanvasPdf
+from matplotlib.backends.backend_agg import FigureCanvasAgg
+from matplotlib.backends.backend_pdf import FigureCanvasPdf
+
 from tacc_stats.cfg import lariat_path
 from tacc_stats.analysis.gen import tspl,tspl_utils,lariat_utils,my_utils
 
@@ -206,7 +207,7 @@ class Plot(object):
     elif self.mode == 'percentile':
       self.fname+='_perc'
     if not self.save:
-      self.canvas = FigureCanvas(self.fig)
+      self.canvas = FigureCanvasAgg(self.fig)
     else: 
       self.canvas = FigureCanvasPdf(self.fig)
       self.fig.savefig(os.path.join(self.outdir,self.fname))

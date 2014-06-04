@@ -7,10 +7,9 @@ import os,sys,pwd
 
 from tacc_stats.site.stampede.models import Job, JobForm
 import tacc_stats.cfg as cfg
-from tacc_stats.analysis.gen import tspl, lariat_utils
-from tacc_stats.analysis.exam import exams as exams
-from tacc_stats.analysis.plot import plots as plots
 
+import tacc_stats.analysis as analysis
+from tacc_stats.analysis.gen import lariat_utils
 from tacc_stats.pickler import job_stats, batch_acct
 # Compatibility with old pickle versions
 sys.modules['pickler.job_stats'] = job_stats
@@ -103,15 +102,15 @@ def update_test_field(date,test,metric,rerun=False):
                'status__in' : ['COMPLETED','TIMEOUT']}
     
     jobs_list = Job.objects.filter(**kwargs).exclude(queue__in=test.ignore_qs)
-    #for e in jobs_list: print e.id,e.nodes,e.run_time,e.queue,e.status,e.mbw    
+
     if not rerun:
         jobs_list = jobs_list.filter(Q(**{metric : None}) | Q(**{metric : float('nan')}))
 
 
     print '# Jobs to be tested:',len(jobs_list)
     test.run(jobs_list.values_list('path',flat=True))
-    for jid in test.su.keys(): 
-        jobs_list.filter(id = jid).update(**{metric : test.su[jid][2]})
+    for jid in test.results.keys(): 
+        jobs_list.filter(id = jid).update(**{metric : test.results[jid]['metric']})
 
 def dates(request):
     
@@ -296,16 +295,16 @@ def get_data(pk):
 
 def master_plot(request, pk):
     data = get_data(pk)
-    mp = plots.MasterPlot(lariat_data="pass")
+    mp = analysis.MasterPlot(lariat_data="pass")
     mp.plot(pk,job_data=data)
     return figure_to_response(mp)
 
 def heat_map(request, pk):    
     data = get_data(pk)
-    hm = plots.HeatMap(k1=['intel_snb','intel_snb'],
-                     k2=['CLOCKS_UNHALTED_REF',
-                         'INSTRUCTIONS_RETIRED'],
-                     lariat_data="pass")
+    hm = analysis.HeatMap(k1=['intel_snb','intel_snb'],
+                          k2=['CLOCKS_UNHALTED_REF',
+                              'INSTRUCTIONS_RETIRED'],
+                          lariat_data="pass")
     hm.plot(pk,job_data=data)
     return figure_to_response(hm)
 
@@ -362,7 +361,7 @@ def type_plot(request, pk, type_name):
     k1 = {'intel_snb' : [type_name]*len(schema)}
     k2 = {'intel_snb': schema}
 
-    tp = plots.DevPlot(k1=k1,k2=k2,lariat_data='pass')
+    tp = analysis.DevPlot(k1=k1,k2=k2,lariat_data='pass')
     tp.plot(pk,job_data=data)
     return figure_to_response(tp)
 
@@ -384,7 +383,7 @@ def type_detail(request, pk, type_name):
 
     return render_to_response("stampede/type_detail.html",{"type_name" : type_name, "jobid" : pk, "stats_data" : stats, "schema" : schema})
 
-
+"""
 from django.template.loader import get_template
 from django.template import Context
 import ho.pisa as pisa
@@ -406,4 +405,4 @@ def render_to_pdf(template_src, context_dict):
     response['Content-Disposition'] = "attachment; filename="+context_dict['name']+"report.pdf"
 
     return response
-
+"""

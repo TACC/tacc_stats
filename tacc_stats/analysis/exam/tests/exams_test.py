@@ -18,7 +18,7 @@ def imb_test():
     imb_test = exams.Imbalance(['intel_snb'],['LOAD_L1D_ALL'],
                                processes=1,threshold=0.01)
     imb_test.run(filelist)
-    imb_test.find_top_users()
+    imb_test.top_jobs()
     assert len(imb_test.failed()) == 1
 
 #### Idle
@@ -46,6 +46,7 @@ def flops_test():
 def mbw_test():
     print("Memory BW test")
     bw_test = exams.MemBw(processes=1,threshold=0.1)
+    bw_test.test(filelist[0])
     bw_test.run(filelist)
     assert len(bw_test.failed()) == 1 
 

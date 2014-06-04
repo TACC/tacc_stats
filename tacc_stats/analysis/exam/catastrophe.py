@@ -9,6 +9,7 @@ class Catastrophe(Test):
       'intel_snb': ['intel_snb']}
   k2={'amd64' : ['DRAM'],
       'intel_snb': ['LOAD_L1D_ALL']}
+  comp_operator = '<'
 
   def compute_fit_params(self,ind):
     fit=[]
@@ -22,8 +23,7 @@ class Catastrophe(Test):
       fit.append((a,b))      
     return fit   
 
-  def test(self,jobid,job_data=None):
-    if not self.setup(jobid,job_data=job_data): return 
+  def compute_metric(self):
 
     bad_hosts=tspl_utils.lost_data(self.ts)
     if len(bad_hosts) > 0:
@@ -50,7 +50,5 @@ class Catastrophe(Test):
       r.append((jnd,brr[i,jnd]))
 
     for (ind,ratio) in r:
-      self.comp2thresh(jobid,ratio,'<')
-      if self.results[jobid]: break
-
+      self.metric = min(ratio,self.metric)
     return

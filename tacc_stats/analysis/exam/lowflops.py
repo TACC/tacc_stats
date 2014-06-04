@@ -10,9 +10,11 @@ class LowFLOPS(Test):
 
   peak={'amd64' : [2.3e9*16*2, 24e9, 1.],
         'intel_snb' : [ 16*2.7e9*2, 16*2.7e9/2.*64., 1.],}
+
+  # If Metric is less than Threshold than flag 
+  comp_operator = '<'
   
-  def test(self,jobid,job_data=None):
-    if not self.setup(jobid,job_data=job_data): return
+  def compute_metric(self):
 
     ts=self.ts
     gfloprate = numpy.zeros(len(ts.t)-1)
@@ -32,9 +34,15 @@ class LowFLOPS(Test):
     mfr=tmean(gfloprate)/ts.numhosts
     mdr=tmean(gdramrate)/ts.numhosts
     mcr=tmean(gcpurate)/(ts.numhosts*ts.wayness*100.)
+
+
+
     if (mcr/self.peak[ts.pmc_type][2] > 0.5):
-      self.comp2thresh(jobid,(mfr/self.peak[ts.pmc_type][0])/(mdr/self.peak[ts.pmc_type][1]),'<')
-    else: self.results[jobid]=False
+      self.metric = (mfr/self.peak[ts.pmc_type][0])/(mdr/self.peak[ts.pmc_type][1]) 
+    else: 
+      self.metric = 0
 
     return
 
+
+    

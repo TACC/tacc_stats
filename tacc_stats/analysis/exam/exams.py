@@ -5,7 +5,6 @@ import operator,traceback
 import multiprocessing
 from datetime import date
 from tacc_stats.analysis.gen import tspl,tspl_utils
-import tacc_stats.cfg as cfg
 
 def unwrap(args):
   try:
@@ -22,6 +21,11 @@ class Test(object):
   @abc.abstractproperty
   def k2(self): pass
 
+  # '>' If metric is greater than threshold flag the job 
+  # '<' If metric is less than threshold flag the job 
+  @abc.abstractproperty
+  def comp_operator(self): pass
+
   ts = None
 
   def __init__(self,processes=1,**kwargs):
@@ -35,21 +39,19 @@ class Test(object):
     self.waynesses=kwargs.get('waynesses',[x+1 for x in range(32)])
 
     manager=multiprocessing.Manager()
-    self.ratios=manager.dict()
     self.results=manager.dict()
-    self.su=manager.dict()
 
-  def setup(self,jobid,job_data=None):
+  def setup(self,job_path,job_data=None):
     self.metric = float("nan")
     try:
       if self.aggregate:
-        self.ts=tspl.TSPLSum(jobid,self.k1,self.k2,job_data=job_data)
+        self.ts=tspl.TSPLSum(job_path,self.k1,self.k2,job_data=job_data)
       else:
-        self.ts=tspl.TSPLBase(jobid,self.k1,self.k2,job_data=job_data)
+        self.ts=tspl.TSPLBase(job_path,self.k1,self.k2,job_data=job_data)
     except tspl.TSPLException as e:
       return False
     except EOFError as e:
-      print('End of file found reading: ' + jobid)
+      print('End of file found reading: ' + job_path)
       return False
 
     if "FAIL" in self.ts.status: return False
@@ -64,58 +66,53 @@ class Test(object):
       return True
 
   def run(self,filelist,**kwargs):
-    if not filelist: return 
+    if not filelist: 
+      print("Please specify a job file list.")
+      return 
+
     pool=multiprocessing.Pool(processes=self.processes) 
     pool.map(unwrap,zip([self]*len(filelist),filelist,[kwargs]*len(filelist)))
     pool.close()
     pool.join()
 
-  def comp2thresh(self,jobid,val,func='>'):
-    comp = {'>': operator.gt, '>=': operator.ge,
-                '<': operator.le, '<=': operator.le,
-                '==': operator.eq}
-    self.metric = val
-    self.su[self.ts.j.id] = (self.ts.owner,self.ts.su,val)
-    if comp[func](val, self.threshold):
-      self.results[jobid] = True
-    else:
-      self.results[jobid] = False
-    return
+  comp = {'>': operator.gt, '>=': operator.ge,
+          '<': operator.le, '<=': operator.le,
+          '==': operator.eq}
 
   def failed(self):
-    results=self.results
     jobs=[]
-    for i in results.keys():
-      if results[i]:
+    for i in self.results.keys():
+      if self.results[i]['result']:
         jobs.append(i)
     return jobs
 
+  # Report top users by SU usage, only count failed jobs 
+  # by default
   def top_jobs(self, failed=True):
     jobs = {}
+    total = {}
+
     if failed: jobs_list = self.failed()
     else: job_list = self.results.keys()
 
-    total = {}
-
     for jobid in jobs_list:
-      jobid = jobid.split('/')[-1]
-      data = self.su[jobid]        
-      if not data[0] in jobs: 
-        jobs[data[0]] = []
-        total[data[0]] = 0
-      jobs[data[0]].append((jobid,data[1],data[2]))
-      total[data[0]] += data[1]
+      data = self.results[jobid]        
+      owner = data['owner']
+
+      jobs.setdefault(owner,[]).append([jobid,data['su'],data['metric'],data['result']])
+      total[owner] = total.get(owner,0) + data['su']
 
     sorted_totals = sorted(total.iteritems(),key=operator.itemgetter(1))
-
     sorted_jobs = []
     for x in sorted_totals[::-1]:
       sorted_jobs.append((x,jobs[x[0]]))
 
     return sorted_jobs
 
-  def date_sweep(self,start,end):
-    for date_dir in os.listdir(cfg.pickles_dir):
+  def date_sweep(self,start,end,directory=None):
+    if not directory: return
+
+    for date_dir in os.listdir(directory):
 
       try:
         s = [int(x) for x in start.split('-')]
@@ -127,13 +124,18 @@ class Test(object):
         continue
 
       print('>>>',date_dir)
-      files = os.path.join(cfg.pickles_dir,date)
+      files = os.path.join(directory,date_dir)
 
     filelist=tspl_utils.getfilelist(files)
     self.run(filelist)
       
-    passed = self.results.values().count(True)
-    failed = self.results.values().count(False)
+    passed = 0
+    failed = 0
+
+    for data in self.results.values():
+      if data['result']: passed +=1
+      else: failed += 1
+
     total = passed + failed
 
     print("---------------------------------------------")
@@ -149,9 +151,32 @@ class Test(object):
     return self.failed()
 
   @abc.abstractmethod
-  def test(self,jobid,job_data=None):
-    """Run the test for a single job"""
+  def compute_metric(self):
+    pass
+    """Compute metric of interest"""
+
+  def comp2thresh(self):
     return
+
+  def test(self,job_path,job_data=None):
+    # Setup job data and filter out unwanted jobs
+    if not self.setup(job_path,job_data=job_data): return
+
+    # Compute metric of interest
+    self.compute_metric()
+
+    # Compare metric to threshold and record result
+    val = self.comp[self.comp_operator](self.metric, self.threshold)
+    self.results[self.ts.j.id] = {'owner' : self.ts.owner,
+                                  'su' : self.ts.su,
+                                  'metric' : self.metric,
+                                  'result' : val
+                                  }
+
+    """Run the test for a single job, comparing threshold
+    to metric"""
+    return
+
 
 
        

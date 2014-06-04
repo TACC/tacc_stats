@@ -13,13 +13,11 @@ class MetaDataRate(Test):
       'removexattr', 'readdir',
       'create','lookup','link','unlink','symlink','mkdir',
       'rmdir','mknod','rename',]
+  comp_operator = '>'
 
-  def test(self,jobid,job_data=None):
-    if not self.setup(jobid,job_data=job_data): return
+  def compute_metric(self):
     ts = self.ts
-
     tmid=(ts.t[:-1]+ts.t[1:])/2.0
-
     meta_rate = numpy.zeros_like(tmid)
 
     for k in ts.j.hosts.keys():
@@ -27,6 +25,5 @@ class MetaDataRate(Test):
 
     meta_rate  /= float(ts.numhosts)
     
-    self.comp2thresh(jobid,numpy.max(meta_rate))
-
+    self.metric = numpy.max(meta_rate)
     return  

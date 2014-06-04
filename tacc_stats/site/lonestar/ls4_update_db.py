@@ -1,15 +1,11 @@
 #!/usr/bin/env python
-from django.core.management import setup_environ
 import os,sys,subprocess
 from subprocess import Popen, PIPE
-
+os.environ['DJANGO_SETTINGS_MODULE']='tacc_stats.site.tacc_stats_site.settings'
 sys.path.append(os.path.join(os.path.dirname(__file__), 
                              'tacc_stats_site'))
 sys.path.append(os.path.join(os.path.dirname(__file__), 
                              'lonestar'))
-
-from tacc_stats.site.tacc_stats_site import settings
-setup_environ(settings)
 
 import tacc_stats.site.lonestar.views as views
 
