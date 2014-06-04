@@ -21,20 +21,20 @@ def main(**args):
     failed = test.date_sweep(args['start'],args['end'],directory = args['dir'])
 
     if args['plot']:
-        plotter = MasterPlot(header='Failed test: '+ test_type.__name__,
-                             prefix=test_type.__name__,outdir=args['o'],
-                             processes=args['p'],threshold=args['t'],
-                             wide=args['wide'],save=True)
+        plotter = analysis.MasterPlot(header='Failed test: '+ test_type.__name__,
+                                      prefix=test_type.__name__,outdir=args['o'],
+                                      processes=args['p'],threshold=args['t'],
+                                      wide=args['wide'],save=True)
         plotter.run(failed)
 
-        vals = [v[2] for j,v in test.su.items()]
+        vals = [v['metric'] for j,v in test.results.items()]
         vals = [val for val in vals if not isnan(val)]
         fig = Figure()
         ax = fig.add_subplot(1,1,1)
         ax.hist(vals,max(5,5*log(len(vals))))
         ax.set_title("Histogram for test: " + test_type.__name__)
         canvas = FigureCanvas(fig)
-        fig.savefig("histogram-"+test_type.__name__+"-"+args['start']+"."+args['end']+".png")
+        fig.savefig("histogram-"+test_type.__name__+"-"+args['start']+"."+args['end']+".pdf")
     return failed
 
 if __name__ == '__main__':

@@ -83,7 +83,7 @@ class Test(object):
     jobs=[]
     for i in self.results.keys():
       if self.results[i]['result']:
-        jobs.append(i)
+        jobs.append(self.results[i]['job_path'])
     return jobs
 
   # Report top users by SU usage, only count failed jobs 
@@ -91,11 +91,12 @@ class Test(object):
   def top_jobs(self, failed=True):
     jobs = {}
     total = {}
+    
+    job_list = []
+    for jobid in self.results.keys():
+      if self.results[jobid]['result']: job_list.append(jobid)
 
-    if failed: jobs_list = self.failed()
-    else: job_list = self.results.keys()
-
-    for jobid in jobs_list:
+    for jobid in job_list:
       data = self.results[jobid]        
       owner = data['owner']
 
@@ -127,7 +128,7 @@ class Test(object):
       files = os.path.join(directory,date_dir)
 
     filelist=tspl_utils.getfilelist(files)
-    self.run(filelist)
+    self.run(filelist[0:30])
       
     passed = 0
     failed = 0
@@ -170,7 +171,8 @@ class Test(object):
     self.results[self.ts.j.id] = {'owner' : self.ts.owner,
                                   'su' : self.ts.su,
                                   'metric' : self.metric,
-                                  'result' : val
+                                  'result' : val,
+                                  'job_path' : job_path
                                   }
 
     """Run the test for a single job, comparing threshold
