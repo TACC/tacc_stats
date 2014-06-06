@@ -188,9 +188,13 @@ def index(request, date = None, uid = None, project = None, user = None, exe = N
     field['run_time__gte'] = 60 
 
     job_list = Job.objects.filter(**field).order_by('-id')
+
     field['job_list'] = job_list
     field['nj'] = len(job_list)
-    
+
+    idle_job_list = job_list.filter(idle__gte = 0.999).order_by('-id')
+    field['idle_job_list'] = idle_job_list
+
     if report: 
         field['report'] = report 
         field['name'] = name 

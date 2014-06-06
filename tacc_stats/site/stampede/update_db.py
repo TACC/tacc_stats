@@ -29,5 +29,9 @@ for date_dir in os.listdir(cfg.pickles_dir):
 
     cpi_test = analysis.HighCPI(threshold=1.0,processes=1)
     views.update_test_field(date_dir,cpi_test,'cpi')
+
     mbw_test = analysis.MemBw(threshold=0.5,processes=1)               
     views.update_test_field(date_dir,mbw_test,'mbw')   
+
+    idle_test = analysis.Idle(threshold=0.999,processes=1,min_hosts=2)
+    views.update_test_field(date_dir,idle_test,'idle')   

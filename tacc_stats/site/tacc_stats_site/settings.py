@@ -1,8 +1,8 @@
 # Django settings for tacc_stats_site project.
 import os
-DIR = os.path.abspath(os.path.dirname(__file__))
+DIR = os.path.dirname(os.path.abspath(__file__))
 
-DEBUG = False
+DEBUG = True
 TEMPLATE_DEBUG = DEBUG
 
 ADMINS = (
@@ -135,8 +135,8 @@ INSTALLED_APPS = (
     #'django_pdf',
     # Uncomment the next line to enable admin documentation:
     # 'django.contrib.admindocs',
-    'tacc_stats.site.stampede',
-    'tacc_stats.site.lonestar',
+    'stampede',
+    'lonestar',
 )
 """
 TEMPLATE_CONTEXT_PROCESSORS=(
@@ -186,7 +186,7 @@ CACHES = {
         'LOCATION': '127.0.0.1:11211',
         },
     'default': { 
-        'BACKEND':'tacc_stats.site.tacc_stats_site.cache.LargeMemcachedCache',
+        'BACKEND':'tacc_stats_site.cache.LargeMemcachedCache',
         'LOCATION': '127.0.0.1:11211',
         'TIMEOUT': None,
         }
