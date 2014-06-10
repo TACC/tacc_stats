@@ -2,7 +2,7 @@
 import os
 DIR = os.path.dirname(os.path.abspath(__file__))
 
-DEBUG = True
+DEBUG = False
 TEMPLATE_DEBUG = DEBUG
 
 ADMINS = (
@@ -135,8 +135,8 @@ INSTALLED_APPS = (
     #'django_pdf',
     # Uncomment the next line to enable admin documentation:
     # 'django.contrib.admindocs',
-    'stampede',
-    'lonestar',
+    'tacc_stats.site.stampede',
+    'tacc_stats.site.lonestar',
 )
 """
 TEMPLATE_CONTEXT_PROCESSORS=(
@@ -185,8 +185,9 @@ CACHES = {
         'BACKEND': 'django.core.cache.backends.memcached.MemcachedCache',
         'LOCATION': '127.0.0.1:11211',
         },
+
     'default': { 
-        'BACKEND':'tacc_stats_site.cache.LargeMemcachedCache',
+        'BACKEND':'tacc_stats.site.tacc_stats_site.cache.LargeMemcachedCache',
         'LOCATION': '127.0.0.1:11211',
         'TIMEOUT': None,
         }

@@ -99,7 +99,8 @@ def update_test_field(date,test,metric,rerun=False):
     kwargs = { 'date' : date, 
                'run_time__gte' : test.min_time,
                'nodes__gte' : test.min_hosts,
-               'status__in' : ['COMPLETED','TIMEOUT']}
+               'status__in' : ['COMPLETED','TIMEOUT']
+               }
     
     jobs_list = Job.objects.filter(**kwargs).exclude(queue__in=test.ignore_qs)
 
@@ -192,8 +193,14 @@ def index(request, date = None, uid = None, project = None, user = None, exe = N
     field['job_list'] = job_list
     field['nj'] = len(job_list)
 
-    idle_job_list = job_list.filter(idle__gte = 0.999).order_by('-id')
+    idle_job_list = job_list.filter(idle__gte = 0.99).exclude(status__in=['CANCELLED,FAILED']).order_by('-id')
     field['idle_job_list'] = idle_job_list
+
+    cat_job_list = job_list.filter(cat__lte = 0.001).exclude(status__in=['CANCELLED,FAILED']).order_by('-id')
+    field['cat_job_list'] = cat_job_list
+
+    cpi_job_list = job_list.filter(cpi__gte = 1.5).exclude(status__in=['CANCELLED,FAILED']).order_by('-id')
+    field['cpi_job_list'] = cpi_job_list
 
     if report: 
         field['report'] = report 

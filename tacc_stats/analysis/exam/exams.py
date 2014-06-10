@@ -128,7 +128,7 @@ class Test(object):
       files = os.path.join(directory,date_dir)
 
     filelist=tspl_utils.getfilelist(files)
-    self.run(filelist[0:30])
+    self.run(filelist)
       
     passed = 0
     failed = 0

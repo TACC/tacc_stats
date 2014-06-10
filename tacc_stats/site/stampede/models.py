@@ -29,6 +29,7 @@ class Job(models.Model):
     cpi = models.FloatField(null=True)
     mbw = models.FloatField(null=True)
     idle = models.FloatField(null=True)
+    cat = models.FloatField(null=True)
 
     def __unicode__(self):
         return str(self.id)

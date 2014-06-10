@@ -21,7 +21,7 @@ class MetaDataRate(Test):
     meta_rate = numpy.zeros_like(tmid)
 
     for k in ts.j.hosts.keys():
-      meta_rate+=numpy.diff(ts.assemble(range(0,len(self.k1)),k,0))/numpy.diff(ts.t)
+      meta_rate+=numpy.diff(ts.assemble(range(0,len(ts.k1)),k,0))/numpy.diff(ts.t)
 
     meta_rate  /= float(ts.numhosts)
     

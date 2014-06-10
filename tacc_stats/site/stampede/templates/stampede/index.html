@@ -46,12 +46,20 @@
 
 {% if job_list %}
     <h1>Job Listing</h1>
-
+<p>Jobs flagged for:
     {% if idle_job_list %}
-    <p>Jobs flagged for:
-      <li>Idle-ness {% for job in idle_job_list %} ({{ job.user }} <a href="{% url 'stampede:job'  job.id %}">{{ job.id }}</a>) {% endfor %}</li>
-    </p>
+     <p> <li>Idle-ness {% for job in idle_job_list %} ({{ job.user }} <a href="{% url 'stampede:job'  job.id %}">{{ job.id }}</a>) {% endfor %}</li></p>
     {% endif %}
+
+    {% if cat_job_list %}
+     <p> <li>Catastrophic failure {% for job in cat_job_list %} ({{ job.user }} <a href="{% url 'stampede:job'  job.id %}">{{ job.id }}</a>) {% endfor %}</li></p>
+    {% endif %}
+
+    {% if cpi_job_list %}
+     <p> <li>High CPI (>1.5) {% for job in cpi_job_list %} ({{ job.user }} <a href="{% url 'stampede:job'  job.id %}">{{ job.id }}</a>) {% endfor %}</li> </p>
+    {% endif %}
+</p>
+
     <table border="1" cellpadding="5" style=font-family:"arial" width:"100%">
         <tr>
 	  <th> Job ID </th>
