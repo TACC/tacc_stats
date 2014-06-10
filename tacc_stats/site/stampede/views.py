@@ -128,8 +128,17 @@ def dates(request):
         month_dict[key].append(date_pair)
 
     date_list = month_dict
-
-    return render_to_response("stampede/dates.html", { 'date_list' : sorted(date_list.iteritems())})
+    field = {}
+    # Computed Metrics
+    """
+    completed_list = Job.objects.filter(run_time__gte = 3600,date__year = 2014).exclude(status__in=['CANCELLED','FAILED'])
+    
+    field['cpi_thresh'] = 0.75
+    field['cpi_job_list']  = completed_list.exclude(Q(cpi = float('nan')) | Q(cpi = None) ).filter(cpi__gte = field['cpi_thresh'])
+    field['cpi_per'] = 100*len(field['cpi_job_list'])/float(len(completed_list))
+    """
+    field['date_list'] = sorted(date_list.iteritems())
+    return render_to_response("stampede/dates.html", field)
 
 def search(request):
 
@@ -193,15 +202,15 @@ def index(request, date = None, uid = None, project = None, user = None, exe = N
     field['job_list'] = job_list
     field['nj'] = len(job_list)
 
-    idle_job_list = job_list.filter(idle__gte = 0.99).exclude(status__in=['CANCELLED,FAILED']).order_by('-id')
-    field['idle_job_list'] = idle_job_list
+    # Computed Metrics
+    completed_list = job_list.exclude(status__in=['CANCELLED','FAILED']).order_by('-id')
+    field['idle_job_list'] = completed_list.filter(idle__gte = 0.99)
+    field['cat_job_list']  = completed_list.filter(cat__lte = 0.001)
 
-    cat_job_list = job_list.filter(cat__lte = 0.001).exclude(status__in=['CANCELLED,FAILED']).order_by('-id')
-    field['cat_job_list'] = cat_job_list
-
-    cpi_job_list = job_list.filter(cpi__gte = 1.5).exclude(status__in=['CANCELLED,FAILED']).order_by('-id')
-    field['cpi_job_list'] = cpi_job_list
-
+    field['cpi_thresh'] = 1.0
+    field['cpi_job_list']  = completed_list.exclude(cpi = float('nan')).filter(cpi__gte = field['cpi_thresh'])
+    field['cpi_per'] = 100*len(field['cpi_job_list'])/float(len(completed_list))
+    
     if report: 
         field['report'] = report 
         field['name'] = name 
@@ -230,7 +239,7 @@ def hist_summary(request, date = None, uid = None, project = None, user = None, 
 
     field['run_time__gte'] = 60 
 
-    job_list = Job.objects.filter(**field).exclude(status__in=['CANCELLED,FAILED'])
+    job_list = Job.objects.filter(**field).exclude(status__in=['CANCELLED','FAILED'])
     fig = Figure(figsize=(16,6))
 
     # Run times
