@@ -123,6 +123,12 @@ short_version = '%s'
 if write_version:
     write_version_py()
 
+if '--monitor-only' in sys.argv:
+    MONITOR_ONLY = True
+    sys.argv.remove('--monitor-only')
+else:
+    MONITOR_ONLY = False
+
 def read_site_cfg():
     config = ConfigParser.ConfigParser()
 
@@ -228,7 +234,10 @@ write_cfg_file(paths)
 
 
 root='tacc_stats/src/monitor/'
-sources=[pjoin(root,'schema.c'),pjoin(root,'dict.c'),pjoin(root,'collect.c'),pjoin(root,'stats_file.c'),pjoin(root,'monitor.c'),pjoin(root,'main.c'),pjoin(root,'stats.c')]
+sources=[
+    pjoin(root,'schema.c'),pjoin(root,'dict.c'),pjoin(root,'collect.c'),
+    pjoin(root,'stats_file.c'),pjoin(root,'monitor.c'),pjoin(root,'main.c'),pjoin(root,'stats.c')
+    ]
 
 for root,dirs,files in os.walk('tacc_stats/src/monitor/'):
     for f in files:
@@ -292,22 +301,30 @@ class MyBDist_RPM(bdist_rpm):
         except: os.mkdir('build')
         
         self.prep_script = "build/bdist_rpm_prep"
-        open(self.prep_script,"w").write(
-            """
+        prep = """
 %define _bindir /opt/%{name}
 %define crontab_file /etc/cron.d/%{name}
 %define stats_dir /var/log/tacc_stats
 %define archive_dir /scratch/projects/%{name}/archive
-%setup -n %{name}-%{unmangled_version}"""
-            )
-        
-        self.build_script = None
+%setup -n %{name}-%{unmangled_version}
+"""        
+        open(self.prep_script,"w").write(prep)
+
+        self.build_script = "build/bdist_rpm_build"        
+        build_cmd = "python setup.py build"
+        if MONITOR_ONLY: build_cmd += ' --monitor-only' 
+        open(self.build_script,"w").write(build_cmd)
+
 
         self.install_script = "build/bdist_rpm_install"
+        install_cmd = 'python setup.py install --single-version-externally-managed -O1 --root=$RPM_BUILD_ROOT --record=INSTALLED_FILES'
+        if MONITOR_ONLY: install_cmd += ' --monitor-only' 
         open(self.install_script,"w").write(
             """
 rm -rf %{buildroot}
-python setup.py install --single-version-externally-managed -O1 --root=$RPM_BUILD_ROOT --record=INSTALLED_FILES
+"""
+            + install_cmd +
+            """
 install -m 0755 -d %{buildroot}/%{_bindir}
 install -m 6755 build/bin/monitor %{buildroot}/%{_bindir}/%{name}
 install -m 0755 tacc_stats/archive.sh %{buildroot}/%{_bindir}/%{name}_archive
@@ -411,50 +428,71 @@ class MyBuildExt(build_ext):
             target_lang=language)
 
 extensions.append(Extension("tacc_stats.monitor", **ext_data))
-cmd = {'build_ext' : MyBuildExt}
 
-    
-cfg_sh(pjoin(os.path.dirname(__file__), 'tacc_stats',
-             'analysis','exams_cron.sh.in'),paths)
-cfg_sh(pjoin(os.path.dirname(__file__), 'tacc_stats',
-             'pickler','do_job_pickles_cron.sh.in'),paths)
-cfg_sh(pjoin(os.path.dirname(__file__), 'tacc_stats',
-             'site','update_cron.sh.in'),paths)
 cfg_sh(pjoin(os.path.dirname(__file__), 'tacc_stats',
              'src','monitor','archive.sh.in'),paths)
 
+if not MONITOR_ONLY:    
+    cfg_sh(pjoin(os.path.dirname(__file__), 'tacc_stats',
+                 'analysis','exams_cron.sh.in'),paths)
+    cfg_sh(pjoin(os.path.dirname(__file__), 'tacc_stats',
+                 'pickler','do_job_pickles_cron.sh.in'),paths)
+    cfg_sh(pjoin(os.path.dirname(__file__), 'tacc_stats',
+                 'site','update_cron.sh.in'),paths)
 
-setup(name=DISTNAME,
-      version=FULLVERSION,
-      maintainer=AUTHOR,
-      package_dir={'':'.'},
-      packages=find_packages(),
-      package_data = {'' : ['*.sh.in','*.cfg'] },
-      scripts=['build/bin/monitor',
-               'tacc_stats/archive.sh',
-               'tacc_stats/analysis/job_sweeper.py',
-               'tacc_stats/analysis/job_plotter.py',
-               'tacc_stats/exams_cron.sh',
-               'tacc_stats/update_cron.sh',
-               'tacc_stats/do_job_pickles_cron.sh',
-               'tacc_stats/site/lonestar/ls4_update_db.py',
-               'tacc_stats/site/stampede/update_db.py',
-               'tacc_stats/pickler/job_pickles.py'],
-      ext_modules=extensions,
-      setup_requires=['nose>=1.0'],
-      install_requires=['argparse','numpy','matplotlib','scipy'],
-      test_suite = 'nose.collector',
-      maintainer_email=EMAIL,
-      description=DESCRIPTION,
-      zip_safe=False,
-      license=LICENSE,
-      cmdclass={'build_ext' : MyBuildExt, 'clean' : CleanCommand, 'bdist_rpm' : MyBDist_RPM},
-      url=URL,
-      download_url=DOWNLOAD_URL,
-      long_description=LONG_DESCRIPTION,
-      classifiers=CLASSIFIERS,
-      platforms='any',
-      **setuptools_kwargs)
+if MONITOR_ONLY:
+    setup(name=DISTNAME,
+          version=FULLVERSION,
+          maintainer=AUTHOR,
+          packages=['tacc_stats/src/monitor'],
+          package_data = {'' : ['*.sh.in'] },
+          scripts=['build/bin/monitor',
+                   'tacc_stats/archive.sh',
+                   ],
+          ext_modules=extensions,
+          maintainer_email=EMAIL,
+          description=DESCRIPTION,
+          zip_safe=False,
+          license=LICENSE,
+          cmdclass={'build_ext' : MyBuildExt, 'clean' : CleanCommand, 'bdist_rpm' : MyBDist_RPM},
+          url=URL,
+          download_url=DOWNLOAD_URL,
+          long_description=LONG_DESCRIPTION,
+          classifiers=CLASSIFIERS,
+          platforms='any',
+          **setuptools_kwargs)
+else:
+    setup(name=DISTNAME,
+          version=FULLVERSION,
+          maintainer=AUTHOR,
+          package_dir={'':'.'},
+          packages=find_packages(),
+          package_data = {'' : ['*.sh.in','*.cfg'] },
+          scripts=['build/bin/monitor',
+                   'tacc_stats/archive.sh',
+                   'tacc_stats/analysis/job_sweeper.py',
+                   'tacc_stats/analysis/job_plotter.py',
+                   'tacc_stats/exams_cron.sh',
+                   'tacc_stats/update_cron.sh',
+                   'tacc_stats/do_job_pickles_cron.sh',
+                   'tacc_stats/site/lonestar/ls4_update_db.py',
+                   'tacc_stats/site/stampede/update_db.py',
+                   'tacc_stats/pickler/job_pickles.py'],
+          ext_modules=extensions,
+          setup_requires=['nose>=1.0'],
+          install_requires=['argparse','numpy','matplotlib','scipy'],
+          test_suite = 'nose.collector',
+          maintainer_email=EMAIL,
+          description=DESCRIPTION,
+          zip_safe=False,
+          license=LICENSE,
+          cmdclass={'build_ext' : MyBuildExt, 'clean' : CleanCommand, 'bdist_rpm' : MyBDist_RPM},
+          url=URL,
+          download_url=DOWNLOAD_URL,
+          long_description=LONG_DESCRIPTION,
+          classifiers=CLASSIFIERS,
+          platforms='any',
+          **setuptools_kwargs)
 
 for name,path in paths.iteritems():
     if os.path.exists(path): print ">>>", path, 'exists'
