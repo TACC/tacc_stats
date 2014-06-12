@@ -126,7 +126,7 @@ and
 
 `tacc_stats end JOBID`
 
-must then be placed in the prolog and epilog respectively for tacc_stats to label
+must then be placed in the Job Scheduler prolog and epilog respectively for tacc_stats to label
 the jobs correctly.
 
 As mentioned above the `monitor` module produces a light-weight C 
