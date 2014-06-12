@@ -93,28 +93,28 @@ file. The meaning of every field  in the `[PATH]` section is specified here:
 3. *Build*
 There are currently three approaches to building and installing the package.
 
-1) `pip`,`easy_install`, or `python setup.py install`: install all perform the same build and 
-install steps.  The package entire is installed using this approach.
+    1) `pip`,`easy_install`, or `python setup.py install`: install all perform the same build and 
+    install steps.  The package entire is installed using this approach.
 
-2) `python setup.py bdist_rpm`: this builds an rpm in the `tacc_stats/dist`
-directory.  The rpm will install the entire package and place a setuid'd root
-version of monitor called `tacc_stats` in `/opt/tacc_stats`.  It will also modify
-crontab to run `tacc_stats` every 10 minutes (configurable) and run `archive.sh`
-every night at a random time between 2am and 4am.  `archive.sh` copies the data
-in `stats_dir` to `tacc_stats_home`.  It is used at TACC to move data from local
-storage on the compute nodes to a central filesystem location.
+    2) `python setup.py bdist_rpm`: this builds an rpm in the `tacc_stats/dist`
+    directory.  The rpm will install the entire package and place a setuid'd root
+    version of monitor called `tacc_stats` in `/opt/tacc_stats`.  It will also modify
+    crontab to run `tacc_stats` every 10 minutes (configurable) and run `archive.sh`
+    every night at a random time between 2am and 4am.  `archive.sh` copies the data
+    in `stats_dir` to `tacc_stats_home`.  It is used at TACC to move data from local
+    storage on the compute nodes to a central filesystem location.
 
-3) `python setup.py bdist_rpm --monitor-only`: this builds an rpm in the `tacc_stats/dist`
-directory.  The rpm will install only the `monitor` package and place a setuid'd root
-version of monitor called `tacc_stats` in `/opt/tacc_stats`.  It will also modify
-crontab to run `tacc_stats` every 10 minutes (configurable) and run `archive.sh`
-every night at a random time between 2am and 5am. This is a light-weight option
-most suitable for installations to the compute nodes.
+    3) `python setup.py bdist_rpm --monitor-only`: this builds an rpm in the `tacc_stats/dist`
+    directory.  The rpm will install only the `monitor` package and place a setuid'd root
+    version of monitor called `tacc_stats` in `/opt/tacc_stats`.  It will also modify
+    crontab to run `tacc_stats` every 10 minutes (configurable) and run `archive.sh`
+    every night at a random time between 2am and 5am. This is a light-weight option
+    most suitable for installations to the compute nodes.
 
-The first two installation methods are most suited to analysis nodes.  They are
-reasonable heavyweight and require several Python packages.  The third approach is
-extremely light-weight and requires only a Python installation.  Both rpm based
-methods set `tacc_stats` and `archive.sh` running automatically.
+    The first two installation methods are most suited to analysis nodes.  They are
+    reasonable heavyweight and require several Python packages.  The third approach is
+    extremely light-weight and requires only a Python installation.  Both rpm based
+    methods set `tacc_stats` and `archive.sh` running automatically.
 
 ----------------------------------------------------------------------------
 
