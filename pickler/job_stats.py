@@ -571,6 +571,7 @@ class Job(object):
                 for i in range(0, m):
                     v = A[i, j]
                     if v < p:
+                        fudged = False
                         # Looks like rollover.
                         if e.width:
                             trace("time %d, counter `%s', rollover prev %d, curr %d\n",
@@ -584,7 +585,7 @@ class Job(object):
                             trace("time %d, counter `%s', suspicious zero, prev %d\n",
                                   self.times[i], e.key, p)
                             v = p # Ugh.
-                        elif (type_name == 'ib_ext' or type_name == 'ib_sw'):
+                        elif (type_name == 'ib_ext' or type_name == 'ib_sw') or (type_name == 'cpu' and e.key == 'iowait'):
                             # We will assume a spurious reset, 
                             # and the reset happened at the start of the counting period.
                             # This happens with IB counters.
@@ -593,8 +594,9 @@ class Job(object):
                             r = 0 # base is now zero
                             self.edit_flags.append("(time %d, host `%s', type `%s', dev `%s', key `%s')" %
                                                    (self.times[i],host.name,type_name,dev_name,e.key))
+                            fudged = True
 
-                        if type_name not in ['ib', 'ib_ext']:
+                        if type_name not in ['ib', 'ib_ext'] and (fudged == False):
                             width = e.width if e.width else 64
                             if ( v - p ) % (2**width) > 2**(width-1):
                                 # This counter rolled more than half of its range
