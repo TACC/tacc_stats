@@ -30,7 +30,7 @@ Code Access
 -----------
 To get access to the tacc_stats source code 
 
-    git clone git clone https://github.com/rtevans/tacc_stats
+    git clone https://github.com/rtevans/tacc_stats
 
 
 ----------------------------------------------------------------------------
@@ -41,10 +41,10 @@ Building
 These commands quickly build and install the TACC Stats package into your
 '~/.local/' directory.  You should customize the tacc_stats/setup.cfg file
 for your system.  
-
-    $ git clone git@github.com:rtevans/tacc_stats.git
+~~~
+    $ git clone https://github.com/rtevans/tacc_stats
     $ pip install --user -e tacc_stats
-
+~~~
 Scripts and executables will be installed in 
 '~/.local/bin' and Python modules in '~/.local/lib'.
 
