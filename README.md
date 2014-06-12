@@ -305,13 +305,13 @@ The `TYPES` that can be collected are:
   ~~~
 
 The `TYPES` to include in a build of tacc_stats are specified in 
-the `do_configure.sh` list `TYPES`.  To add a new `TYPE` to tacc_stats,
-write the appropriate `TYPENAME.c` file and place it in the monitor directory.
+the `setup.cfg` list `TYPES`.  To add a new `TYPE` to tacc_stats,
+write the appropriate `TYPENAME.c` file and place it in the `src/monitor/` directory.
 Then add the `TYPENAME` to the `TYPES` list.
  
 For the keys associated with each `TYPE`, see the appropriate schema.
 For the source and meanings of the counters, see the tacc_stats source
-`https://github.com/bbarth/tacc_stats`, the CentOS 5.6 kernel source,
+`https://github.com/rtevans/tacc_stats`, the CentOS 5.6 kernel source,
 especially `Documentation/*`, and the manpages, especially proc(5).
 
 I have not tracked down the meanings of all counters.  However, if I
