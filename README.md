@@ -30,7 +30,7 @@ Code Access
 -----------
 To get access to the tacc_stats source code 
 
-    git clone git@github.com:rtevans/tacc_stats.git
+    git clone git clone https://github.com/rtevans/tacc_stats
 
 
 ----------------------------------------------------------------------------
