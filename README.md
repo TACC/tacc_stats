@@ -5,8 +5,6 @@ Authors
 -------
 Bill Barth     (<mailto:bbarth@tacc.utexas.edu>)    
 R. Todd Evans  (<mailto:rtevans@tacc.utexas.edu>)  
-John Hammond   (<mailto:jhammond@tacc.utexas.edu>)  
-Andy R. Terrel (<mailto:aterrel@tacc.utexas.edu>)  
 
 
 Executive Summary
