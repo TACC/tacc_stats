@@ -41,6 +41,8 @@ SF_COMMENT_CHAR = '#'
 SF_PROPERTY_CHAR = '$'
 SF_MARK_CHAR = '%'
 
+KEEP_EDITS = False
+
 def schema_fixup(type_name, desc):
     """ This function implements a workaround for a known issue with incorrect schema """
     """ definitions for irq, block and sched tacc_stats metrics. """
@@ -570,8 +572,8 @@ class Job(object):
                 # Rebase, check for rollover.
                 for i in range(0, m):
                     v = A[i, j]
+                    correction_factor = numpy.uint64(0)
                     if v < p:
-                        fudged = False
                         # Looks like rollover.
                         if e.width:
                             trace("time %d, counter `%s', rollover prev %d, curr %d\n",
@@ -590,19 +592,19 @@ class Job(object):
                             # and the reset happened at the start of the counting period.
                             # This happens with IB counters.
                             # A[i,j] = v + A[i-1,j] = v + v_(t-1) - r
-                            v += A[i-1,j] # Add new value after reset to old re-based value
+                            correction_factor = A[i-1,j]
                             r = 0 # base is now zero
-                            self.edit_flags.append("(time %d, host `%s', type `%s', dev `%s', key `%s')" %
+                            if KEEP_EDITS:
+                                self.edit_flags.append("(time %d, host `%s', type `%s', dev `%s', key `%s')" %
                                                    (self.times[i],host.name,type_name,dev_name,e.key))
-                            fudged = True
 
-                        if type_name not in ['ib', 'ib_ext'] and (fudged == False):
+                        if type_name not in ['ib', 'ib_ext'] and (correction_factor == numpy.uint64(0) ):
                             width = e.width if e.width else 64
                             if ( v - p ) % (2**width) > 2**(width-1):
                                 # This counter rolled more than half of its range
                                 self.logoverflow(host.name, type_name, dev_name, e.key)
 
-                    A[i, j] = v - r
+                    A[i, j] = v - r + correction_factor
                     p = v
             if e.mult:
                 for i in range(0, m):
