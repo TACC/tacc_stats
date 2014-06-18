@@ -34,6 +34,39 @@ def removeDotKey(obj):
             del obj[key]
     return obj
 
+def compute_ratio(stats, indices, numerator, denominator, out):
+    if numerator in indices and denominator in indices and 'ERROR' not in indices:
+        cidx = indices[numerator]
+        insidx = indices[denominator]
+        if stats[-1, insidx] > 0:
+            out.append( 1.0 * stats[-1,cidx] / stats[-1, insidx] )
+
+def compute_sum(stats, indices, a, b, out, hostwalltime):
+    if a in indices and b in indices and 'ERROR' not in indices:
+        cidx = indices[a]
+        insidx = indices[b]
+        out.append( (1.0 * stats[-1,cidx] + 1.0 * stats[-1, insidx])/ hostwalltime )
+
+def addtoseries(interface, series, enties, data):
+    if interface not in series:
+        series[interface] = data
+        enties[interface] = 1
+    else:
+        series[interface] += data
+        enties[interface] += 1
+
+def converttooutput(series, summaryDict, j):
+    for l in series.keys():
+        for k in series[l].keys():
+            if isinstance(series[l][k], dict):
+                for i in series[l][k].keys():
+                    v = calculate_stats(series[l][k][i])
+                    addinstmetrics(summaryDict,j.overflows, l, i, k, v)
+            else:
+                v = calculate_stats(series[l][k])
+                addmetrics(summaryDict,j.overflows, l, k, v)
+
+
 class LariatManager:
     def __init__(self, lariatpath):
         self.lariatpath = lariatpath
@@ -95,15 +128,7 @@ class LariatManager:
 
 
 def calculate_stats(v):
-    res = {
-      'avg': 0.0,
-      'cov': 0.0,
-      'kurt': 0.0,
-      'max': 0.0,
-      'median': 0.0,
-      'min': 0.0,
-      'skew': 0.0,
-      }
+    res = { }
 
     if len(v) > 0:
 
@@ -118,10 +143,17 @@ def calculate_stats(v):
 
         res['max'] = float(v_max)
         res['avg'] = v_avg
-        res['kurt'] = v_kurt
-        res['median'] = float(numpy.median(v, axis=0))
+        res['krt'] = v_kurt
         res['min'] = float(v_min)
-        res['skew'] = v_skew
+        res['skw'] = v_skew
+        res['cnt'] = len(v)
+        if res['min'] == res['max']:
+            res['med'] = res['min']
+            res['std'] = 0.0
+        else:
+            res['med'] = float(numpy.median(v, axis=0))
+            if len(v) > 2:
+                res['std'] = scipy.stats.tstd(v)
 
         if 0 < v_avg:
             res['cov'] = math.sqrt(v_var) / v_avg
@@ -132,27 +164,38 @@ def addinstmetrics(summary, overflows, device, interface, instance, values):
 
     key = (device + "-" + interface + "-" + instance).replace(".", "-")
 
-    if device in overflows and interface in overflows[device] and instance in overflows[device][interface]:
-        summary[key] = { "error": 2048, "error_msg": "Counter overflow on hosts " + str(overflows[device][interface][instance]) }
+    data = values
+
+    if COMPACT_OUTPUT and 'avg' in values and values['avg'] == 0.0:
         return
+
+    if device in overflows and interface in overflows[device] and instance in overflows[device][interface]:
+        data = { "error": 2048, "error_msg": "Counter overflow on hosts " + str(overflows[device][interface][instance]) }
     
-    if COMPACT_OUTPUT and 'overall_avg' in values and values['overall_avg'] == 0.0:
-        summary[key] = { 'overall_avg': 0.0 }
-    else:
-        summary[key] = values
+    if device not in summary:
+        summary[device.replace(".","-")] = {}
+    if interface not in summary[device]:
+        summary[device.replace(".","-")][interface.replace(".","-")] = {}
+
+    summary[device.replace(".","-")][interface.replace(".","-")][instance.replace(".","-")] = data
 
 def addmetrics(summary, overflows, device, interface, values):
 
-    key = (device + "-" + interface).replace(".", "-")
+    data = values
 
-    if device in overflows and interface in overflows[device]:
-        summary[key] = { "error": 2048, "error_msg": "Counter overflow on hosts " + str(overflows[device][interface]) }
+    if COMPACT_OUTPUT and 'avg' in values and values['avg'] == 0.0:
         return
+
+    if device in overflows:
+        # The cpu device is special because all of the counters are summed together - an overflow in one
+        # impacts all cpu metrics.
+        if (device == "cpu") or ( interface in overflows[device]):
+            data = { "error": 2048, "error_msg": "Counter overflow on hosts " + str(overflows[device]) }
     
-    if COMPACT_OUTPUT and 'overall_avg' in values and values['overall_avg'] == 0.0:
-        summary[key] = { 'overall_avg': 0.0 }
-    else:
-        summary[key] = values
+    if device not in summary:
+        summary[device.replace(".","-")] = {}
+
+    summary[device.replace(".","-")][interface.replace(".","-")] = data
 
 def summarize(j, lariatcache):
 
@@ -162,11 +205,16 @@ def summarize(j, lariatcache):
     metrics = None
     statsOk = True
 
-    aggregates = [ "sched", "intel_pmc3", "intel_uncore", "intel_snb", "intel_snb_cbo", "intel_snb_imc", "intel_snb_pcu", "intel_snb_hau", "intel_snb_qpi", "intel_snb_r2pci" ]
+    perinterface = [ "cpu", "mem", "sched", "intel_pmc3", "intel_uncore", "intel_snb", "intel_snb_cbo", "intel_snb_imc", "intel_snb_pcu", "intel_snb_hau", "intel_snb_qpi", "intel_snb_r2pci" ]
     conglomerates = [ "irq" ]
 
     # The ib and ib_ext counters are known to be incorrect on all tacc_stats systems
     ignorelist = [ "ib", "ib_ext" ]
+
+    # nfs metrics take up alot of space
+    ignorelist.append("nfs")
+    ignorelist.append("osc")
+    ignorelist.append("mdc")
 
     if VERBOSE:
         sys.stderr.write( "{} ID: {}\n".format( datetime.datetime.utcnow().isoformat(), j.acct['id'] ) )
@@ -195,41 +243,46 @@ def summarize(j, lariatcache):
             metrics[t].append(m)
 
     indices = {}
-    sums = {}
+    totals = {}
     series = {}  # we keep the time series data here, because we need to calculate min/max/median & 1/2/3/4th order of moments
+    enties = {}
+    isevent = {}
 
-    for k in metrics.keys():
-        indices[k] = {}
-        sums[k] = {}
-        series[k] = {}
-        for l in metrics[k]:
+    for metricname, metric in metrics.iteritems():
+        indices[metricname] = {}
+        isevent[metricname] = {}
+        totals[metricname] = {}
+        series[metricname] = {}
+        enties[metricname] = {}
+        for interface in metric:
             try:
-                if l in j.get_schema(k):
-                    indices[k][l] = j.get_schema(k)[l].index
+                if interface in j.get_schema(metricname):
+                    indices[metricname][interface] = j.get_schema(metricname)[interface].index
+                    isevent[metricname][interface] = j.get_schema(metricname)[interface].is_event
             except:
-                sys.stderr.write( 'ERROR: summary metric ' + str(l) + ' not in the schema\n' )
+                sys.stderr.write( 'ERROR: summary metric ' + str(interface) + ' not in the schema\n' )
                 sys.stderr.write( 'ERROR: %s\n' % sys.exc_info()[0] )
                 sys.stderr.write( '%s\n' % traceback.format_exc() )
-                summaryDict['Error'].append('summary metric ' + str(l) + ' not in the schema')
-            sums[k][l] = {}
-            series[k][l] = {}
+                summaryDict['Error'].append('summary metric ' + str(interface) + ' not in the schema')
 
-    nCores_allhosts = 0
     nHosts = 0
+    corederived = { "cpicore": [], "cpiref": [], "cpldref": [] }
+    socketderived = { "membw": [] }
+
+    # Naming convention:
+    #  metricname - the name of the metric (such as cpu, mem etc).
+    #  interface  - the interface exposed for the metric (such as user, system)
+    #  device     - the name of the device (ie cpu0, numanode0, eth0 )
 
     for host in j.hosts.itervalues():  # for all the hosts present in the file
         nHosts += 1
         nCoresPerSocket = 1
-
-        timedeltas = numpy.diff(host.times)
-        validtimes = [ True if x > MINTIMEDELTA else False for x in timedeltas ]
-        reciprocals = 1.0 / numpy.compress(validtimes, timedeltas)
         hostwalltime = host.times[-1] - host.times[0]
 
         if abs(hostwalltime - walltime) > TIMETHRESHOLD:
             summaryDict['Error'].append("Large discrepency between job account walltime and tacc_stats walltime for {}. {} != {}.".format(host.name, walltime, hostwalltime) )
 
-        if len(reciprocals) == 0:
+        if hostwalltime < MINTIMEDELTA:
             summaryDict['Error'].append("Insufficient data points for host {}. {}".format(host.name, host.times) )
             continue
         
@@ -238,183 +291,156 @@ def summarize(j, lariatcache):
             nCoresPerSocket = len(host.stats['cpu']) \
               // len(host.stats['mem'])
 
-        for k in indices.keys():
-            if k in host.stats.keys() and k not in ignorelist:
-                for interface in host.stats[k].keys():
-                    if k == 'cpu':  # special handling for 'cpu'
-                        nCores_allhosts = nCores_allhosts + 1
+        for metricname in indices.keys():
+            if metricname in ignorelist:
+                continue
+            if metricname not in host.stats.keys():
+                continue
 
-                        if interface not in sums['cpu']['all'].keys():
-                            sums['cpu']['all'][interface] = 0
-                            series['cpu']['all'][interface] = []
+            for device in host.stats[metricname].keys():
+                for interface, index in indices[metricname].iteritems():
 
-                        sums['cpu']['all'][interface] += sum(host.stats['cpu'][interface][-1]) / hostwalltime
+                    if isevent[metricname][interface]:
+                        # Counter-type metrics get converted into average rates
 
-                        v = [ sum(x) for x in host.stats['cpu'][interface] ]
-                        deltas = numpy.diff(v)
-                        rates = numpy.compress(validtimes,deltas) * reciprocals
+                        if metricname in perinterface:
+                            # Generate per-interface values
+                            if interface not in totals[metricname]:
+                                totals[metricname][interface] = []
 
-                        if 0.0 in rates:
-                            summaryDict['Error'].append("host {}, cpu {} unusual halted clock".format(host.name, interface) )
-                            statsOk = False
-
-                        series['cpu']['all'][interface].extend(rates)
-
-                    for l in indices[k].keys():
-                        v = host.stats[k][interface][:, indices[k][l]]
-                        if interface not in sums[k][l].keys():
-                            if j.get_schema(k)[l].is_event:
-                                # Only generate the sums values for events
-                                sums[k][l][interface] = 0
-
-                            series[k][l][interface] = []
-                        if j.get_schema(k)[l].is_event:
-                            # If the datatype is an event then the values are converted to rates.
-                            sums[k][l][interface] += (v[-1] - v[0]) / hostwalltime
-
-                            rates = numpy.compress(validtimes, numpy.diff(v)) * reciprocals
-                            series[k][l][interface].extend(rates.tolist() )
+                            totals[metricname][interface].append( host.stats[metricname][device][-1,index] / hostwalltime )
                         else:
-                            # else the datatype is an instantaneous value such as memory, load ave or disk usage.
-                            if 2 < len(v):
+                            # Generate values for all enties
+                            if interface not in totals[metricname]:
+                                totals[metricname][interface] = {}
+                            if device not in totals[metricname][interface]:
+                                totals[metricname][interface][device] = []
+                            
+                            totals[metricname][interface][device].append( host.stats[metricname][device][-1,index] / hostwalltime  )
+                    else:
+                        # Instantaneous metrics have all timeseries values processed except
+                        # the first and last
+                        ndatapoints = len(host.stats[metricname][device][:,index])
+                        if ndatapoints > 2:
+                            end = ndatapoints - 1
+                        else:
+                            end = ndatapoints
 
-                             # for memory metrics, throw away the first (and the last, if possible) results
-                             # since they are measured at the endpoints of a job
+                        data = host.stats[metricname][device][1:ndatapoints,index]
 
-                                v = v[1:len(v) - 1]
+                        # Special case - memory is raw per node, but averaged per core
+                        if metricname == "mem":
+                            data /= nCoresPerSocket
+
+                        if metricname in perinterface:
+                            addtoseries(interface, series[metricname], enties[metricname], data)
+                        else:
+                            # Generate values for all enties
+                            if interface not in series[metricname]:
+                                series[metricname][interface] = {}
+                                enties[metricname][interface] = {}
+                            if device not in series[metricname][interface]:
+                                series[metricname][interface][device] = data
+                                enties[metricname][interface][device] = 1
                             else:
-                                v = v[1:len(v)]
-                            series[k][l][interface].extend(v / nCoresPerSocket)
+                                series[metricname][interface][device] += data
+                                enties[metricname][interface][device] += 1
+                # end for interface, index in indices[metricname].iteritems()
 
-    if 0 < nCores_allhosts and statsOk:
+                # Special cases
+                if metricname == "cpu":
+                    if "all" not in totals["cpu"]:
+                        totals["cpu"]["all"] = []
+                    totals["cpu"]["all"].append( sum( 1.0 * host.stats[metricname][device][-1,:] / hostwalltime) )
 
-        # SSE_FLOPS
+                elif metricname == "intel_snb":
+                    compute_ratio(host.stats[metricname][device], indices[metricname], 'CLOCKS_UNHALTED_CORE', 'INSTRUCTIONS_RETIRED', corederived["cpicore"])
+                    compute_ratio(host.stats[metricname][device], indices[metricname], 'CLOCKS_UNHALTED_REF', 'INSTRUCTIONS_RETIRED', corederived["cpiref"])
+                    compute_ratio(host.stats[metricname][device], indices[metricname], 'LOAD_L1D_ALL', 'CLOCKS_UNHALTED_REF', corederived["cpldref"])
 
-        if 'intel_snb' in sums.keys():
+                elif metricname == "intel_pmc3":
+                    compute_ratio(host.stats[metricname][device], indices[metricname], 'CLOCKS_UNHALTED_CORE', 'INSTRUCTIONS_RETIRED', corederived["cpicore"])
+                    compute_ratio(host.stats[metricname][device], indices[metricname], 'CLOCKS_UNHALTED_REF', 'INSTRUCTIONS_RETIRED', corederived["cpiref"])
 
+                elif metricname == "intel_snb_imc":
+                    compute_sum(host.stats[metricname][device], indices[metricname], 'CAS_READS', 'CAS_WRITES', socketderived["membw"], hostwalltime / 64.0 )
 
-            if 'SSE_D_ALL' in sums['intel_snb'] and 'SIMD_D_256' in sums['intel_snb'] and 'ERROR' not in sums['intel_snb']:
-                s1 = 0
-                s2 = 0
-                v = []
-                for l in sums['intel_snb']['SSE_D_ALL'].keys():
-                    # iterate all CPU cores
-                    s1 += sums['intel_snb']['SSE_D_ALL'][l]
-                    s2 += sums['intel_snb']['SIMD_D_256'][l]
-                    summaryDict['FLOPS'] = { "value": ( 2 * ( s1/nCores_allhosts ) ) + ( 4 * ( s2/nCores_allhosts ) ) }
+                elif metricname == "mem":
+                    if 'MemUsed' in indices[metricname] and 'FilePages' in indices[metricname] and 'Slab' in indices[metricname]:
+
+                        muindex = indices[metricname]['MemUsed']
+                        fpindex = indices[metricname]['FilePages']
+                        slindex = indices[metricname]['Slab']
+
+                        ndatapoints = len(host.stats[metricname][device][:,muindex])
+                        if ndatapoints > 2:
+                            end = ndatapoints - 1
+                        else:
+                            end = ndatapoints
+
+                        memstat = host.stats[metricname][device][1:ndatapoints,muindex] - \
+                                host.stats[metricname][device][1:ndatapoints,fpindex] - \
+                                host.stats[metricname][device][1:ndatapoints,slindex]
+
+                        addtoseries("used_minus_diskcache", series[metricname], enties[metricname], memstat)
+
+            # end for device
+        # end loop over hosts
+
+    if 'cpu' not in totals or 'all' not in totals['cpu']:
+        statsOk = False
+        summaryDict['Error'].append( "No CPU information" )
+
+    # Change series values into per entity values e.g. Memory per node or IO per node
+    for metricname, ifstats in series.iteritems():
+        for interface, devstats in ifstats.iteritems():
+            if isinstance(devstats, dict):
+                for devname, dstats in devstats.iteritems():
+                    dstats /= enties[metricname][interface][devname]
+            else:
+                devstats /= enties[metricname][interface]
+
+    if statsOk:
+
+        for mname, mdata in corederived.iteritems():
+            # Store CPI per core
+            if len(mdata) > 0:
+                summaryDict[mname] = calculate_stats(mdata)
+                if len(mdata) != len( totals['cpu']['all'] ):
+                    summaryDict[mname]['error'] = 2
+                    summaryDict[mname]['error_msg'] = 'Not all cores have counters'
+
+        for mname, mdata in socketderived.iteritems():
+            # Store socket derived metrics
+            if len(mdata) > 0:
+                summaryDict[mname] = calculate_stats(mdata)
+
+        # flops
+        if 'intel_snb' in totals.keys():
+
+            if 'SSE_D_ALL' in totals['intel_snb'] and 'SIMD_D_256' in totals['intel_snb'] and 'ERROR' not in totals['intel_snb']:
+                flops = 4.0 * numpy.array(totals['intel_snb']['SIMD_D_256']) + 2.0 * numpy.array(totals['intel_snb']['SSE_D_ALL'])
+                summaryDict['FLOPS'] = calculate_stats(flops)
             else:
                 summaryDict['FLOPS'] = { 'error': 2, "error_msg": 'Counters were reprogrammed during job' }
 
-        elif 'intel_pmc3' in sums.keys():
+        # TODO Nehalem/Westmere flops
 
-            if 'PMC2' in sums['intel_pmc3'] and 'ERROR' not in sums['intel_pmc3']:
-                s = 0
-                v = []
-                for l in sums['intel_pmc3']['PMC2'].keys():
-                    # iterate all CPU cores
-                    s += sums['intel_pmc3']['PMC2'][l]
-                    v.extend(series['intel_pmc3']['PMC2'][l])
-                if v:
-                    v = calculate_stats(v)
-                    if 0 < v['max']:
-                        v['overall_avg'] = s / nCores_allhosts
-                        summaryDict['FLOPS'] = v
-
-        for device in aggregates:
-            if device in sums.keys():
-                for interface in sums[device]:
-                    s = 0
-                    v = []
-                    for l in sums[device][interface].keys():
-                        s += sums[device][interface][l]
-                        v.extend(series[device][interface][l])
-                    if len(v) > 0:
-                        v = calculate_stats(v)
-                        if 0 < v['max']:
-                            v['overall_avg'] = s / nCores_allhosts
-                        addmetrics(summaryDict, j.overflows, device, interface, v)
-                del sums[device]
-                del series[device]
-    
-        for device in conglomerates:
-            if device in sums.keys():
-                s = dict()
-                v = dict()
-                for interface in sums[device]:
-                    for index in sums[device][interface]:
-                        if index not in s:
-                            s[index] = 0
-                            v[index] = []
-                        s[index] += sums[device][interface][index]
-                        v[index].extend(series[device][interface][index])
-                for index in s:
-                    if len(v[index]) > 0:
-                        v[index] = calculate_stats(v[index])
-                        if 0 < v[index]['max']:
-                            v[index]['overall_avg'] = s[index] / nCores_allhosts
-                        addmetrics(summaryDict, j.overflows, device, interface, v[index])
-
-                del sums[device]
-                del series[device]
-
-        # memory usage
-
-        v = []
-        v2 = []
-        v3 = []
-        for l in series['mem']['MemUsed'].keys():
-
-            # iterate all memory sockets
-
-            v.extend(series['mem']['MemUsed'][l])
-            v2.extend(series['mem']['FilePages'][l])
-            v3.extend(series['mem']['Slab'][l])
-        if v:
-            res = calculate_stats(v)
-            if 0 < res['max']:
-                addmetrics(summaryDict, j.overflows, 'mem', 'used', res)
-            res = calculate_stats([a - b - c for (a, b, c) in zip(v, v2, v3)])
-            if 0 < res['max']:
-                addmetrics(summaryDict, j.overflows, 'mem', 'used_minus_diskcache', res)
 
         # cpu usage
+        totalcpus = numpy.array(totals['cpu']['all'])
+        if min(totalcpus) < 90.0:
+            summaryDict['Error'].append("Corrupt CPU counters")
+            summaryDict['cpuall'] = calculate_stats(totalcpus)
+        else:
+            for interface, cdata in totals['cpu'].iteritems():
+                if interface != "all":
+                    v = calculate_stats( numpy.array(cdata) / totalcpus )
+                    addmetrics(summaryDict,j.overflows, "cpu", interface, v)
+        del totals['cpu']
 
-        s = 0
-        v = []
-        for l in sums['cpu']['all'].keys():
-
-            # iterate all CPU cores
-
-            s += sums['cpu']['all'][l]
-            v.extend(series['cpu']['all'][l])
-        if 0 < s:
-            for l in indices['cpu'].keys():
-                s2 = 0
-                v2 = []
-                for k in sums['cpu'][l].keys():
-                    s2 += sums['cpu'][l][k]
-                    v2.extend(series['cpu'][l][k])
-
-                v2 = calculate_stats( numpy.array(v2) / numpy.array(v) )
-                if 0 < v2['max']:
-                    v2['overall_avg'] = s2 / s
-                    addmetrics(summaryDict, j.overflows, 'cpu', l, v2)
-
-        del sums['cpu']  # we are done with 'cpu'
-        del series['cpu']
-        del sums['mem']  # we are done with 'mem'
-        del series['mem']
-
-    # deal with general cases
-
-    if statsOk:
-        for l in series.keys():
-            for k in series[l].keys():
-                for i in series[l][k].keys():
-                    v = calculate_stats(series[l][k][i])
-                    if l in sums and k in sums[l] and i in sums[l][k]:
-                        v['overall_avg'] = sums[l][k][i] / nHosts
-                    addinstmetrics(summaryDict,j.overflows, l, i, k, v)
+        converttooutput(series, summaryDict, j)
+        converttooutput(totals, summaryDict, j)
 
     # add in lariat data
     if lariatcache != None:
@@ -448,7 +474,7 @@ def summarize(j, lariatcache):
                 sys.stderr.write( '%s\n' % traceback.format_exc() )
                 summaryDict['Error'].append("schema data not found")
 
-    summaryDict['summary_version'] = "0.9.13"
+    summaryDict['summary_version'] = "0.9.19"
     uniq = str(j.acct['id'])
     if 'cluster' in j.acct:
         uniq += "-" + j.acct['cluster']
