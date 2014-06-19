@@ -24,7 +24,7 @@ def imb_test():
 #### Idle
 def idle_test():
     print("Idle host test")
-    idle_test = exams.Idle(processes=1,threshold=1-0.9)
+    idle_test = exams.Idle(processes=1,threshold=0.0)
     idle_test.run(filelist)
     assert len((idle_test.failed())) == 1
 
