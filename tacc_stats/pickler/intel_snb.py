@@ -140,10 +140,14 @@ class reformat_counters:
         self.fix_registers = []
 
         # Just need the first hosts schema
+        stats = None
         for host in job.hosts.itervalues():
             if name not in host.stats: return
             stats = host.stats[name]
             break
+        
+        if stats == None:
+            return
 
         schema_desc = job.schemas.get(self.name).desc
         registers = schema_desc.split()
@@ -166,6 +170,20 @@ class reformat_counters:
             break
 
 
+        # Now check for all hosts:
+        # all devices have the same control settings
+        # all devices control setting remain the same during the job
+        for host in job.hosts.itervalues():
+            if name in host.stats:
+                for dev, array in host.stats[name].iteritems():
+                    devidx = 0
+                    for j in self.ctl_registers:
+                        settings = array[:,j]
+                        if event_map.get(settings[0],str(settings[0])) != dev_schema[devidx] or settings.min() != settings.max():
+                            # The control settings for this device changed during the run
+                            # mark as the error metric
+                            dev_schema[devidx] = "ERROR,E"
+                        devidx += 1
 
         # Schema appended for fixed ctrs 
         nr_fixed = len(self.fix_registers)
