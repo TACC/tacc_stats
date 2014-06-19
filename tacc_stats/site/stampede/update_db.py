@@ -25,7 +25,7 @@ for date_dir in os.listdir(cfg.pickles_dir):
     
     print 'Run update for',date_dir
 
-    #views.update(date_dir)
+    views.update(date_dir)
 
     cpi_test = analysis.HighCPI(threshold=1.0,processes=2)
     views.update_test_field(date_dir,cpi_test,'cpi',rerun=True)
