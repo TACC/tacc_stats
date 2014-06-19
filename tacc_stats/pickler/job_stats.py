@@ -1,14 +1,6 @@
 #!/usr/bin/env python
 import datetime, errno, glob, numpy, os, sys, time, gzip
-from subprocess import Popen, PIPE
 import amd64_pmc, intel_snb, batch_acct
-
-if sys.version.startswith("3"):
-    import io
-    io_method = io.BytesIO
-else:
-    import cStringIO
-    io_method = cStringIO.StringIO
 
 verbose = os.getenv('TACC_STATS_VERBOSE')
 
@@ -203,9 +195,8 @@ class Host(object):
                 # Prune to files that might overlap with job.
                 ent_start = long(base)
                 ent_end = ent_start + 2*RAW_STATS_TIME_MAX
-                self.trace("Bill: %d, %d, %d, %d, %d, %d \n", ent_start,job_start,ent_end, job_end,  max(job_start, ent_start) , min(job_end, ent_end))
-#                if max(job_start, ent_start) <= min(job_end, ent_end):
-                if ((ent_start <= job_start) and (job_start <= ent_end)) or ((ent_start <= job_end) and (job_end <= ent_end)) or (max(job_start, ent_start) <= min(job_end, ent_end)) :
+
+                if max(job_start, ent_start) <= min(job_end, ent_end):
                     full_path = os.path.join(raw_host_stats_dir, ent)
                     path_list.append((full_path, ent_start))
                     self.trace("path `%s', start %d\n", full_path, ent_start)
@@ -321,9 +312,12 @@ class Host(object):
         # into lists of tuples in self.raw_stats.  The lists will be
         # converted into numpy arrays below.
         for path, start_time in path_list:
-            fd = gzip.open(path)
-            self.read_stats_file(fd)
-            fd.close()
+            if path.endswith('.gz'):
+                with gzip.open(path) as fd:
+                    self.read_stats_file(fd)
+            else:
+                with open(path) as fd:
+                    self.read_stats_file(fd)
         # begin_mark = 'begin %s' % self.job.id # No '%'.
         # if not begin_mark in self.marks:
         #     self.error("no begin mark found\n")
