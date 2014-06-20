@@ -1,6 +1,9 @@
 #!/usr/bin/env python
 import datetime, errno, glob, numpy, os, sys, time, gzip
 import amd64_pmc, intel_snb, batch_acct
+import re
+#import procdump
+import string
 
 verbose = os.getenv('TACC_STATS_VERBOSE')
 
@@ -28,6 +31,49 @@ SF_DEVICES_CHAR = '@'
 SF_COMMENT_CHAR = '#'
 SF_PROPERTY_CHAR = '$'
 SF_MARK_CHAR = '%'
+
+KEEP_EDITS = False
+
+def schema_fixup(type_name, desc):
+    if type_name == "irq":
+        # All of the irq metrics are 32 bits wide
+        res = ""
+        for token in desc.split():
+            res += token.strip() + ",W=32 "
+        return res
+
+    elif type_name == "sched":
+        # Most sched counters are 32 bits wide with 3 exceptions
+        res = ""
+        sixtyfourbitcounters = [ "running_time,E,U=ms", "waiting_time,E,U=ms", "pcount,E" ]
+        for token in desc.split():
+            if token in sixtyfourbitcounters:
+                res += token.strip() + " "
+            else:
+                res += token.strip() + ",W=32 "
+        return res
+    elif type_name == "block":
+        # Most block counters are 64bits wide with a few exceptions
+        res = ""
+        thirtytwobitcounters = [ "rd_ticks,E,U=ms", "wr_ticks,E,U=ms", "in_flight", "io_ticks,E,U=ms", "time_in_queue,E,U=ms" ]
+        for token in desc.split():
+            if token in thirtytwobitcounters:
+                res += token.strip() + ",W=32 "
+            else:
+                res += token.strip() + " "
+        return res
+    elif type_name == "panfs":
+        # The syscall_*_(n+)s stats are not events
+        res = ""
+        for token in desc.split():
+            token = token.strip()
+            if token.startswith("syscall_") and ( token.endswith("_s,E,U=s") or token.endswith("_ns,E,U=ns")):
+                res += string.replace(token, "E,", "") + " "
+            else:
+                res += token + " "
+        return res
+
+    return desc
 
 class SchemaEntry(object):
     __slots__ = ('key', 'index', 'is_control', 'is_event', 'width', 'mult', 'unit')
@@ -145,19 +191,6 @@ class Schema(dict):
         return self._value_list
 
 
-#def get_host_list_path(acct, host_list_dir):
-#    """Return the path of the host list written during the prolog."""
-#    # Example: /share/sge6.2/default/tacc/hostfile_logs/2011/05/19/prolog_hostfile.1957000.IV32627
-#    start_date = datetime.date.fromtimestamp(acct['start_time'])
-#    base_glob = 'prolog_hostfile.' + acct['id'] + '.*'
-#    for days in (0, -1, 1):
-#        yyyy_mm_dd = (start_date + datetime.timedelta(days)).strftime("%Y/%m/%d")
-#        full_glob = os.path.join(host_list_dir, yyyy_mm_dd, base_glob)
-#        for path in glob.iglob(full_glob):
-#            return path
-#    return None
-
-
 def stats_file_discard_record(file):
     for line in file:
         if line.isspace():
@@ -175,6 +208,7 @@ class Host(object):
         self.marks = {}
         self.raw_stats = {}
         self.raw_stats_dir=raw_stats_dir
+        #self.procdump = procdump.ProcDump()
 
     def trace(self, fmt, *args):
         self.job.trace('%s: ' + fmt, self.name, *args)
@@ -192,11 +226,16 @@ class Host(object):
                 base, dot, ext = ent.partition(".")
                 if not base.isdigit():
                     continue
+                if ext != "gz":
+                    continue
+                # Support for filenames of the form %Y%m%d
+                if re.match('^[0-9]{4}[0-1][0-9][0-3][0-9]$', base):
+                    base = (datetime.datetime.strptime(base,"%Y%m%d") - datetime.datetime(1970,1,1)).total_seconds()
                 # Prune to files that might overlap with job.
                 ent_start = long(base)
                 ent_end = ent_start + 2*RAW_STATS_TIME_MAX
 
-                if max(job_start, ent_start) <= min(job_end, ent_end):
+                if ((ent_start <= job_start) and (job_start <= ent_end)) or ((ent_start <= job_end) and (job_end <= ent_end)) or (max(job_start, ent_start) <= min(job_end, ent_end)) :
                     full_path = os.path.join(raw_host_stats_dir, ent)
                     path_list.append((full_path, ent_start))
                     self.trace("path `%s', start %d\n", full_path, ent_start)
@@ -255,17 +294,26 @@ class Host(object):
         if not file_schemas:
             self.trace("file `%s' bad header\n", file.name)
             return
+        rec_jobid = set()
         # Scan file for records belonging to JOBID.
         for line in file:
             try:
                 c = line[0]
                 if c.isdigit():
-                    str_time, rec_jobid = line.split()
+                    str_time, str_jobid = line.split()
                     rec_time = long(str_time)
-                    if rec_jobid == self.job.id:
+                    rec_jobid = set(str_jobid.split(','))
+                    if self.job.id in rec_jobid:
                         self.trace("file `%s' rec_time %d, rec_jobid `%s'\n",
                                    file.name, rec_time, rec_jobid)
                         self.times.append(rec_time)
+                        break
+                elif line.startswith('% begin'):
+                    rec_jobid.add(line.split()[2])
+                    if self.job.id in rec_jobid:
+                        self.times.append(rec_time)
+                        mark = line[1:].strip()
+                        self.marks[mark] = True
                         break
             except Exception as exc:
                 self.trace("file `%s', caught `%s', discarding `%s'\n",
@@ -277,21 +325,48 @@ class Host(object):
             self.trace("file `%s' has no records belonging to job\n", file.name)
             return
         # OK, we found a record belonging to JOBID.
+        skip = False
         for line in file:
             try:
                 c = line[0]
                 if c.isdigit():
-                    str_time, rec_jobid = line.split()
+                    skip = False
+                    str_time, str_jobid = line.split()
                     rec_time = long(str_time)
-                    if rec_jobid != self.job.id:                        
-                        return
+                    rec_jobid = set(str_jobid.split(','))
+                    if self.job.id not in rec_jobid:
+                        line = file.next()
+                        if line.startswith(SF_MARK_CHAR): 
+                            tokens = line[1:].strip().split(" ")
+                            if len(tokens) > 1 and tokens[0].strip() == "end":
+                                rec_jobid.add( tokens[1].strip() )
+                            else:
+                                self.trace("file '%s' syntax error '%s'\n", file.name, line)
+                        if self.job.id not in rec_jobid:
+                            return
                     self.trace("file `%s' rec_time %d, rec_jobid `%s'\n",
                                file.name, rec_time, rec_jobid)
                     self.times.append(rec_time)
                 elif c.isalpha():
-                    self.parse_stats(rec_time, line, file_schemas, file)            
+                    if False == skip:
+                        self.parse_stats(rec_time, line, file_schemas, file)            
                 elif c == SF_MARK_CHAR:
                     mark = line[1:].strip()
+                    actions = mark.split()
+                    if actions[1].strip() != self.job.id:
+                        self.times.pop()
+                        skip = True
+                    else:
+                        if actions[0] == "begin" and len(self.times) > 1:
+                            # this is a 'begin' record for this job, but have already processed a record
+                            # for this job. This race condition occurs if the job starts very close to the
+                            # normal cron-initiated record.  Tacc_stats resets some performance counters on
+                            # a begin, so it is necessary to discard the records before this one.
+                            self.job.errors.add("BEGIN_IN_MIDDLE {} {} {} discard {} previous".format(self.name, file.name, rec_time, len(self.times)-1 ) )
+                            self.raw_stats = {}
+                            self.times = [ rec_time ]
+
+                        skip = False
                     self.marks[mark] = True
                 #elif c == SF_COMMENT_CHAR:
                     #pass        
@@ -312,12 +387,12 @@ class Host(object):
         # into lists of tuples in self.raw_stats.  The lists will be
         # converted into numpy arrays below.
         for path, start_time in path_list:
-            if path.endswith('.gz'):
-                with gzip.open(path) as fd:
-                    self.read_stats_file(fd)
-            else:
-                with open(path) as fd:
-                    self.read_stats_file(fd)
+            try:
+                with gzip.open(path) as file:
+                    self.read_stats_file(file)
+            except IOError as ioe:
+                self.error("read error for file %s\n", path)
+
         # begin_mark = 'begin %s' % self.job.id # No '%'.
         # if not begin_mark in self.marks:
         #     self.error("no begin mark found\n")
@@ -340,7 +415,7 @@ class Host(object):
 class Job(object):
     # TODO errors/comments
     __slots__ = ('id', 'start_time', 'end_time', 'acct', 'schemas', 'hosts',
-    'times','stats_home', 'host_list_dir', 'batch_acct', 'edit_flags')
+    'times','stats_home', 'host_list_dir', 'batch_acct', 'edit_flags')#, 'errors', 'overflows')
 
     def __init__(self, acct, stats_home, host_list_dir, batch_acct):
         self.id = acct['id']
@@ -355,6 +430,10 @@ class Job(object):
         self.batch_acct=batch_acct
         self.edit_flags = []
 
+        # Not compatible with existing data at TACC
+        #self.errors = set()
+        #self.overflows = dict()
+
     def trace(self, fmt, *args):
         trace('%s: ' + fmt, self.id, *args)
 
@@ -364,24 +443,28 @@ class Job(object):
     def get_schema(self, type_name, desc=None):
         schema = self.schemas.get(type_name)
         if schema:
-            if desc and schema.desc != desc:
+            if desc and schema.desc != schema_fixup(type_name,desc):
                 # ...
                 return None
         elif desc:
+            desc = schema_fixup(type_name, desc)
             schema = self.schemas[type_name] = Schema(desc)
         return schema
 
     def gather_stats(self):
-        path = self.batch_acct.get_host_list_path(self.acct, self.host_list_dir)
-        if not path:
-            self.error("no host list found\n")
-            return False
-        try:
-            with open(path) as file:
-                host_list = [host for line in file for host in line.split()]
-        except IOError as (err, str):
-            self.error("cannot open host list `%s': %s\n", path, str)
-            return False
+        if "host_list" in self.acct:
+            host_list = self.acct['host_list']
+        else:
+            path = self.batch_acct.get_host_list_path(self.acct, self.host_list_dir)
+            if not path:
+                self.error("no host list found\n")
+                return False
+            try:
+                with open(path) as file:
+                    host_list = [host for line in file for host in line.split()]
+            except IOError as (err, str):
+                self.error("cannot open host list `%s': %s\n", path, str)
+                return False
         if len(host_list) == 0:
             self.error("empty host list\n")
             return False
@@ -403,6 +486,7 @@ class Job(object):
         for host in self.hosts.itervalues():
             times_lis.append(host.times)
             del host.times
+
         times_lis.sort(key=lambda lis: len(lis))
         # Choose times to have median length.
         times = list(times_lis[len(times_lis) / 2])
@@ -410,7 +494,7 @@ class Job(object):
             return False
         times.sort()
         # Ensure that times is sane and monotonically increasing.
-        t_min = self.start_time
+        t_min = 0
         for i in range(0, len(times)): 
             t = max(times[i], t_min)
             times[i] = t
@@ -420,6 +504,8 @@ class Job(object):
         self.trace("job start to first collect %d\n", times[0] - self.start_time)
         self.trace("last collect to job end %d\n", self.end_time - times[-1])
         self.times = numpy.array(times, dtype=numpy.uint64)
+        #if len(times_lis[0]) != len(times_lis[-1]):
+        #    self.errors.add( "Number of records differs between hosts (min {}, max {})".format(len(times_lis[0]), len(times_lis[-1]) ) )
         return True
     
     def process_dev_stats(self, host, type_name, schema, dev_name, raw):
@@ -440,11 +526,18 @@ class Job(object):
         k = 0
         # len(raw) may not be equal to m, so we fill out A by choosing values
         # with the closest timestamps.
-        for i in range(1, m - 1):
+        # TODO sort out host times
+        host.times = []
+        for i in range(1, m-1):
             t = self.times[i]
             while k + 1 < len(raw) and abs(raw[k + 1][0] - t) <= abs(raw[k][0] - t):
                 k += 1
+            #jitter = abs(raw[k][0] - t)
+            #if jitter > 60:
+            #    self.errors.add("Warning - high jitter for host {} job {} Actual time {}, Thunked to {} (Delta {})".format(host.name, self.id, raw[k][0], t, jitter))
             A[i] = raw[k][1]
+            host.times.append(raw[k][0])
+
         # OK, we fit the raw values into A.  Now fixup rollover and
         # convert units.
         for e in schema.itervalues():
@@ -454,6 +547,7 @@ class Job(object):
                 # Rebase, check for rollover.
                 for i in range(0, m):
                     v = A[i, j]
+                    #correction_factor = numpy.uint64(0)
                     if v < p:
                         # Looks like rollover.
                         if e.width:
@@ -468,21 +562,43 @@ class Job(object):
                             trace("time %d, counter `%s', suspicious zero, prev %d\n",
                                   self.times[i], e.key, p)
                             v = p # Ugh.
-                        elif (type_name == 'ib_ext' or type_name == 'ib_sw'):
+                        elif (type_name == 'ib_ext' or type_name == 'ib_sw') or \
+                                (type_name == 'cpu' and e.key == 'iowait'):
                             # We will assume a spurious reset, 
                             # and the reset happened at the start of the counting period.
                             # This happens with IB counters.
                             # A[i,j] = v + A[i-1,j] = v + v_(t-1) - r
-                            v += A[i-1,j] # Add new value after reset to old re-based value
+                            #correction_factor = A[i-1,j]
+                            v += A[i-1,j]#correction_factor
                             r = 0 # base is now zero
-                            self.edit_flags.append("(time %d, host `%s', type `%s', dev `%s', key `%s')" %
-                                                   (self.times[i],host.name,type_name,dev_name,e.key))
+                            if KEEP_EDITS:
+                                self.edit_flags.append("(time %d, host `%s', type `%s', dev `%s', key `%s')" %
+                                                       (self.times[i],host.name,type_name,dev_name,e.key))
+                                
+                        # These logs conflict with a years worth of data
+                        """
+                        if type_name not in ['ib', 'ib_ext'] and (correction_factor == numpy.uint64(0) ):
+                            width = e.width if e.width else 64
+                            if ( v - p ) % (2**width) > 2**(width-1):
+                                # This counter rolled more than half of its range
+                                self.logoverflow(host.name, type_name, dev_name, e.key)
+                            """    
                     A[i, j] = v - r
                     p = v
             if e.mult:
                 for i in range(0, m):
                     A[i, j] *= e.mult
         return A
+
+    def logoverflow(self, host_name, type_name, dev_name, key_name):
+        if type_name not in self.overflows:
+            self.overflows[type_name] = dict()
+        if dev_name not in self.overflows[type_name]:
+            self.overflows[type_name][dev_name] = dict()
+        if key_name not in self.overflows[type_name][dev_name]:
+            self.overflows[type_name][dev_name][key_name] = []
+
+        self.overflows[type_name][dev_name][key_name].append(host_name)
 
     def process_stats(self):
         for host in self.hosts.itervalues():
@@ -563,9 +679,3 @@ def from_id(id, **kwargs):
         return from_acct(acct)
     else:
         return None
-
-# if True:
-#     t0 = time.time()
-#     j = job_stats.from_id(2294341)
-#     t1 = time.time()
-#     print t1 - t0

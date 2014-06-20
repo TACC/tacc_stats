@@ -5,7 +5,7 @@ set -eu
 prog=$(basename $0)
 prog_dir=$(readlink -f $(dirname $0))
 
-export PATH=python_path:$prog_dir:$PATH
+export PATH=$prog_dir:$PATH:python_path
 
 date=$(date --date=yesterday +%F)
 
