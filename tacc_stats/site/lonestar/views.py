@@ -21,20 +21,19 @@ from matplotlib.figure import Figure
 from matplotlib.backends.backend_agg import FigureCanvasAgg as FigureCanvas
 from django.core.cache import cache,get_cache 
 
-def ls4_update(meta = None):
-    if not meta: return
-
-    # Only need to populate lariat cache once
-    jobid = meta.json.keys()[0]
+def update(meta = None, rerun=False):
 
     ld = lariat_utils.LariatData(directory = '/hpc/tacc_stats_site/lonestar/lariatData',
                                  daysback = 2)
     
     for jobid, json in meta.json.iteritems():
+        print jobid
+        if rerun:
+            if LS4Job.objects.filter(id = jobid).exists():
+                job = LS4Job.objects.filter(id = jobid).delete()
 
-        if LS4Job.objects.filter(id = jobid).exists(): continue  
-        ld.set_job(jobid,
-                   end_epoch = meta.json[jobid]['end_epoch'])
+        obj,created = LS4Job.objects.get_or_create(id = jobid)
+        if not created: continue
         
         if json['exit_status'] != 0: json['status'] = 'TIMEOUT/CANCELLED'
         else: json['status'] = 'COMPLETED'
@@ -60,19 +59,16 @@ def ls4_update(meta = None):
         jsondb['path'] = json['path']
         jsondb['date'] = json['date']
         jsondb['user'] = json['owner']
-
+        
         # LD
+        try: ld.set_job(jobid,end_time = meta.json[jobid]['end_epoch'])        
+        except: pass
         jsondb['exe'] = ld.exc.split('/')[-1]
         jsondb['cwd'] = ld.cwd
         jsondb['threads'] = ld.threads
         
-        
-        try:
-            job_model, created = LS4Job.objects.get_or_create(**jsondb) 
-        except:
-            print "Something wrong with json",jsondb
-    return 
-
+        obj = LS4Job(**jsondb)
+        obj.save()
 
 def dates(request):
     

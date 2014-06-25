@@ -16,9 +16,9 @@ def main(**args):
                      min_time=args['s'], min_hosts=args['N'],
                      waynesses=args['waynesses'], aggregate=args['a'])
 
-    print 'Run test '+ test_type.__name__+' for date >>>' 
+    print 'Running test: '+ test_type.__name__
 
-    failed = test.date_sweep(args['start'],args['end'],directory = args['dir'])
+    failed = test.date_sweep(args['start'],args['end'],pickles_dir = args['dir'])
 
     if args['plot']:
         plotter = analysis.MasterPlot(header='Failed test: '+ test_type.__name__,

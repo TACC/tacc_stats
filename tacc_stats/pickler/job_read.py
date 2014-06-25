@@ -31,16 +31,16 @@ class JobRead:
                     old = dev_data[0]                    
                     for t in range(len(dev_data)):                        
                         new = dev_data[t]
-                        flag = False
+                        flag = True
                         for j in range(len(new)):
                             if new[j] < old[j]: 
                                 flag = True 
                                 break
 
                         if flag:
-                            print type_name,dev_name
-                            print t-1,old
-                            print t,new
+                            print host_name,type_name,dev_name
+                            print self.data.times[t-1],old
+                            print self.data.times[t],new
                         old = new
 
 if __name__ == '__main__':

@@ -1,38 +1,28 @@
 #!/usr/bin/env python
-import os,sys,subprocess
-from subprocess import Popen, PIPE
+import os,sys
+from datetime import timedelta,datetime
 os.environ['DJANGO_SETTINGS_MODULE']='tacc_stats.site.tacc_stats_site.settings'
-sys.path.append(os.path.join(os.path.dirname(__file__), 
-                             'tacc_stats_site'))
-sys.path.append(os.path.join(os.path.dirname(__file__), 
-                             'lonestar'))
-
-import tacc_stats.site.lonestar.views as views
-
+from tacc_stats.site.lonestar import views
 from tacc_stats.pickler import MetaData as MetaData
-import datetime
 
 path = "/hpc/tacc_stats_site/lonestar/pickles"
+try:
+    start = datetime.strptime(sys.argv[1],"%Y-%m-%d")
+    end   = datetime.strptime(sys.argv[2],"%Y-%m-%d")
+except:
+    start = datetime.now() - timedelta(days=1)
+    end   = start
 
-p = Popen(["date --date " + sys.argv[1] + ' +%Y-%m-%d'], stdout = PIPE, 
-                   shell = True) 
-date_start = p.communicate()[0].strip()
+for root,dirnames,filenames in os.walk(path):
+    for directory in dirnames:
 
-p = Popen(["date --date " + sys.argv[2] + ' +%Y-%m-%d'], stdout = PIPE,
-                   shell = True) 
-date_end = p.communicate()[0].strip()
+        date = datetime.strptime(directory,'%Y-%m-%d')
+        if max(date.date(),start.date()) > min(date.date(),end.date()): continue
+        print 'Run update for',date.date()
 
-for date in os.listdir(path):
+        meta = MetaData.MetaData(os.path.join(path,directory))
+        meta.load_update()
+        print 'Number of pickle files to upload into DB',len(meta.json.keys())
+        views.update(meta = meta)
 
-    s = [int(x) for x in date_start.split('-')]
-    e = [int(x) for x in date_end.split('-')]
-    d = [int(x) for x in date.split('-')]
-
-    if not datetime.date(s[0],s[1],s[2]) <= datetime.date(d[0],d[1],d[2]) <= datetime.date(e[0],e[1],e[2]): continue
-    
-    print 'Run update for',date
-    meta = MetaData.MetaData(os.path.join(path,date))
-    meta.load_update()
-    print 'Number of pickle files to upload into DB',len(meta.json.keys())
-    views.ls4_update(meta = meta)
-
+    break

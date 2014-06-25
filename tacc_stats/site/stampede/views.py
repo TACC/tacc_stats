@@ -27,9 +27,7 @@ from matplotlib.backends.backend_agg import FigureCanvasAgg as FigureCanvas
 from django.core.cache import cache,get_cache 
 import traceback
 
-#from memory_profiler import profile
-#@profile
-def update(date):
+def update(date,rerun=False):
 
     ld = lariat_utils.LariatData(directory = cfg.lariat_path,
                                  daysback = 2)
@@ -37,56 +35,51 @@ def update(date):
     tz = pytz.timezone('US/Central')
 
     pickle_dir = os.path.join(cfg.pickles_dir,date)
-    date_objects = Job.objects.filter(date=date)
-
     nf = len(os.listdir(pickle_dir))
+
     ctr = 0
+
     print "Number of pickle files =",nf
     for root, directory, pickle_files in os.walk(pickle_dir):
-
-        for pickle_file in pickle_files:
+        for pickle_file in sorted(pickle_files):
             ctr += 1
-
-            try: obj, created = date_objects.get_or_create(id = pickle_file)
-            except: 
-                print traceback.format_exc()
-                pass
-
+            
+            if rerun:
+                if Job.objects.filter(id = pickle_file).exists():
+                    job = Job.objects.filter(id = pickle_file).delete()
+            obj,created = Job.objects.get_or_create(id = pickle_file)
+            if not created: continue
             try:
-                if created:
-                    pickle_path = os.path.join(root,str(pickle_file))
-                    # Create job row if it doesn't exists
-                    with open(pickle_path, 'rb') as f:
-                        data = np.load(f,mmap_mode='r')
-                        json = data.acct
-                        del data
-                        del json['yesno'], json['unknown']
-                        json['run_time'] = json['end_time'] - json['start_time']
 
-                        json['path'] = pickle_path
-                        json['start_epoch'] = json['start_time']
-                        json['end_epoch'] = json['end_time']
+                pickle_path = os.path.join(root,str(pickle_file))
+                with open(pickle_path, 'rb') as f:
+                    json = np.load(f).acct
+                del json['yesno'], json['unknown']
+                json['run_time'] = json['end_time'] - json['start_time']
+
+                json['path'] = pickle_path
+                json['start_epoch'] = json['start_time']
+                json['end_epoch'] = json['end_time']
                         
-                        utc_start = datetime.utcfromtimestamp(json['start_time']).replace(tzinfo=pytz.utc)
-                        utc_end = datetime.utcfromtimestamp(json['end_time']).replace(tzinfo=pytz.utc)
-                        
-                        json['start_time'] = utc_start.astimezone(tz)
-                        json['end_time'] =  utc_end.astimezone(tz)
-                        json['date'] = json['end_time'].date()
-                        
-                        ld.set_job(pickle_file,end_epoch = json['end_epoch'])
+                utc_start = datetime.utcfromtimestamp(json['start_time']).replace(tzinfo=pytz.utc)
+                utc_end = datetime.utcfromtimestamp(json['end_time']).replace(tzinfo=pytz.utc)
+                json['start_time'] = utc_start.astimezone(tz)
+                json['end_time'] =  utc_end.astimezone(tz)
+                json['date'] = json['end_time'].date()
+                
+                ld.set_job(pickle_file, end_time = date)
+                
+                json['exe'] = ld.exc.split('/')[-1]
+                json['cwd'] = ld.cwd[0:128]
+                json['threads'] = ld.threads
+                if ld.wayness:
+                    json['wayness'] = ld.wayness
 
-                        json['exe'] = ld.exc.split('/')[-1]
-                        json['cwd'] = ld.cwd[0:128]
-                        json['threads'] = ld.threads
-                        if ld.wayness:
-                            json['wayness'] = ld.wayness
+                try: json['user']=pwd.getpwuid(int(json['uid']))[0]
+                except: json['user']=ld.user
 
-                        try: json['user']=pwd.getpwuid(int(json['uid']))[0]
-                        except: json['user']=ld.user
-
-                        obj = Job(**json)
-                        obj.save()
+                obj = Job(**json)
+                obj.save()
             except: 
                 print pickle_file,'failed'
                 print traceback.format_exc()

@@ -11,6 +11,7 @@ def setup_func():
     a.write('tacc_stats_home = \"' + data_dir + '\"\n'
             'acct_path = \"'+ data_dir +'/tacc_jobs_completed\"\n'
             'host_list_dir= \"' + data_dir + '\"\n'
+            'pickles_dir= \"' + path + '\"\n'
             'host_name_ext= \"platform.extension\"\n'
             'batch_system = \"SLURM\"\n'
             'seek=0\n')
@@ -20,7 +21,9 @@ def setup_func():
 
 def teardown_func():
     os.remove(os.path.join(path,"cfg.py"))
-    os.remove(os.path.join(path,"1835740"))
+    os.remove(os.path.join(path,"cfg.pyc"))
+    os.remove(os.path.join(path,'2013-10-01',"1835740"))
+    os.rmdir(os.path.join(path,'2013-10-01'))
 
 @with_setup(setup_func, teardown_func)
 def test():
@@ -45,11 +48,11 @@ def test():
     pickler = job_pickles.JobPickles(**pickle_options)
     pickler.run()
        
-    assert os.path.isfile(os.path.join(path,'1835740')) == True
+    assert os.path.isfile(os.path.join(path,'2013-10-01','1835740')) == True
     print("Pickle file generated.")
 
     old = pickle.load(open(os.path.join(path,'1835740_ref')))
-    new = pickle.load(open(os.path.join(path,'1835740')))
+    new = pickle.load(open(os.path.join(path,'2013-10-01','1835740')))
 
     assert new.id == old.id
     for i in range(len(old.times)):
@@ -68,7 +71,7 @@ def test():
                     for j in range(len(dev_stats[i])):
 
                         if new.hosts[host_name].stats[type_name][dev_name][i][j]-dev_stats[i][j] != 0.0:
-                            print(host_name,type_name,dev_name,new.hosts[host_name].stats[type_name][dev_name][i][j],dev_stats[i][j])
-                            #continue
+                            print(new.times[i],host_name,type_name,dev_name,new.hosts[host_name].stats[type_name][dev_name][i][j],dev_stats[i][j])
+                            continue
                         assert new.hosts[host_name].stats[type_name][dev_name][i][j] == dev_stats[i][j]
 

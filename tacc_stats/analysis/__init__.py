@@ -1,5 +1,4 @@
 # Import tests to run on data
-
 from tacc_stats.analysis.exam.membw import MemBw
 from tacc_stats.analysis.exam.idle import Idle
 from tacc_stats.analysis.exam.imbalance import Imbalance
@@ -16,3 +15,5 @@ from tacc_stats.analysis.plot.metadatarate import MetaDataRatePlot
 from tacc_stats.analysis.plot.heatmap import HeatMap
 from tacc_stats.analysis.plot.devplot import DevPlot
 
+# Import generation utilities
+from tacc_stats.analysis.gen.lariat_utils import LariatData

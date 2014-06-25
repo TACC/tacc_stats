@@ -1,15 +1,9 @@
+from __future__ import print_function
 import json
-import time, os, fnmatch
+import datetime, time, os, fnmatch
 import re
 import textwrap
 
-#from pympler import tracker
-
-
-def make_date_string(t):
-  lt=time.localtime(t)
-  return '%(y)04d-%(m)02d-%(d)02d' % { 'y' : lt.tm_year, 'm' : lt.tm_mon,
-                                       'd' : lt.tm_mday }
 def replace_path_bits(path,user,maxlen):
   res=re.sub('/work/[0-9]+/'+user,r'\$WORK',path)
   res=re.sub('/scratch/[0-9]+/'+user,r'\$SCRATCH',res)
@@ -37,7 +31,7 @@ def replace_and_wrap_path_bits(path,user,maxlen,indent=0):
 class LariatDataException(Exception):
   def __init__(self,arg):
     self.value=arg
-    print self.value
+    print(self.value)
 
 class LariatData:
 
@@ -61,23 +55,23 @@ class LariatData:
     r'^c37b1'  : 'CHARMM*',
     }
 
-  def __init__(self,directory=None,daysback=0):
+  def __init__(self,directory=None,daysback=3):
     # Initialize to invalid/empty states
-    self.ld=dict()
-    self.json_list = []
+    self.ld_json=dict()
+    self.loaded_files = []
     self.directory = directory
     self.daysback = daysback
-    #self.memory_tracker = tracker.SummaryTracker()
-
 
   # Can accept ts object or jobid and end_epoch
-  def set_job(self,ts,end_epoch=None):
-    if not end_epoch:
-      jobid = ts.j.id
-      end_epoch = ts.j.end_time
-    else: jobid=ts
+  def set_job(self,job,end_time=None):
 
-    # Find the set of JSON files matching the end_epoch date
+    try:
+      jobid = job.j.id
+      end_time = job.j.end_time
+    except: 
+      jobid = job
+
+    # Find the set of JSON files matching the end_time date or epoch
     # Initialize to invalid/empty states
     self.id=0
     self.user='nobody'
@@ -89,49 +83,55 @@ class LariatData:
     self.wayness=None
 
     # Find the json file the job should be in
-    if end_epoch > 0 and self.directory != None:
-      matches=[]
-      for day in range(self.daysback+1):
-        ds=make_date_string(end_epoch-day*24*3600)
-        for root, dirnames, filenames in os.walk(self.directory):
-          for fn in fnmatch.filter(filenames,'*'+ds+'.json'):
-            matches.append(os.path.join(root,fn))
+    if self.directory == None: 
+      print("Please initialize LariatData with a valid lariat directory")
 
-      if len(matches) != 0:
-        for m in matches:
-          if jobid in self.ld: continue
-          if m in self.json_list: continue
-          else: self.json_list.append(m)
-
-          print 'Load lariat data for job',jobid,'from',m
-          print self.json_list
-          try:
-            self.ld.update(json.load(open(m))) # Should be only one match
-          except:
-            json_str = open(m).read()
-            json_str = re.sub(r'\\','',json_str)
-            self.ld.update(json.loads(json_str))
-      else:
-        print 'Json file for ' + jobid + ' not found in ' + self.directory
-
-    # Check if job is in json
+    # Check if job is in json.
+    # Load if it is not unless file has been loaded already.
+    if jobid not in self.ld_json:
+      self.load_file(end_time)
+            
+    # If job data exists it should be here.
     try:
-      self.id=self.ld[jobid][0]['jobID']
-      self.user=self.ld[jobid][0]['user']
-      self.exc=replace_and_shorten_path_bits(self.ld[jobid][0]['exec'],
-                                             self.user,60)
-      self.cwd=replace_and_shorten_path_bits(self.ld[jobid][0]['cwd'],
-                                             self.user,60)
-      self.threads=int(self.ld[jobid][0]['numThreads'])
-      self.cores=int(self.ld[jobid][0]['numCores'])
-      self.nodes=int(self.ld[jobid][0]['numNodes'])
-      self.wayness=int(float(self.cores)/self.nodes)
-
+      entry = self.ld_json[jobid][0]
     except KeyError:
-      print str(jobid) + ' did not call ibrun' + \
-          ' or has no lariat data for some other reason'
-    except: pass
-    #self.memory_tracker.print_diff()
+      print("Lariat Data for",jobid,"absent.")
+      self.ld_json[jobid] = [None]
+    if not self.ld_json[jobid][0]: return
+
+    self.id=entry['jobID']
+    self.user=entry['user']
+    self.exc=replace_and_shorten_path_bits(entry['exec'],self.user,60)
+    self.cwd=replace_and_shorten_path_bits(entry['cwd'],self.user,60)
+    self.threads=int(entry['numThreads'])
+    self.cores=int(entry['numCores'])
+    self.nodes=int(entry['numNodes'])
+    self.wayness=int(float(self.cores)/self.nodes)
+
+  def load_file(self,end_time):
+    for day in range(self.daysback+1):
+
+      delta = datetime.timedelta(days=day)
+      try:
+        date_obj = datetime.datetime.fromtimestamp(end_time)
+      except:      
+        date_obj = datetime.datetime.strptime(end_time,"%Y-%m-%d")
+      date = (date_obj-delta).strftime("%Y-%m-%d")
+
+      for root, dirnames, filenames in os.walk(self.directory):
+        for filename in fnmatch.filter(filenames,'*'+date+'.json'):
+
+          if filename in self.loaded_files: continue
+          else: self.loaded_files.append(filename)
+
+          try:
+            with open(os.path.join(root,filename)) as fd:
+              self.ld_json.update(json.loads(re.sub(r'\\','',fd.read())))
+              print('Loaded Lariat Data from',filename)
+          except IOError:
+            print("Load failed for",filename)
+    
+
   def title(self):
     title='E: ' + self.exc
     if (self.cwd != 'unknown'):
@@ -148,9 +148,9 @@ class LariatData:
         return patterns[i]
     return name
 
-  def get_runtimes(self,end_epoch):
-    start_times=[int(ibr['startEpoch']) for ibr in self.ld[self.id]]
-    start_times.extend([end_epoch])
+  def get_runtimes(self,end_time):
+    start_times=[int(ibr['startEpoch']) for ibr in self.ld_json[self.id]]
+    start_times.extend([end_time])
     st2=sorted(start_times)
     return [(a-b) for (a,b) in zip(st2[1:],st2[:-1])]
     

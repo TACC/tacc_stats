@@ -550,42 +550,35 @@ class Job(object):
                 # Rebase, check for rollover.
                 for i in range(0, m):
                     v = A[i, j]
-                    correction_factor = numpy.uint64(0)
                     if v < p:
                         # Looks like rollover.
+                        # Rebase narrow counters and spurious resets.
+                        # 64-bit overflows are correctly handled automatically                        
+                        fudged = False
                         if e.width:
                             trace("time %d, counter `%s', rollover prev %d, curr %d\n",
                                   self.times[i], e.key, p, v)
                             r -= numpy.uint64(1L << e.width)
-                        elif v == 0:
-                            # Spurious reset
-                            # This happens with the IB counters.
-                            # Ignore this value, use previous instead.
-                            # TODO Interpolate or something.
-                            trace("time %d, counter `%s', suspicious zero, prev %d\n",
-                                  self.times[i], e.key, p)
-                            v = p # Ugh.
-                        elif (type_name == 'ib_ext' or type_name == 'ib_sw') or (type_name == 'cpu' and e.key == 'iowait'):
+                        elif v == 0 or (type_name == 'ib_ext' or type_name == 'ib_sw') or \
+                                (type_name == 'cpu' and e.key == 'iowait'):
                             # We will assume a spurious reset, 
                             # and the reset happened at the start of the counting period.
-                            # This happens with IB counters.
-                            # A[i,j] = v + A[i-1,j] = v + v_(t-1) - r
-                            correction_factor = A[i-1,j]
-                            v += correction_factor
-                            r = 0 # base is now zero
+                            # This happens with IB counters and sometimes with Lustre stats.
+                            # A[i,j] = v + A[i-1,j] = v - r. Rebase to previous value.
+                            r = numpy.uint(0) - A[i-1,j]
                             if KEEP_EDITS:
                                 self.edit_flags.append("(time %d, host `%s', type `%s', dev `%s', key `%s')" %
                                                        (self.times[i],host.name,type_name,dev_name,e.key))
-                                
+                            fudged =True
                         # These logs conflict with a years worth of data
                         """
-                        if type_name not in ['ib', 'ib_ext'] and (correction_factor == numpy.uint64(0) ):
+                        if type_name not in ['ib', 'ib_ext'] and not fudged:
                             width = e.width if e.width else 64
                             if ( v - p ) % (2**width) > 2**(width-1):
                                 # This counter rolled more than half of its range
                                 self.logoverflow(host.name, type_name, dev_name, e.key)
-                            """    
-                    A[i, j] = v - r #+ correction_factor
+                        """    
+                    A[i, j] = v - r
                     p = v
             if e.mult:
                 for i in range(0, m):

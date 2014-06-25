@@ -3,7 +3,7 @@ import os,sys
 import abc
 import operator,traceback
 import multiprocessing
-from datetime import date
+from datetime import datetime,timedelta
 from tacc_stats.analysis.gen import tspl,tspl_utils
 
 def unwrap(args):
@@ -110,24 +110,25 @@ class Test(object):
 
     return sorted_jobs
 
-  def date_sweep(self,start,end,directory=None):
-    if not directory: return
+  def date_sweep(self,start,end,pickles_dir=None):
+    try:
+      start = datetime.strptime(start,"%Y-%m-%d")
+      end   = datetime.strptime(end,"%Y-%m-%d")
+    except:
+      start = datetime.now() - timedelta(days=1)
+      end   = start
 
-    for date_dir in os.listdir(directory):
+    filelist = []
+    for root,dirnames,filenames in os.walk(pickles_dir):
+      for directory in dirnames:
 
-      try:
-        s = [int(x) for x in start.split('-')]
-        e = [int(x) for x in end.split('-')]
-        d = [int(x) for x in date_dir.split('-')]
-      except: continue
+        date = datetime.strptime(directory,'%Y-%m-%d')
+        if max(date.date(),start.date()) > min(date.date(),end.date()): continue
 
-      if not date(s[0],s[1],s[2]) <= date(d[0],d[1],d[2]) <= date(e[0],e[1],e[2]): 
-        continue
+        print('for date',date.date())
+        filelist.extend(tspl_utils.getfilelist(os.path.join(root,directory)))
+      break
 
-      print('>>>',date_dir)
-      files = os.path.join(directory,date_dir)
-
-    filelist=tspl_utils.getfilelist(files)
     self.run(filelist)
       
     passed = 0
