@@ -1,10 +1,14 @@
 import csv, os, subprocess, datetime, glob
+try: 
+    import tacc_stats.pickler.tests.cfg as cfg
+except: 
+    import tacc_stats.cfg as cfg
 
-def factory(kind,acct_file,host_name_ext=''):
-  if kind == 'SGE':
-    return SGEAcct(acct_file,host_name_ext)
-  elif kind == 'SLURM':
-    return SLURMAcct(acct_file,host_name_ext)
+def factory():
+  if cfg.batch_system == 'SGE':
+    return SGEAcct(cfg.acct_path,cfg.host_name_ext)
+  elif cfg.batch_system == 'SLURM':
+    return SLURMAcct(cfg.acct_path,cfg.host_name_ext)
 
 class BatchAcct(object):
 
@@ -159,7 +163,7 @@ class SLURMAcct(BatchAcct):
     for days in (0, -2, 2):
       yyyy_mm_dd = (start_date + datetime.timedelta(days)).strftime("%Y/%m/%d")
       full_glob = os.path.join(host_list_dir, yyyy_mm_dd, base_glob)
-      print 'host list paths', full_glob
+
       for path in glob.iglob(full_glob):
         return path
     return None
