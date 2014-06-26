@@ -9,6 +9,7 @@ def plotter_test():
     args = {'files': filelist, 'plot': 'MasterPlot', 'full': False, 'header': '', 'o': '.', 'p': 1, 'prefix': '', 'mode': 'lines', 'wide': False}
 
     plotter.main(**args)
-    assert os.path.isfile(args['o']+'/_1835740_r_tsyshe_master'+'.pdf')
-    os.remove('_1835740_r_tsyshe_master'+'.pdf')
+    assert os.path.isfile(args['o']+'/_1835740_809035_master'+'.pdf') or os.path.isfile(args['o']+'/_1835740_r_tsyshe_master'+'.pdf')
 
+    try: os.remove('_1835740_809035_master'+'.pdf')
+    except: os.remove('_1835740_r_tsyshe_master'+'.pdf')
