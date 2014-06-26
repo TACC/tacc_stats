@@ -21,7 +21,7 @@ def job_pickle(reader_inst,
                host_list_dir = cfg.host_list_dir,
                acct = None,
                pickle_prot = pickle.HIGHEST_PROTOCOL):
-    print(reader_inst)
+
     if reader_inst['end_time'] == 0:
         return
 
@@ -33,7 +33,8 @@ def job_pickle(reader_inst,
     if os.path.exists(os.path.join(date_dir, reader_inst['id'])): 
         print(reader_inst['id'] + " exists, don't reprocess")
         return
-
+    else:
+        print("process Job",reader_inst['id'])
     job = job_stats.from_acct(reader_inst, 
                               tacc_stats_home, 
                               host_list_dir, acct)
@@ -45,9 +46,12 @@ class JobPickles:
 
     def __init__(self,processes=1,**kwargs):
         self.processes=kwargs.get('processes',1)
-        self.start = kwargs.get('start',(datetime.now()-timedelta(days=1)))
-        self.end = kwargs.get('end',datetime.now())
         self.pickles_dir = kwargs.get('pickle_dir',cfg.pickles_dir)
+
+        self.start = kwargs.get('start',None)
+        self.end = kwargs.get('end',None)
+        if not self.start: self.start = (datetime.now()-timedelta(days=1))
+        if not self.end:   self.end   = datetime.now()
 
         self.seek = kwargs.get('seek',cfg.seek)
         self.batch_system = kwargs.get('batch_system','SLURM')
@@ -63,8 +67,10 @@ class JobPickles:
             self.end = datetime.strptime(self.end,'%Y-%m-%d')
         except: pass
 
-        self.start = time.mktime(self.start.timetuple())
-        self.end = time.mktime(self.end.timetuple())
+        self.start = time.mktime(self.start.date().timetuple())
+        self.end = time.mktime(self.end.date().timetuple())
+
+        print("Pickle jobs between",datetime.fromtimestamp(self.start),"and",datetime.fromtimestamp(self.end))
 
     def run(self):
         pool = multiprocessing.Pool(processes = self.processes)
@@ -84,7 +90,7 @@ class JobPickles:
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Run pickler for jobs')
 
-    parser.add_argument('-dir', help='Directory to store data',type=str)
+    parser.add_argument('-dir', help='Directory to store data',type=str,default=cfg.pickles_dir)
     parser.add_argument('-start', help='Start date',type=str)
     parser.add_argument('-end', help='End date',type=str)
     parser.add_argument('-p', help='Set number of processes',
