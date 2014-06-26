@@ -2,11 +2,7 @@
 from __future__ import print_function
 
 import os,sys
-
-try: 
-    import tacc_stats.pickler.tests.cfg as cfg
-except: 
-    import tacc_stats.cfg as cfg
+import tacc_stats.cfg as cfg
 
 from tacc_stats.pickler import batch_acct,job_stats
 from datetime import datetime,timedelta
@@ -55,7 +51,15 @@ class JobPickles:
         self.seek = kwargs.get('seek',cfg.seek)
         self.tacc_stats_home = kwargs.get('tacc_stats_home',cfg.tacc_stats_home)
         self.host_list_dir = kwargs.get('host_list_dir',cfg.host_list_dir)
-        self.acct = batch_acct.factory()
+
+        self.batch_system = kwargs.get('batch_system',cfg.batch_system)
+        self.acct_path = kwargs.get('acct_path',cfg.acct_path)
+        self.host_name_ext = kwargs.get('host_name_ext',cfg.host_name_ext)
+
+        print(self.batch_system,self.acct_path,self.host_name_ext)
+        self.acct = batch_acct.factory(self.batch_system,
+                                       self.acct_path,
+                                       self.host_name_ext)
 
         try:
             self.start = datetime.strptime(self.start,'%Y-%m-%d')

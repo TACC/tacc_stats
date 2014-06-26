@@ -3,6 +3,11 @@ import os, sys
 from nose import with_setup
 import cPickle as pickle
 
+from tacc_stats.pickler import job_pickles
+from tacc_stats.pickler import job_stats, batch_acct
+sys.modules['pickler.job_stats'] = job_stats
+sys.modules['pickler.batch_acct'] = batch_acct
+
 path = os.path.dirname(os.path.abspath(__file__))
 data_dir = os.path.join(path, 'data')
 
@@ -29,16 +34,18 @@ def teardown_func():
 
 @with_setup(setup_func, teardown_func)
 def test():
-    from tacc_stats.pickler import job_pickles
-    from tacc_stats.pickler import job_stats, batch_acct
-    sys.modules['pickler.job_stats'] = job_stats
-    sys.modules['pickler.batch_acct'] = batch_acct
-    from tacc_stats.pickler.tests import cfg
 
+    from tacc_stats.pickler.tests import cfg
     pickle_options = { 'processes'       : 1,
                        'start'           : '2013-10-01',
                        'end'             : '2013-10-02',
-                       'pickle_dir'      : path,
+                       'pickle_dir'      : cfg.pickles_dir,
+                       'batch_system'    : cfg.batch_system,
+                       'acct_path'       : cfg.acct_path,
+                       'tacc_stats_home' : cfg.tacc_stats_home,
+                       'host_list_dir'   : cfg.host_list_dir,
+                       'host_name_ext'   : cfg.host_name_ext,
+                       'seek'            : cfg.seek
                        }
 
     pickler = job_pickles.JobPickles(**pickle_options)
@@ -68,21 +75,21 @@ def test():
 
                         if new.hosts[host_name].stats[type_name][dev_name][i][j]-dev_stats[i][j] != 0.0:
                             print(new.times[i],host_name,type_name,dev_name,new.hosts[host_name].stats[type_name][dev_name][i][j],dev_stats[i][j])
-                            continue
+                            #continue
                         assert new.hosts[host_name].stats[type_name][dev_name][i][j] == dev_stats[i][j]
 
 @with_setup(setup_func, teardown_func)
 def test_ids():
-    from tacc_stats.pickler import job_pickles
-    from tacc_stats.pickler import job_stats, batch_acct
-    sys.modules['pickler.job_stats'] = job_stats
-    sys.modules['pickler.batch_acct'] = batch_acct
     from tacc_stats.pickler.tests import cfg
-
     pickle_options = { 'processes'       : 1,
-                       'pickle_dir'      : path,
+                       'pickle_dir'      : cfg.pickles_dir,
+                       'batch_system'    : cfg.batch_system,
+                       'acct_path'       : cfg.acct_path,
+                       'tacc_stats_home' : cfg.tacc_stats_home,
+                       'host_list_dir'   : cfg.host_list_dir,
+                       'host_name_ext'   : cfg.host_name_ext,
+                       'seek'            : cfg.seek
                        }
-
     pickler = job_pickles.JobPickles(**pickle_options)
     pickler.run(['1835740'])
        
@@ -110,6 +117,6 @@ def test_ids():
 
                         if new.hosts[host_name].stats[type_name][dev_name][i][j]-dev_stats[i][j] != 0.0:
                             print(new.times[i],host_name,type_name,dev_name,new.hosts[host_name].stats[type_name][dev_name][i][j],dev_stats[i][j])
-                            continue
+                            #continue
                         assert new.hosts[host_name].stats[type_name][dev_name][i][j] == dev_stats[i][j]
 

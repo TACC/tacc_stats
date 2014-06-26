@@ -1,14 +1,10 @@
 import csv, os, subprocess, datetime, glob
-try: 
-    import tacc_stats.pickler.tests.cfg as cfg
-except: 
-    import tacc_stats.cfg as cfg
 
-def factory():
-  if cfg.batch_system == 'SGE':
-    return SGEAcct(cfg.acct_path,cfg.host_name_ext)
-  elif cfg.batch_system == 'SLURM':
-    return SLURMAcct(cfg.acct_path,cfg.host_name_ext)
+def factory(batch_system,acct_path,host_name_ext):
+  if batch_system == 'SGE':
+    return SGEAcct(acct_path,host_name_ext)
+  elif batch_system == 'SLURM':
+    return SLURMAcct(acct_path,host_name_ext)
 
 class BatchAcct(object):
 
