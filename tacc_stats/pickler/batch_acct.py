@@ -31,7 +31,6 @@ class BatchAcct(object):
 
       ## Clean up when colons exist in job name
       if None in d:
-        #print 'before',d
         num_cols = len(d[None])
         for cols in range(num_cols):
           d['name'] = d['name']+':'+d['status']        
@@ -42,7 +41,7 @@ class BatchAcct(object):
         d['nodes'] = int(d['nodes'])
         d['cores'] = int(d['cores'])
         del d[None]
-        #print 'after',d
+
       # Accounting records with pe_taskid != NONE are generated for
       # sub_tasks of a tightly integrated job and should be ignored.
       if start_time <= d['end_time'] and d['end_time'] < end_time:

@@ -20,7 +20,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Plot list of jobs')
     parser.add_argument('-p', help='Set number of processes',
                         type=int, default=1)
-    parser.add_argument('-files', help='Files to plot',
+    parser.add_argument('files', help='Files to plot',
                         nargs='?', type=str)
     parser.add_argument('-mode', help='Style of plot: lines, percentile',
                         type=str,default='lines')
@@ -29,7 +29,7 @@ if __name__ == '__main__':
     parser.add_argument('-prefix', help='Prefix of plot name',
                         type=str,default='')
     parser.add_argument('-plot', help='Plot type to generate',
-                        type=str)
+                        type=str,default='MasterPlot')
     parser.add_argument('-full', help='Do not aggregate over node',
                         action="store_true")
     parser.add_argument('-o', help='Output directory',

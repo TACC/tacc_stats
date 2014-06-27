@@ -77,7 +77,7 @@ class JobPickles:
                                                 acct = self.acct)
 
         print("Use",self.processes,"processes")
-        print("Gather node-level data from",self.tacc_stats_home+"archive/")
+        print("Gather node-level data from",self.tacc_stats_home+"/archive/")
         print("Write pickle files to",self.pickles_dir)
 
     def run(self,jobids = None):

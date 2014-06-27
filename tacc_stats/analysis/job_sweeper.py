@@ -42,9 +42,9 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Run tests for jobs')
     parser.add_argument('-dir', help='Pickles Directory',
                         type=str, default=cfg.pickles_dir)
-    parser.add_argument('-start', help='Start date',
+    parser.add_argument('start', help='Start date',
                         type=str,default='')
-    parser.add_argument('-end', help='End date',
+    parser.add_argument('end', help='End date',
                         type=str,default='')
     parser.add_argument('-p', help='Set number of processes',
                         type=int, default=1)
