@@ -467,7 +467,7 @@ else:
           maintainer=AUTHOR,
           package_dir={'':'.'},
           packages=find_packages(),
-          package_data = {'' : ['*.sh.in','*.cfg'] },
+          package_data = {'' : ['*.sh.in','*.cfg','*.html','*.png','*.jpg','*.h'] },
           scripts=['build/bin/monitor',
                    'tacc_stats/archive.sh',
                    'tacc_stats/analysis/job_sweeper.py',
