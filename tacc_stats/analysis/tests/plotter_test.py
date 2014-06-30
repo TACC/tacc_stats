@@ -13,3 +13,4 @@ def plotter_test():
 
     try: os.remove('_1835740_809035_master'+'.pdf')
     except: os.remove('_1835740_r_tsyshe_master'+'.pdf')
+

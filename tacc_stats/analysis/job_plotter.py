@@ -1,8 +1,10 @@
 #!/usr/bin/env python
-import sys
-
+import sys, os
+from datetime import datetime
+from tacc_stats import cfg as cfg
 import tacc_stats.analysis as analysis
 import tacc_stats.analysis.gen.tspl_utils as tspl_utils
+from tacc_stats.pickler import batch_acct
 
 def main(**args):
     plot_type = getattr(sys.modules[analysis.__name__],args['plot']) 
@@ -12,7 +14,24 @@ def main(**args):
                      aggregate=(not args['full']),wide=args['wide'],
                      save=True)
 
-    filelist=tspl_utils.getfilelist(args['files'])
+    if 'jobids' in args:
+        batch_system = args.get('batch_system',cfg.batch_system)
+        acct_path = args.get('acct_path',cfg.acct_path)
+        host_name_ext = args.get('host_name_ext',cfg.host_name_ext)
+        
+        acct = batch_acct.factory(batch_system,
+                                  acct_path,
+                                  host_name_ext)
+        reader = acct.find_jobids(args['jobids'])
+        filelist = []
+        for acct in reader:
+            date_dir = os.path.join(cfg.pickles_dir,
+                                    datetime.fromtimestamp(acct['end_time']).strftime('%Y-%m-%d'))
+            filelist.append(os.path.join(date_dir,acct['id']))
+
+    else:
+        filelist = tspl_utils.getfilelist(args['files'])
+
     plot.run(filelist)
 
 if __name__ == '__main__':
@@ -22,6 +41,8 @@ if __name__ == '__main__':
                         type=int, default=1)
     parser.add_argument('files', help='Files to plot',
                         nargs='?', type=str)
+    parser.add_argument('-jobids', help='Job IDs to plot',
+                        nargs='+', type=str)
     parser.add_argument('-mode', help='Style of plot: lines, percentile',
                         type=str,default='lines')
     parser.add_argument('-header', help='Header of plot',

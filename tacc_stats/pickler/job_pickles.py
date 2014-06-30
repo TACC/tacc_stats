@@ -81,13 +81,9 @@ class JobPickles:
         print("Write pickle files to",self.pickles_dir)
 
     def run(self,jobids = None):
-        if jobids:            
-            print("Pickle following jobs:",jobids)
-            reader = []
-            for reader_inst in self.acct.reader():
-                if reader_inst['id'] in jobids:
-                    reader.append(reader_inst)
-                if len(reader) == len(jobids): break
+        if jobids:
+            print("Pickle following jobs:",jobids)            
+            reader = self.acct.find_jobids(jobids)
         else:
             print("Pickle jobs between",
                   datetime.fromtimestamp(self.start),

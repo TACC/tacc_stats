@@ -28,34 +28,47 @@ class BatchAcct(object):
           d[n] = t(d[n])
       except:
         pass
-
       ## Clean up when colons exist in job name
-      if None in d:
-        num_cols = len(d[None])
-        for cols in range(num_cols):
-          d['name'] = d['name']+':'+d['status']        
-          d['status'] = str(d['nodes'])
-          d['nodes'] = d['cores']
-          d['cores'] = d[None][0]
-          del d[None][0]
-        d['nodes'] = int(d['nodes'])
-        d['cores'] = int(d['cores'])
-        del d[None]
+      d = self.clean_up(d)
 
       # Accounting records with pe_taskid != NONE are generated for
       # sub_tasks of a tightly integrated job and should be ignored.
-      if start_time <= d['end_time'] and d['end_time'] < end_time:
+      if max(start_time, d['end_time']) <= min(d['end_time'], end_time):
         if self.batch_kind=='SGE' and d['pe_taskid'] == 'NONE':
           yield d
         elif self.batch_kind=='SLURM':
           yield d
 
+  def find_jobids(self, jobids):
+    id_idx = self.field_names.index('id')
+    sids = [str(jobid) for jobid in jobids]
 
-  def from_id_with_file_1(self, id, seek=0):
-    for acct in self.reader(seek=seek):
-      if acct['id'] == id:
-        return acct
-    return None
+    with open(self.acct_file) as fd:
+      for line in fd:
+        s = line.split(':')
+        if s[id_idx] in sids:
+          for d in csv.DictReader(line.splitlines(1),delimiter=':',fieldnames=self.field_names):
+            try:
+              for n, t, x in self.fields: d[n] = t(d[n])
+            except: pass
+            d = self.clean_up(d)
+          yield d        
+        
+
+  def clean_up(self,d):
+    if None not in d: return d
+    num_cols = len(d[None])
+    
+    for cols in range(num_cols):
+      d['name'] = d['name']+':'+d['status']        
+      d['status'] = str(d['nodes'])
+      d['nodes'] = d['cores']
+      d['cores'] = d[None][0]
+      del d[None][0]
+    d['nodes'] = int(d['nodes'])
+    d['cores'] = int(d['cores'])
+    del d[None]
+    return d
 
 class SGEAcct(BatchAcct):
 
