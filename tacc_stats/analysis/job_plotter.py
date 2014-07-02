@@ -14,7 +14,7 @@ def main(**args):
                      aggregate=(not args['full']),wide=args['wide'],
                      save=True)
 
-    if 'jobids' in args:
+    try:
         batch_system = args.get('batch_system',cfg.batch_system)
         acct_path = args.get('acct_path',cfg.acct_path)
         host_name_ext = args.get('host_name_ext',cfg.host_name_ext)
@@ -29,7 +29,7 @@ def main(**args):
                                     datetime.fromtimestamp(acct['end_time']).strftime('%Y-%m-%d'))
             filelist.append(os.path.join(date_dir,acct['id']))
 
-    else:
+    except:
         filelist = tspl_utils.getfilelist(args['files'])
 
     plot.run(filelist)
