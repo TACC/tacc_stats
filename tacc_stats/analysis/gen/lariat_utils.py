@@ -89,7 +89,7 @@ class LariatData:
     # Check if job is in json.
     # Load if it is not unless file has been loaded already.
     if jobid not in self.ld_json:
-      self.load_file(end_time)
+      self.load_file(jobid,end_time)
             
     # If job data exists it should be here.
     try:
@@ -108,7 +108,7 @@ class LariatData:
     self.nodes=int(entry['numNodes'])
     self.wayness=int(float(self.cores)/self.nodes)
 
-  def load_file(self,end_time):
+  def load_file(self,jobid,end_time):
     for day in range(self.daysback+1):
 
       delta = datetime.timedelta(days=day)
@@ -130,7 +130,7 @@ class LariatData:
               print('Loaded Lariat Data from',filename)
           except IOError:
             print("Load failed for",filename)
-    
+          if jobid in self.ld_json: return
 
   def title(self):
     title='E: ' + self.exc

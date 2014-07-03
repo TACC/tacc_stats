@@ -24,8 +24,9 @@ def job_pickle(reader_inst,
                             datetime.fromtimestamp(reader_inst['end_time']).strftime('%Y-%m-%d'))
     try: os.makedirs(date_dir)
     except: pass
-
+    
     if os.path.exists(os.path.join(date_dir, reader_inst['id'])): 
+
         print(reader_inst['id'] + " exists, don't reprocess")
         return
     else:
