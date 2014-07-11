@@ -145,12 +145,10 @@
 #define QPI_PERF_EVENT(event, umask) \
   ( (event) \
   | (umask << 8) \
-  | (1UL << 15) /* Extra bit. */ \
   | (0UL << 18) /* Edge Detection. */ \
   | (1UL << 21) /* Enable extra bit. */ \
   | (1UL << 22) /* Enable. */ \
   | (0UL << 23) /* Invert */ \
-  | (0x01UL << 24) /* Threshold */ \
   )
 
 /*! \name Events
@@ -160,10 +158,10 @@
 
 @{
  */
-#define G0_IDLE     QPI_PERF_EVENT(0x00,0x01) //!< all null packets
-#define G0_NON_DATA QPI_PERF_EVENT(0x00,0x04) //!< protocol overhead
-#define G1_DRS_DATA QPI_PERF_EVENT(0x02,0x08) //!< for data bandwidth, flits x 8B/time
-#define G2_NCB_DATA QPI_PERF_EVENT(0x03,0x04) //!< for data bandwidth, flits x 8B/time
+#define TxL_FLITS_G1_SNP  QPI_PERF_EVENT(0x00,0x01) //!< snoops requests
+#define TxL_FLITS_G1_HOM  QPI_PERF_EVENT(0x00,0x04) //!< snoop responses
+#define G1_DRS_DATA       QPI_PERF_EVENT(0x02,0x08) //!< for data bandwidth, flits x 8B/time
+#define G2_NCB_DATA       QPI_PERF_EVENT(0x03,0x04) //!< for data bandwidth, flits x 8B/time
 //@}
 
 static int intel_snb_qpi_begin_dev(char *bus_dev, uint32_t *events, size_t nr_events)
@@ -219,8 +217,8 @@ static int intel_snb_qpi_begin(struct stats_type *type)
   int nr = 0;
 
   uint32_t qpi_events[2][4] = {
-    { G0_IDLE, G0_NON_DATA, G1_DRS_DATA, G2_NCB_DATA},
-    { G0_IDLE, G0_NON_DATA, G1_DRS_DATA, G2_NCB_DATA},
+    { TxL_FLITS_G1_SNP,  TxL_FLITS_G1_HOM, G1_DRS_DATA, G2_NCB_DATA},
+    { TxL_FLITS_G1_SNP,  TxL_FLITS_G1_HOM, G1_DRS_DATA, G2_NCB_DATA},
   };
 
   /* 2 buses and 4 devices per bus */
