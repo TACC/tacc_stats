@@ -75,11 +75,11 @@ pcu_event_map = {
     }
 ## QPI Unit events
 def QPI_PERF_EVENT(event, umask):
-    return (event) | (umask << 8) | (1L << 15) | (0L << 18) | (1L << 21) | (1L << 22) | (0L <<23) | (1L << 24)
+    return (event) | (umask << 8) | (0L << 18) | (1L << 21) | (1L << 22) | (0L <<23)
 ## QPI map
 qpi_event_map = {
-    QPI_PERF_EVENT(0x00, 0x01) : 'G0_IDLE,E',
-    QPI_PERF_EVENT(0x00, 0x04) : 'G0_NON_DATA,E',
+    QPI_PERF_EVENT(0x00, 0x01) : 'TxL_FLITS_G1_SNP,E',
+    QPI_PERF_EVENT(0x00, 0x04) : 'TxL_FLITS_G1_HOM,E',
     QPI_PERF_EVENT(0x02, 0x08) : 'G1_DRS_DATA,E',
     QPI_PERF_EVENT(0x03, 0x04) : 'G2_NCB_DATA,E',              
     }

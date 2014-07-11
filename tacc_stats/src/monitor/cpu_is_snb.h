@@ -49,7 +49,7 @@ static int cpu_is_sandybridge(char *cpu)
 
   get_cpuid_signature(cpuid_fd,signature);
   TRACE("cpu%s, CPUID Signature %s\n", cpu, signature);
-  if (strncmp(signature, "06_2a", 5) !=0 && strncmp(signature, "06_2d", 5) !=0)
+  if (strncmp(signature, "06_3e", 5) !=0 && strncmp(signature, "06_2a", 5) !=0 && strncmp(signature, "06_2d", 5) !=0)
     goto out;
 
   rc = 1;

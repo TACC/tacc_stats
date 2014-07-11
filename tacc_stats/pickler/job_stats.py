@@ -566,6 +566,7 @@ class Job(object):
                             # This happens with IB counters and sometimes with Lustre stats.
                             # A[i,j] = v + A[i-1,j] = v - r. Rebase to previous value.
                             r = numpy.uint(0) - A[i-1,j]
+
                             if KEEP_EDITS:
                                 self.edit_flags.append("(time %d, host `%s', type `%s', dev `%s', key `%s')" %
                                                        (self.times[i],host.name,type_name,dev_name,e.key))
@@ -577,7 +578,7 @@ class Job(object):
                             if ( v - p ) % (2**width) > 2**(width-1):
                                 # This counter rolled more than half of its range
                                 self.logoverflow(host.name, type_name, dev_name, e.key)
-                        """    
+                        """
                     A[i, j] = v - r
                     p = v
             if e.mult:
