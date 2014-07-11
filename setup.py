@@ -155,6 +155,7 @@ def write_stats_x(types):
     try:
         for t,val in sorted(types.iteritems(), key=operator.itemgetter(0)):            
             if val == 'True':
+                print '>>>>>>>>>>>>>>>>>>>>>>',t,val
                 a.write('X('+t+') ')
     finally:
         a.write('\n')
@@ -479,7 +480,7 @@ else:
                    'tacc_stats/site/stampede/update_db.py',
                    'tacc_stats/pickler/job_pickles.py'],
           ext_modules=extensions,
-          setup_requires=['nose>=1.0'],
+          setup_requires=['nose'],
           install_requires=['argparse','numpy','matplotlib','scipy'],
           test_suite = 'nose.collector',
           maintainer_email=EMAIL,

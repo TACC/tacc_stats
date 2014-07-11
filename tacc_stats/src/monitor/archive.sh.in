@@ -6,25 +6,25 @@ PATH=/bin:/usr/bin
 umask 0022
 
 prog=$(basename $0)
-stats_dir=$1
-archive_dir=$2
-host_dir=$archive_dir/$(hostname --fqdn)
+STATS_DIR=$1
+ARCHIVE_DIR=$2
+HOST_DIR=$ARCHIVE_DIR/$(hostname --fqdn)
 
-if [ -z "$stats_dir" -o -z "archive_dir" ]; then
+if [ -z "$STATS_DIR" -o -z "ARCHIVE_DIR" ]; then
     echo "Usage: ${prog} STATS_DIR ARCHIVE_DIR" >&2
     exit 1
 fi
 
-if ! [ -d $stats_dir ]; then
+if ! [ -d $STATS_DIR ]; then
     exit 1
 fi
 
-if ! [ -d $host_dir ] && ! mkdir $host_dir; then
+if ! [ -d $HOST_DIR ] && ! mkdir $HOST_DIR; then
     exit 1
 fi
 
 now=$(date +%s)
-for file in $stats_dir/*; do
+for file in $STATS_DIR/*; do
     if ! [ -f $file ]; then
         continue
     fi
@@ -36,7 +36,7 @@ for file in $stats_dir/*; do
     if ((now - base < 86400)); then
         continue
     fi
-    if gzip -c $file > $host_dir/$base.gz; then
+    if gzip -c $file > $HOST_DIR/$base.gz; then
         rm $file
     fi
 done
