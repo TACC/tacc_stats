@@ -619,8 +619,9 @@ class Job(object):
         """
         # TODO Handle control registers.
         schema = self.schemas[type_name]
+
         m = len(self.times)
-        n = len(schema)
+        n = len(schema.keys())
         A = numpy.zeros((m, n), dtype=numpy.uint64) # Output.       
         nr_hosts = 0
         nr_devs = 0

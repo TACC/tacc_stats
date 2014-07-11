@@ -74,8 +74,10 @@ def update(date,rerun=False):
                 json['exe'] = ld.exc.split('/')[-1]
                 json['cwd'] = ld.cwd[0:128]
                 json['threads'] = ld.threads
-                if ld.wayness:
-                    json['wayness'] = ld.wayness
+
+                if ld.cores: json['cores'] = ld.cores
+                if ld.nodes: json['nodes'] = ld.nodes
+                if ld.wayness: json['wayness'] = ld.wayness
 
                 try: json['user']=pwd.getpwuid(int(json['uid']))[0]
                 except: json['user']=ld.user
@@ -205,12 +207,23 @@ def index(request, date = None, uid = None, project = None, user = None, exe = N
     field['cpi_thresh'] = 1.0
     field['cpi_job_list']  = completed_list.exclude(cpi = float('nan')).filter(cpi__gte = field['cpi_thresh'])
     field['cpi_per'] = 100*len(field['cpi_job_list'])/float(len(completed_list))
-    
+
+    field['idle_job_list'] = list_to_dict(field['idle_job_list'],'idle')
+    field['cat_job_list'] = list_to_dict(field['cat_job_list'],'cat')
+    field['cpi_job_list'] = list_to_dict(field['cpi_job_list'],'cpi')
+
     if report: 
         field['report'] = report 
         field['name'] = name 
         return render_to_pdf("stampede/index.html", field)
     else:  return render_to_response("stampede/index.html", field)
+
+def list_to_dict(job_list,metric):
+    job_dict={}
+    for job in job_list:
+        job_dict.setdefault(job.user,[]).append((job.id,round(job.__dict__[metric],3)))
+    return job_dict
+    
 
 def hist_summary(request, date = None, uid = None, project = None, user = None, exe = None, report = None):
 
@@ -310,7 +323,7 @@ def get_data(pk):
 
 def master_plot(request, pk):
     data = get_data(pk)
-    mp = analysis.MasterPlot(lariat_data="pass")
+    mp = analysis.MasterPlot()#lariat_data="pass")
     mp.plot(pk,job_data=data)
     return figure_to_response(mp)
 

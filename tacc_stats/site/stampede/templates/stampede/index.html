@@ -48,15 +48,45 @@
     <h1>Job Listing</h1>
 <p>Jobs flagged for:
     {% if idle_job_list %}
-     <p> <li>Idle-ness {% for job in idle_job_list %} ({{ job.user }} <a href="{% url 'stampede:job'  job.id %}">{{ job.id }}</a>) {% endfor %}</li></p>
-    {% endif %}
+     <p> <li>Idle-ness
+	 <table>
+	 {% for key,values in idle_job_list.items %} 
+	 <tr><td><a href="{% url 'stampede:user_view'  key %}"> {{ key }}</a> </td>
+	   <td>{% for v,d in values %} 
+	      <td><a href="{% url 'stampede:job'  v %}">{{ v }}</a>({{ d }})</td>
+	   {% endfor %}
+	 </td></tr>
+	 {% endfor %}
+	 </table>
+     </li></p>
+     {% endif %}
 
     {% if cat_job_list %}
-     <p> <li>Catastrophic failure {% for job in cat_job_list %} ({{ job.user }} <a href="{% url 'stampede:job'  job.id %}">{{ job.id }}</a>) {% endfor %}</li></p>
+     <p> <li>Catastrophic failure 
+	 <table>
+	 {% for key,values in cat_job_list.items %} 
+	 <tr><td><a href="{% url 'stampede:user_view'  key %}"> {{ key }}</a> </td>
+	   <td>{% for v,d in values %} 
+	      <td><a href="{% url 'stampede:job'  v %}">{{ v }}</a>({{ d }})</td>
+	   {% endfor %}
+	 </td></tr>
+	 {% endfor %}
+	 </table>
+     </li></p>
     {% endif %}
 
     {% if cpi_job_list %}
-     <p> <li>High CPI (>{{cpi_thresh}},%{{cpi_per}}) {% for job in cpi_job_list %} ({{ job.user }} <a href="{% url 'stampede:job'  job.id %}">{{ job.id }}</a>) {% endfor %}</li> </p>
+     <p> <li>High CPI (>{{cpi_thresh}},%{{cpi_per}}) 
+	 <table>
+	 {% for key,values in cpi_job_list.items %} 
+	 <tr><td><a href="{% url 'stampede:user_view'  key %}"> {{ key }}</a> </td>
+	   <td>{% for v,d in values %} 
+	     <td> <a href="{% url 'stampede:job'  v %}">{{ v }}</a>({{ d }})</td>
+	   {% endfor %}
+	 </td></tr>
+	 {% endfor %}
+	 </table>
+     </li> </p>
     {% endif %}
 </p>
 

@@ -20,18 +20,18 @@ for root,dirnames,filenames in os.walk(cfg.pickles_dir):
         if max(date.date(),start.date()) > min(date.date(),end.date()): continue
         print 'Run update for',date.date()
 
-        views.update(directory)
+        views.update(directory,rerun=False)
         
         cpi_test = analysis.HighCPI(threshold=1.0,processes=1)
-        views.update_test_field(directory,cpi_test,'cpi')#,rerun=True)
+        views.update_test_field(directory,cpi_test,'cpi',rerun=False)
         
         mbw_test = analysis.MemBw(threshold=0.5,processes=1)               
-        views.update_test_field(directory,mbw_test,'mbw')   
+        views.update_test_field(directory,mbw_test,'mbw',rerun=False)   
         
         idle_test = analysis.Idle(threshold=0.999,processes=1,min_hosts=2)
-        views.update_test_field(directory,idle_test,'idle')#,rerun=True)   
+        views.update_test_field(directory,idle_test,'idle',rerun=False)   
         
         cat_test = analysis.Catastrophe(threshold=0.001,processes=1,min_hosts=2)
-        views.update_test_field(directory,cat_test,'cat')   
+        views.update_test_field(directory,cat_test,'cat',rerun=False)   
         
     break

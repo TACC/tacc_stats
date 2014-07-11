@@ -1,5 +1,5 @@
 from plots import Plot
-from matplotlib import cm
+from matplotlib import cm,colors
 from matplotlib.figure import Figure
 from scipy.stats import tmean, tvar
 from numpy import *
@@ -18,8 +18,8 @@ class HeatMap(Plot):
     ts=self.ts
 
     host_cpi = {}
-
-    for v in ts.data[0]:
+    host_names = ts.data[0].keys()
+    for v in host_names:
         ncores = len(ts.data[0][v])
         num = 0
         den = 0
@@ -53,13 +53,12 @@ class HeatMap(Plot):
     self.ax.set_ylim(bottom=ycore.min(),top=ycore.max())
     self.ax.set_yticks(yhost[0:-1]-ncores/2.)
 
-    self.ax.set_yticklabels([pair[0] +'(' + "{0:.2f}".format(pair[1]) +')' for pair in host_cpi.items()],fontsize=fontsize)
+    self.ax.set_yticklabels([key +'(' + "{0:.2f}".format(host_cpi[key]) +')' for key in host_names],fontsize=fontsize)
 
     self.ax.set_xlim(left=time.min(),right=time.max())
-
-    pcm = self.ax.pcolormesh(time, ycore, cpi)
-    pcm.cmap = cm.get_cmap('hot_r')
-
+    
+    pcm = self.ax.pcolor(time, ycore, cpi,vmin=0.0,vmax=5.0)
+    pcm.cmap = cm.get_cmap('jet_r')
 
     try: self.ax.set_title(self.k2[ts.pmc_type][0] +'/'+self.k2[ts.pmc_type][1] + '\n'+ r'$\bar{Mean}=$'+'{0:.2f}'.format(mean_cpi)+r'$\pm$'+'{0:.2f}'.format(sqrt(var_cpi)))
     except: self.ax.set_title(self.k2[0] +'/'+self.k2[1] + '\n'+ r'$\bar{Mean}$='+'{0:.2f}'.format(mean_cpi)+r'$\pm$'+'{0:.2f}'.format(sqrt(var_cpi)))
