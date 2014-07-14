@@ -10,7 +10,7 @@ STATS_DIR=$1
 ARCHIVE_DIR=$2
 HOST_DIR=$ARCHIVE_DIR/$(hostname --fqdn)
 
-if [ -z "$STATS_DIR" -o -z "ARCHIVE_DIR" ]; then
+if [ -z "$STATS_DIR" -o -z "$ARCHIVE_DIR" ]; then
     echo "Usage: ${prog} STATS_DIR ARCHIVE_DIR" >&2
     exit 1
 fi

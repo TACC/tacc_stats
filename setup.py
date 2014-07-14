@@ -266,7 +266,7 @@ define_macros=[('STATS_DIR_PATH','\"'+paths['stats_dir']+'\"'),
                ('STATS_LOCK_PATH','\"'+paths['stats_lock']+'\"'),
                ('JOBID_FILE_PATH','\"'+paths['jobid_file']+'\"')]
              
-flags = ['-D_GNU_SOURCE','-DDEBUG',
+flags = ['-D_GNU_SOURCE','-DDEBUG','-Wp,-U_FORTIFY_SOURCE',
          '-O3','-Wall','-g']
 ext_data=dict(sources=sources,
               include_dirs=['tacc_stats/src/monitor/'] + include_dirs,
