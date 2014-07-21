@@ -16,14 +16,10 @@ class MetaDataRate(Test):
   comp_operator = '>'
 
   def compute_metric(self):
-    ts = self.ts
-    tmid=(ts.t[:-1]+ts.t[1:])/2.0
-    meta_rate = numpy.zeros_like(tmid)
 
-    for k in ts.j.hosts.keys():
-      meta_rate+=numpy.diff(ts.assemble(range(0,len(ts.k1)),k,0))/numpy.diff(ts.t)
-
-    meta_rate  /= float(ts.numhosts)
+    meta_rate = 0
+    for i in range(0,len(self.ts.k1)):
+      meta_rate += self.arc(self.ts.data[i])
     
-    self.metric = numpy.max(meta_rate)
+    self.metric = meta_rate
     return  

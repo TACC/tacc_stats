@@ -5,6 +5,7 @@ import operator,traceback
 import multiprocessing
 from datetime import datetime,timedelta
 from tacc_stats.analysis.gen import tspl,tspl_utils
+from scipy.stats import tmean
 
 def unwrap(args):
   try:
@@ -157,8 +158,14 @@ class Test(object):
     pass
     """Compute metric of interest"""
 
-  def comp2thresh(self):
-    return
+  def arc(self,data):
+    avg = 0
+    self.val = {}
+    for h in self.ts.j.hosts.keys():
+      self.val[h] = (data[h][0][-1]-data[h][0][0])*(self.ts.t[-1]-self.ts.t[0])**-1
+      avg += (data[h][0][-1]-data[h][0][0])*(self.ts.t[-1]-self.ts.t[0])**-1
+
+    return avg/self.ts.numhosts
 
   def test(self,job_path,job_data=None):
     # Setup job data and filter out unwanted jobs

@@ -155,6 +155,7 @@ def write_stats_x(types):
     try:
         for t,val in sorted(types.iteritems(), key=operator.itemgetter(0)):            
             if val == 'True':
+                print '>>>>>>>>>>>>>>>>>>>>>>',t,val
                 a.write('X('+t+') ')
     finally:
         a.write('\n')
@@ -265,7 +266,7 @@ define_macros=[('STATS_DIR_PATH','\"'+paths['stats_dir']+'\"'),
                ('STATS_LOCK_PATH','\"'+paths['stats_lock']+'\"'),
                ('JOBID_FILE_PATH','\"'+paths['jobid_file']+'\"')]
              
-flags = ['-D_GNU_SOURCE','-DDEBUG',
+flags = ['-D_GNU_SOURCE','-DDEBUG','-Wp,-U_FORTIFY_SOURCE',
          '-O3','-Wall','-g']
 ext_data=dict(sources=sources,
               include_dirs=['tacc_stats/src/monitor/'] + include_dirs,
@@ -479,7 +480,7 @@ else:
                    'tacc_stats/site/stampede/update_db.py',
                    'tacc_stats/pickler/job_pickles.py'],
           ext_modules=extensions,
-          setup_requires=['nose>=1.0'],
+          setup_requires=['nose'],
           install_requires=['argparse','numpy','matplotlib','scipy'],
           test_suite = 'nose.collector',
           maintainer_email=EMAIL,

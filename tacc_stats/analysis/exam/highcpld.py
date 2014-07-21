@@ -7,15 +7,7 @@ class HighCPLD(Test):
   comp_operator = '>'
 
   def compute_metric(self):
-    ts = self.ts
 
-    tmid=(ts.t[:-1]+ts.t[1:])/2.0       
-    clock_rate = numpy.zeros_like(tmid)
-    instr_rate = numpy.zeros_like(tmid)
-    for k in ts.j.hosts.keys():
-      clock_rate += numpy.diff(ts.assemble([0],k,0))/numpy.diff(ts.t)
-      instr_rate += numpy.diff(ts.assemble([1],k,0))/numpy.diff(ts.t)
+    cpld += self.arc(self.ts.data[0])/self.arc(self.ts.data[1])
 
-    self.metric = tmean(clock_rate/instr_rate)
-
-    return
+    self.metric = cpld
