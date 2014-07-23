@@ -119,4 +119,3 @@ def test_ids():
                             print(new.times[i],host_name,type_name,dev_name,new.hosts[host_name].stats[type_name][dev_name][i][j],dev_stats[i][j])
                             #continue
                         assert new.hosts[host_name].stats[type_name][dev_name][i][j] == dev_stats[i][j]
-
