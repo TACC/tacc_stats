@@ -5,7 +5,7 @@ from django.db.models import Q
 
 import os,sys,pwd
 
-from tacc_stats.site.stampede.models import Job, JobForm
+from tacc_stats.site.stampede.models import Job, Host, JobForm
 import tacc_stats.cfg as cfg
 
 import tacc_stats.analysis as analysis
@@ -35,27 +35,45 @@ def update(date,rerun=False):
     tz = pytz.timezone('US/Central')
 
     pickle_dir = os.path.join(cfg.pickles_dir,date)
-    nf = len(os.listdir(pickle_dir))
 
     ctr = 0
 
-    print "Number of pickle files =",nf
     for root, directory, pickle_files in os.walk(pickle_dir):
+        num_files = len(pickle_files)
+        print "Number of pickle files in",root,'=',num_files
         for pickle_file in sorted(pickle_files):
             ctr += 1
+            print pickle_file
+            try:
+                if rerun:
+                    if Job.objects.filter(id = pickle_file).exists():
+                        job = Job.objects.filter(id = pickle_file).delete()
             
-            if rerun:
-                if Job.objects.filter(id = pickle_file).exists():
-                    job = Job.objects.filter(id = pickle_file).delete()
-
-            try: obj,created = Job.objects.get_or_create(id = pickle_file)
+                obj,created = Job.objects.get_or_create(id = pickle_file)
             except: print pickle_file,"doesn't look like a pickled job"
-            if not created: continue
+
+            if not created: 
+                if len(obj.host_set.all()) > 0: 
+                    print obj.host_set.all()
+                    continue 
+                try:
+                    pickle_path = os.path.join(root,str(pickle_file))
+                    with open(pickle_path, 'rb') as f:
+                        hosts = np.load(f).hosts.keys()
+                        for host_name in hosts:
+                            h = Host(name=host_name)
+                            h.save()
+                            h.jobs.add(obj)
+                except: pass
+                continue
             try:
 
                 pickle_path = os.path.join(root,str(pickle_file))
                 with open(pickle_path, 'rb') as f:
-                    json = np.load(f).acct
+                    data = np.load(f)
+                    json = data.acct
+                    hosts = data.hosts.keys()
+
                 del json['yesno'], json['unknown']
                 json['run_time'] = json['end_time'] - json['start_time']
 
@@ -84,11 +102,18 @@ def update(date,rerun=False):
 
                 obj = Job(**json)
                 obj.save()
+
+                for host_name in hosts:
+                    h = Host(name=host_name)
+                    print host_name
+                    h.save()
+                    h.jobs.add(obj)
+
             except: 
                 print pickle_file,'failed'
                 print traceback.format_exc()
                 print date
-            print "Percentage Completed =",100*float(ctr)/nf
+            print "Percentage Completed =",100*float(ctr)/num_files
 
 def update_test_field(date,test,metric,rerun=False):
     print "Run",test.__class__.__name__,"test for",date

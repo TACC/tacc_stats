@@ -45,6 +45,13 @@ class Job(models.Model):
 
         return ret_val
 
+class Host(models.Model):
+    name = models.CharField(max_length=128)
+    jobs = models.ManyToManyField(Job)
+    class Meta: ordering = ('name',)
+
+    def __unicode__(self):
+        return str(self.name)
 
 class JobForm(ModelForm):
     class Meta:
