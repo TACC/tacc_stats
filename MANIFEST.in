@@ -1,2 +1,3 @@
 include tacc_stats/src/monitor/*.h
 include tacc_stats/src/monitor/*.sh.in
+include tacc_stats/*/*.sh.in
