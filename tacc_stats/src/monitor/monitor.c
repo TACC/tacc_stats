@@ -7,7 +7,7 @@
 #include <signal.h>
 #include <malloc.h>
 #include <errno.h>
-#include <time.h>
+#include <sys/time.h>
 #include <sys/stat.h>
 #include <sys/types.h>
 #include "string1.h"
@@ -16,7 +16,8 @@
 #include "trace.h"
 #include "pscanf.h"
 
-time_t current_time;
+struct timeval tp;
+double current_time;
 char current_jobid[80] = "0";
 int nr_cpus;
 
@@ -155,7 +156,9 @@ _main(PyObject *self, PyObject *args)
     goto out;
   }
 
-  current_time = time(NULL);
+  gettimeofday(&tp,NULL);
+  current_time = tp.tv_sec+tp.tv_usec/1000000.0;
+
   pscanf(JOBID_FILE_PATH, "%79s", current_jobid);
   nr_cpus = sysconf(_SC_NPROCESSORS_ONLN);
 
@@ -174,7 +177,7 @@ _main(PyObject *self, PyObject *args)
   int select_all = cmd != cmd_collect || arg_count == 0;
 
   if (sf.sf_empty) {
-    char *link_path = strf("%s/%ld", STATS_DIR_PATH, current_time);
+    char *link_path = strf("%s/%ld", STATS_DIR_PATH, (long)current_time);
     if (link_path == NULL)
       ERROR("cannot create path: %m\n");
     else if (link(current_path, link_path) < 0)
