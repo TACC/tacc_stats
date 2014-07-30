@@ -3,14 +3,14 @@ import sys
 from matplotlib.figure import Figure
 from matplotlib.backends.backend_pdf import FigureCanvasPdf as FigureCanvas
 from numpy import log,isnan
-
-import tacc_stats.analysis as analysis
+import tacc_stats.analysis.exam as exam
+import tacc_stats.analysis.plot as plot
 import tacc_stats.cfg as cfg
 
 def main(**args):
 
     print args
-    test_type = getattr(sys.modules[analysis.__name__],args['test'])
+    test_type = getattr(sys.modules[exam.__name__],args['test'])
     
     test = test_type(processes=args['p'], threshold=args['t'], 
                      min_time=args['s'], min_hosts=args['N'],
@@ -21,10 +21,10 @@ def main(**args):
     failed = test.date_sweep(args['start'],args['end'],pickles_dir = args['dir'])
 
     if args['plot']:
-        plotter = analysis.MasterPlot(header='Failed test: '+ test_type.__name__,
-                                      prefix=test_type.__name__,outdir=args['o'],
-                                      processes=args['p'],threshold=args['t'],
-                                      wide=args['wide'],save=True)
+        plotter = plot.MasterPlot(header='Failed test: '+ test_type.__name__,
+                                  prefix=test_type.__name__,outdir=args['o'],
+                                  processes=args['p'],threshold=args['t'],
+                                  wide=args['wide'],save=True)
         plotter.run(failed)
 
         vals = [v['metric'] for j,v in test.results.items()]

@@ -30,6 +30,7 @@ class Job(models.Model):
     mbw = models.FloatField(null=True)
     idle = models.FloatField(null=True)
     cat = models.FloatField(null=True)
+    mem = models.FloatField(null=True)
 
     def __unicode__(self):
         return str(self.id)

@@ -16,9 +16,9 @@ def search(kwargs):
         print job.user,job.run_time/3600.*job.nodes
         if job.user in data:
 
-            data[job.user] += job.run_time/3600.*job.nodes
+            data[job.user] += job.run_time/3600.*job.nodes*16
         else:
-            data[job.user] = job.run_time/3600.*job.nodes
+            data[job.user] = job.run_time/3600.*job.nodes*16
     print '-------------------------'
     for x,v in data.iteritems():
         print x,v

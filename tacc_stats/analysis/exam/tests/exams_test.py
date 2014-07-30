@@ -1,9 +1,16 @@
 from __future__ import print_function
 import os, sys, subprocess, glob
-import tacc_stats.analysis as exams
+import tacc_stats.analysis.exam as exams
 
 ### Test exams
 filelist = [os.path.join(os.path.dirname(os.path.abspath(__file__)),'1835740_ref')] * 3
+
+#### Max Memory Usage Test
+def memusage_test():
+    print("MemUsage Test")
+    mem_test = exams.MemUsage(processes=1,threshold=1000)
+    mem_test.run(filelist)
+    assert len(mem_test.failed()) == 1
 
 #### CPI Test
 def cpi_test():

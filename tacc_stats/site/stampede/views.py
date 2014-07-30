@@ -8,7 +8,7 @@ import os,sys,pwd
 from tacc_stats.site.stampede.models import Job, JobForm
 import tacc_stats.cfg as cfg
 
-import tacc_stats.analysis as analysis
+import tacc_stats.analysis.plot as plots
 from tacc_stats.analysis.gen import lariat_utils
 from tacc_stats.pickler import job_stats, batch_acct
 # Compatibility with old pickle versions
@@ -50,6 +50,12 @@ def update(date,rerun=False):
 
             try: obj,created = Job.objects.get_or_create(id = pickle_file)
             except: print pickle_file,"doesn't look like a pickled job"
+
+            pickle_path = os.path.join(root,str(pickle_file))
+            #with open(pickle_path, 'rb') as f:
+            #    data = np.load(f)
+            #    print obj.id,obj.start_epoch-data.times[0],obj.nodes
+
             if not created: continue
             try:
 
@@ -74,7 +80,7 @@ def update(date,rerun=False):
                 json['exe'] = ld.exc.split('/')[-1]
                 json['cwd'] = ld.cwd[0:128]
                 json['threads'] = ld.threads
-
+                json['name'] = json['name'][0:128]
                 if ld.cores: json['cores'] = ld.cores
                 if ld.nodes: json['nodes'] = ld.nodes
                 if ld.wayness: json['wayness'] = ld.wayness
@@ -85,6 +91,8 @@ def update(date,rerun=False):
                 obj = Job(**json)
                 obj.save()
             except: 
+                print json
+                sys.exit()
                 print pickle_file,'failed'
                 print traceback.format_exc()
                 print date
@@ -203,6 +211,7 @@ def index(request, date = None, uid = None, project = None, user = None, exe = N
     completed_list = job_list.exclude(status__in=['CANCELLED','FAILED']).order_by('-id')
     field['idle_job_list'] = completed_list.filter(idle__gte = 0.99)
     field['cat_job_list']  = completed_list.filter(cat__lte = 0.001)
+    field['mem_job_list'] = completed_list.filter(mem__gte = 30)
 
     field['cpi_thresh'] = 1.0
     field['cpi_job_list']  = completed_list.exclude(cpi = float('nan')).filter(cpi__gte = field['cpi_thresh'])
@@ -211,6 +220,7 @@ def index(request, date = None, uid = None, project = None, user = None, exe = N
     field['idle_job_list'] = list_to_dict(field['idle_job_list'],'idle')
     field['cat_job_list'] = list_to_dict(field['cat_job_list'],'cat')
     field['cpi_job_list'] = list_to_dict(field['cpi_job_list'],'cpi')
+    field['mem_job_list'] = list_to_dict(field['mem_job_list'],'mem')
 
     if report: 
         field['report'] = report 
@@ -253,7 +263,7 @@ def hist_summary(request, date = None, uid = None, project = None, user = None, 
     # Run times
     job_times = np.array(job_list.values_list('run_time',flat=True))/3600.
     ax = fig.add_subplot(221)
-    ax.hist(job_times, max(5, 5*np.log(len(job_list))))
+    ax.hist(job_times, max(5, 5*np.log(len(job_list))),log=True)
     ax.set_xlim((0,max(job_times)+1))
     ax.set_ylabel('# of jobs')
     ax.set_xlabel('# hrs')
@@ -262,7 +272,7 @@ def hist_summary(request, date = None, uid = None, project = None, user = None, 
     # Number of cores
     job_size =  np.array(job_list.values_list('cores',flat=True))
     ax = fig.add_subplot(222)
-    ax.hist(job_size, max(5, 5*np.log(len(job_list))))
+    ax.hist(job_size, max(5, 5*np.log(len(job_list))),log=True)
     ax.set_xlim((0,max(job_size)+1))
     ax.set_title('Run Sizes for Completed Jobs')
     ax.set_xlabel('# cores')
@@ -274,7 +284,7 @@ def hist_summary(request, date = None, uid = None, project = None, user = None, 
         mean_cpi = job_cpi.mean()
         var_cpi = job_cpi.var()
         job_cpi = job_cpi[job_cpi<4.0]
-        ax.hist(job_cpi, max(5, 5*np.log(len(job_list))))
+        ax.hist(job_cpi, max(5, 5*np.log(len(job_list))),log=True)
         #ax.set_xlim(0,min(job_cpi.max(),4.0))
         ax.set_ylabel('# of jobs')
         ax.set_title('CPI for Successful Jobs over 1 hr '+r'$\bar{Mean}=$'+'{0:.2f}'.format(mean_cpi)+' '+r'$Var=$' +  '{0:.2f}'.format(var_cpi))
@@ -323,16 +333,16 @@ def get_data(pk):
 
 def master_plot(request, pk):
     data = get_data(pk)
-    mp = analysis.MasterPlot()#lariat_data="pass")
+    mp = plots.MasterPlot(lariat_data="pass")
     mp.plot(pk,job_data=data)
     return figure_to_response(mp)
 
 def heat_map(request, pk):    
     data = get_data(pk)
-    hm = analysis.HeatMap(k1=['intel_snb','intel_snb'],
-                          k2=['CLOCKS_UNHALTED_REF',
-                              'INSTRUCTIONS_RETIRED'],
-                          lariat_data="pass")
+    hm = plots.HeatMap(k1=['intel_snb','intel_snb'],
+                       k2=['CLOCKS_UNHALTED_REF',
+                           'INSTRUCTIONS_RETIRED'],
+                       lariat_data="pass")
     hm.plot(pk,job_data=data)
     return figure_to_response(hm)
 
@@ -389,7 +399,7 @@ def type_plot(request, pk, type_name):
     k1 = {'intel_snb' : [type_name]*len(schema)}
     k2 = {'intel_snb': schema}
 
-    tp = analysis.DevPlot(k1=k1,k2=k2,lariat_data='pass')
+    tp = plots.DevPlot(k1=k1,k2=k2,lariat_data='pass')
     tp.plot(pk,job_data=data)
     return figure_to_response(tp)
 

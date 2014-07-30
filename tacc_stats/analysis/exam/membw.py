@@ -1,6 +1,4 @@
 from exams import Test
-import numpy
-from scipy.stats import tmean
 
 class MemBw(Test):
 

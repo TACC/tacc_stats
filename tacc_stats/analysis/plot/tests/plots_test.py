@@ -1,6 +1,6 @@
 from __future__ import print_function
 import os, sys
-import tacc_stats.analysis as plots
+import tacc_stats.analysis.plot as plots
 
 ### Test plotters
 filelist = [os.path.join(os.path.dirname(os.path.abspath(__file__)),'1835740_ref')]

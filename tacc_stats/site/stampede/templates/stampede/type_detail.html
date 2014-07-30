@@ -11,7 +11,7 @@
     <table border="1" cellpadding="5">
       <tr><th>record</th>{% for key in schema %} <th>{{key}}</th>{% endfor %}</tr>
       {% for time, values in stats_data %}
-          <tr><th>{{time}}</th>{% for value in values %}<th>{{ value }} </th> {% endfor %}</tr>
+          <tr><th>{{time}}</th>{% for value in values %}<th>{{ value|stringformat:"e" }} </th> {% endfor %}</tr>
       {% endfor %}
     </table>
 

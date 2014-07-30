@@ -1,6 +1,4 @@
 from exams import Test
-import numpy
-from scipy.stats import tmean
 
 class HighCPI(Test):
   k1 = ['intel_snb', 'intel_snb']      

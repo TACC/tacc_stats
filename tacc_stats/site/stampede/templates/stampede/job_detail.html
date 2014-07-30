@@ -22,6 +22,7 @@
 	  <th> cores </th>
 	  <th> nodes </th>
 	  <th> threads/task </th>
+	  <th> HWM (GB on node) </th>
 	</tr>
         <tr bgcolor="{{job.color}}">
 	  <td><a href="{% url 'stampede:job'  job.id %}">{{ job.id }}</a>
@@ -39,6 +40,7 @@
           <td align=right>{{ job.cores }}</td>
           <td align=right>{{ job.nodes }}</td>
           <td align=right>{{ job.threads }}</td>
+          <td align=right>{{ job.mem|stringformat:".3e" }}</td>
         </tr>
    </table>
    <p><font size="5">Working Directory: {{job.cwd}}</font></p><p> <a href={{ splunk_url }}> Splunk URL</a></p>

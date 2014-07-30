@@ -2,12 +2,12 @@
 import sys, os
 from datetime import datetime
 from tacc_stats import cfg as cfg
-import tacc_stats.analysis as analysis
+import tacc_stats.analysis.plot as plots
 import tacc_stats.analysis.gen.tspl_utils as tspl_utils
 from tacc_stats.pickler import batch_acct
 
 def main(**args):
-    plot_type = getattr(sys.modules[analysis.__name__],args['plot']) 
+    plot_type = getattr(sys.modules[plots.__name__],args['plot']) 
     plot = plot_type(processes=args['p'],mode=args['mode'], 
                      header=args['header'],
                      prefix=args['prefix'],outdir=args['o'],

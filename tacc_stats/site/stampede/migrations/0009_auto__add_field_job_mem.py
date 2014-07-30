@@ -8,40 +8,15 @@ from django.db import models
 class Migration(SchemaMigration):
 
     def forwards(self, orm):
-        # Adding model 'Job'
-        db.create_table(u'stampede_job', (
-            ('id', self.gf('django.db.models.fields.BigIntegerField')(primary_key=True)),
-            ('uid', self.gf('django.db.models.fields.BigIntegerField')(null=True)),
-            ('project', self.gf('django.db.models.fields.CharField')(max_length=128)),
-            ('start_time', self.gf('django.db.models.fields.DateTimeField')(null=True)),
-            ('end_time', self.gf('django.db.models.fields.DateTimeField')(null=True)),
-            ('start_epoch', self.gf('django.db.models.fields.PositiveIntegerField')(null=True)),
-            ('end_epoch', self.gf('django.db.models.fields.PositiveIntegerField')(null=True)),
-            ('run_time', self.gf('django.db.models.fields.PositiveIntegerField')(null=True)),
-            ('queue_time', self.gf('django.db.models.fields.PositiveIntegerField')(null=True)),
-            ('queue', self.gf('django.db.models.fields.CharField')(max_length=16, null=True)),
-            ('name', self.gf('django.db.models.fields.CharField')(max_length=128, null=True)),
-            ('status', self.gf('django.db.models.fields.CharField')(max_length=16, null=True)),
-            ('nodes', self.gf('django.db.models.fields.PositiveIntegerField')(null=True)),
-            ('cores', self.gf('django.db.models.fields.PositiveIntegerField')(null=True)),
-            ('wayness', self.gf('django.db.models.fields.PositiveIntegerField')(null=True)),
-            ('path', self.gf('django.db.models.fields.FilePathField')(max_length=128, null=True)),
-            ('date', self.gf('django.db.models.fields.DateField')(null=True, db_index=True)),
-            ('user', self.gf('django.db.models.fields.CharField')(max_length=128, null=True)),
-            ('exe', self.gf('django.db.models.fields.CharField')(max_length=128, null=True)),
-            ('cwd', self.gf('django.db.models.fields.CharField')(max_length=128, null=True)),
-            ('threads', self.gf('django.db.models.fields.BigIntegerField')(null=True)),
-            ('cpi', self.gf('django.db.models.fields.FloatField')(null=True)),
-            ('mbw', self.gf('django.db.models.fields.FloatField')(null=True)),
-            ('idle', self.gf('django.db.models.fields.FloatField')(null=True)),
-            ('cat', self.gf('django.db.models.fields.FloatField')(null=True)),
-        ))
-        db.send_create_signal(u'stampede', ['Job'])
+        # Adding field 'Job.mem'
+        db.add_column(u'stampede_job', 'mem',
+                      self.gf('django.db.models.fields.FloatField')(null=True),
+                      keep_default=False)
 
 
     def backwards(self, orm):
-        # Deleting model 'Job'
-        db.delete_table(u'stampede_job')
+        # Deleting field 'Job.mem'
+        db.delete_column(u'stampede_job', 'mem')
 
 
     models = {
@@ -58,6 +33,7 @@ class Migration(SchemaMigration):
             'id': ('django.db.models.fields.BigIntegerField', [], {'primary_key': 'True'}),
             'idle': ('django.db.models.fields.FloatField', [], {'null': 'True'}),
             'mbw': ('django.db.models.fields.FloatField', [], {'null': 'True'}),
+            'mem': ('django.db.models.fields.FloatField', [], {'null': 'True'}),
             'name': ('django.db.models.fields.CharField', [], {'max_length': '128', 'null': 'True'}),
             'nodes': ('django.db.models.fields.PositiveIntegerField', [], {'null': 'True'}),
             'path': ('django.db.models.fields.FilePathField', [], {'max_length': '128', 'null': 'True'}),

@@ -6,10 +6,10 @@ class MasterPlot(Plot):
       ['amd64_core','amd64_core','amd64_sock','lnet','lnet',
        'ib_sw','ib_sw','cpu'],
       'intel' : ['intel_pmc3', 'intel_pmc3', 'intel_pmc3', 
-                 'lnet', 'lnet', 'ib_ext','ib_ext','cpu','mem','mem'],
+                 'lnet', 'lnet', 'ib_ext','ib_ext','cpu','mem','mem','mem'],
       'intel_snb' : ['intel_snb_imc', 'intel_snb_imc', 'intel_snb', 
                      'lnet', 'lnet', 'ib_sw','ib_sw','cpu',
-                     'intel_snb', 'intel_snb', 'mem', 'mem'],
+                     'intel_snb', 'intel_snb', 'mem', 'mem','mem'],
       }
   
   k2={'amd64':
@@ -17,10 +17,10 @@ class MasterPlot(Plot):
        'rx_bytes','tx_bytes','user'],
       'intel' : ['MEM_LOAD_RETIRED_L1D_HIT', 'FP_COMP_OPS_EXE_X87', 
                  'INSTRUCTIONS_RETIRED', 'rx_bytes','tx_bytes', 
-                 'port_recv_data','port_xmit_data','user', 'MemUsed', 'AnonPages'],
+                 'port_recv_data','port_xmit_data','user', 'MemUsed', 'FilePages','Slab'],
       'intel_snb' : ['CAS_READS', 'CAS_WRITES', 'LOAD_L1D_ALL',
                      'rx_bytes','tx_bytes', 'rx_bytes','tx_bytes','user',
-                     'SSE_D_ALL', 'SIMD_D_256', 'MemUsed', 'AnonPages'],
+                     'SSE_D_ALL', 'SIMD_D_256', 'MemUsed', 'FilePages','Slab'],
       }
 
   fname='master'
@@ -74,8 +74,9 @@ class MasterPlot(Plot):
 
     #Plot key 3
     idx0=k2_tmp.index('MemUsed')
-    idx1=k2_tmp.index('AnonPages')
-    plot(self.fig.add_subplot(6,cols,3*shift), [idx0,-idx1], 3600.,2.**30.0, ylabel='Memory Usage GB',do_rate=False)
+    idx1=k2_tmp.index('FilePages')
+    idx2=k2_tmp.index('Slab')
+    plot(self.fig.add_subplot(6,cols,3*shift), [idx0,-idx1,-idx2], 3600.,2.**30.0, ylabel='Memory Usage GB',do_rate=False)
 
     # Plot lnet sum rate
     idx0=k1_tmp.index('lnet')
