@@ -13,42 +13,38 @@ class Catastrophe(Test):
 
   def compute_fit_params(self,ind):
     fit=[]
+    r1=range(ind)
+    r2=[x + ind for x in range(len(self.dt)-ind)]
+
     for v in self.ts:
-      rate=numpy.divide(numpy.diff(v),numpy.diff(self.ts.t))
-      tmid=(self.ts.t[:-1]+self.ts.t[1:])/2.0
-      r1=range(ind)
-      r2=[x + ind for x in range(len(rate)-ind)]
-      a=numpy.trapz(rate[r1],tmid[r1])/(tmid[ind]-tmid[0])
-      b=numpy.trapz(rate[r2],tmid[r2])/(tmid[-1]-tmid[ind])
-      fit.append((a,b))      
+      rate=numpy.divide(numpy.diff(v),self.dt)
+      # integral before time slice 
+      a=numpy.trapz(rate[r1],self.tmid[r1])/(self.tmid[ind]-self.tmid[0])
+      # integral after time slice
+      b=numpy.trapz(rate[r2],self.tmid[r2])/(self.tmid[-1]-self.tmid[ind])
+      # ratio of integral after time over before time
+      fit.append(b/a)      
     return fit   
 
   def compute_metric(self):
 
-    bad_hosts=tspl_utils.lost_data(self.ts)
-    if len(bad_hosts) > 0:
-      print(self.ts.j.id, ': Detected hosts with bad data: ', bad_hosts)
+    if len(tspl_utils.lost_data(self.ts)) > 0: 
+      print(self.ts.j.id, ': Detected hosts with bad data')
       return
 
+    self.tmid=(self.ts.t[:-1]+self.ts.t[1:])/2.0
+    self.dt = numpy.diff(self.ts.t)
+
+    #skip first and last two time slices
     vals=[]
     for i in [x + 2 for x in range(self.ts.size-4)]:
       vals.append(self.compute_fit_params(i))
 
-    vals2=[]
-    for v in vals:
-      vals2.append([ b/a for (a,b) in v])
+    #times  hosts ---->
+    #  |
+    #  |
+    #  |
+    #  V
 
-
-    arr=numpy.array(vals2)
-    brr=numpy.transpose(arr)
-
-    (m,n)=numpy.shape(brr)
-
-    r=[]
-    for i in range(m):
-      jnd=numpy.argmin(brr[i,:])
-      r.append((jnd,brr[i,jnd]))
-
-    for (ind,ratio) in r:
-      self.metric = min(ratio,self.metric)
+    self.metric = numpy.array(vals).min()
     return

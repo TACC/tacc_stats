@@ -22,16 +22,16 @@ for root,dirnames,filenames in os.walk(cfg.pickles_dir):
 
         views.update(directory,rerun=False)
         
-        cpi_test = exam.HighCPI(threshold=1.0,processes=1)
+        cpi_test = exam.HighCPI(threshold=1.0,processes=1,ignore_status=['FAILED,CANCELLED'])
         views.update_test_field(directory,cpi_test,'cpi',rerun=False)
         
-        mbw_test = exam.MemBw(threshold=0.5,processes=1)               
+        mbw_test = exam.MemBw(threshold=0.5,processes=1,ignore_status=['FAILED,CANCELLED'])               
         views.update_test_field(directory,mbw_test,'mbw',rerun=False)   
         
-        idle_test = exam.Idle(threshold=0.999,processes=1,min_hosts=2)
+        idle_test = exam.Idle(threshold=0.999,processes=1,min_hosts=2,ignore_status=['FAILED,CANCELLED'])
         views.update_test_field(directory,idle_test,'idle',rerun=False)   
         
-        cat_test = exam.Catastrophe(threshold=0.001,processes=1,min_hosts=2)
+        cat_test = exam.Catastrophe(threshold=0.001,processes=1)
         views.update_test_field(directory,cat_test,'cat',rerun=False)   
 
         mem_test = exam.MemUsage(threshold=30,processes=1)

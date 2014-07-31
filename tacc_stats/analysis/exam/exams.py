@@ -38,7 +38,7 @@ class Test(object):
     self.ignore_qs=kwargs.get('ignore_qs',['gpu','gpudev','vis',
                                            'visdev','development'])
     self.waynesses=kwargs.get('waynesses',[x+1 for x in range(32)])
-
+    self.ignore_status=kwargs.get('ignore_status',[])
     manager=multiprocessing.Manager()
     self.results=manager.dict()
 
@@ -55,9 +55,7 @@ class Test(object):
       print('End of file found reading: ' + job_path)
       return False
 
-    if "FAIL" in self.ts.status: return False
-    if "CANCELLED" in self.ts.status: return False 
-
+    if self.ts.status in self.ignore_status: return False
     if not tspl_utils.checkjob(self.ts,self.min_time,
                                self.waynesses,skip_queues=self.ignore_qs):
       return False

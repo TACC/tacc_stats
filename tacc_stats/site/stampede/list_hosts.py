@@ -17,28 +17,27 @@ hosts = {}
 jobs = {}
 
 cpi = {}
-metric = 'cpi'
+metric = 'mem'
 
-for host in Host.objects.all():
-    r,n=host.name.split('-')
-    if 'c400' in r: continue
-    racks.append(r)
-    nodes.append(n)
-racks = sorted(set(racks))
-nodes = sorted(set(nodes))
+#for host in Host.objects.all():
 
 
-for job in Job.objects.filter(date=datetime.strptime('2014-07-01','%Y-%m-%d')).filter(nodes__gt = 60).exclude(Q(**{metric : None}) | Q(**{metric : float('nan')})).all(): 
+for job in Job.objects.filter(date=datetime.strptime('2014-07-29','%Y-%m-%d')).filter(nodes__gt = 0).exclude(Q(**{metric : None}) | Q(**{metric : float('nan')})).all(): 
     print job.id,job.nodes
     for host in job.host_set.all():
-
+        r,n=host.name.split('-')
+        if 'c400' in r: continue
+        racks.append(r)
+        nodes.append(n)
+        racks = sorted(set(racks))
+        nodes = sorted(set(nodes))
         
         try:
-            cpi[host.name] += job.mbw*job.run_time
-            jobs[host.name] += job.run_time
+            cpi[host.name] += job.mem#*job.run_time
+            jobs[host.name] += 1#job.run_time
         except:
-            cpi[host.name] = job.mbw*job.run_time
-            jobs[host.name] = job.run_time
+            cpi[host.name] = job.mem#*job.run_time
+            jobs[host.name] = 1#job.run_time
 
             
 x = np.zeros((len(nodes),len(racks)))

@@ -18,7 +18,7 @@ class HeatMap(Plot):
     ts=self.ts
 
     host_cpi = {}
-    host_names = ts.data[0].keys()
+    host_names = sorted(ts.data[0].keys())
     for v in host_names:
         ncores = len(ts.data[0][v])
         num = 0

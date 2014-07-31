@@ -28,7 +28,7 @@ class DevPlot(Plot):
 
     for i in range(n_events):
       self.ax = self.fig.add_subplot(n_events,1,i+1)
-      self.plot_lines(self.ax, [i], 3600., yscale=scale, do_rate = do_rate)
+      self.plot_lines(self.ax, [i], xscale=3600., yscale=scale, do_rate = do_rate)
       self.ax.set_ylabel(events[i],size='small')
     self.ax.set_xlabel("Time (hr)")
     self.fig.subplots_adjust(hspace=0.5)

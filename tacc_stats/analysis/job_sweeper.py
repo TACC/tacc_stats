@@ -14,7 +14,8 @@ def main(**args):
     
     test = test_type(processes=args['p'], threshold=args['t'], 
                      min_time=args['s'], min_hosts=args['N'],
-                     waynesses=args['waynesses'], aggregate=args['a'])
+                     waynesses=args['waynesses'], aggregate=args['a'],
+                     ignore_status=args['ignore_status'])
 
     print 'Running test: '+ test_type.__name__
 
@@ -56,6 +57,8 @@ if __name__ == '__main__':
                         type=float, default=1.0)
     parser.add_argument('-test', help='Test to run',
                         type=str, default='Idle')
+    parser.add_argument('-ignore_status', help='Status types to ignore',
+                        nargs='?', type=str, default=[])
     parser.add_argument('-waynesses', help='Wayness required',
                         nargs='?', type=int, default=[x+1 for x in range(32)])
     parser.add_argument('-a', help='Aggregate over node', default=True)

@@ -54,7 +54,6 @@ def update(date,rerun=False):
 
             if not created: 
                 if len(obj.host_set.all()) > 0: 
-                    print obj.host_set.all()
                     continue 
                 try:
                     pickle_path = os.path.join(root,str(pickle_file))
@@ -123,11 +122,10 @@ def update_test_field(date,test,metric,rerun=False):
     
     kwargs = { 'date' : date, 
                'run_time__gte' : test.min_time,
-               'nodes__gte' : test.min_hosts,
-               'status__in' : ['COMPLETED','TIMEOUT']
+               'nodes__gte' : test.min_hosts
                }
     
-    jobs_list = Job.objects.filter(**kwargs).exclude(queue__in=test.ignore_qs)
+    jobs_list = Job.objects.filter(**kwargs).exclude(Q(queue__in=test.ignore_qs) | Q(status__in = test.ignore_status))
 
     if not rerun:
         jobs_list = jobs_list.filter(Q(**{metric : None}) | Q(**{metric : float('nan')}))
@@ -228,9 +226,10 @@ def index(request, date = None, uid = None, project = None, user = None, exe = N
     field['nj'] = len(job_list)
 
     # Computed Metrics
+    field['cat_job_list']  = job_list.filter(cat__lte = 0.001)
+    
     completed_list = job_list.exclude(status__in=['CANCELLED','FAILED']).order_by('-id')
     field['idle_job_list'] = completed_list.filter(idle__gte = 0.99)
-    field['cat_job_list']  = completed_list.filter(cat__lte = 0.001)
     field['mem_job_list'] = completed_list.filter(mem__gte = 30)
 
     field['cpi_thresh'] = 1.0
@@ -399,14 +398,15 @@ class JobDetailView(DetailView):
         context['host_list'] = host_list
 
         urlstring="https://scribe.tacc.utexas.edu:8000/en-US/app/search/search?q=search%20kernel:"
-        urlstring+="%20host%3D"+host_list[0]
-
+        hoststring=urlstring+"%20host%3D"+host_list[0]
+        serverstring=urlstring+"%20mds*%20OR%20%20oss*"
         for host in host_list[1:]:
-            urlstring+="%20OR%20%20host%3D"+host
+            hoststring+="%20OR%20%20host%3D"+host
 
-        urlstring+="&earliest="+str(job.start_epoch)+"&latest="+str(job.end_epoch)+"&display.prefs.events.count=50"
-
-        context['splunk_url'] = urlstring
+        hoststring+="&earliest="+str(job.start_epoch)+"&latest="+str(job.end_epoch)+"&display.prefs.events.count=50"
+        serverstring+="&earliest="+str(job.start_epoch)+"&latest="+str(job.end_epoch)+"&display.prefs.events.count=50"
+        context['client_url'] = hoststring
+        context['server_url'] = serverstring
 
         return context
 
