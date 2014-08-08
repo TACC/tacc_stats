@@ -50,8 +50,9 @@ def update(date,rerun=False):
                         job = Job.objects.filter(id = pickle_file).delete()
             
                 obj,created = Job.objects.get_or_create(id = pickle_file)
-            except: print pickle_file,"doesn't look like a pickled job"
-
+            except: 
+                print pickle_file,"doesn't look like a pickled job"
+                continue
             if not created: 
                 if len(obj.host_set.all()) > 0: 
                     continue 
@@ -111,7 +112,6 @@ def update(date,rerun=False):
 
             except: 
                 print json
-                sys.exit()
                 print pickle_file,'failed'
                 print traceback.format_exc()
                 print date
@@ -135,6 +135,45 @@ def update_test_field(date,test,metric,rerun=False):
     test.run(jobs_list.values_list('path',flat=True))
     for jid in test.results.keys(): 
         jobs_list.filter(id = jid).update(**{metric : test.results[jid]['metric']})
+
+
+def sys_plot(request, pk):
+
+    racks = []
+    nodes = []
+    for host in Host.objects.values_list('name',flat=True).distinct():
+        r,n=host.split('-')
+        racks.append(r)
+        nodes.append(n)
+    racks = sorted(set(racks))
+    nodes = sorted(set(nodes))
+
+    job = Job.objects.get(id=pk)
+    hosts = job.host_set.all().values_list('name',flat=True)
+
+    x = np.zeros((len(nodes),len(racks)))
+    for r in range(len(racks)):
+        for n in range(len(nodes)):
+            name = str(racks[r])+'-'+str(nodes[n])
+            if name in hosts: x[n][r] = 1.0
+
+    fig = Figure(figsize=(25,6))
+    ax=fig.add_subplot(1,1,1)
+
+    ax.set_yticks(range(len(nodes)))
+    ax.set_yticklabels(nodes,fontsize=6)
+    ax.set_xticks(range(len(racks)))
+    ax.set_xticklabels(racks,fontsize=6,rotation=90)
+
+    pcm = ax.pcolor(np.array(range(len(racks)+1)),np.array(range(len(nodes)+1)),x)
+
+    canvas = FigureCanvas(fig)    
+    response = HttpResponse(content_type='image/png')
+    response['Content-Disposition'] = "attachment; filename="+pk+"-sys.png"
+    fig.savefig(response, format='png')
+
+    return response
+
 
 def dates(request):
     
@@ -226,7 +265,7 @@ def index(request, date = None, uid = None, project = None, user = None, exe = N
     field['nj'] = len(job_list)
 
     # Computed Metrics
-    field['cat_job_list']  = job_list.filter(cat__lte = 0.001)
+    field['cat_job_list']  = job_list.filter(Q(cat__lte = 0.001) | Q(cat__gte = 1000)).exclude(cat = float('nan'))
     
     completed_list = job_list.exclude(status__in=['CANCELLED','FAILED']).order_by('-id')
     field['idle_job_list'] = completed_list.filter(idle__gte = 0.99)

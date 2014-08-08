@@ -6,7 +6,7 @@ from tacc_stats.site.lonestar.models import LS4Job, LS4JobForm
 import os,sys
 
 from tacc_stats.analysis.gen import tspl, lariat_utils
-import tacc_stats.analysis as analysis
+import tacc_stats.analysis.plot as plot
 
 from tacc_stats.pickler import job_stats, batch_acct
 sys.modules['pickler.job_stats'] = job_stats
@@ -198,14 +198,14 @@ def get_data(pk):
 
 def master_plot(request, pk):
     data = get_data(pk)
-    mp = analysis.MasterPlot(lariat_data="pass")
+    mp = plot.MasterPlot(lariat_data="pass")
     mp.plot(pk,job_data=data)
     return figure_to_response(mp.fig)
 
 def heat_map(request, pk):
     
     data = get_data(pk)
-    hm = analysis.HeatMap({'intel' : ['intel_pmc3','intel_pmc3']},
+    hm = plot.HeatMap({'intel' : ['intel_pmc3','intel_pmc3']},
                           {'intel' : ['CLOCKS_UNHALTED_REF',
                                       'INSTRUCTIONS_RETIRED']},
                           lariat_data="pass")
@@ -264,7 +264,7 @@ def type_plot(request, pk, type_name):
     k1 = {'intel' : [type_name]*len(schema)}
     k2 = {'intel': schema}
 
-    tp = analysis.DevPlot(k1,k2,lariat_data='pass')
+    tp = plot.DevPlot(k1,k2,lariat_data='pass')
     tp.plot(pk,job_data=data)
     return figure_to_response(tp.fig)
 

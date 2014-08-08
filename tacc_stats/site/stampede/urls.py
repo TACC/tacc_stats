@@ -15,6 +15,9 @@ urlpatterns = patterns('',
                        url(r'^type_plot/(?P<pk>\d+)/(?P<type_name>\w+)/$', 
                            type_plot, name = 'type_plot'),
 
+                       url(r'^sys_plot/(?P<pk>\d+)/$', 
+                           sys_plot, name = 'sys_plot'),
+
                        url(r'^master_plot/(?P<pk>\d+)/$', 
                            master_plot, name = 'master_plot'),
 

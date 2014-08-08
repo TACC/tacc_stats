@@ -8,3 +8,4 @@ from tacc_stats.analysis.exam.lowflops import LowFLOPS
 from tacc_stats.analysis.exam.metadatarate import MetaDataRate
 from tacc_stats.analysis.exam.highcpi import HighCPI
 from tacc_stats.analysis.exam.highcpld import HighCPLD
+from tacc_stats.analysis.exam.c3_state import C3State
