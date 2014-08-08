@@ -38,6 +38,14 @@ def schema_fixup(type_name, desc):
     """ This function implements a workaround for a known issue with incorrect schema """
     """ definitions for irq, block and sched tacc_stats metrics. """
 
+    if type_name == "ib" and 'W=32' not in desc:
+        # All of the irq metrics are 32 bits wide
+        res = ""
+        for token in desc.split():
+            res += token.strip() + ",W=32 "
+        return res.strip()+'\n'
+
+
     if type_name == "irq":
         # All of the irq metrics are 32 bits wide
         res = ""
@@ -256,11 +264,12 @@ class Host(object):
                 c = line[0]
                 if c == SF_SCHEMA_CHAR:
                     type_name, schema_desc = line[1:].split(None, 1)
+
                     schema = self.job.get_schema(type_name, schema_desc)
                     if schema:
                         file_schemas[type_name] = schema
                     else:
-                        self.error("file `%s', type `%s', schema mismatch desc `%s'\n",
+                        self.error("file `%s', type `%s', schema mismatch desc\n%s\n",
                                    file.name, type_name, schema_desc)
                 elif c == SF_PROPERTY_CHAR:
                     pass
@@ -304,7 +313,10 @@ class Host(object):
                 c = line[0]
                 if c.isdigit():
                     str_time, str_jobid = line.split()
-                    rec_time = long(str_time)
+                    try:
+                        rec_time = float(str_time)
+                    except ValueError:
+                        rec_time = long(str_time)
                     rec_jobid = set(str_jobid.split(','))
                     if self.job.id in rec_jobid:
                         self.trace("file `%s' rec_time %d, rec_jobid `%s'\n",
@@ -335,7 +347,12 @@ class Host(object):
                 if c.isdigit():
                     skip = False
                     str_time, str_jobid = line.split()
-                    rec_time = long(str_time)
+
+                    try:
+                        rec_time = float(str_time)
+                    except ValueError:
+                        rec_time = long(str_time)
+
                     rec_jobid = set(str_jobid.split(','))
                     if self.job.id not in rec_jobid:
                         line = file.next()

@@ -69,6 +69,7 @@ def test():
         #    assert host.times[i] == new.hosts[host_name].times[i]
 
         for type_name, type_stats in host.stats.iteritems():
+            if type_name =='ib': continue
             for dev_name, dev_stats in type_stats.iteritems():
                 for i in range(len(dev_stats)):
                     for j in range(len(dev_stats[i])):
@@ -109,8 +110,9 @@ def test_ids():
     for host_name, host in old.hosts.iteritems():
         #for i in range(len(host.times)):
         #    assert host.times[i] == new.hosts[host_name].times[i]
-
+        
         for type_name, type_stats in host.stats.iteritems():
+            if type_name =='ib': continue
             for dev_name, dev_stats in type_stats.iteritems():
                 for i in range(len(dev_stats)):
                     for j in range(len(dev_stats[i])):

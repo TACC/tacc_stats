@@ -19,10 +19,12 @@ cpu_event_map = {
     CORE_PERF_EVENT(0xD1,0x01) : 'LOAD_OPS_L1_HIT,E', 
     CORE_PERF_EVENT(0xD1,0x02) : 'LOAD_OPS_L2_HIT,E', 
     CORE_PERF_EVENT(0xD1,0x04) : 'LOAD_OPS_LLC_HIT,E', 
-    CORE_PERF_EVENT(0x10,0x90) : 'SSE_D_ALL,E',
-    CORE_PERF_EVENT(0x11,0x02) : 'SIMD_D_256,E',
+    CORE_PERF_EVENT(0x10,0x90) : 'SSE_DOUBLE_ALL,E',
+    CORE_PERF_EVENT(0x11,0x02) : 'SIMD_DOUBLE_256,E',
     CORE_PERF_EVENT(0xA2,0x01) : 'STALLS,E',
     CORE_PERF_EVENT(0x51,0x01) : 'LOAD_L1D_ALL,E',
+    CORE_PERF_EVENT(0x10,0x80) : 'SSE_DOUBLE_SCALAR,E',
+    CORE_PERF_EVENT(0x10,0x10) : 'SSE_DOUBLE_PACKED,E',
     'FIXED0'                   : 'INSTRUCTIONS_RETIRED,E',
     'FIXED1'                   : 'CLOCKS_UNHALTED_CORE,E',
     'FIXED2'                   : 'CLOCKS_UNHALTED_REF,E',
@@ -180,6 +182,8 @@ class reformat_counters:
                     for j in self.ctl_registers:
                         settings = array[:,j]
                         if event_map.get(settings[0],str(settings[0])) != dev_schema[devidx] or settings.min() != settings.max():
+                            #if name in 'intel_snb': print host.name,dev,settings
+                            #print '>>>>>>>>>>>>>>>>>>>>>error'
                             # The control settings for this device changed during the run
                             # mark as the error metric
                             dev_schema[devidx] = "ERROR,E"
