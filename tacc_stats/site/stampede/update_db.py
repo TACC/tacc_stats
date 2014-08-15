@@ -20,14 +20,14 @@ for root,dirnames,filenames in os.walk(cfg.pickles_dir):
         if max(date.date(),start.date()) > min(date.date(),end.date()): continue
         print 'Run update for',date.date()
 
-        views.update(directory,rerun=False)
+        views.update(directory,rerun=False)        
         
         cpi_test = exam.HighCPI(threshold=1.0,processes=1,ignore_status=['FAILED,CANCELLED'])
         views.update_test_field(directory,cpi_test,'cpi',rerun=False)
-        
+
         mbw_test = exam.MemBw(threshold=0.5,processes=1,ignore_status=['FAILED,CANCELLED'])               
         views.update_test_field(directory,mbw_test,'mbw',rerun=False)   
-        
+
         idle_test = exam.Idle(threshold=0.999,processes=1,min_hosts=2,ignore_status=['FAILED,CANCELLED'])
         views.update_test_field(directory,idle_test,'idle',rerun=False)   
         

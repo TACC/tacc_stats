@@ -130,9 +130,12 @@ def update_test_field(date,test,metric,rerun=False):
     if not rerun:
         jobs_list = jobs_list.filter(Q(**{metric : None}) | Q(**{metric : float('nan')}))
 
+    paths = []
+    for job in jobs_list:
+        paths.append(os.path.join(cfg.pickles_dir,job.date.strftime('%Y-%m-%d'),str(job.id)))
 
     print '# Jobs to be tested:',len(jobs_list)
-    test.run(jobs_list.values_list('path',flat=True))
+    test.run(paths)
     for jid in test.results.keys(): 
         jobs_list.filter(id = jid).update(**{metric : test.results[jid]['metric']})
 
@@ -384,7 +387,7 @@ def get_data(pk):
         data = cache.get(pk)
     else:
         job = Job.objects.get(pk = pk)
-        with open(job.path,'rb') as f:
+        with open(os.path.join(cfg.pickles_dir,job.date.strftime('%Y-%m-%d'),str(job.id)),'rb') as f:
             data = pickle.load(f)
             cache.set(job.id, data)
     return data
