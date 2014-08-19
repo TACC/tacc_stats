@@ -5,6 +5,7 @@
 #include <limits.h>
 #include <stdarg.h>
 #include <sys/utsname.h>
+#include <syslog.h>
 #include "stats.h"
 #include "stats_file.h"
 #include "schema.h"
@@ -18,7 +19,7 @@
 #define SF_PROPERTY_CHAR '$'
 #define SF_MARK_CHAR '%'
 
-#define sf_printf(sf, fmt, args...) fprintf(sf->sf_file, fmt, ##args)
+#define sf_printf(sf, fmt, args...)  fprintf(sf->sf_file, fmt, ##args) //syslog(LOG_INFO, fmt, ##args)
 
 static int sf_rd_hdr(struct stats_file *sf)
 {
@@ -194,20 +195,21 @@ int stats_file_mark(struct stats_file *sf, const char *fmt, ...)
 int stats_file_close(struct stats_file *sf)
 {
   int rc = 0;
+  char *rec;
 
   if (sf->sf_empty)
     sf_wr_hdr(sf);
 
   fseek(sf->sf_file, 0, SEEK_END);
-
   sf_printf(sf, "\n%f %s\n", current_time, current_jobid);
-
+  asprintf(&rec,"\n%f %s\n", current_time, current_jobid);  
   /* Write mark. */
   if (sf->sf_mark != NULL) {
     const char *str = sf->sf_mark;
     while (*str != 0) {
       const char *eol = strchrnul(str, '\n');
       sf_printf(sf, "%c%*s\n", SF_MARK_CHAR, (int) (eol - str), str);
+      asprintf(&rec, "%s%c%*s\n", rec, SF_MARK_CHAR, (int) (eol - str), str);
       str = eol;
       if (*str == '\n')
         str++;
@@ -227,14 +229,21 @@ int stats_file_close(struct stats_file *sf)
       struct stats *stats = key_to_stats(dev);
 
       sf_printf(sf, "%s %s", type->st_name, stats->s_dev);
-
+      asprintf(&rec, "%s%s %s", rec, type->st_name, stats->s_dev);
       size_t k;
       for (k = 0; k < type->st_schema.sc_len; k++)
-        sf_printf(sf, " %llu", stats->s_val[k]);
-
+	{
+	  sf_printf(sf, " %llu", stats->s_val[k]);
+	  asprintf(&rec, "%s %llu", rec, stats->s_val[k]);
+	}
       sf_printf(sf, "\n");
+      asprintf(&rec, "%s\n",rec);
     }
   }
+
+  openlog(NULL, LOG_PID, 0);
+  syslog(LOG_INFO,"%s",rec);
+  closelog();
 
   if (ferror(sf->sf_file)) {
     ERROR("error writing to `%s': %m\n", sf->sf_path);

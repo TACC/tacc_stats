@@ -179,8 +179,13 @@ def sys_plot(request, pk):
 
 
 def dates(request):
-    
-    date_list = os.listdir(cfg.pickles_dir)
+
+    date_list = []
+    dates = Job.objects.values_list('date',flat=True).distinct()
+
+    for date in dates:
+        date_list.append(dates.strftime('%Y-%m-%d'))
+
     date_list = sorted(date_list, key=lambda d: map(int, d.split('-')))
 
     month_dict ={}
