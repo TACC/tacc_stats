@@ -59,7 +59,7 @@ MICRO = 0
 ISRELEASED = True
 VERSION = '%d.%d.%d' % (MAJOR, MINOR, MICRO)
 QUALIFIER = ''
-
+RMQ = True
 FULLVERSION = VERSION
 write_version = True
 
@@ -240,6 +240,8 @@ sources=[
     pjoin(root,'stats_file.c'),pjoin(root,'monitor.c'),pjoin(root,'main.c'),pjoin(root,'stats.c')
     ]
 
+if RMQ: sources.append(pjoin(root,'amqp_listen.c'))
+
 for root,dirs,files in os.walk('tacc_stats/src/monitor/'):
     for f in files:
         name,ext = os.path.splitext(f)        
@@ -265,7 +267,11 @@ define_macros=[('STATS_DIR_PATH','\"'+paths['stats_dir']+'\"'),
                ('STATS_PROGRAM','\"tacc_stats\"'),
                ('STATS_LOCK_PATH','\"'+paths['stats_lock']+'\"'),
                ('JOBID_FILE_PATH','\"'+paths['jobid_file']+'\"')]
-             
+if RMQ:
+    define_macros.append(('RMQ',True))
+    library_dirs.append("/usr/local/lib64")
+    libraries.append("rabbitmq")
+
 flags = ['-D_GNU_SOURCE','-DDEBUG','-Wp,-U_FORTIFY_SOURCE',
          '-O3','-Wall','-g']
 ext_data=dict(sources=sources,
@@ -401,11 +407,24 @@ class MyBuildExt(build_ext):
 
         language = ext.language or self.compiler.detect_language(sources)
         
-        compiler_objects = objects
-        compiler_objects.remove(pjoin(self.build_temp,'tacc_stats','src',
-                                      'monitor','monitor.o'))
+        objects.remove(pjoin(self.build_temp,'tacc_stats','src',
+                             'monitor','monitor.o'))
+        print objects
+        if RMQ:
+            objects.remove(pjoin(self.build_temp,'tacc_stats','src',
+                                 'monitor','amqp_listen.o'))
+            self.compiler.link_executable(
+                [pjoin(self.build_temp,'tacc_stats','src',
+                      'monitor','amqp_listen.o')], 
+                'build/bin/ampq_listend',
+                libraries=ext.libraries,
+                library_dirs=ext.library_dirs,
+                runtime_library_dirs=ext.runtime_library_dirs,
+                extra_postargs=extra_args,
+                target_lang=language)
+
         self.compiler.link_executable(
-            compiler_objects, 'build/bin/monitor',
+            objects, 'build/bin/monitor',
             libraries=ext.libraries,
             library_dirs=ext.library_dirs,
             runtime_library_dirs=ext.runtime_library_dirs,

@@ -71,6 +71,10 @@ static void usage(void)
           "\n"
           "Mandatory arguments to long options are mandatory for short options too.\n"
           "  -h, --help         display this help and exit\n"
+#ifdef RMQ 
+          "  -s [SERVER] or --server [SERVER]       Server to send data.\n"
+          "  -p [PORT] or --port [PORT]         Port to use (5672 is the default).\n"
+#endif
           /* "  -l, --list-types ...\n" */
           /* describe */
           ,
@@ -83,16 +87,20 @@ int main(int argc, char *argv[])
   int lock_timeout = 30;
   const char *current_path = STATS_DIR_PATH"/current";
   const char *mark = NULL;
+  const char *host = NULL;
+  const char *port = NULL;
   int rc = 0;
 
   struct option opts[] = {
     { "help", 0, 0, 'h' },
     { "mark", 0, 0, 'm' },
+    { "server", required_argument, 0, 's' },
+    { "port", required_argument, 0, 'p' },
     { NULL, 0, 0, 0 },
   };
 
   int c;
-  while ((c = getopt_long(argc, argv, "hm:", opts, 0)) != -1) {
+  while ((c = getopt_long(argc, argv, "hm:s:p:", opts, 0)) != -1) {
     switch (c) {
     case 'h':
       usage();
@@ -100,16 +108,32 @@ int main(int argc, char *argv[])
     case 'm':
       mark = optarg;
       break;
+    case 's':
+      host = optarg;
+      continue;
+    case 'p':
+      port = optarg;
+      continue;
     case '?':
       fprintf(stderr, "Try `%s --help' for more information.\n", program_invocation_short_name);
       exit(1);
     }
   }
-
   umask(022);
 
   if (!(optind < argc))
     FATAL("must specify a command\n");
+
+#ifdef RMQ
+  if (host == NULL) {
+    ERROR("Must specify a RMQ server with -s [--server] argument.\n");
+    rc = 1;
+    goto out;
+  }
+  if (port == NULL) { 
+    port = "5672";
+  }
+#endif
 
   const char *cmd_str = argv[optind];
   char **arg_list = argv + optind + 1;
@@ -161,6 +185,11 @@ int main(int argc, char *argv[])
     rc = 1;
     goto out;
   }
+
+#ifdef RMQ
+  sf.sf_host = host;
+  sf.sf_port = port;
+#endif
 
   int enable_all = 0;
   int select_all = cmd != cmd_collect || arg_count == 0;

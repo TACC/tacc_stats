@@ -182,9 +182,11 @@ def dates(request):
 
     date_list = []
     dates = Job.objects.values_list('date',flat=True).distinct()
-
     for date in dates:
-        date_list.append(dates.strftime('%Y-%m-%d'))
+        try:
+            date_list.append(date.strftime('%Y-%m-%d'))
+        except: 
+            pass
 
     date_list = sorted(date_list, key=lambda d: map(int, d.split('-')))
 

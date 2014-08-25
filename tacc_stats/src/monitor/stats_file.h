@@ -6,6 +6,9 @@ struct stats_file {
   char *sf_path;
   FILE *sf_file;
   char *sf_mark;
+  char *sf_data;
+  char *sf_host;
+  char *sf_port;
   unsigned int sf_empty:1;
 };
 
