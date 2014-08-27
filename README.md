@@ -205,10 +205,9 @@ where the 4 optional arguments have the following meaning
   - `-start`     : the start of the date range, e.g. `"2013-09-25 00:00:00"`
   - `-end`       : the end of the date range, e.g. `"2013-09-26   00:00:00"`
   - `jobids`     : individual jobids to pickle
+  - 
 No arguments results in all jobs from the previous day getting pickled and stored in the `pickles_dir`
-defined in `setup.cfg`.
-
-On Stampede argumentless `job_pickles.py` is run every 24 hours as a `cron` job.
+defined in `setup.cfg`. On Stampede argumentless `job_pickles.py` is run every 24 hours as a `cron` job.
 
 For pickling data with Intel Sandy Bridge core and uncore counters it is useful to
 modify the event_map dictionaries in `intel_snb.py` to include whatever events you are counting.The dictionaries map a control register value to a Schema name.  
