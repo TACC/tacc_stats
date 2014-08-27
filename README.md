@@ -118,16 +118,32 @@ There are currently three approaches to building and installing the package.
 
 Running
 -------
-Installation method 3 can be used for compute nodes.  The lines 
+Installation method 3 can be used for compute nodes.  In order for 
+tacc_stats to correcly label records with JOBIDs it is required that
+the job scheduler prolog and epilog contain the lines 
 
-`tacc_stats begin JOBID`
+`echo $JOBID > jobid_file`  
+`tacc_stats begin $JOBID`
 
 and 
 
-`tacc_stats end JOBID`
+`tacc_stats end $JOBID`
+`echo 0 > jobid_file`
 
-must then be placed in the Job Scheduler prolog and epilog respectively for tacc_stats to label
-the jobs correctly.
+respectively.  To perform the pickling of this data it is also necessary to 
+generate an accounting file that contains at least the JOBID and time range 
+that the job ran.  The pickling will currently work without modification on 
+SGE job schedulers.  It will also work on any accounting file with the format
+
+`$JOBID : UID : Project ID : Junk : Start time : End time : Time place in queue : SLURM partition : Junk : Job name : Job completion status : Nodes : Cores`
+
+for each record using the SLURM interface.  In addition to the accounting file,
+a directory of host-file logs (hosts belonging to a particular job) must be
+generated.  The accounting file and host-file logs are used to map JOBID's to 
+time and node ranges so that the job-level data can be extracted from the
+raw data efficiently.
+
+
 
 As mentioned above the `monitor` module produces a light-weight C 
 code called `monitor` which is setuid'd to `/opt/tacc_stats/tacc_stats`.  It is called at the beginning of every job to configure Performance Monitoring Counter registers
