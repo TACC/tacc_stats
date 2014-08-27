@@ -1,4 +1,5 @@
 dist/
+rabbitmq-c/
 tacc_stats.egg-info/
 *.pyc
 *.o

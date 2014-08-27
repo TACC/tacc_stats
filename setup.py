@@ -353,24 +353,47 @@ fi
             )
 
         self.post_install = "build/bdist_rpm_postinstall"
-        open(self.post_install,"w").write(
+        fd = open(self.post_install,"w")
+        fd.write(
             """
 (
  archive_min=$(( ((RANDOM * 60) / 32768) %% 60 ))
  archive_hour=$(( (RANDOM %% 2) + 2 ))
 
  echo \"MAILTO=\\"\\"\"
+""")
+        if RMQ:
+            fd.write(
+"""
+ echo \"*/10 * * * * root %{_bindir}/%{name} -s tacc-stats collect\"
+ echo \"55 23 * * * root %{_bindir}/%{name} -s tacc-stats rotate\"
+""")
+        else:
+            fd.write(
+"""
  echo \"*/10 * * * * root %{_bindir}/%{name} collect\"
  echo \"55 23 * * * root %{_bindir}/%{name} rotate\"
+""")
+        fd.write(
+"""
  echo \"${archive_min} ${archive_hour} * * * root %{_bindir}/%{name}_archive %{stats_dir} %{archive_dir}\"
 ) > %{crontab_file}
 
 /sbin/service crond restart || :
-
+""")
+        if RMQ:
+            fd.write(
+"""
+%{_bindir}/%{name} rotate -s tacc-stats
+            """
+            )
+        else:
+            fd.write(
+"""
 %{_bindir}/%{name} rotate
             """
             )
-
+        fd.close()
         self.pre_install = None
         self.post_uninstall = None
 

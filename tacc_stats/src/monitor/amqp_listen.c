@@ -68,7 +68,7 @@ int main(int argc, char const *const *argv)
   amqp_get_rpc_reply(conn);
 
   {
-    amqp_queue_declare_ok_t *r = amqp_queue_declare(conn, 1, amqp_empty_bytes, 0, 0, 0, 1,
+    amqp_queue_declare_ok_t *r = amqp_queue_declare(conn, 1, amqp_cstring_bytes("tacc_stats"), 0, 1, 0, 0,
                                  amqp_empty_table);
     amqp_get_rpc_reply(conn);
     queuename = amqp_bytes_malloc_dup(r->queue);
@@ -82,7 +82,7 @@ int main(int argc, char const *const *argv)
                   amqp_empty_table);
   amqp_get_rpc_reply(conn);
 
-  amqp_basic_consume(conn, 1, queuename, amqp_empty_bytes, 0, 1, 0, amqp_empty_table);
+  amqp_basic_consume(conn, 1, queuename, amqp_empty_bytes, 0, 0, 0, amqp_empty_table);
   amqp_get_rpc_reply(conn);
 
   {
@@ -93,22 +93,12 @@ int main(int argc, char const *const *argv)
       amqp_maybe_release_buffers(conn);
 
       res = amqp_consume_message(conn, &envelope, NULL, 0);
+      status = amqp_basic_ack(conn, 1, envelope.delivery_tag, 0);
 
       if (AMQP_RESPONSE_NORMAL != res.reply_type) {
         break;
       }
-      /*
-      printf("Delivery %u, exchange %.*s routingkey %.*s\n",
-             (unsigned) envelope.delivery_tag,
-             (int) envelope.exchange.len, (char *) envelope.exchange.bytes,
-             (int) envelope.routing_key.len, (char *) envelope.routing_key.bytes);
 
-      if (envelope.message.properties._flags & AMQP_BASIC_CONTENT_TYPE_FLAG) {
-        printf("Content-type: %.*s\n",
-               (int) envelope.message.properties.content_type.len,
-               (char *) envelope.message.properties.content_type.bytes);
-      }
-      */
       printf("%.*s\n", (int) envelope.message.body.len, (char *) envelope.message.body.bytes);
       amqp_destroy_envelope(&envelope);
     }

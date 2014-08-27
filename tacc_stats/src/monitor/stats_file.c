@@ -256,7 +256,11 @@ int stats_file_close(struct stats_file *sf)
 
   sf->sf_data="";
   fseek(sf->sf_file, 0, SEEK_END);
-  sf_printf(sf, "\n%f %s\n", current_time, current_jobid);
+
+  struct utsname uts_buf;
+  uname(&uts_buf);
+
+  sf_printf(sf, "\n%f %s %s\n", current_time, current_jobid, uts_buf.nodename);
 
   /* Write mark. */
   if (sf->sf_mark != NULL) {
