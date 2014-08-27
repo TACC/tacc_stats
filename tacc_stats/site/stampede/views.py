@@ -279,7 +279,7 @@ def index(request, date = None, uid = None, project = None, user = None, exe = N
     
     completed_list = job_list.exclude(status__in=['CANCELLED','FAILED']).order_by('-id')
     field['idle_job_list'] = completed_list.filter(idle__gte = 0.99)
-    field['mem_job_list'] = completed_list.filter(mem__gte = 30)
+    field['mem_job_list'] = completed_list.filter(mem__lte = 30, queue = 'largemem')
 
     field['cpi_thresh'] = 1.0
     field['cpi_job_list']  = completed_list.exclude(cpi = float('nan')).filter(cpi__gte = field['cpi_thresh'])

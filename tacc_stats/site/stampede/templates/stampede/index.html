@@ -49,7 +49,7 @@
 <p>Jobs flagged for:
 
     {% if mem_job_list %}
-     <p> <li>High Water Mark > 30 GB on a Node
+     <p> <li>Memory HWM < 30 GB on a Largemem Node
 	 <table>
 	 {% for key,values in mem_job_list.items %} 
 	 <tr><td><a href="{% url 'stampede:user_view'  key %}"> {{ key }}</a> </td>
