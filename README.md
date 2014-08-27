@@ -197,20 +197,18 @@ these files do not survive a reboot.
 ### Running `job_pickles.py`
 `job_pickles.py` can be run manually by:
 
-    $ ./job_pickles.py path_to_pickles/ date_start date_end
+    $ ./job_pickles.py [-start date_start] [-end date_end] [-dir directory] [-jobids id0 id1 ... idn]
 
-where the 3 required arguments have the following meaning
+where the 4 optional arguments have the following meaning
 
-  - `path_to_pickles/`: the directory to store pickled dictionaries
-  - `date_start`      : the start of the date range, e.g. `"2013-09-25 04:00:00"`
-  - `date_end`        : the end of the date range, e.g. `"2013-09-26   05:00:00"`
+  - `-dir`       : the directory to store pickled dictionaries
+  - `-start`     : the start of the date range, e.g. `"2013-09-25 00:00:00"`
+  - `-end`       : the end of the date range, e.g. `"2013-09-26   00:00:00"`
+  - `jobids`     : individual jobids to pickle
+No arguments results in all jobs from the previous day getting pickled and stored in the `pickles_dir`
+defined in `setup.cfg`.
 
-One could also run
-
-    $ ./do_job_pickles_cron.sh
-
-to pickle all raw stats data in the 24 hour period `yesterday` to `today`.  On Stampede
-this script is invoked every 24 hours using a `crontab` file.
+On Stampede argumentless `job_pickles.py` is run every 24 hours as a `cron` job.
 
 For pickling data with Intel Sandy Bridge core and uncore counters it is useful to
 modify the event_map dictionaries in `intel_snb.py` to include whatever events you are counting.The dictionaries map a control register value to a Schema name.  
