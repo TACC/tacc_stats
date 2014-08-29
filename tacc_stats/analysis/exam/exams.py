@@ -156,12 +156,16 @@ class Test(object):
     pass
     """Compute metric of interest"""
 
+  # Compute Average Rate of Change
   def arc(self,data):
+
     avg = 0
     self.val = {}
+    idt = (self.ts.t[-1]-self.ts.t[0])**-1
+
     for h in self.ts.j.hosts.keys():
-      self.val[h] = (data[h][0][-1]-data[h][0][0])*(self.ts.t[-1]-self.ts.t[0])**-1
-      avg += (data[h][0][-1]-data[h][0][0])*(self.ts.t[-1]-self.ts.t[0])**-1
+      self.val[h] = (data[h][0][-1]-data[h][0][0])*idt
+      avg += self.val[h]
 
     return avg/self.ts.numhosts
 

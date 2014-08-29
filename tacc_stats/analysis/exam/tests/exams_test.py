@@ -5,6 +5,20 @@ import tacc_stats.analysis.exam as exams
 ### Test exams
 filelist = [os.path.join(os.path.dirname(os.path.abspath(__file__)),'1835740_ref')] * 3
 
+#### Maximum Packet Rate Test
+def packetrate_test():
+    print("PacketRate Test")
+    pr_test = exams.PacketRate(processes=1,threshold=0)
+    pr_test.run(filelist)
+    assert len(pr_test.failed()) == 1
+
+#### Mean Packet Size Test
+def packetsize_test():
+    print("PacketSize Test")
+    pr_test = exams.PacketSize(processes=1,threshold=1.0e3)
+    pr_test.run(filelist)
+    assert len(pr_test.failed()) == 1
+
 #### Max Memory Usage Test
 def memusage_test():
     print("MemUsage Test")
