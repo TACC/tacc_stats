@@ -12,19 +12,25 @@ def search(kwargs):
     jobs_list = Job.objects.filter(**kwargs)
 
     data = {}
+    strfmt = '{0:10} {1:10} {2:10} {3:20} {4:10} {5:20}'
+    print strfmt.format('id', 'date','user','exe', 'sus',kwargs)
     for job in jobs_list:
-        print job.user,job.run_time/3600.*job.nodes
-        if job.user in data:
+        
+        print strfmt.format(str(job.id),str(job.date),str(job.user),str(job.exe),'{0:.2f}'.format(16*job.run_time/3600.*job.nodes),'{0:.2f}'.format(job.packetrate))+'{0:.2f}'.format(job.packetsize)
 
+    """
+        if job.user in data:
             data[job.user] += job.run_time/3600.*job.nodes*16
         else:
             data[job.user] = job.run_time/3600.*job.nodes*16
+
     print '-------------------------'
     for x,v in data.iteritems():
         print x,v
+    """
 
-
-fields = {'exe__icontains' : 'release'}
+fields = {'packetrate__gte' : 1.0e6}#, 
+#          'packetsize__lte' : 64*2**10}
 
 
 search(fields)

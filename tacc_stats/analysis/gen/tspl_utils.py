@@ -7,10 +7,12 @@ VERBOSE=True
 
 # Check a TSPickleLoader object to see if its job has a minimum run time and has
 # its wayness in a list
-def checkjob(ts, minlen, way, skip_queues=[]):
+def checkjob(ts, minlen, minhosts, way, skip_queues=[], ignore_status=[]):
   if ts.t[len(ts.t)-1] < minlen:
     if VERBOSE: print ts.j.id + ': %(time)8.3f' % {'time' : ts.t[len(ts.t)-1]/3600} + ' hours'
     return False
+  if ts.numhosts < minhosts:
+    if VERBOSE: print ts.j.id + ': too few hosts, job has ' +ts.numhosts +' < minhosts' +minhosts
   elif getattr(way, '__iter__', False):
     if ts.wayness not in way:
       if VERBOSE: print ts.j.id + ': skipping ' + str(ts.wayness) + '-way'
@@ -21,6 +23,10 @@ def checkjob(ts, minlen, way, skip_queues=[]):
   elif (len(skip_queues) > 0) and (ts.queue in skip_queues):
     if VERBOSE: print ts.j.id + ' skipping queue: ' + ts.queue
     return False
+  elif (len(ignore_status) > 0) and (ts.status in ignore_status):
+    if VERBOSE: print ts.j.id + ' ingored status: ' + ts.status
+    return False
+
   return True
 
 

@@ -31,6 +31,8 @@ class Job(models.Model):
     idle = models.FloatField(null=True)
     cat = models.FloatField(null=True)
     mem = models.FloatField(null=True)
+    packetrate = models.FloatField(null=True)
+    packetsize = models.FloatField(null=True)
 
     def __unicode__(self):
         return str(self.id)

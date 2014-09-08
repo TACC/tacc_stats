@@ -48,11 +48,16 @@ def update(date,rerun=False):
                 if rerun:
                     if Job.objects.filter(id = pickle_file).exists():
                         job = Job.objects.filter(id = pickle_file).delete()
-            
+                else:
+                    if Job.objects.filter(id = pickle_file).exists():
+                        continue
+
                 obj,created = Job.objects.get_or_create(id = pickle_file)
+
             except: 
                 print pickle_file,"doesn't look like a pickled job"
                 continue
+
             if not created: 
                 if len(obj.host_set.all()) > 0: 
                     continue 

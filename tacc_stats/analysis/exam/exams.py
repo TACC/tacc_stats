@@ -2,6 +2,7 @@ from __future__ import print_function
 import os,sys
 import abc
 import operator,traceback
+import cPickle as pickle
 import multiprocessing
 from datetime import datetime,timedelta
 from tacc_stats.analysis.gen import tspl,tspl_utils
@@ -35,15 +36,14 @@ class Test(object):
     self.aggregate=kwargs.get('aggregate',True)
     self.min_time=kwargs.get('min_time',3600)
     self.min_hosts=kwargs.get('min_hosts',1)    
-    self.ignore_qs=kwargs.get('ignore_qs',['gpu','gpudev','vis',
-                                           'visdev','development'])
+    self.ignore_qs=kwargs.get('ignore_qs',['gpu','gpudev','vis','visdev','development'])
     self.waynesses=kwargs.get('waynesses',[x+1 for x in range(32)])
     self.ignore_status=kwargs.get('ignore_status',[])
+
     manager=multiprocessing.Manager()
     self.results=manager.dict()
 
   def setup(self,job_path,job_data=None):
-    self.metric = float("nan")
     try:
       if self.aggregate:
         self.ts=tspl.TSPLSum(job_path,self.k1,self.k2,job_data=job_data)
@@ -55,14 +55,12 @@ class Test(object):
       print('End of file found reading: ' + job_path)
       return False
 
-    if self.ts.status in self.ignore_status: return False
-    if not tspl_utils.checkjob(self.ts,self.min_time,
-                               self.waynesses,skip_queues=self.ignore_qs):
-      return False
-    elif self.ts.numhosts < self.min_hosts:
-      return False
-    else:
-      return True
+    return tspl_utils.checkjob(self.ts,
+                               self.min_time,
+                               self.min_hosts,
+                               self.waynesses,
+                               skip_queues=self.ignore_qs,
+                               ignore_status=self.ignore_status)
 
   def run(self,filelist,**kwargs):
     if not filelist: 
@@ -170,6 +168,13 @@ class Test(object):
     return avg/self.ts.numhosts
 
   def test(self,job_path,job_data=None):
+    
+    with open(job_path) as fd:
+      try:
+        job_data = pickle.load(fd)
+      except EOFError as e:
+        raise TSPLException('End of file found for: ' + job_path)
+
     # Setup job data and filter out unwanted jobs
     if not self.setup(job_path,job_data=job_data): return
 

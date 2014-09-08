@@ -37,5 +37,11 @@ for root,dirnames,filenames in os.walk(cfg.pickles_dir):
         mem_test = exam.MemUsage(threshold=30,processes=1)
         views.update_test_field(directory,mem_test,'mem',rerun=False)   
 
+        pr_test = exam.PacketRate(threshold=10,processes=1,ignore_status=['FAILED,CANCELLED'])
+        views.update_test_field(directory,pr_test,'packetrate',rerun=False)   
+
+        ps_test = exam.PacketSize(threshold=10,processes=1,ignore_status=['FAILED,CANCELLED'])
+        views.update_test_field(directory,ps_test,'packetsize',rerun=False)   
+
         
     break

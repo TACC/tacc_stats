@@ -1,5 +1,5 @@
 from exams import Test
-import numpy,math
+import numpy
 
 class PacketRate(Test):
     k1=['ib_sw','ib_sw',

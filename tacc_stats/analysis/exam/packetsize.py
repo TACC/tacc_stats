@@ -1,5 +1,4 @@
 from exams import Test
-import numpy,math
 
 class PacketSize(Test):
   k1=['ib_sw','ib_sw',

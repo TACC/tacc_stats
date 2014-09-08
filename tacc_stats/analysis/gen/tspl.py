@@ -47,22 +47,6 @@ class TSPLBase:
     except:
       raise TSPLException('Something is funny with file' + file )
     
-    """
-    try:
-      self.wayness=int(re.findall('\d+',self.j.acct['granted_pe'])[0])
-    except AttributeError:
-      raise TSPLException("Pickle file broken: " + file)
-    except KeyError:
-      try:
-        self.wayness=self.j.acct['cores']/self.j.acct['nodes']
-      except ZeroDivisionError:
-        if VERBOSE: print "Read zero nodes, assuming 16 way for job " + str(self.j.id)
-        self.wayness=16
-      except TypeError:
-        raise TSPLException('Something is funny with job ' +str(self.j.id) +
-                            ' ' + str(self.j.acct['cores']) + ' ' +
-                            str(self.j.acct['nodes']))
-    """
     try:
       self.queue=self.j.acct['queue']
     except KeyError:
