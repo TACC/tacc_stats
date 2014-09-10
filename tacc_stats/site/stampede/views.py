@@ -206,76 +206,48 @@ def dates(request):
 
     date_list = month_dict
     field = {}
-    # Computed Metrics
-    """
-    completed_list = Job.objects.filter(run_time__gte = 3600,date__year = 2014).exclude(status__in=['CANCELLED','FAILED'])
-    
-    field['cpi_thresh'] = 0.75
-    field['cpi_job_list']  = completed_list.exclude(Q(cpi = float('nan')) | Q(cpi = None) ).filter(cpi__gte = field['cpi_thresh'])
-    field['cpi_per'] = 100*len(field['cpi_job_list'])/float(len(completed_list))
-    """
+
     field['date_list'] = sorted(date_list.iteritems())
-    return render_to_response("stampede/dates.html", field)
+    return render_to_response("stampede/search.html", field)
 
 def search(request):
 
-    if 'q' in request.GET:
-        q = request.GET['q']
+    if 'jobid' in request.GET:
         try:
-            job = Job.objects.get(id = q)
+            job = Job.objects.get(id = request.GET['jobid'])
             return HttpResponseRedirect("/stampede/job/"+str(job.id)+"/")
         except: pass
+    try:
+        fields = request.GET.dict()
+        new_fields = {k:v for k,v in fields.items() if v}
+        fields = new_fields
 
-    if 'u' in request.GET:
-        u = request.GET['u']
-        try:
-            return index(request, uid = u)
-        except: pass
+        if 'opt_field0' in fields.keys() and 'value0' in fields.keys():
+            fields[fields['opt_field0']] = fields['value0']
+            del fields['opt_field0'], fields['value0']
+        if 'opt_field1' in fields.keys() and 'value1' in fields.keys():
+            fields[fields['opt_field1']] = fields['value1']
+            del fields['opt_field1'], fields['value1']
 
-    if 'n' in request.GET:
-        user = request.GET['n']
-        try:
-            return index(request, user = user)
-        except: pass
 
-    if 'p' in request.GET:
-        project = request.GET['p']
-        try:
-            return index(request, project = project)
-        except: pass
+        print 'search', fields
+        return index(request, **fields)
+    except: pass
 
-    if 'x' in request.GET:
-        x = request.GET['x']
-        try:
-            return index(request, exe = x)
-        except: pass
+    return render(request, 'stampede/search.html', {'error' : True})
 
-    return render(request, 'stampede/dates.html', {'error' : True})
-
-def index(request, date = None, uid = None, project = None, user = None, exe = None, report=None):
-    
-    field = {}
+def index(request, **field):
+    print 'index',field
     name = ''
-    if date:
-        name+=date+'-'
-        field['date'] = date
-    if uid:
-        name+=uid+'-'
-        field['uid'] = uid
-    if user:
-        name+=user+'-'
-        field['user'] = user
-    if project:
-        name+=project+'-'
-        field['project'] = project
-    if exe:
-        name+=exe+'-'
-        field['exe__icontains'] = exe
+    for key, val in field.iteritems():
+        name += val + '-'
 
-    field['run_time__gte'] = 60 
-
+    field['run_time__gte'] = 60
     job_list = Job.objects.filter(**field).order_by('-id')
 
+    field['name'] = name + 'hist'
+    field['histograms'] = hist_summary(job_list)
+    
     field['job_list'] = job_list
     field['nj'] = len(job_list)
 
@@ -295,11 +267,7 @@ def index(request, date = None, uid = None, project = None, user = None, exe = N
     field['cpi_job_list'] = list_to_dict(field['cpi_job_list'],'cpi')
     field['mem_job_list'] = list_to_dict(field['mem_job_list'],'mem')
 
-    if report: 
-        field['report'] = report 
-        field['name'] = name 
-        return render_to_pdf("stampede/index.html", field)
-    else:  return render_to_response("stampede/index.html", field)
+    return render_to_response("stampede/index.html", field)
 
 def list_to_dict(job_list,metric):
     job_dict={}
@@ -307,30 +275,9 @@ def list_to_dict(job_list,metric):
         job_dict.setdefault(job.user,[]).append((job.id,round(job.__dict__[metric],3)))
     return job_dict
     
+def hist_summary(job_list):
 
-def hist_summary(request, date = None, uid = None, project = None, user = None, exe = None, report = None):
-
-    field = {}
-    name = ''
-    if date:
-        field['date'] = date
-        name+=date+'-'
-    if uid:
-        field['uid'] = uid
-        name+=uid+'-'
-    if user:
-        field['user'] = user
-        name+=user+'-'
-    if project:
-        field['project'] = project
-        name+=project+'-'
-    if exe:
-        field['exe__icontains'] = exe
-        name+=exe+'-'
-
-    field['run_time__gte'] = 60 
-
-    job_list = Job.objects.filter(**field).exclude(status__in=['CANCELLED','FAILED'])
+    job_list = job_list.exclude(status__in=['CANCELLED','FAILED'])
     fig = Figure(figsize=(16,6))
 
     # Run times
@@ -377,14 +324,17 @@ def hist_summary(request, date = None, uid = None, project = None, user = None, 
     fig.subplots_adjust(hspace=0.5)      
     canvas = FigureCanvas(fig)
     
-    if report:
-        response = HttpResponse(content_type='image/pdf')
-        response['Content-Disposition'] = "attachment; filename="+name+"hist.pdf"
-        fig.savefig(response, format='pdf')
-    else:
-        response = HttpResponse(content_type='image/png')
-        response['Content-Disposition'] = "attachment; filename="+name+"hist.png"
-        fig.savefig(response, format='png')
+    import StringIO,base64,urllib
+    imgdata = StringIO.StringIO()
+    fig.savefig(imgdata, format='png')
+    imgdata.seek(0)
+    response = "data:image/png;base64,%s" % base64.b64encode(imgdata.buf)
+    
+    """
+    response = HttpResponse(content_type='data:image/png;base64')
+    response['Content-Disposition'] = "attachment; filename="+name+"hist.png"
+    fig.savefig(response, format='png')
+    """
 
     return response
 
@@ -495,26 +445,3 @@ def type_detail(request, pk, type_name):
 
     return render_to_response("stampede/type_detail.html",{"type_name" : type_name, "jobid" : pk, "stats_data" : stats, "schema" : schema})
 
-"""
-from django.template.loader import get_template
-from django.template import Context
-import ho.pisa as pisa
-import cStringIO as StringIO
-import cgi
-
-def render_to_pdf(template_src, context_dict):
-    template = get_template(template_src)
-    context = Context(context_dict)
-    html  = template.render(context)
-    
-    result = StringIO.StringIO()
-    
-    pdf = pisa.pisaDocument(StringIO.StringIO(html.encode("UTF-8")), dest=result)
-    
-    response = HttpResponse(result.getvalue(), \
-                                mimetype='application/pdf',)
-    
-    response['Content-Disposition'] = "attachment; filename="+context_dict['name']+"report.pdf"
-
-    return response
-"""
