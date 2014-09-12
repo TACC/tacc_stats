@@ -20,28 +20,19 @@ for root,dirnames,filenames in os.walk(cfg.pickles_dir):
         if max(date.date(),start.date()) > min(date.date(),end.date()): continue
         print 'Run update for',date.date()
 
-        views.update(directory,rerun=False)        
+        #views.update(directory,rerun=False)        
+
+        aud = exam.Auditor(processes=1)
         
-        cpi_test = exam.HighCPI(threshold=1.0,processes=1,ignore_status=['FAILED,CANCELLED'])
-        views.update_test_field(directory,cpi_test,'cpi',rerun=False)
+        aud.stage(exam.HighCPI,threshold=1.0,ignore_status=['FAILED,CANCELLED'])
+        aud.stage(exam.MemBw,threshold=0.5,ignore_status=['FAILED,CANCELLED'])
+        aud.stage(exam.Catastrophe,threshold=0.001)
+        aud.stage(exam.MemUsage,threshold=30)
+        aud.stage(exam.PacketRate,threshold=1e6,ignore_status=['FAILED,CANCELLED'])
+        aud.stage(exam.PacketSize,threshold=64,ignore_status=['FAILED,CANCELLED'])
+        aud.stage(exam.Idle,threshold=0.999,min_hosts=2,
+                  ignore_status=['FAILED,CANCELLED'])        
 
-        mbw_test = exam.MemBw(threshold=0.5,processes=1,ignore_status=['FAILED,CANCELLED'])               
-        views.update_test_field(directory,mbw_test,'mbw',rerun=False)   
-
-        idle_test = exam.Idle(threshold=0.999,processes=1,min_hosts=2,ignore_status=['FAILED,CANCELLED'])
-        views.update_test_field(directory,idle_test,'idle',rerun=False)   
-        
-        cat_test = exam.Catastrophe(threshold=0.001,processes=1)
-        views.update_test_field(directory,cat_test,'cat',rerun=False)   
-
-        mem_test = exam.MemUsage(threshold=30,processes=1)
-        views.update_test_field(directory,mem_test,'mem',rerun=False)   
-
-        pr_test = exam.PacketRate(threshold=10,processes=1,ignore_status=['FAILED,CANCELLED'])
-        views.update_test_field(directory,pr_test,'packetrate',rerun=False)   
-
-        ps_test = exam.PacketSize(threshold=10,processes=1,ignore_status=['FAILED,CANCELLED'])
-        views.update_test_field(directory,ps_test,'packetsize',rerun=False)   
-
+        views.update_test_field(directory,aud)
         
     break

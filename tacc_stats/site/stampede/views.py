@@ -122,28 +122,35 @@ def update(date,rerun=False):
                 print date
             print "Percentage Completed =",100*float(ctr)/num_files
 
-def update_test_field(date,test,metric,rerun=False):
-    print "Run",test.__class__.__name__,"test for",date
-    
-    kwargs = { 'date' : date, 
-               'run_time__gte' : test.min_time,
-               'nodes__gte' : test.min_hosts
-               }
-    
-    jobs_list = Job.objects.filter(**kwargs).exclude(Q(queue__in=test.ignore_qs) | Q(status__in = test.ignore_status))
+def update_test_field(date,auditor,rerun=False):
 
-    if not rerun:
-        jobs_list = jobs_list.filter(Q(**{metric : None}) | Q(**{metric : float('nan')}))
+    print 'Run the following tests for:',date
+    for name, test in auditor.measures.iteritems():
+        print name
+        
+    jobs_list = Job.objects.filter(date = date)
 
     paths = []
     for job in jobs_list:
-        paths.append(os.path.join(cfg.pickles_dir,job.date.strftime('%Y-%m-%d'),str(job.id)))
-
+        paths.append(os.path.join(cfg.pickles_dir,
+                                  job.date.strftime('%Y-%m-%d'),
+                                  str(job.id)))
     print '# Jobs to be tested:',len(jobs_list)
-    test.run(paths)
-    for jid in test.results.keys(): 
-        jobs_list.filter(id = jid).update(**{metric : test.results[jid]['metric']})
 
+    auditor.run(paths)
+
+    schema_map = {'HighCPI' : 'cpi', 
+                  'MemBw' : 'mbw', 
+                  'Catastrophe' : 'cat', 
+                  'MemUsage' : 'mem', 
+                  'PacketRate' : 'packetrate', 
+                  'PacketSize' : 'packetsize',
+                  'Idle' : 'idle'}
+
+    for name, results in auditor.metrics.iteritems():
+        for jobid in results.keys():
+            jobs_list.filter(id = jobid).update(**{schema_map[name] : 
+                                                   results[jobid]})
 
 def sys_plot(request, pk):
 

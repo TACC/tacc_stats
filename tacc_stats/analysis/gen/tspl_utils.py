@@ -3,31 +3,28 @@ import tspl
 from numpy import zeros,array
 from scipy import interpolate
 
-VERBOSE=True
+VERBOSE = False
 
 # Check a TSPickleLoader object to see if its job has a minimum run time and has
 # its wayness in a list
-def checkjob(ts, minlen, minhosts, way, skip_queues=[], ignore_status=[]):
-  if ts.t[len(ts.t)-1] < minlen:
-    if VERBOSE: print ts.j.id + ': %(time)8.3f' % {'time' : ts.t[len(ts.t)-1]/3600} + ' hours'
+def checkjob(ts, minlen, minhosts, way=[], skip_queues=[], ignore_status=[]):
+  if ts.t[-1] < minlen:
+    if VERBOSE: print ts.j.id + ': too short, %(time)8.3f' % {'time' : ts.t[-1]/3600} + ' hours'
     return False
-  if ts.numhosts < minhosts:
-    if VERBOSE: print ts.j.id + ': too few hosts, job has ' +ts.numhosts +' < minhosts' +minhosts
-  elif getattr(way, '__iter__', False):
-    if ts.wayness not in way:
-      if VERBOSE: print ts.j.id + ': skipping ' + str(ts.wayness) + '-way'
-      return False
-  elif ts.wayness != way:
+  elif ts.numhosts < minhosts:
+    if VERBOSE: print ts.j.id + ': too few hosts, job has ' +str(ts.numhosts) +' < minhosts' + str(minhosts)
+    return False
+  elif ts.wayness not in way:
     if VERBOSE: print ts.j.id + ': skipping ' + str(ts.wayness) + '-way'
     return False
-  elif (len(skip_queues) > 0) and (ts.queue in skip_queues):
+  elif ts.queue in skip_queues:
     if VERBOSE: print ts.j.id + ' skipping queue: ' + ts.queue
     return False
-  elif (len(ignore_status) > 0) and (ts.status in ignore_status):
+  elif ts.status in ignore_status:
     if VERBOSE: print ts.j.id + ' ingored status: ' + ts.status
     return False
-
-  return True
+  else:
+    return True
 
 
 def global_interp_data(ts,samples):

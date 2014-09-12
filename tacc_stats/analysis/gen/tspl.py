@@ -146,7 +146,7 @@ class TSPLBase:
 
     self.title='ID: %(ID)s, u: %(u)s, q: %(queue)s, N: %(name)s, '\
                 'D: %(date)s, NH: %(nh)d' % \
-           { 'ID' : self.j.id,'u': 'userxxx', 'queue': self.queue,
+           { 'ID' : self.j.id,'u': self.owner, 'queue': self.queue,
              'name': tspl_utils.string_shorten(self.j.acct['name'],15),
              'nh' : self.numhosts,
              'date': self.end_date }
