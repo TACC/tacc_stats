@@ -1,6 +1,7 @@
-from django.contrib.auth.models import User, Group
+from django.contrib.auth.models import User, Group, Permission
 from rest_framework import viewsets, generics
 from rest_framework.renderers import JSONRenderer
+from rest_framework.permissions import IsAuthenticatedOrReadOnly
 from serializers import UserSerializer, GroupSerializer, JobSerializer
 from stampede.models import Job
 from django.views.decorators.csrf import csrf_exempt
@@ -30,21 +31,26 @@ class GroupViewSet(viewsets.ModelViewSet):
       queryset = Group.objects.all()
       serializer_class = GroupSerializer
 
-#class JobsViewSet(viewsets.ModelViewSet):
-#   """
-#   API endpoint that returns jobs run by a user
-#   """
-#   queryset = Job.objects.all()
-#   serializer_class = JobSerializer
+class JobsViewSet(viewsets.ModelViewSet):
+   """
+   API endpoint that returns jobs run by a user
+   """
+   queryset = Job.objects.all()
+   serializer_class = JobSerializer
 
-class UserJobs(generics.ListAPIView):
+class UserJobsViewSet(viewsets.ModelViewSet):
       """
       API endpoint that returns jobs run by a user
       """
       serializer_class = JobSerializer
+      permission_classes = (IsAuthenticatedOrReadOnly,)
       def get_queryset(self):
-           user = self.kwargs['user']
-           return Job.objects.filter(user=user) 
+          # user = self.kwargs['user']
+           queryset = Job.objects.all()
+           user = self.request.QUERY_PARAMS.get('user', None)
+           if user is not None:
+                queryset = queryset.filter(user=user)
+           return queryset
      
 #@csrf_exempt
 #def UserJobs(request, user):
