@@ -10,8 +10,8 @@ router = routers.DefaultRouter()
 router.register(r'users', apiviews.UserViewSet)
 router.register(r'groups',apiviews.GroupViewSet)
 #router.register(r'jobs(?P<user>[a-zA-Z0-9_]+)/$',apiviews.UserJobs.as_view(),'job-list')
-router.register(r'userjobs',apiviews.UserJobsViewSet,'job-list')
-router.register(r'jobs',apiviews.JobsViewSet)
+router.register(r'jobs',apiviews.JobsViewSet,'job-list')
+#router.register(r'jobs',apiviews.JobsViewSet)
 
 urlpatterns = patterns('',
     # Examples:
@@ -23,7 +23,7 @@ urlpatterns = patterns('',
     # Uncomment the admin/doc line below to enable admin documentation:
     # url(r'^docs/admin/', include('django.contrib.admindocs.urls')),
  
-     url(r'^api-docs/', include('rest_framework_swagger.urls')),
+     url(r'^docs/', include('rest_framework_swagger.urls')),
 
     # Uncomment the next line to enable the admin:
     url(r'^lonestar/', include('lonestar.urls', namespace="lonestar"),name='lonestar'),
