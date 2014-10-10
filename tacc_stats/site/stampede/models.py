@@ -33,7 +33,10 @@ class Job(models.Model):
     mem = models.FloatField(null=True)
     packetrate = models.FloatField(null=True)
     packetsize = models.FloatField(null=True)
-
+    GigEBW = models.FloatField(null=True)
+    flops = models.FloatField(null=True)
+    VecPercent = models.FloatField(null=True)
+    
     def __unicode__(self):
         return str(self.id)
 
@@ -48,6 +51,9 @@ class Job(models.Model):
 
         return ret_val
 
+    def sus(self):
+        return self.nodes * self.run_time * 0.0002777777777777778
+
 class Host(models.Model):
     name = models.CharField(max_length=128)
     jobs = models.ManyToManyField(Job)
@@ -60,3 +66,12 @@ class JobForm(ModelForm):
     class Meta:
         model = Job
         fields = ['id']
+"""
+class TestInfo(models.Model):
+    test_name = models.CharField(max_length=128)
+    field_name = models.CharField(max_length=128)
+    threshold = models.FloatField(null=True)
+
+    # Computed Metric .op. Threshold
+    comparator = models.CharField(max_length=2)
+"""

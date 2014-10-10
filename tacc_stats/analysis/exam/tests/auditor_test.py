@@ -14,7 +14,10 @@ def auditors_test():
     aud.stage(exams.PacketSize,threshold=1.0e3)
 
     aud.run(filelist)
-    aud.test()
+
+    aud.test(exams.MemUsage,threshold=1000)
+    aud.test(exams.PacketRate,threshold=0)
+    aud.test(exams.PacketSize,threshold=1.0e3)
     
     assert (aud.results['MemUsage'].values().count(True)) ==  1
     assert (aud.results['PacketRate'].values().count(True)) ==  1

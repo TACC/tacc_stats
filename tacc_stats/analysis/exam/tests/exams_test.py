@@ -5,13 +5,42 @@ import tacc_stats.analysis.exam as exams
 ### Test exams
 filelist = [os.path.join(os.path.dirname(os.path.abspath(__file__)),'1835740_ref')] * 3
 
+#### VecPercent
+def vecpercent_test():
+    print("VecPercent Test")
+    aud = exams.Auditor(processes=1)
+    aud.stage(exams.VecPercent)
+    aud.run(filelist)
+    aud.test(exams.VecPercent,threshold=30)
+    assert (aud.results['VecPercent'].values().count(True)) == 1
+
+#### GigE bandwidth
+def gige_bw_test():
+    print("GigEBW Test")
+    aud = exams.Auditor(processes=1)
+    print("aggregated?",exams.GigEBW.aggregate)
+    aud.stage(exams.GigEBW)
+    aud.run(filelist)
+    aud.test(exams.GigEBW,threshold=0)
+    assert (aud.results['GigEBW'].values().count(True)) == 1
+
+#### Maximum Packet Rate Test
+"""
+def gigepacketrate_test():
+    print("GigEPacketRate Test")
+    aud = exams.Auditor(processes=1)
+    aud.stage(exams.GigEPacketRate,threshold=0)
+    aud.run(filelist)
+    aud.test()
+    assert (aud.results['GigEPacketRate'].values().count(True)) == 1
+"""
 #### Maximum Packet Rate Test
 def packetrate_test():
     print("PacketRate Test")
     aud = exams.Auditor(processes=1)
-    aud.stage(exams.PacketRate,threshold=0)
+    aud.stage(exams.PacketRate)
     aud.run(filelist)
-    aud.test()
+    aud.test(exams.PacketRate,threshold=0)
     assert (aud.results['PacketRate'].values().count(True)) == 1
 
 #### Mean Packet Size Test
@@ -20,52 +49,52 @@ def packetsize_test():
     aud = exams.Auditor(processes=1)
     aud.stage(exams.PacketSize,threshold=10000)
     aud.run(filelist)
-    aud.test()
+    aud.test(exams.PacketSize,threshold=10000)
     assert (aud.results['PacketSize'].values().count(True)) == 1
 
 #### Max Memory Usage Test
 def memusage_test():
     print("MemUsage Test")
     aud = exams.Auditor(processes=1)
-    aud.stage(exams.MemUsage,threshold=100)
+    aud.stage(exams.MemUsage)
     aud.run(filelist)
-    aud.test()
+    aud.test(exams.MemUsage,threshold=100)
     assert (aud.results['MemUsage'].values().count(True)) == 1
 
 #### CPI Test
 def cpi_test():
     print("HighCPI Test")
     aud = exams.Auditor(processes=1)
-    aud.stage(exams.HighCPI,threshold=0.01)
+    aud.stage(exams.HighCPI)
     aud.run(filelist)
-    aud.test()
+    aud.test(exams.HighCPI,threshold=0.01)
     assert (aud.results['HighCPI'].values().count(True)) == 1
 
 #### Node Imbalance
 def imb_test():
     print("Imbalance Test")
     aud = exams.Auditor(processes=1)
-    aud.stage(exams.Imbalance,threshold=0.01)
+    aud.stage(exams.Imbalance)
     aud.run(filelist)
-    aud.test()
+    aud.test(exams.Imbalance,threshold=0.01)
     assert (aud.results['Imbalance'].values().count(True)) == 1
 
 #### Idle
 def idle_test():
     print("Idle Test")
     aud = exams.Auditor(processes=1)
-    aud.stage(exams.Idle,threshold=0.01)
+    aud.stage(exams.Idle)
     aud.run(filelist)
-    aud.test()
+    aud.test(exams.Idle,threshold=0.01)
     assert (aud.results['Idle'].values().count(True)) == 1
 
 #### Catastrophic
 def cat_test():
     print("Catastrophe Test")
     aud = exams.Auditor(processes=1)
-    aud.stage(exams.Catastrophe,threshold=10)
+    aud.stage(exams.Catastrophe)
     aud.run(filelist)
-    aud.test()
+    aud.test(exams.Catastrophe,threshold=10)
     assert (aud.results['Catastrophe'].values().count(True)) == 1
 
 #### Low FLOPS test
@@ -74,7 +103,7 @@ def flops_test():
     aud = exams.Auditor(processes=1)
     aud.stage(exams.LowFLOPS,threshold=10e6)
     aud.run(filelist)
-    aud.test()
+    aud.test(exams.LowFLOPS,threshold=10e6)
     assert (aud.results['LowFLOPS'].values().count(True)) == 1
 
 
@@ -84,7 +113,7 @@ def mbw_test():
     aud = exams.Auditor(processes=1)
     aud.stage(exams.MemBw,threshold=0.1)
     aud.run(filelist)
-    aud.test()
+    aud.test(exams.MemBw,threshold=0.1)
     assert (aud.results['MemBw'].values().count(True)) == 1
 
 #### Metadata Rate
@@ -93,7 +122,7 @@ def mdr_test():
     aud = exams.Auditor(processes=1)
     aud.stage(exams.MetaDataRate,threshold=0.1)
     aud.run(filelist)
-    aud.test()
+    aud.test(exams.MetaDataRate,threshold=0.1)
     assert (aud.results['MetaDataRate'].values().count(True)) == 1
 
 

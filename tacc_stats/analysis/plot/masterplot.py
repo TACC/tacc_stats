@@ -1,5 +1,6 @@
 from plots import Plot
 from matplotlib.figure import Figure
+import numpy 
 
 class MasterPlot(Plot):
   k1={'amd64' :
@@ -9,7 +10,7 @@ class MasterPlot(Plot):
                  'lnet', 'lnet', 'ib_ext','ib_ext','cpu','mem','mem','mem'],
       'intel_snb' : ['intel_snb_imc', 'intel_snb_imc', 'intel_snb', 
                      'lnet', 'lnet', 'ib_sw','ib_sw','cpu',
-                     'intel_snb', 'intel_snb', 'mem', 'mem','mem'],
+                     'intel_snb', 'intel_snb', 'intel_snb', 'mem', 'mem','mem'],
       }
   
   k2={'amd64':
@@ -20,7 +21,7 @@ class MasterPlot(Plot):
                  'port_recv_data','port_xmit_data','user', 'MemUsed', 'FilePages','Slab'],
       'intel_snb' : ['CAS_READS', 'CAS_WRITES', 'LOAD_L1D_ALL',
                      'rx_bytes','tx_bytes', 'rx_bytes','tx_bytes','user',
-                     'SSE_D_ALL', 'SIMD_D_256', 'MemUsed', 'FilePages','Slab'],
+                     'SSE_DOUBLE_SCALAR', 'SSE_DOUBLE_PACKED', 'SIMD_DOUBLE_256', 'MemUsed', 'FilePages','Slab'],
       }
 
   fname='master'
@@ -55,10 +56,31 @@ class MasterPlot(Plot):
 
     if self.ts.pmc_type == 'intel_snb' :
       # Plot key 1
-      idx0=k2_tmp.index('SSE_D_ALL')
-      idx1=k2_tmp.index('SIMD_D_256')
-      plot(self.fig.add_subplot(6,cols,1*shift),[idx0,idx1],3600.,1e9,
-           ylabel='Total AVX +\nSSE Ginst/s')
+      """
+      idx0=k2_tmp.index('SSE_DOUBLE_SCALAR')
+      idx1=k2_tmp.index('SSE_DOUBLE_PACKED')
+      idx2=k2_tmp.index('SIMD_DOUBLE_256')
+      """
+      ax = self.fig.add_subplot(6,cols,1*shift)
+      schema = self.ts.j.get_schema('intel_snb')
+      for host_name in self.ts.j.hosts.keys():
+        stats = self.ts.j.aggregate_stats('intel_snb',host_names=[host_name])
+        if 'SSE_D_ALL' in schema:
+          flops = stats[0][:,schema['SSE_D_ALL'].index]+4*stats[0][:,schema['SIMD_D_256'].index]
+          
+        if 'SSE_DOUBLE_SCALAR' in schema:
+          flops = stats[0][:,schema['SSE_DOUBLE_SCALAR'].index]+2*stats[0][:,schema['SSE_DOUBLE_PACKED'].index]+4*stats[0][:,schema['SIMD_DOUBLE_256'].index]
+          
+        ax.plot((self.ts.t[:-1]+self.ts.t[1:])/(3600*2.0),
+                (numpy.diff(flops)/numpy.diff(self.ts.t))/1.0e9)
+
+      data = self.ts.j.aggregate_stats('intel_snb')
+      nodes = data[1]
+      data = data[0].astype(float)
+
+      ax.set_ylabel('Dbl GFLOPS')
+      #plot(self.fig.add_subplot(6,cols,1*shift),[idx0,idx1,idx2],3600.,1e9,
+      #     ylabel='Double AVX +\nSSE Ginst/s')
 
       # Plot key 2
       idx0=k2_tmp.index('CAS_READS')

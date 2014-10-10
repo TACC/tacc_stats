@@ -2,37 +2,38 @@ from exams import Test
 import numpy
 from scipy.stats import tmean
 
-class LowFLOPS(Test):
+class VecPercent(Test):
   k1={'amd64' : ['amd64_core','amd64_sock','cpu'],
       'intel_snb' : [ 'intel_snb', 'intel_snb', 'intel_snb']}
   k2={'amd64' : ['SSE_FLOPS', 'DRAM',      'user'],
       'intel_snb' : ['SIMD_D_256','SSE_D_ALL','LOAD_L1D_ALL']}
-
-  peak={'amd64' : [2.3e9*16*2, 24e9, 1.],
-        'intel_snb' : [ 16*2.7e9*2, 16*2.7e9/2.*64., 1.],}
 
   # If metric is less than threshold then flag 
   comp_operator = '<'
   
   def compute_metric(self):
 
-    gfloprate = 0
+    gvecrate = 0
     if self.ts.pmc_type == 'amd64' :
-      gfloprate += self.arc(self.ts.data[0])
+      gvecrate += self.arc(self.ts.data[0])
 
     if self.ts.pmc_type == 'intel_snb':
       schema = self.ts.j.get_schema('intel_snb')
       if 'ERROR' in schema: return
       data = self.ts.j.aggregate_stats('intel_snb')
-
+      nodes = data[1]
+      data = data[0].astype(float)
+      
       try:
-        flops = numpy.diff(data[0][:,schema['SSE_DOUBLE_SCALAR'].index] + 2*data[0][:,schema['SSE_DOUBLE_PACKED'].index] + 4*data[0][:,schema['SIMD_DOUBLE_256'].index])/numpy.diff(self.ts.t)
+        vectorized = 2*data[:,schema['SSE_DOUBLE_PACKED'].index]+4*data[:,schema['SIMD_DOUBLE_256'].index]
+        every = vectorized + data[:,schema['SSE_DOUBLE_SCALAR'].index]
       except: 
-        flops = numpy.diff(data[0][:,schema['SSE_D_ALL'].index] + 4*data[0][:,schema['SIMD_D_256'].index])/numpy.diff(self.ts.t)
+        vectorized = 4*data[:,schema['SIMD_D_256'].index]
+        every = vectorized + data[:,schema['SSE_D_ALL'].index]
 
-      flops = flops/data[1]
+      vecs = numpy.diff(vectorized)/numpy.diff(every)
 
-    self.metric = tmean(flops)/1.0e9
+    self.metric = tmean(vecs)
 
     return
 

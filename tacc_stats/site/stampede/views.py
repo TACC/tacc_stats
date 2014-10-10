@@ -4,8 +4,8 @@ from django.views.generic import DetailView, ListView
 from django.db.models import Q
 
 import os,sys,pwd
-
-from tacc_stats.site.stampede.models import Job, Host, JobForm
+from tacc_stats.analysis import exam
+from tacc_stats.site.stampede.models import Job, Host, TestInfo
 import tacc_stats.cfg as cfg
 
 import tacc_stats.analysis.plot as plots
@@ -27,6 +27,27 @@ from matplotlib.backends.backend_agg import FigureCanvasAgg as FigureCanvas
 from django.core.cache import cache,get_cache 
 import traceback
 
+"""
+def update_test_info():
+    schema_map = {'HighCPI' : ['cpi','>',1.5], 
+                  'MemBw' : ['mbw', '>', 0.0 ],
+                  'Catastrophe' : ['cat', '<',0.001] ,
+                  'MemUsage' : ['mem','>',31], 
+                  'PacketRate' : ['packetrate','>',0], 
+                  'PacketSize' : ['packetsize','>',0],
+                  'Idle' : ['idle','>',0.99],
+                  'LowFLOPS' : ['flops','<',10],
+                  'VecPercent' : ['VecPercent','<',5],
+                  'GigEBW' : ['GigEBW','>',1e7]}
+
+    for name in schema_map:
+        obj = TestInfo(test_name = name, 
+                       field_name = schema_map[name][0], 
+                       comparator = schema_map[name][1], 
+                       threshold = schema_map[name][2])
+    obj.save()
+"""
+
 def update(date,rerun=False):
 
     ld = lariat_utils.LariatData(directory = cfg.lariat_path,
@@ -43,7 +64,7 @@ def update(date,rerun=False):
         print "Number of pickle files in",root,'=',num_files
         for pickle_file in sorted(pickle_files):
             ctr += 1
-            print pickle_file
+            #print pickle_file
             try:
                 if rerun:
                     if Job.objects.filter(id = pickle_file).exists():
@@ -111,7 +132,6 @@ def update(date,rerun=False):
 
                 for host_name in hosts:
                     h = Host(name=host_name)
-                    print host_name
                     h.save()
                     h.jobs.add(obj)
 
@@ -128,7 +148,9 @@ def update_test_field(date,auditor,rerun=False):
     for name, test in auditor.measures.iteritems():
         print name
         
-    jobs_list = Job.objects.filter(date = date)
+    jobs_list = Job.objects.filter(date = date).exclude(run_time__lt = 3600)
+
+    #jobs_list = jobs_list.filter(Q(**{'VecPercent' : None}) | Q(**{'VecPercent' : float('nan')}))
 
     paths = []
     for job in jobs_list:
@@ -138,14 +160,7 @@ def update_test_field(date,auditor,rerun=False):
     print '# Jobs to be tested:',len(jobs_list)
 
     auditor.run(paths)
-
-    schema_map = {'HighCPI' : 'cpi', 
-                  'MemBw' : 'mbw', 
-                  'Catastrophe' : 'cat', 
-                  'MemUsage' : 'mem', 
-                  'PacketRate' : 'packetrate', 
-                  'PacketSize' : 'packetsize',
-                  'Idle' : 'idle'}
+    print 'finished computing metrics'
 
     for name, results in auditor.metrics.iteritems():
         for jobid in results.keys():
@@ -235,7 +250,9 @@ def search(request):
         if 'opt_field1' in fields.keys() and 'value1' in fields.keys():
             fields[fields['opt_field1']] = fields['value1']
             del fields['opt_field1'], fields['value1']
-
+        if 'opt_field2' in fields.keys() and 'value2' in fields.keys():
+            fields[fields['opt_field2']] = fields['value2']
+            del fields['opt_field2'], fields['value2']
 
         print 'search', fields
         return index(request, **fields)
@@ -249,14 +266,18 @@ def index(request, **field):
     for key, val in field.iteritems():
         name += val + '-'
 
-    field['run_time__gte'] = 60
+    import time
+    start = time.time()
+
+    if 'run_time__gte' in field: pass
+    else: field['run_time__gte'] = 60
     job_list = Job.objects.filter(**field).order_by('-id')
 
     field['name'] = name + 'hist'
     field['histograms'] = hist_summary(job_list)
     
     field['job_list'] = job_list
-    field['nj'] = len(job_list)
+    field['nj'] = job_list.count()
 
     # Computed Metrics
     field['cat_job_list']  = job_list.filter(Q(cat__lte = 0.001) | Q(cat__gte = 1000)).exclude(cat = float('nan'))
@@ -265,15 +286,35 @@ def index(request, **field):
     field['idle_job_list'] = completed_list.filter(idle__gte = 0.99)
     field['mem_job_list'] = completed_list.filter(mem__lte = 30, queue = 'largemem')
 
-    field['cpi_thresh'] = 1.0
+    field['cpi_thresh'] = 1.5
     field['cpi_job_list']  = completed_list.exclude(cpi = float('nan')).filter(cpi__gte = field['cpi_thresh'])
-    field['cpi_per'] = 100*len(field['cpi_job_list'])/float(len(completed_list))
+    field['cpi_per'] = 100*field['cpi_job_list'].count()/float(completed_list.count())
+
+    field['gigebw_thresh'] = 2**20
+    field['gigebw_job_list']  = completed_list.exclude(GigEBW = float('nan')).filter(GigEBW__gte = field['gigebw_thresh'])
 
     field['idle_job_list'] = list_to_dict(field['idle_job_list'],'idle')
     field['cat_job_list'] = list_to_dict(field['cat_job_list'],'cat')
     field['cpi_job_list'] = list_to_dict(field['cpi_job_list'],'cpi')
     field['mem_job_list'] = list_to_dict(field['mem_job_list'],'mem')
+    field['gigebw_job_list'] = list_to_dict(field['gigebw_job_list'],'GigEBW')
+    end = time.time()
 
+    print '>>>>>>>>>>>',end-start
+    """
+    from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
+    paginator = Paginator(job_list, 25) # Show 25 contacts per page
+    page = request.GET.get('page')
+    try:
+        jobs = paginator.page(page)
+    except PageNotAnInteger:
+        # If page is not an integer, deliver first page.
+        jobs = paginator.page(1)
+    except EmptyPage:
+        # If page is out of range (e.g. 9999), deliver last page of results.
+        jobs = paginator.page(paginator.num_pages)
+    field['job_list'] = jobs
+    """
     return render_to_response("stampede/index.html", field)
 
 def list_to_dict(job_list,metric):
@@ -303,30 +344,48 @@ def hist_summary(job_list):
     ax.set_xlim((0,max(job_size)+1))
     ax.set_title('Run Sizes for Completed Jobs')
     ax.set_xlabel('# cores')
+    
+    first = 'cpi'
+    second = 'flops'
 
+    tmp = job_list.exclude(Q(**{first : None}) | Q(**{first : float('nan')}) | Q(**{second : None}) | Q(**{second : float('nan')}))
+
+    cpi = []
+    gflops = []
+    
+    for job in tmp: 
+        cpi.append(getattr(job,first))
+        gflops.append(getattr(job,second))
+    print 'f m',np.corrcoef(cpi,gflops)
+    """
+    ax = fig.add_subplot(223)  
+    ax.scatter(cpi,gflops)
+    ax.set_ylim([0,380])
+    ax.set_xlim([min(cpi)-0.1,max(cpi)+0.1])
+    """
     try:
         # CPI
-        job_cpi = np.array(job_list.exclude(Q(**{'cpi' : None}) | Q(**{'cpi' : float('nan')})).values_list('cpi',flat=True))
+        job_cpi = np.array(cpi)
         ax = fig.add_subplot(223)
+        job_cpi = job_cpi[job_cpi<5.0]
         mean_cpi = job_cpi.mean()
-        var_cpi = job_cpi.var()
-        job_cpi = job_cpi[job_cpi<4.0]
+        std_cpi = job_cpi.std()
         ax.hist(job_cpi, max(5, 5*np.log(len(job_list))),log=True)
-        #ax.set_xlim(0,min(job_cpi.max(),4.0))
         ax.set_ylabel('# of jobs')
-        ax.set_title('CPI for Successful Jobs over 1 hr '+r'$\bar{Mean}=$'+'{0:.2f}'.format(mean_cpi)+' '+r'$Var=$' +  '{0:.2f}'.format(var_cpi))
+        ax.set_title('CPI (Jobs > 1 hr) '+r'$\bar{Mean}=$'+'{0:.2f}'.format(mean_cpi)+' '+r'$\pm$' +  '{0:.2f}'.format(std_cpi))
         ax.set_xlabel('CPI')
     except: pass
     try:
         # MBW
-        job_mbw = np.array(job_list.exclude(Q(**{'mbw' : None}) | Q(**{'mbw' : float('nan')})).values_list('mbw',flat=True))
+        job_flops = np.array(gflops)
+        job_flops = job_flops[job_flops<400]
+        mean_flops = job_flops.mean()
+        std_flops = job_flops.std()
         ax = fig.add_subplot(224)        
-        job_mbw = job_mbw[job_mbw < 1.0]
-        ax.hist(job_mbw, max(5, 5*np.log(len(job_list))))
-        #ax.set_xlim(0,job_mbw.max())
+        ax.hist(job_flops, max(5, 5*np.log(len(job_list))),log=True)
         ax.set_ylabel('# of jobs')
-        ax.set_title('MBW for Successful Jobs over 1 hr')
-        ax.set_xlabel('MBW')
+        ax.set_title('GFLOPS/Node (Jobs > 1 hr) '+r'$\bar{Mean}=$'+'{0:.2f}'.format(mean_flops)+' '+r'$\pm$' +  '{0:.2f}'.format(std_flops))
+        ax.set_xlabel('GFLOPS')
     except: pass
     fig.subplots_adjust(hspace=0.5)      
     canvas = FigureCanvas(fig)
@@ -393,6 +452,14 @@ class JobDetailView(DetailView):
         job = context['job']
 
         data = get_data(job.id)
+
+        for test_name, field in schema_map.iteritems():
+            test_type = getattr(sys.modules[exam.__name__],test_name)
+            test = test_type(min_time=0,ignore_qs=[])
+            try:
+                metric = test.test(job.path,data)
+                setattr(job,field,metric)
+            except: continue
 
         type_list = []
         host_list = []
