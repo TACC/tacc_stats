@@ -1,10 +1,10 @@
-from django.contrib.auth.models import User, Group, Permission
-from rest_framework import viewsets, generics
+from django.contrib.auth.models import User, Group
+from rest_framework import viewsets
 from rest_framework.renderers import JSONRenderer
 from rest_framework.permissions import IsAuthenticatedOrReadOnly
 from serializers import UserSerializer, GroupSerializer, JobSerializer
 from stampede.models import Job
-from django.views.decorators.csrf import csrf_exempt
+from lonestar.models import LS4Job
 from django.http import HttpResponse
 
 class JSONResponse(HttpResponse):
@@ -32,26 +32,22 @@ class GroupViewSet(viewsets.ModelViewSet):
       serializer_class = GroupSerializer
 
 
-class JobsViewSet(viewsets.ModelViewSet):
-      """
-      API endpoint that returns all jobs or run by a user
-      """
-      serializer_class = JobSerializer
-      permission_classes = (IsAuthenticatedOrReadOnly,)
-      def get_queryset(self):
-           queryset = Job.objects.all()
+class JobsView(object):
+     def apply_filter(this,resource_job):
+           request = this.request
+           queryset = resource_job.objects.all()
            # check for any url query parameters and filter accordingly
 
-           user = self.request.QUERY_PARAMS.get('user', None)
-           job_id = self.request.QUERY_PARAMS.get('job_id', None)
-           project_id = self.request.QUERY_PARAMS.get('project_id', None)
-           uid = self.request.QUERY_PARAMS.get('uid', None)
-           start_time = self.request.QUERY_PARAMS.get('start_time', None)
-           end_time = self.request.QUERY_PARAMS.get('end_time', None)
-           run_time = self.request.QUERY_PARAMS.get('run_time', None)
-           queue_time = self.request.QUERY_PARAMS.get('queue_time', None)
-           queue = self.request.QUERY_PARAMS.get('queue', None)
-           status = self.request.QUERY_PARAMS.get('status', None)
+           user = request.QUERY_PARAMS.get('user', None)
+           job_id = request.QUERY_PARAMS.get('job_id', None)
+           project_id = request.QUERY_PARAMS.get('project_id', None)
+           uid = request.QUERY_PARAMS.get('uid', None)
+           start_time = request.QUERY_PARAMS.get('start_time', None)
+           end_time = request.QUERY_PARAMS.get('end_time', None)
+           run_time = request.QUERY_PARAMS.get('run_time', None)
+           queue_time = request.QUERY_PARAMS.get('queue_time', None)
+           queue = request.QUERY_PARAMS.get('queue', None)
+           status = request.QUERY_PARAMS.get('status', None)
            if user is not None:
                 queryset = queryset.filter(user=user)
            if job_id is not None:
@@ -59,19 +55,29 @@ class JobsViewSet(viewsets.ModelViewSet):
            if project_id is not None:
                 queryset = queryset.filter(project=project_id)
            if uid is not None:
-                queryset = queryset.filter(uid=uid) 
+                queryset = queryset.filter(uid=uid)
            if queue is not None:
                 queryset = queryset.filter(queue=queue)
            if status is not None:
                 queryset = queryset.filter(status=status)
            return queryset
-     
-#@csrf_exempt
-#def UserJobs(request, user):
-#     """
-#     Comment
-#     """  
-#     jobs = Job.objects.filter(user=user)
-#     serializer = JobSerializer(jobs,many=True)
-#     return JSONResponse(serializer.data)
 
+class StampedeJobsViewSet(viewsets.ModelViewSet,JobsView):
+      """
+      API endpoint that returns all jobs or run by a user
+      """
+      serializer_class = JobSerializer
+      permission_classes = (IsAuthenticatedOrReadOnly,)
+
+      def get_queryset(self):
+           return JobsView.apply_filter(self,Job)
+     
+class LonestarJobsViewSet(viewsets.ModelViewSet,JobsView):
+      """
+      API endpoint that returns all jobs or run by a user
+      """
+      serializer_class = JobSerializer
+      permission_classes = (IsAuthenticatedOrReadOnly,)
+
+      def get_queryset(self):
+           return JobsView.apply_filter(self,LS4Job)

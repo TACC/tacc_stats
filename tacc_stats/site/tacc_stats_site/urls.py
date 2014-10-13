@@ -10,8 +10,8 @@ router = routers.DefaultRouter()
 router.register(r'users', apiviews.UserViewSet)
 router.register(r'groups',apiviews.GroupViewSet)
 #router.register(r'jobs(?P<user>[a-zA-Z0-9_]+)/$',apiviews.UserJobs.as_view(),'job-list')
-router.register(r'jobs',apiviews.JobsViewSet,'job-list')
-#router.register(r'jobs',apiviews.JobsViewSet)
+router.register(r'jobs/stampede',apiviews.StampedeJobsViewSet,'job-list')
+router.register(r'jobs/lonestar',apiviews.LonestarJobsViewSet,'ls4job-list')
 
 urlpatterns = patterns('',
     # Examples:
