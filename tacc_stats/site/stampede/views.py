@@ -5,7 +5,7 @@ from django.db.models import Q
 
 import os,sys,pwd
 from tacc_stats.analysis import exam
-from tacc_stats.site.stampede.models import Job, Host, TestInfo
+from tacc_stats.site.stampede.models import Job, Host#, TestInfo
 import tacc_stats.cfg as cfg
 
 import tacc_stats.analysis.plot as plots
@@ -27,6 +27,16 @@ from matplotlib.backends.backend_agg import FigureCanvasAgg as FigureCanvas
 from django.core.cache import cache,get_cache 
 import traceback
 
+schema_map = {'HighCPI' : 'cpi',
+              'MemBw' : 'mbw',
+              'Catastrophe' : 'cat',
+              'MemUsage' : 'mem',
+              'PacketRate' : 'packetrate',
+              'PacketSize' : 'packetsize',
+              'Idle' : 'idle',
+              'LowFLOPS' : 'flops',
+              'VecPercent' : 'VecPercent',
+              'GigEBW' : 'GigEBW'}
 """
 def update_test_info():
     schema_map = {'HighCPI' : ['cpi','>',1.5], 
