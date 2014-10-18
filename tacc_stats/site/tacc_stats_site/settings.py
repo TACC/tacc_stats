@@ -139,6 +139,7 @@ INSTALLED_APPS = (
     'tacc_stats.site.lonestar',
     'rest_framework',
     'rest_framework_swagger',
+    'django_extensions'
 )
 """
 TEMPLATE_CONTEXT_PROCESSORS=(
@@ -159,6 +160,10 @@ REST_FRAMEWORK = {
     'DEFAULT_PERMISSION_CLASSES': [
         'rest_framework.permissions.DjangoModelPermissionsOrAnonReadOnly'
     ],
+    'DEFAULT_RENDERER_CLASSES': (
+        'rest_framework.renderers.JSONRenderer',
+        'rest_framework.renderers.BrowsableAPIRenderer',
+    ),
     'PAGINATE_BY': 10
 }
 

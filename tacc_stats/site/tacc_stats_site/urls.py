@@ -2,6 +2,7 @@ from django.conf.urls import patterns, include, url
 from rest_framework import routers
 import apiviews
 import settings
+from stampede import stampedeapiviews
 # Uncomment the next two lines to enable the admin:
 from django.contrib import admin
 admin.autodiscover()
@@ -9,9 +10,10 @@ admin.autodiscover()
 router = routers.DefaultRouter()
 router.register(r'users', apiviews.UserViewSet)
 router.register(r'groups',apiviews.GroupViewSet)
-#router.register(r'jobs(?P<user>[a-zA-Z0-9_]+)/$',apiviews.UserJobs.as_view(),'job-list')
-router.register(r'jobs/stampede',apiviews.StampedeJobsViewSet,'job-list')
-router.register(r'jobs/lonestar',apiviews.LonestarJobsViewSet,'ls4job-list')
+router.register(r'stampede/jobs',apiviews.StampedeJobsViewSet,'job')
+router.register(r'lonestar/jobs',apiviews.LonestarJobsViewSet,'ls4job')
+#router.register(r'lonestar/jobs',apiviews.LonestarJobsViewSet,'ls4job')
+#router.register(r'stampede/jobs/master_plot/(?P<pk>\d+)/$',stampedeapiviews.JobDetailView,'job-list')
 
 urlpatterns = patterns('',
     # Examples:
@@ -30,8 +32,8 @@ urlpatterns = patterns('',
     url(r'^stampede/', include('stampede.urls', namespace="stampede"),name='stampede'),
     
     url(r'^admin/', include(admin.site.urls)),
-    
+
     #Django Rest API
     url(r'^api/', include(router.urls)),
-    url(r'^api-auth/', include('rest_framework.urls', namespace='rest_framework'))
+    url(r'^api-auth/', include('rest_framework.urls', namespace='rest_framework')),
 )
