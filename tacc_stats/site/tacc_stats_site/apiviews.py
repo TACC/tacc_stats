@@ -1,14 +1,20 @@
 from django.contrib.auth.models import User, Group
 from rest_framework import viewsets
+from rest_framework_extensions.mixins import PaginateByMaxMixin
 from rest_framework import generics
 from rest_framework.renderers import JSONRenderer
 from rest_framework.permissions import IsAuthenticatedOrReadOnly
 from serializers import UserSerializer, GroupSerializer, JobSerializer,JobDetailSerializer
 from stampede.models import Job
+from stampede import stampedeapiviews
 from lonestar.models import LS4Job
 from django.http import HttpResponse
 from django.shortcuts import get_object_or_404
 from rest_framework.response import Response
+from rest_framework.decorators import detail_route, list_route
+from rest_framework import status
+from django.core.paginator import Paginator
+import json
 
 class JSONResponse(HttpResponse):
     """
@@ -62,7 +68,7 @@ class JobsView(object):
                 queryset = queryset.filter(status=status)
            return queryset
 
-class StampedeJobsViewSet(viewsets.ReadOnlyModelViewSet,JobsView):
+class StampedeJobsViewSet(viewsets.ReadOnlyModelViewSet, PaginateByMaxMixin, JobsView):
     """
     Jobs can be filtered using url query parameters mentioned below (FOR LIST RESPONSE ONLY).
     user -- name of the user
@@ -71,15 +77,17 @@ class StampedeJobsViewSet(viewsets.ReadOnlyModelViewSet,JobsView):
     queue -- name of the queue
     status -- status of the job
     """
+    max_paginate_by = 10
     serializer_class = JobSerializer
     permission_classes = (IsAuthenticatedOrReadOnly,)
-    #paginate_by = 100
+
     def list(self,request):
         """
         Returns jobs run on Stampede.
         """
         print 'stampede list ----------------------------------------------------------------------------'
         queryset = JobsView.apply_filter(self,Job)
+        #paginator = Paginator(queryset, 100)
         serializer = JobSerializer(queryset,many=True)
         print 'stampede list2 ----------------------------------------------------------------------------'
         return Response(serializer.data)
@@ -92,7 +100,13 @@ class StampedeJobsViewSet(viewsets.ReadOnlyModelViewSet,JobsView):
         job = get_object_or_404(queryset, pk=pk)
         serializer = JobDetailSerializer(job)
         return Response(serializer.data)
-     
+
+    @detail_route(methods=['get'])
+    def type_info(self, request, pk=None):
+        type_name = request.QUERY_PARAMS.get('type', None)
+        type_info = stampedeapiviews.type_info(pk,type_name)
+        return Response(type_info)
+
 class LonestarJobsViewSet(viewsets.ReadOnlyModelViewSet,JobsView):
     """
     Jobs can be filtered using url query parameters mentioned below (FOR LIST RESPONSE ONLY).
@@ -104,7 +118,7 @@ class LonestarJobsViewSet(viewsets.ReadOnlyModelViewSet,JobsView):
     """
     serializer_class = JobSerializer
     permission_classes = (IsAuthenticatedOrReadOnly,)
-    #paginate_by = 100
+
     def list(self,request):
         """
         Returns jobs run on Lonestar.

@@ -139,7 +139,8 @@ INSTALLED_APPS = (
     'tacc_stats.site.lonestar',
     'rest_framework',
     'rest_framework_swagger',
-    'django_extensions'
+    'django_extensions',
+    'rest_framework_extensions'
 )
 """
 TEMPLATE_CONTEXT_PROCESSORS=(
@@ -160,11 +161,9 @@ REST_FRAMEWORK = {
     'DEFAULT_PERMISSION_CLASSES': [
         'rest_framework.permissions.DjangoModelPermissionsOrAnonReadOnly'
     ],
-    'DEFAULT_RENDERER_CLASSES': (
-        'rest_framework.renderers.JSONRenderer',
-        'rest_framework.renderers.BrowsableAPIRenderer',
-    ),
-    'PAGINATE_BY': 10
+    'PAGINATE_BY': 10,                 # Default to 10
+    'PAGINATE_BY_PARAM': 'page_size',  # Allow client to override, using `?page_size=xxx`.
+    'MAX_PAGINATE_BY': 100             # Maximum limit allowed when using `?page_size=xxx`.
 }
 
 LOGGING = {

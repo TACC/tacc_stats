@@ -2,7 +2,6 @@ from django.http import HttpResponse, HttpResponseRedirect
 from django.shortcuts import render_to_response, render
 from django.views.generic import DetailView, ListView
 from django.db.models import Q
-
 import os,sys,pwd
 
 from tacc_stats.site.stampede.models import Job, Host, JobForm
@@ -27,135 +26,12 @@ from matplotlib.backends.backend_agg import FigureCanvasAgg as FigureCanvas
 from django.core.cache import cache,get_cache
 import traceback
 from rest_framework.decorators import api_view
-import base64, json
+import base64
+import json
 from cStringIO import StringIO
 from django.http import HttpResponse
 from rest_framework.response import Response
 
-def update(date,rerun=False):
-
-    ld = lariat_utils.LariatData(directory = cfg.lariat_path,
-                                 daysback = 2)
-
-    tz = pytz.timezone('US/Central')
-
-    pickle_dir = os.path.join(cfg.pickles_dir,date)
-
-    ctr = 0
-
-    for root, directory, pickle_files in os.walk(pickle_dir):
-        num_files = len(pickle_files)
-        print "Number of pickle files in",root,'=',num_files
-        for pickle_file in sorted(pickle_files):
-            ctr += 1
-            print pickle_file
-            try:
-                if rerun:
-                    if Job.objects.filter(id = pickle_file).exists():
-                        job = Job.objects.filter(id = pickle_file).delete()
-                else:
-                    if Job.objects.filter(id = pickle_file).exists():
-                        continue
-
-                obj,created = Job.objects.get_or_create(id = pickle_file)
-
-            except:
-                print pickle_file,"doesn't look like a pickled job"
-                continue
-
-            if not created:
-                if len(obj.host_set.all()) > 0:
-                    continue
-                try:
-                    pickle_path = os.path.join(root,str(pickle_file))
-                    with open(pickle_path, 'rb') as f:
-                        hosts = np.load(f).hosts.keys()
-                        for host_name in hosts:
-                            h = Host(name=host_name)
-                            h.save()
-                            h.jobs.add(obj)
-                except: pass
-                continue
-
-            try:
-
-                pickle_path = os.path.join(root,str(pickle_file))
-                with open(pickle_path, 'rb') as f:
-                    data = np.load(f)
-                    json = data.acct
-                    hosts = data.hosts.keys()
-
-                del json['yesno'], json['unknown']
-                json['run_time'] = json['end_time'] - json['start_time']
-
-                json['path'] = pickle_path
-                json['start_epoch'] = json['start_time']
-                json['end_epoch'] = json['end_time']
-
-                utc_start = datetime.utcfromtimestamp(json['start_time']).replace(tzinfo=pytz.utc)
-                utc_end = datetime.utcfromtimestamp(json['end_time']).replace(tzinfo=pytz.utc)
-                json['start_time'] = utc_start.astimezone(tz)
-                json['end_time'] =  utc_end.astimezone(tz)
-                json['date'] = json['end_time'].date()
-
-                ld.set_job(pickle_file, end_time = date)
-
-                json['exe'] = ld.exc.split('/')[-1]
-                json['cwd'] = ld.cwd[0:128]
-                json['threads'] = ld.threads
-                json['name'] = json['name'][0:128]
-                if ld.cores: json['cores'] = ld.cores
-                if ld.nodes: json['nodes'] = ld.nodes
-                if ld.wayness: json['wayness'] = ld.wayness
-
-                try: json['user']=pwd.getpwuid(int(json['uid']))[0]
-                except: json['user']=ld.user
-
-                obj = Job(**json)
-                obj.save()
-
-                for host_name in hosts:
-                    h = Host(name=host_name)
-                    print host_name
-                    h.save()
-                    h.jobs.add(obj)
-
-            except:
-                print json
-                print pickle_file,'failed'
-                print traceback.format_exc()
-                print date
-            print "Percentage Completed =",100*float(ctr)/num_files
-
-def update_test_field(date,auditor,rerun=False):
-
-    print 'Run the following tests for:',date
-    for name, test in auditor.measures.iteritems():
-        print name
-
-    jobs_list = Job.objects.filter(date = date)
-
-    paths = []
-    for job in jobs_list:
-        paths.append(os.path.join(cfg.pickles_dir,
-                                  job.date.strftime('%Y-%m-%d'),
-                                  str(job.id)))
-    print '# Jobs to be tested:',len(jobs_list)
-
-    auditor.run(paths)
-
-    schema_map = {'HighCPI' : 'cpi',
-                  'MemBw' : 'mbw',
-                  'Catastrophe' : 'cat',
-                  'MemUsage' : 'mem',
-                  'PacketRate' : 'packetrate',
-                  'PacketSize' : 'packetsize',
-                  'Idle' : 'idle'}
-
-    for name, results in auditor.metrics.iteritems():
-        for jobid in results.keys():
-            jobs_list.filter(id = jobid).update(**{schema_map[name] :
-                                                   results[jobid]})
 
 def sys_plot(request, pk):
 
@@ -188,104 +64,12 @@ def sys_plot(request, pk):
     pcm = ax.pcolor(np.array(range(len(racks)+1)),np.array(range(len(nodes)+1)),x)
 
     canvas = FigureCanvas(fig)
-    response = HttpResponse(content_type='image/png')
-    response['Content-Disposition'] = "attachment; filename="+pk+"-sys.png"
-    fig.savefig(response, format='png')
+    #response = HttpResponse(content_type='image/png')
+    #response['Content-Disposition'] = "attachment; filename="+pk+"-sys.png"
+    sio = StringIO()
+    fig.savefig(sio, format='png')
+    return base64.standard_b64encode(sio.getvalue())
 
-    return response
-
-
-def dates(request):
-
-    date_list = []
-    dates = Job.objects.values_list('date',flat=True).distinct()
-    for date in dates:
-        try:
-            date_list.append(date.strftime('%Y-%m-%d'))
-        except:
-            pass
-
-    date_list = sorted(date_list, key=lambda d: map(int, d.split('-')))
-
-    month_dict ={}
-
-    for date in date_list:
-        y,m,d = date.split('-')
-        key = y+' / '+m
-        if key not in month_dict: month_dict[key] = []
-        date_pair = (date, d)
-        month_dict[key].append(date_pair)
-
-    date_list = month_dict
-    field = {}
-
-    field['date_list'] = sorted(date_list.iteritems())
-    return render_to_response("stampede/search.html", field)
-
-def search(request):
-
-    if 'jobid' in request.GET:
-        try:
-            job = Job.objects.get(id = request.GET['jobid'])
-            return HttpResponseRedirect("/stampede/job/"+str(job.id)+"/")
-        except: pass
-    try:
-        fields = request.GET.dict()
-        new_fields = {k:v for k,v in fields.items() if v}
-        fields = new_fields
-
-        if 'opt_field0' in fields.keys() and 'value0' in fields.keys():
-            fields[fields['opt_field0']] = fields['value0']
-            del fields['opt_field0'], fields['value0']
-        if 'opt_field1' in fields.keys() and 'value1' in fields.keys():
-            fields[fields['opt_field1']] = fields['value1']
-            del fields['opt_field1'], fields['value1']
-
-
-        print 'search', fields
-        return index(request, **fields)
-    except: pass
-
-    return render(request, 'stampede/search.html', {'error' : True})
-
-def index(request, **field):
-    print 'index',field
-    name = ''
-    for key, val in field.iteritems():
-        name += val + '-'
-
-    field['run_time__gte'] = 60
-    job_list = Job.objects.filter(**field).order_by('-id')
-
-    field['name'] = name + 'hist'
-    field['histograms'] = hist_summary(job_list)
-
-    field['job_list'] = job_list
-    field['nj'] = len(job_list)
-
-    # Computed Metrics
-    field['cat_job_list']  = job_list.filter(Q(cat__lte = 0.001) | Q(cat__gte = 1000)).exclude(cat = float('nan'))
-
-    completed_list = job_list.exclude(status__in=['CANCELLED','FAILED']).order_by('-id')
-    field['idle_job_list'] = completed_list.filter(idle__gte = 0.99)
-    field['mem_job_list'] = completed_list.filter(mem__lte = 30, queue = 'largemem')
-
-    field['cpi_thresh'] = 1.0
-    field['cpi_job_list']  = completed_list.exclude(cpi = float('nan')).filter(cpi__gte = field['cpi_thresh'])
-    field['cpi_per'] = 100*len(field['cpi_job_list'])/float(len(completed_list))
-
-    field['idle_job_list'] = list_to_dict(field['idle_job_list'],'idle')
-    field['cat_job_list'] = list_to_dict(field['cat_job_list'],'cat')
-    field['cpi_job_list'] = list_to_dict(field['cpi_job_list'],'cpi')
-    field['mem_job_list'] = list_to_dict(field['mem_job_list'],'mem')
-
-    return render_to_response("stampede/index.html", field)
-
-def list_to_dict(job_list,metric):
-    job_dict={}
-    for job in job_list:
-        job_dict.setdefault(job.user,[]).append((job.id,round(job.__dict__[metric],3)))
-    return job_dict
 
 def hist_summary(job_list):
 
@@ -350,13 +134,7 @@ def hist_summary(job_list):
 
     return response
 
-def figure_to_response(p):
-    response = HttpResponse(content_type='image/png')
-    response['Content-Disposition'] = "attachment; filename="+p.fname+".png"
-    p.fig.savefig(response, format='png')
-    return response
-
-def figure_to_json(p):
+def figure_to_base64(p):
     sio = StringIO()
     p.fig.savefig(sio, format='png')
     return base64.standard_b64encode(sio.getvalue())
@@ -375,7 +153,7 @@ def master_plot(request, pk):
     data = get_data(pk)
     mp = plots.MasterPlot(lariat_data="pass")
     mp.plot(pk,job_data=data)
-    return figure_to_json(mp)
+    return figure_to_base64(mp)
 
 def heat_map(request, pk):
     data = get_data(pk)
@@ -384,7 +162,7 @@ def heat_map(request, pk):
                            'INSTRUCTIONS_RETIRED'],
                        lariat_data="pass")
     hm.plot(pk,job_data=data)
-    return figure_to_json(hm)
+    return figure_to_base64(hm)
 
 def build_schema(data,name):
     schema = []
@@ -393,6 +171,49 @@ def build_schema(data,name):
             schema.append(value.key + ','+value.unit)
         else: schema.append(value.key)
     return schema
+
+def type_list(job_id):
+    data = get_data(job_id)
+    type_list = []
+    host0=data.hosts.values()[0]
+    for type_name, type in host0.stats.iteritems():
+        schema = ' '.join(build_schema(data,type_name))
+        type_list.append( (type_name, schema) )
+
+    return sorted(type_list, key = lambda type_name: type_name[0])
+
+def type_info(pk, type_name):
+    data = get_data(pk)
+    if data is None:
+        return None
+    schema = build_schema(data,type_name)
+    schema0 = [x.split(',')[0] for x in schema]
+    raw_stats = data.aggregate_stats(type_name)[0]
+    stats = []
+    scale = 1.0
+    for t in range(len(raw_stats)):
+        temp = []
+        times = data.times-data.times[0]
+        for event in range(len(raw_stats[t])):
+            temp.append(raw_stats[t,event]*scale)
+        stats.append((times[t],temp))
+
+    k1 = {'intel_snb' : [type_name]*len(schema0)}
+    k2 = {'intel_snb': schema0}
+
+    tp = plots.DevPlot(k1=k1,k2=k2,lariat_data='pass')
+    tp.plot(pk,job_data=data)
+    plot_base64 = figure_to_base64(tp)
+    print stats
+    print schema
+    return {
+                    'type_name':type_name,
+                    'job_id': pk,
+                    'type_plot':plot_base64,
+                    'schema':schema,
+                    'stats':stats
+                    }
+
 
 class JobDetailView(DetailView):
 
@@ -430,35 +251,4 @@ class JobDetailView(DetailView):
         context['server_url'] = serverstring
 
         return context
-
-def type_plot(request, pk, type_name):
-    data = get_data(pk)
-
-    schema = build_schema(data,type_name)
-    schema = [x.split(',')[0] for x in schema]
-
-    k1 = {'intel_snb' : [type_name]*len(schema)}
-    k2 = {'intel_snb': schema}
-
-    tp = plots.DevPlot(k1=k1,k2=k2,lariat_data='pass')
-    tp.plot(pk,job_data=data)
-    return figure_to_response(tp)
-
-
-def type_detail(request, pk, type_name):
-    data = get_data(pk)
-
-    schema = build_schema(data,type_name)
-    raw_stats = data.aggregate_stats(type_name)[0]
-
-    stats = []
-    scale = 1.0
-    for t in range(len(raw_stats)):
-        temp = []
-        times = data.times-data.times[0]
-        for event in range(len(raw_stats[t])):
-            temp.append(raw_stats[t,event]*scale)
-        stats.append((times[t],temp))
-
-    return render_to_response("stampede/type_detail.html",{"type_name" : type_name, "jobid" : pk, "stats_data" : stats, "schema" : schema})
 
