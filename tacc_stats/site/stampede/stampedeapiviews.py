@@ -188,6 +188,10 @@ def type_info(pk, type_name):
         return None
     schema = build_schema(data,type_name)
     schema0 = [x.split(',')[0] for x in schema]
+
+    k1 = {'intel_snb' : [type_name]*len(schema0)}
+    k2 = {'intel_snb': schema0}
+
     raw_stats = data.aggregate_stats(type_name)[0]
     stats = []
     scale = 1.0
@@ -197,9 +201,6 @@ def type_info(pk, type_name):
         for event in range(len(raw_stats[t])):
             temp.append(raw_stats[t,event]*scale)
         stats.append((times[t],temp))
-
-    k1 = {'intel_snb' : [type_name]*len(schema0)}
-    k2 = {'intel_snb': schema0}
 
     tp = plots.DevPlot(k1=k1,k2=k2,lariat_data='pass')
     tp.plot(pk,job_data=data)

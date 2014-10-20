@@ -1,20 +1,19 @@
 from django.contrib.auth.models import User, Group
 from rest_framework import viewsets
 from rest_framework_extensions.mixins import PaginateByMaxMixin
-from rest_framework import generics
 from rest_framework.renderers import JSONRenderer
 from rest_framework.permissions import IsAuthenticatedOrReadOnly
-from serializers import UserSerializer, GroupSerializer, JobSerializer,JobDetailSerializer
+from serializers import UserSerializer, GroupSerializer, StampedeJobSerializer, StampedeJobDetailSerializer, LonestarJobSerializer,LonestarJobDetailSerializer
 from stampede.models import Job
 from stampede import stampedeapiviews
 from lonestar.models import LS4Job
+from lonestar import lonestarapiviews
 from django.http import HttpResponse
 from django.shortcuts import get_object_or_404
 from rest_framework.response import Response
 from rest_framework.decorators import detail_route, list_route
 from rest_framework import status
 from django.core.paginator import Paginator
-import json
 
 class JSONResponse(HttpResponse):
     """
@@ -78,18 +77,16 @@ class StampedeJobsViewSet(viewsets.ReadOnlyModelViewSet, PaginateByMaxMixin, Job
     status -- status of the job
     """
     max_paginate_by = 10
-    serializer_class = JobSerializer
+    serializer_class = StampedeJobSerializer
     permission_classes = (IsAuthenticatedOrReadOnly,)
 
     def list(self,request):
         """
         Returns jobs run on Stampede.
         """
-        print 'stampede list ----------------------------------------------------------------------------'
         queryset = JobsView.apply_filter(self,Job)
         #paginator = Paginator(queryset, 100)
-        serializer = JobSerializer(queryset,many=True)
-        print 'stampede list2 ----------------------------------------------------------------------------'
+        serializer = StampedeJobSerializer(queryset,many=True)
         return Response(serializer.data)
 
     def retrieve(self, request, pk=None):
@@ -98,7 +95,7 @@ class StampedeJobsViewSet(viewsets.ReadOnlyModelViewSet, PaginateByMaxMixin, Job
         """
         queryset = Job.objects.all()
         job = get_object_or_404(queryset, pk=pk)
-        serializer = JobDetailSerializer(job)
+        serializer = StampedeJobDetailSerializer(job)
         return Response(serializer.data)
 
     @detail_route(methods=['get'])
@@ -116,17 +113,15 @@ class LonestarJobsViewSet(viewsets.ReadOnlyModelViewSet,JobsView):
     queue -- name of the queue
     status -- status of the job
     """
-    serializer_class = JobSerializer
+    serializer_class = LonestarJobSerializer
     permission_classes = (IsAuthenticatedOrReadOnly,)
 
     def list(self,request):
         """
         Returns jobs run on Lonestar.
         """
-        print 'lonestar list ----------------------------------------------------------------------------'
         queryset = JobsView.apply_filter(self,LS4Job)
-        serializer = JobSerializer(queryset,many=True)
-        print 'lonestar2 list ----------------------------------------------------------------------------'
+        serializer = LonestarJobSerializer(queryset,many=True)
         return Response(serializer.data)
 
     def retrieve(self, request, pk=None):
@@ -135,5 +130,11 @@ class LonestarJobsViewSet(viewsets.ReadOnlyModelViewSet,JobsView):
         """
         queryset = LS4Job.objects.all()
         job = get_object_or_404(queryset, pk=pk)
-        serializer = JobDetailSerializer(job)
+        serializer = LonestarJobDetailSerializer(job)
         return Response(serializer.data)
+
+    @detail_route(methods=['get'])
+    def type_info(self, request, pk=None):
+        type_name = request.QUERY_PARAMS.get('type', None)
+        type_info = lonestarapiviews.type_info(pk,type_name)
+        return Response(type_info)
