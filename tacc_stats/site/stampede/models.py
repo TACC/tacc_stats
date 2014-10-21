@@ -41,14 +41,12 @@ class Job(models.Model):
         return str(self.id)
 
     def color(self):
-
         if self.status == 'COMPLETED': 
             ret_val = "lightblue"
         elif self.status == 'FAILED':
             ret_val = "red"
         else:
             ret_val = "silver"
-
         return ret_val
 
     def sus(self):
@@ -66,7 +64,7 @@ class JobForm(ModelForm):
     class Meta:
         model = Job
         fields = ['id']
-"""
+
 class TestInfo(models.Model):
     test_name = models.CharField(max_length=128)
     field_name = models.CharField(max_length=128)
@@ -74,4 +72,7 @@ class TestInfo(models.Model):
 
     # Computed Metric .op. Threshold
     comparator = models.CharField(max_length=2)
-"""
+
+    def __unicode__(self):
+        return str(self.test_name)
+

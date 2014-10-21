@@ -41,9 +41,15 @@
           <td align=right>{{ job.nodes }}</td>
           <td align=right>{{ job.threads }}</td>
         </tr>
+	<tr><th> Test </th> <th> Measured </th> <th> Threshold </th> <th> Result </th>
         <tr>
-	  <th> CPI </th>
-	  <th> MBW </th>
+	  {% for key,value in testinfo_dict.items %}
+	  <tr> <th> {{ key }} </th> 
+	   <th> {{ value.0|stringformat:"0.2e" }} </th>
+	   <th> {{ value.1|stringformat:"0.2e" }} </th>
+	   <th> {{ value.2 }} </th> </tr>
+	  {% endfor %}
+<!---	  <th> MBW </th>
 	  <th> Idle </th>
 	  <th> Catastrophe </th>
 	  <th> Mem HWM (GB) </th>
@@ -51,9 +57,12 @@
 	  <th> Ave IB Packet Size (B) </th>
 	  <th> GigE BW (B)</th>
 	  <th> Ave GFLOPS </th>
-	  <th> Vec Percent </th>
+	  <th> Vec Percent </th> --->
 	</tr>
-	<tr>
+<!---	<tr>
+	  {% for test in test_list %}
+	  <td align=right>{{ job.test.test_name }}</td>
+	  {% endfor %}
           <td align=right>{{ job.cpi|stringformat:".2f" }}</td>
           <td align=right>{{ job.mbw|stringformat:".2f" }}</td>
           <td align=right>{{ job.idle|stringformat:".2f" }}</td>
@@ -63,7 +72,7 @@
           <td align=right>{{ job.packetsize|stringformat:".2e" }}</td>
           <td align=right>{{ job.GigEBW|stringformat:".2e" }}</td>
           <td align=right>{{ job.flops|stringformat:".2f" }}</td>
-          <td align=right>{{ job.VecPercent|stringformat:".2f" }}</td>
+          <td align=right>{{ job.VecPercent|stringformat:".2f" }}</td>--->
 	</tr>
 
    </table>

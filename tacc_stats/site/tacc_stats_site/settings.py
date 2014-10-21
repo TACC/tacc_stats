@@ -13,17 +13,21 @@ MANAGERS = ADMINS
 
 DATABASES = {
     'default': {
-        'ENGINE': 'django.db.backends.postgresql_psycopg2', # Add '', 'mysql', 'sqlite3' or 'oracle'.
-        'NAME': 'tacc_stats_site_db',                      # Or path to database file if using sqlite3.
-        # The following settings are not used with sqlite3:
-        #'ENGINE': 'django.db.backends.sqlite3',
-        #'NAME' : os.path.join(DIR,'sqlite3.db'),
-        #'USER': 'rtevans',
-        #'PASSWORD': '',
-        #'HOST': 'tacc-stats',                      # Empty for localhost through domain sockets or '127.0.0.1' for localhost through TCP.
-        #'PORT': '5432',                      # Set to empty string for default.
+        'ENGINE': 'django.db.backends.postgresql_psycopg2',
+        'NAME': 'tacc_stats_site_db',                     
+        'USER': 'rtevans',
+        'PASSWORD': '',
+        'HOST': 'tacc-stats',         
+        'PORT': '5432',               
+        },
+    'xalt' : {
+        'ENGINE' : 'django.db.backends.mysql',
+        'NAME' : 'xalt',
+        'USER' : 'xaltUser',
+        'PASSWORD' : 'kutwgbh',
+        'HOST' : 'tacc-stats'
+        }        
     }
-}
 
 # Hosts/domain names that are valid for this site; required if DEBUG is False
 # See https://docs.djangoproject.com/en/1.5/ref/settings/#allowed-hosts

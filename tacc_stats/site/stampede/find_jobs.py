@@ -29,7 +29,7 @@ def search(kwargs):
         print x,v
     """
 
-fields = {'packetrate__gte' : 1.0e6}#, 
+fields = {'date__gte' : '2014-10-12'}#, 
 #          'packetsize__lte' : 64*2**10}
 
 

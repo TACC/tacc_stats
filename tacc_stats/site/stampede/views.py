@@ -5,7 +5,8 @@ from django.db.models import Q
 
 import os,sys,pwd
 from tacc_stats.analysis import exam
-from tacc_stats.site.stampede.models import Job, Host#, TestInfo
+from tacc_stats.site.stampede.models import Job, Host, TestInfo
+from tacc_stats.site.xalt.models import run
 import tacc_stats.cfg as cfg
 
 import tacc_stats.analysis.plot as plots
@@ -27,20 +28,9 @@ from matplotlib.backends.backend_agg import FigureCanvasAgg as FigureCanvas
 from django.core.cache import cache,get_cache 
 import traceback
 
-schema_map = {'HighCPI' : 'cpi',
-              'MemBw' : 'mbw',
-              'Catastrophe' : 'cat',
-              'MemUsage' : 'mem',
-              'PacketRate' : 'packetrate',
-              'PacketSize' : 'packetsize',
-              'Idle' : 'idle',
-              'LowFLOPS' : 'flops',
-              'VecPercent' : 'VecPercent',
-              'GigEBW' : 'GigEBW'}
-"""
 def update_test_info():
     schema_map = {'HighCPI' : ['cpi','>',1.5], 
-                  'MemBw' : ['mbw', '>', 0.0 ],
+                  'MemBw' : ['mbw', '<', 1.0 ],
                   'Catastrophe' : ['cat', '<',0.001] ,
                   'MemUsage' : ['mem','>',31], 
                   'PacketRate' : ['packetrate','>',0], 
@@ -51,30 +41,27 @@ def update_test_info():
                   'GigEBW' : ['GigEBW','>',1e7]}
 
     for name in schema_map:
+        if TestInfo.objects.filter(test_name = name).exists():
+            TestInfo.objects.filter(test_name = name).delete()
+
         obj = TestInfo(test_name = name, 
                        field_name = schema_map[name][0], 
                        comparator = schema_map[name][1], 
                        threshold = schema_map[name][2])
-    obj.save()
-"""
+        obj.save()
 
 def update(date,rerun=False):
-
     ld = lariat_utils.LariatData(directory = cfg.lariat_path,
                                  daysback = 2)
-
     tz = pytz.timezone('US/Central')
-
     pickle_dir = os.path.join(cfg.pickles_dir,date)
 
     ctr = 0
-
     for root, directory, pickle_files in os.walk(pickle_dir):
         num_files = len(pickle_files)
         print "Number of pickle files in",root,'=',num_files
         for pickle_file in sorted(pickle_files):
             ctr += 1
-            #print pickle_file
             try:
                 if rerun:
                     if Job.objects.filter(id = pickle_file).exists():
@@ -84,59 +71,56 @@ def update(date,rerun=False):
                         continue
 
                 obj,created = Job.objects.get_or_create(id = pickle_file)
-
             except: 
                 print pickle_file,"doesn't look like a pickled job"
                 continue
 
-            if not created: 
-                if len(obj.host_set.all()) > 0: 
-                    continue 
-                try:
-                    pickle_path = os.path.join(root,str(pickle_file))
-                    with open(pickle_path, 'rb') as f:
-                        hosts = np.load(f).hosts.keys()
-                        for host_name in hosts:
-                            h = Host(name=host_name)
-                            h.save()
-                            h.jobs.add(obj)
-                except: pass
-                continue
-
             try:
-
                 pickle_path = os.path.join(root,str(pickle_file))
                 with open(pickle_path, 'rb') as f:
                     data = np.load(f)
                     json = data.acct
                     hosts = data.hosts.keys()
-
                 del json['yesno'], json['unknown']
-                json['run_time'] = json['end_time'] - json['start_time']
-
-                json['path'] = pickle_path
-                json['start_epoch'] = json['start_time']
-                json['end_epoch'] = json['end_time']
-                        
                 utc_start = datetime.utcfromtimestamp(json['start_time']).replace(tzinfo=pytz.utc)
                 utc_end = datetime.utcfromtimestamp(json['end_time']).replace(tzinfo=pytz.utc)
+                json['run_time'] = json['end_time'] - json['start_time']
+                json['start_epoch'] = json['start_time']
+                json['end_epoch'] = json['end_time']
                 json['start_time'] = utc_start.astimezone(tz)
                 json['end_time'] =  utc_end.astimezone(tz)
                 json['date'] = json['end_time'].date()
-                
-                ld.set_job(pickle_file, end_time = date)
-                
-                json['exe'] = ld.exc.split('/')[-1]
-                json['cwd'] = ld.cwd[0:128]
-                json['threads'] = ld.threads
                 json['name'] = json['name'][0:128]
-                if ld.cores: json['cores'] = ld.cores
-                if ld.nodes: json['nodes'] = ld.nodes
-                if ld.wayness: json['wayness'] = ld.wayness
 
                 try: json['user']=pwd.getpwuid(int(json['uid']))[0]
-                except: json['user']=ld.user
+                except: json['user']='unknown'
 
+                ### If xalt or lariat data is available 
+                ### add info to the tacc_stats_site_db 
+                # Assign additional xalt data if available
+                xd = run.objects.using('xalt').filter(job_id = json['id'])
+                if xd:
+                    xd              = xd[0]
+                    print 'Using xalt',xd.job_id
+                    json['user']    = xd.user
+                    json['exe']     = xd.exec_path.split('/')[-1][0:128]
+                    json['cwd']     = xd.cwd[0:128]
+                    json['threads'] = xd.num_threads
+                    json['cores']   = xd.num_cores
+                    json['nodes']   = xd.num_nodes
+                    json['wayness'] = xd.num_cores/xd.num_nodes
+                """
+                else: # Otherwise use Lariat Data if available
+                    ld.set_job(pickle_file, end_time = date)
+                    print 'Using lariat',ld.id
+                    json['user']    = ld.user
+                    json['exe']     = ld.exc.split('/')[-1]
+                    json['cwd']     = ld.cwd[0:128]
+                    json['threads'] = ld.threads
+                    if ld.cores: json['cores'] = ld.cores
+                    if ld.nodes: json['nodes'] = ld.nodes
+                    if ld.wayness: json['wayness'] = ld.wayness
+                """
                 obj = Job(**json)
                 obj.save()
 
@@ -144,7 +128,6 @@ def update(date,rerun=False):
                     h = Host(name=host_name)
                     h.save()
                     h.jobs.add(obj)
-
             except: 
                 print json
                 print pickle_file,'failed'
@@ -152,12 +135,27 @@ def update(date,rerun=False):
                 print date
             print "Percentage Completed =",100*float(ctr)/num_files
 
-def update_test_field(date,auditor,rerun=False):
+def update_test_field(date,rerun=False):
+    update_test_info()
+    aud = exam.Auditor(processes=2)
+
+    aud.stage(exam.GigEBW)
+    aud.stage(exam.HighCPI,ignore_status=['FAILED','CANCELLED'])
+    aud.stage(exam.MemBw,ignore_status=['FAILED','CANCELLED'])
+    aud.stage(exam.Catastrophe)
+    aud.stage(exam.MemUsage)
+    aud.stage(exam.PacketRate,ignore_status=['FAILED','CANCELLED'])
+    aud.stage(exam.PacketSize,ignore_status=['FAILED','CANCELLED'])
+    aud.stage(exam.Idle,min_hosts=2,ignore_status=['FAILED','CANCELLED'])
+    aud.stage(exam.LowFLOPS,ignore_status=['FAILED','CANCELLED'])
+    aud.stage(exam.VecPercent,ignore_status=['FAILED','CANCELLED'])
 
     print 'Run the following tests for:',date
-    for name, test in auditor.measures.iteritems():
+    for name, test in aud.measures.iteritems():
         print name
-        
+        obj = TestInfo.objects.get(test_name = name)
+        print obj.field_name,obj.threshold,obj.comparator
+
     jobs_list = Job.objects.filter(date = date).exclude(run_time__lt = 3600)
 
     #jobs_list = jobs_list.filter(Q(**{'VecPercent' : None}) | Q(**{'VecPercent' : float('nan')}))
@@ -169,13 +167,13 @@ def update_test_field(date,auditor,rerun=False):
                                   str(job.id)))
     print '# Jobs to be tested:',len(jobs_list)
 
-    auditor.run(paths)
+    aud.run(paths)
     print 'finished computing metrics'
 
-    for name, results in auditor.metrics.iteritems():
+    for name, results in aud.metrics.iteritems():
+        obj = TestInfo.objects.get(test_name = name)
         for jobid in results.keys():
-            jobs_list.filter(id = jobid).update(**{schema_map[name] : 
-                                                   results[jobid]})
+            jobs_list.filter(id = jobid).update(**{ obj.field_name : results[jobid]})
 
 def sys_plot(request, pk):
 
@@ -463,19 +461,35 @@ class JobDetailView(DetailView):
 
         data = get_data(job.id)
 
-        for test_name, field in schema_map.iteritems():
-            test_type = getattr(sys.modules[exam.__name__],test_name)
+        import operator
+        comp = {'>': operator.gt, '>=': operator.ge,
+                '<': operator.le, '<=': operator.le,
+                '==': operator.eq}
+        
+        testinfo_dict = {}
+        for obj in TestInfo.objects.all():
+            obj.test_name,
+            test_type = getattr(sys.modules[exam.__name__],obj.test_name)
             test = test_type(min_time=0,ignore_qs=[])
-            try:
+            try: 
                 metric = test.test(job.path,data)
-                setattr(job,field,metric)
+                setattr(job,obj.field_name,metric)
+                result = comp[obj.comparator](metric, obj.threshold)
+                
+                if result: string = 'Failed'
+                else: string = 'Passed'
+                testinfo_dict[obj.test_name] = (metric,obj.threshold,string)
             except: continue
+
+        context['testinfo_dict'] = testinfo_dict
 
         type_list = []
         host_list = []
 
         for host_name, host in data.hosts.iteritems():
             host_list.append(host_name)
+        if len(host_list) != job.nodes:
+            job.status = str(job.nodes-len(host_list))+"_NODES_MISSING"
         host0=data.hosts.values()[0]
         for type_name, type in host0.stats.iteritems():
             schema = ' '.join(build_schema(data,type_name))
