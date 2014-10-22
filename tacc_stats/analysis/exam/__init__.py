@@ -11,3 +11,4 @@ from tacc_stats.analysis.exam.highcpld import HighCPLD
 from tacc_stats.analysis.exam.c3_state import C3State
 from tacc_stats.analysis.exam.message_rate import MessageRate
 from tacc_stats.analysis.exam.packet_size import PacketSize
+from tacc_stats.analysis.exam.lnet_packet_rate import LnetPacketRate
