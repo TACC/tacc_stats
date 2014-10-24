@@ -53,8 +53,8 @@ CLASSIFIERS = [
     'Topic :: Scientific/Engineering',
 ]
 
-MAJOR = 1
-MINOR = 1
+MAJOR = 2
+MINOR = 0
 MICRO = 0
 ISRELEASED = True
 VERSION = '%d.%d.%d' % (MAJOR, MINOR, MICRO)
@@ -322,23 +322,24 @@ class MyBDist_RPM(bdist_rpm):
         if MONITOR_ONLY: build_cmd += ' --monitor-only' 
         open(self.build_script,"w").write(build_cmd)
 
-
         self.install_script = "build/bdist_rpm_install"
-        install_cmd = 'python setup.py install --single-version-externally-managed -O1 --root=$RPM_BUILD_ROOT --record=INSTALLED_FILES'
-        if MONITOR_ONLY: install_cmd += ' --monitor-only' 
-        open(self.install_script,"w").write(
-            """
+        install_cmds = """
 rm -rf %{buildroot}
-"""
-            + install_cmd +
-            """
+python setup.py install --single-version-externally-managed -O1 --root=$RPM_BUILD_ROOT --record=INSTALLED_FILES """
+        if MONITOR_ONLY: install_cmds += '--monitor-only' 
+        install_cmds += """
 install -m 0755 -d %{buildroot}/%{_bindir}
 install -m 6755 build/bin/monitor %{buildroot}/%{_bindir}/%{name}
 install -m 0755 tacc_stats/archive.sh %{buildroot}/%{_bindir}/%{name}_archive
 echo %{_bindir}/%{name} >> %{_builddir}/%{name}-%{unmangled_version}/INSTALLED_FILES
 echo %{_bindir}/%{name}_archive >> %{_builddir}/%{name}-%{unmangled_version}/INSTALLED_FILES
             """
-            )
+        if RMQ: install_cmds += """
+install -m 0755 build/bin/amqp_listend %{buildroot}/%{_bindir}/%{name}_listend
+echo %{_bindir}/%{name}_listend >> %{_builddir}/%{name}-%{unmangled_version}/INSTALLED_FILES
+        """
+
+        open(self.install_script,"w").write(install_cmds)
 
         self.clean_script = None
         self.verify_script = None
@@ -439,7 +440,7 @@ class MyBuildExt(build_ext):
             self.compiler.link_executable(
                 [pjoin(self.build_temp,'tacc_stats','src',
                       'monitor','amqp_listen.o')], 
-                'build/bin/ampq_listend',
+                'build/bin/amqp_listend',
                 libraries=ext.libraries,
                 library_dirs=ext.library_dirs,
                 runtime_library_dirs=ext.runtime_library_dirs,

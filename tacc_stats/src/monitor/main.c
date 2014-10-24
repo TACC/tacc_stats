@@ -87,8 +87,8 @@ int main(int argc, char *argv[])
   int lock_timeout = 30;
   const char *current_path = STATS_DIR_PATH"/current";
   const char *mark = NULL;
-  const char *host = NULL;
-  const char *port = NULL;
+  char *host = NULL;
+  char *port = NULL;
   int rc = 0;
 
   struct option opts[] = {

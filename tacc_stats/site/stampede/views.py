@@ -37,7 +37,7 @@ def update_test_info():
                   'PacketSize' : ['packetsize','>',0],
                   'Idle' : ['idle','>',0.99],
                   'LowFLOPS' : ['flops','<',10],
-                  'VecPercent' : ['VecPercent','<',5],
+                  'VecPercent' : ['VecPercent','<',0.05],
                   'GigEBW' : ['GigEBW','>',1e7]}
 
     for name in schema_map:
