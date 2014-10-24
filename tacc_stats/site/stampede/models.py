@@ -33,13 +33,16 @@ class Job(models.Model):
     mem = models.FloatField(null=True)
     packetrate = models.FloatField(null=True)
     packetsize = models.FloatField(null=True)
+    GigEBW = models.FloatField(null=True)
+    flops = models.FloatField(null=True)
+    VecPercent = models.FloatField(null=True)
 
     def __unicode__(self):
         return str(self.id)
 
     def color(self):
 
-        if self.status == 'COMPLETED': 
+        if self.status == 'COMPLETED':
             ret_val = "lightblue"
         elif self.status == 'FAILED':
             ret_val = "red"

@@ -18,7 +18,7 @@ class GroupSerializer(serializers.HyperlinkedModelSerializer):
 class StampedeJobSerializer(serializers.HyperlinkedModelSerializer):
     class Meta:
         model = Job
-        fields = ('id', 'project', 'start_time','end_time','start_epoch','end_epoch','run_time','queue','name','status','nodes','cores','path','date','user','exe','cwd','threads')
+        fields = ('id', 'project', 'start_time','end_time','start_epoch','end_epoch','run_time','queue','name','status','nodes','cores','path','date','user','exe','cwd','threads','GigEBW','flops','VecPercent',)
 
 class StampedeJobDetailSerializer(serializers.HyperlinkedModelSerializer):
     master_plot = serializers.SerializerMethodField("get_master_plot")
