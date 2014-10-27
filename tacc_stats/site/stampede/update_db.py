@@ -19,7 +19,7 @@ for root,dirnames,filenames in os.walk(cfg.pickles_dir):
         if max(date.date(),start.date()) > min(date.date(),end.date()): continue
         print 'Run update for',date.date()
 
-        views.update(directory,rerun=True)        
-        views.update_test_field(directory,rerun=True)
+        views.update(directory,rerun=False)        
+        views.update_metric_fields(directory)
         
     break

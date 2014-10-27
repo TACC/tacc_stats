@@ -28,7 +28,7 @@ from matplotlib.backends.backend_agg import FigureCanvasAgg as FigureCanvas
 from django.core.cache import cache,get_cache 
 import traceback
 
-def update_test_info():
+def update_comp_info():
     schema_map = {'HighCPI' : ['cpi','>',1.5], 
                   'MemBw' : ['mbw', '<', 1.0 ],
                   'Catastrophe' : ['cat', '<',0.001] ,
@@ -135,8 +135,8 @@ def update(date,rerun=False):
                 print date
             print "Percentage Completed =",100*float(ctr)/num_files
 
-def update_test_field(date,rerun=False):
-    update_test_info()
+def update_metric_fields(date,rerun=False):
+    update_comp_info()
     aud = exam.Auditor(processes=2)
 
     aud.stage(exam.GigEBW)

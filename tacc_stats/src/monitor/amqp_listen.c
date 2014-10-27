@@ -2,10 +2,13 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
+#include <fcntl.h>
 #include <getopt.h>
+#include <syslog.h>
 #include <stdint.h>
 #include <unistd.h>
 #include <sys/time.h>
+#include <sys/types.h>
 #include <sys/stat.h>
 #include <amqp_tcp_socket.h>
 #include <amqp.h>
@@ -42,7 +45,7 @@ int consume(const char *hostname, const char* port, const char* archive_dir)
     amqp_get_rpc_reply(conn);
     queuename = amqp_bytes_malloc_dup(r->queue);
     if (queuename.bytes == NULL) {
-      fprintf(stderr, "Out of memory while copying queue name");
+      syslog(LOG_ERR, "Out of memory while copying queue name\n");
       goto out;
     }
   }
@@ -56,7 +59,6 @@ int consume(const char *hostname, const char* port, const char* archive_dir)
 
   // Write data to file in hostname directory
   FILE *fd;
-
   {
     while (1) {
       amqp_rpc_reply_t res;
@@ -99,16 +101,17 @@ int consume(const char *hostname, const char* port, const char* archive_dir)
       const char *stats_dir_path = strf("%s/%s",archive_dir,hostname);
       if (mkdir(stats_dir_path, 0777) < 0) {
 	if (errno != EEXIST)
-	  FATAL("cannot create directory `%s': %m\n", stats_dir_path);
+	  syslog(LOG_ERR, "cannot create directory `%s': %m\n", stats_dir_path);
       }
       char *current_path = strf("%s/%s",stats_dir_path,"current");
 
       // Unlink from old file if starting a new file      
       if (new_file) {
 	if (unlink(current_path) < 0 && errno != ENOENT) {
-	  ERROR("cannot unlink `%s': %m\n", current_path);
+	  syslog(LOG_ERR, "cannot unlink `%s': %m\n", current_path);
 	  rc = 1;
 	}
+	syslog(LOG_INFO, "Rotating stats file for %s.\n", hostname);
 	fd = fopen(current_path, "w");
 	struct timeval tp;
 	double current_time;
@@ -118,15 +121,15 @@ int consume(const char *hostname, const char* port, const char* archive_dir)
 	// Link to new file which will be left behind after next rotation
 	char *link_path = strf("%s/%ld", stats_dir_path, (long)current_time);
 	if (link_path == NULL)
-	  ERROR("cannot create path: %m\n");
+	  syslog(LOG_ERR, "cannot create path: %m\n");
 	else if (link(current_path, link_path) < 0)
-	  ERROR("cannot link `%s' to `%s': %m\n", current_path, link_path);
+	  syslog(LOG_ERR, "cannot link `%s' to `%s': %m\n", current_path, link_path);
 	free(link_path);	  	 
       }
       else {
 	fd = fopen(current_path, "a+");
       }
-
+      syslog(LOG_INFO, "Consuming stats data from %s\n", hostname);
       fprintf(fd,"%.*s",
 	      (int) envelope.message.body.len, 
 	      (char *) envelope.message.body.bytes);
@@ -149,14 +152,38 @@ int consume(const char *hostname, const char* port, const char* archive_dir)
 int main(int argc, char *argv[])
 {
 
+  /* Our process ID and Session ID */
+  pid_t pid, sid;
+  
+  /* Fork off the parent process */
+  pid = fork();
+  if (pid < 0) {
+    exit(EXIT_FAILURE);
+  }
+  /* If we got a good PID, then
+     we can exit the parent process. */
+  if (pid > 0) {
+    exit(EXIT_SUCCESS);
+  }
+  /* Create a new SID for the child process */
+  sid = setsid();
+  if (sid < 0) {
+    /* Log the failure */
+    exit(EXIT_FAILURE);
+  }
+  /* Change the current working directory */
+  if ((chdir("/")) < 0) {
+    /* Log the failure */
+    exit(EXIT_FAILURE);
+  }
+
+  /* Daemon Specific initialization */
   char *hostname = NULL;
   char *archive_dir = NULL;
   char *port = NULL;
-  int rc = 0;
 
   if (argc < 3) {
-    fprintf(stderr, "Usage: command amqp_listend -s SERVER -a ARCHIVE_DIR -p PORT (5672 is default)\n");
-    return 1;
+    FATAL("Usage: command amqp_listend -s SERVER -a ARCHIVE_DIR -p PORT (5672 is default)\n");
   }
 
   struct option opts[] = {
@@ -190,7 +217,13 @@ int main(int argc, char *argv[])
   if (port == NULL) {
     port = "5672";
   }
+        
+  /* Close out the standard file descriptors */
+  close(STDIN_FILENO);
+  close(STDOUT_FILENO);
+  close(STDERR_FILENO);
+  syslog(LOG_INFO, "Starting tacc_stats consuming daemon.\n");
   consume(hostname, port, archive_dir);
 
-  return rc;
+  exit(EXIT_SUCCESS);
 }

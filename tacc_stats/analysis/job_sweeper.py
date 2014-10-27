@@ -46,8 +46,9 @@ def get_filelist(start,end,pickles_dir=None):
             if max(date.date(),start.date()) > min(date.date(),end.date()): 
                 continue
             print('for date',date.date())
+            print(tspl_utils.getfilelist(os.path.join(root,directory)))
             filelist.extend(tspl_utils.getfilelist(os.path.join(root,directory)))
-            break
+        break
     return filelist
 
 def test_report(auditor, test_type):
@@ -122,25 +123,26 @@ def main(**args):
                                   wide=args['wide'],save=True)
         plotter.run(failed[test_type.__name__])
     return failed
+
 if __name__ == '__main__':
     import argparse
     parser = argparse.ArgumentParser(description='Run tests for jobs')
-    parser.add_argument('-dir', help='Pickles Directory',
-                        type=str, default=cfg.pickles_dir)
     parser.add_argument('start', help='Start date',
                         type=str,default='')
     parser.add_argument('end', help='End date',
                         type=str,default='')
-    parser.add_argument('-p', help='Set number of processes',
-                        type=int, default=1)
+    parser.add_argument('-test', type=str, nargs='+', 
+                        help='Tests to run')
+    parser.add_argument('-p', nargs='?', type=int, default=1,
+                        help='Set number of processes')
+    parser.add_argument('-dir', help='Pickles Directory',
+                        type=str, default=cfg.pickles_dir)
     parser.add_argument('-N', help='Set minimum number of hosts',
                         type=int, default=1)
     parser.add_argument('-s', help='Set minimum time in seconds',
                         type=int, default=3600)
     parser.add_argument('-t', help='Set test threshold',
                         type=float, nargs='*',default=[1.0])
-    parser.add_argument('-test', help='Test to run',
-                        type=str, nargs = '*', default=['Idle'])
     parser.add_argument('-ignore_status', help='Status types to ignore',
                         nargs='*', type=str, default=[])
     parser.add_argument('-waynesses', help='Wayness required',
@@ -152,5 +154,5 @@ if __name__ == '__main__':
                         action="store_true")
     parser.add_argument('-plot', help='Generate a plot',
                         action="store_true")
-    
+
     main(**vars(parser.parse_args()))
