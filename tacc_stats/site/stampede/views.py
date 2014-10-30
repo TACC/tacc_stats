@@ -62,16 +62,11 @@ def update(date,rerun=False):
         print "Number of pickle files in",root,'=',num_files
         for pickle_file in sorted(pickle_files):
             ctr += 1
-            try:
-                if rerun:
-                    if Job.objects.filter(id = pickle_file).exists():
-                        job = Job.objects.filter(id = pickle_file).delete()
-                else:
-                    if Job.objects.filter(id = pickle_file).exists():
-                        continue
 
-                obj,created = Job.objects.get_or_create(id = pickle_file)
-            except: 
+            try:
+                if rerun: pass
+                elif Job.objects.filter(id = pickle_file).exists(): continue
+            except:
                 print pickle_file,"doesn't look like a pickled job"
                 continue
 
@@ -121,8 +116,7 @@ def update(date,rerun=False):
                     if ld.nodes: json['nodes'] = ld.nodes
                     if ld.wayness: json['wayness'] = ld.wayness
                 """
-                obj = Job(**json)
-                obj.save()
+                obj, created = Job.objects.update_or_create(**json)
 
                 for host_name in hosts:
                     h = Host(name=host_name)
@@ -195,9 +189,9 @@ def sys_plot(request, pk):
             name = str(racks[r])+'-'+str(nodes[n])
             if name in hosts: x[n][r] = 1.0
 
-    fig = Figure(figsize=(25,6))
+    fig = Figure(figsize=(17,5))
     ax=fig.add_subplot(1,1,1)
-
+    fig.tight_layout()
     ax.set_yticks(range(len(nodes)))
     ax.set_yticklabels(nodes,fontsize=6)
     ax.set_xticks(range(len(racks)))
@@ -365,7 +359,7 @@ def hist_summary(job_list):
         ax.set_xlabel('CPI')
     except: pass
     try:
-        # MBW
+        # FLOPS
         job_flops = np.array(gflops)
         job_flops = job_flops[job_flops<400]
         mean_flops = job_flops.mean()
