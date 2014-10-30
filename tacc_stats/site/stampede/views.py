@@ -133,16 +133,17 @@ def update_metric_fields(date,rerun=False):
     update_comp_info()
     aud = exam.Auditor(processes=2)
 
-    aud.stage(exam.GigEBW)
-    aud.stage(exam.HighCPI,ignore_status=['FAILED','CANCELLED'])
-    aud.stage(exam.MemBw,ignore_status=['FAILED','CANCELLED'])
-    aud.stage(exam.Catastrophe)
-    aud.stage(exam.MemUsage)
-    aud.stage(exam.PacketRate,ignore_status=['FAILED','CANCELLED'])
-    aud.stage(exam.PacketSize,ignore_status=['FAILED','CANCELLED'])
-    aud.stage(exam.Idle,min_hosts=2,ignore_status=['FAILED','CANCELLED'])
-    aud.stage(exam.LowFLOPS,ignore_status=['FAILED','CANCELLED'])
-    aud.stage(exam.VecPercent,ignore_status=['FAILED','CANCELLED'])
+    
+    aud.stage(exam.GigEBW, ignore_qs=[], min_time = 600)
+    aud.stage(exam.HighCPI, ignore_qs=[], min_time = 600)
+    aud.stage(exam.MemBw, ignore_qs=[], min_time = 600)
+    aud.stage(exam.Catastrophe, ignore_qs=[], min_time = 3600)
+    aud.stage(exam.MemUsage, ignore_qs=[], min_time = 600)
+    aud.stage(exam.PacketRate, ignore_qs=[], min_time = 600)
+    aud.stage(exam.PacketSize, ignore_qs=[], min_time = 600)
+    aud.stage(exam.Idle,min_hosts=2, ignore_qs=[], min_time = 600)
+    aud.stage(exam.LowFLOPS, ignore_qs=[], min_time = 600)
+    aud.stage(exam.VecPercent, ignore_qs=[], min_time = 600)
 
     print 'Run the following tests for:',date
     for name, test in aud.measures.iteritems():
@@ -150,16 +151,20 @@ def update_metric_fields(date,rerun=False):
         obj = TestInfo.objects.get(test_name = name)
         print obj.field_name,obj.threshold,obj.comparator
 
-    jobs_list = Job.objects.filter(date = date).exclude(run_time__lt = 3600)
+    jobs_list = Job.objects.filter(date = date).exclude(run_time__lt = 600)
 
-    #jobs_list = jobs_list.filter(Q(**{'VecPercent' : None}) | Q(**{'VecPercent' : float('nan')}))
+    # Use mem to see if job was tested.  It will always exist
+    if not rerun:
+        jobs_list = jobs_list.filter(mem__isnull=True)
 
     paths = []
     for job in jobs_list:
         paths.append(os.path.join(cfg.pickles_dir,
                                   job.date.strftime('%Y-%m-%d'),
                                   str(job.id)))
-    print '# Jobs to be tested:',len(jobs_list)
+    num_jobs = jobs_list.count()
+    print '# Jobs to be tested:',num_jobs
+    if num_jobs == 0 : return
 
     aud.run(paths)
     print 'finished computing metrics'
@@ -320,7 +325,7 @@ def hist_summary(job_list):
     # Run times
     job_times = np.array(job_list.values_list('run_time',flat=True))/3600.
     ax = fig.add_subplot(221)
-    ax.hist(job_times, max(5, 5*np.log(len(job_list))),log=True)
+    ax.hist(job_times, max(5, 5*np.log(len(job_times))),log=True)
     ax.set_xlim((0,max(job_times)+1))
     ax.set_ylabel('# of jobs')
     ax.set_xlabel('# hrs')
@@ -329,7 +334,7 @@ def hist_summary(job_list):
     # Number of cores
     job_size =  np.array(job_list.values_list('cores',flat=True))
     ax = fig.add_subplot(222)
-    ax.hist(job_size, max(5, 5*np.log(len(job_list))),log=True)
+    ax.hist(job_size, max(5, 5*np.log(len(job_size))),log=True)
     ax.set_xlim((0,max(job_size)+1))
     ax.set_title('Run Sizes for Completed Jobs')
     ax.set_xlabel('# cores')
@@ -353,7 +358,7 @@ def hist_summary(job_list):
         job_cpi = job_cpi[job_cpi<5.0]
         mean_cpi = job_cpi.mean()
         std_cpi = job_cpi.std()
-        ax.hist(job_cpi, max(5, 5*np.log(len(job_list))),log=True)
+        ax.hist(job_cpi, max(5, 5*np.log(len(job_cpi))),log=True)
         ax.set_ylabel('# of jobs')
         ax.set_title('CPI (Jobs > 1 hr) '+r'$\bar{Mean}=$'+'{0:.2f}'.format(mean_cpi)+' '+r'$\pm$' +  '{0:.2f}'.format(std_cpi))
         ax.set_xlabel('CPI')
@@ -365,7 +370,7 @@ def hist_summary(job_list):
         mean_flops = job_flops.mean()
         std_flops = job_flops.std()
         ax = fig.add_subplot(224)        
-        ax.hist(job_flops, max(5, 5*np.log(len(job_list))),log=True)
+        ax.hist(job_flops, max(5, 5*np.log(len(job_flops))),log=True)
         ax.set_ylabel('# of jobs')
         ax.set_title('GFLOPS/Node (Jobs > 1 hr) '+r'$\bar{Mean}=$'+'{0:.2f}'.format(mean_flops)+' '+r'$\pm$' +  '{0:.2f}'.format(std_flops))
         ax.set_xlabel('GFLOPS')
