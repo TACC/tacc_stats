@@ -32,7 +32,6 @@ urlpatterns = patterns('',
                        url(r'^exe_summary/(?P<exe__icontains>.*)/$', 
                            hist_summary, name = 'exe_summary' ),
 
-
                        url(r'^date/(?P<date>\d{4}-\d{2}-\d{2})/$', 
                            index, name='date_view'),
                        url(r'^uid/(?P<uid>\d+?)/$',

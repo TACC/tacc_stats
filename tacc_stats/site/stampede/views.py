@@ -272,16 +272,19 @@ def index(request, **field):
     print 'index',field
     name = ''
     for key, val in field.iteritems():
-        name += val + '-'
-
-    import time
-    start = time.time()
+        name += '['+key+'='+val+']-'
 
     if 'run_time__gte' in field: pass
     else: field['run_time__gte'] = 60
-    job_list = Job.objects.filter(**field).order_by('-id')
 
-    field['name'] = name + 'hist'
+    order_key = '-id'
+    if 'order_key' in field: 
+        order_key = field['order_key']
+        del field['order_key']
+
+    job_list = Job.objects.filter(**field).order_by(order_key)
+
+    field['name'] = name + 'search'
     field['histograms'] = hist_summary(job_list)
     
     field['job_list'] = job_list
@@ -306,23 +309,7 @@ def index(request, **field):
     field['cpi_job_list'] = list_to_dict(field['cpi_job_list'],'cpi')
     field['mem_job_list'] = list_to_dict(field['mem_job_list'],'mem')
     field['gigebw_job_list'] = list_to_dict(field['gigebw_job_list'],'GigEBW')
-    end = time.time()
 
-    print '>>>>>>>>>>>',end-start
-    """
-    from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
-    paginator = Paginator(job_list, 25) # Show 25 contacts per page
-    page = request.GET.get('page')
-    try:
-        jobs = paginator.page(page)
-    except PageNotAnInteger:
-        # If page is not an integer, deliver first page.
-        jobs = paginator.page(1)
-    except EmptyPage:
-        # If page is out of range (e.g. 9999), deliver last page of results.
-        jobs = paginator.page(paginator.num_pages)
-    field['job_list'] = jobs
-    """
     return render_to_response("stampede/index.html", field)
 
 def list_to_dict(job_list,metric):
@@ -364,13 +351,7 @@ def hist_summary(job_list):
     for job in tmp: 
         cpi.append(getattr(job,first))
         gflops.append(getattr(job,second))
-    print 'f m',np.corrcoef(cpi,gflops)
-    """
-    ax = fig.add_subplot(223)  
-    ax.scatter(cpi,gflops)
-    ax.set_ylim([0,380])
-    ax.set_xlim([min(cpi)-0.1,max(cpi)+0.1])
-    """
+
     try:
         # CPI
         job_cpi = np.array(cpi)

@@ -2,7 +2,7 @@
 import os
 DIR = os.path.dirname(os.path.abspath(__file__))
 
-DEBUG = False
+DEBUG = True
 TEMPLATE_DEBUG = DEBUG
 
 ADMINS = (
@@ -119,7 +119,7 @@ ROOT_URLCONF = 'tacc_stats_site.urls'
 WSGI_APPLICATION = 'tacc_stats_site.wsgi.application'
 
 TEMPLATE_DIRS = (
-    os.path.join(DIR,'templates')
+    os.path.join(DIR,'templates'),
     # Put strings here, like "/home/html/django_templates" or "C:/www/django/templates".
     # Always use forward slashes, even on Windows.
     # Don't forget to use absolute paths, not relative paths.

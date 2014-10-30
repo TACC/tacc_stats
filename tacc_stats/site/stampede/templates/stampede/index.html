@@ -4,7 +4,7 @@
 </head>
 <body>
 
-{{ name }}
+<font face="verdana" color ="blue" size="4">{{ name }}</font>
 <img src="{{ histograms }}" />
 
 <h1># Jobs over 1 mn in run time = {{nj}}</h1>
@@ -99,7 +99,7 @@
 	  <th> status </th>
 	  <th> wayness </th>
 	  <th> cores </th>
-	  <th> nodes </th>
+	  <th>nodes</th>
 	  <th> SUs </th>
 	</tr>
     {% for job in job_list %}
@@ -125,23 +125,6 @@
 {% else %}
     <p>No jobs are available.</p>
 {% endif %}
-<!---
-<div class="pagination">
-    <span class="step-links">
-        {% if job_list.has_previous %}
-            <a href="?page={{ job_list.previous_page_number }}">previous</a>
-        {% endif %}
-
-        <span class="current">
-            Page {{ job_list.number }} of {{ job_list.paginator.num_pages }}.
-        </span>
-
-        {% if job_list.has_next %}
-            <a href="?page={{ job_list.next_page_number }}">next</a>
-        {% endif %}
-    </span>
-</div>
---->
 
 </body>
 </html>
