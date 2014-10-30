@@ -1,6 +1,10 @@
 #!/usr/bin/env python
-import os,sys
-os.environ['DJANGO_SETTINGS_MODULE']='tacc_stats.site.tacc_stats_site.settings'
+import os
+os.environ.setdefault("DJANGO_SETTINGS_MODULE",
+                      "tacc_stats.site.tacc_stats_site.settings")
+import django
+django.setup()
+
 from tacc_stats.site.stampede.models import Job
     
 def search(kwargs):

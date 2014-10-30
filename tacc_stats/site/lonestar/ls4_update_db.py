@@ -2,6 +2,9 @@
 import os,sys
 from datetime import timedelta,datetime
 os.environ['DJANGO_SETTINGS_MODULE']='tacc_stats.site.tacc_stats_site.settings'
+import django
+django.setup()
+
 from tacc_stats.site.lonestar import views
 from tacc_stats.pickler import MetaData as MetaData
 

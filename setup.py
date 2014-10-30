@@ -476,14 +476,6 @@ extensions.append(Extension("tacc_stats.monitor", **ext_data))
 cfg_sh(pjoin(os.path.dirname(__file__), 'tacc_stats',
              'src','monitor','archive.sh.in'),paths)
 
-if not MONITOR_ONLY:    
-    cfg_sh(pjoin(os.path.dirname(__file__), 'tacc_stats',
-                 'analysis','exams_cron.sh.in'),paths)
-    cfg_sh(pjoin(os.path.dirname(__file__), 'tacc_stats',
-                 'pickler','do_job_pickles_cron.sh.in'),paths)
-    cfg_sh(pjoin(os.path.dirname(__file__), 'tacc_stats',
-                 'site','update_cron.sh.in'),paths)
-
 if MONITOR_ONLY:
     setup(name=DISTNAME,
           version=FULLVERSION,
@@ -516,9 +508,6 @@ else:
                    'tacc_stats/archive.sh',
                    'tacc_stats/analysis/job_sweeper.py',
                    'tacc_stats/analysis/job_plotter.py',
-                   'tacc_stats/exams_cron.sh',
-                   'tacc_stats/update_cron.sh',
-                   'tacc_stats/do_job_pickles_cron.sh',
                    'tacc_stats/site/lonestar/ls4_update_db.py',
                    'tacc_stats/site/stampede/update_db.py',
                    'tacc_stats/pickler/job_pickles.py'],
