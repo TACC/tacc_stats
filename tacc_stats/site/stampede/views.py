@@ -30,8 +30,9 @@ import traceback
 
 def update_comp_info():
     schema_map = {'HighCPI' : ['cpi','>',1.5], 
+                  'HighCPLD' : ['cpld','>',1.5], 
                   'MemBw' : ['mbw', '<', 1.0 ],
-                  'Catastrophe' : ['cat', '<',0.001] ,
+                  'Catastrophe' : ['cat', '<',0.01] ,
                   'MemUsage' : ['mem','>',31], 
                   'PacketRate' : ['packetrate','>',0], 
                   'PacketSize' : ['packetsize','>',0],
@@ -132,10 +133,10 @@ def update(date,rerun=False):
 def update_metric_fields(date,rerun=False):
     update_comp_info()
     aud = exam.Auditor(processes=2)
-
     
     aud.stage(exam.GigEBW, ignore_qs=[], min_time = 600)
     aud.stage(exam.HighCPI, ignore_qs=[], min_time = 600)
+    aud.stage(exam.HighCPLD, ignore_qs=[], min_time = 600)
     aud.stage(exam.MemBw, ignore_qs=[], min_time = 600)
     aud.stage(exam.Catastrophe, ignore_qs=[], min_time = 3600)
     aud.stage(exam.MemUsage, ignore_qs=[], min_time = 600)
@@ -266,6 +267,7 @@ def search(request):
     except: pass
 
     return render(request, 'stampede/search.html', {'error' : True})
+
 
 def index(request, **field):
     print 'index',field

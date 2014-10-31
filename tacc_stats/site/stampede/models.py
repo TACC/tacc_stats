@@ -27,6 +27,7 @@ class Job(models.Model):
     threads = models.BigIntegerField(null=True)
 
     cpi = models.FloatField(null=True)
+    cpld = models.FloatField(null=True)
     mbw = models.FloatField(null=True)
     idle = models.FloatField(null=True)
     cat = models.FloatField(null=True)
