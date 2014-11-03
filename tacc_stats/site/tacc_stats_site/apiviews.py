@@ -14,7 +14,7 @@ from rest_framework.response import Response
 from rest_framework.decorators import detail_route, list_route
 from rest_framework import status
 from django.core.paginator import Paginator
-
+from renderers import TACCJSONRenderer
 class JSONResponse(HttpResponse):
     """
     An HttpResponse that renders its content into JSON.
@@ -79,7 +79,7 @@ class StampedeJobsViewSet(viewsets.ReadOnlyModelViewSet, PaginateByMaxMixin, Job
     max_paginate_by = 10
     serializer_class = StampedeJobSerializer
     permission_classes = (IsAuthenticatedOrReadOnly,)
-
+    renderer_classes = (TACCJSONRenderer,)
     def list(self,request):
         """
         Returns jobs run on Stampede.
@@ -115,7 +115,7 @@ class LonestarJobsViewSet(viewsets.ReadOnlyModelViewSet,JobsView):
     """
     serializer_class = LonestarJobSerializer
     permission_classes = (IsAuthenticatedOrReadOnly,)
-
+    renderer_classes = (TACCJSONRenderer,)
     def list(self,request):
         """
         Returns jobs run on Lonestar.

@@ -16,15 +16,19 @@ class GroupSerializer(serializers.HyperlinkedModelSerializer):
         fields = ('url', 'name')
 
 class StampedeJobSerializer(serializers.HyperlinkedModelSerializer):
+    gig_ebw = serializers.CharField(source='GigEBW')
+    vec_percent = serializers.CharField(source='VecPercent')
     class Meta:
         model = Job
-        fields = ('id', 'project', 'start_time','end_time','start_epoch','end_epoch','run_time','queue','name','status','nodes','cores','path','date','user','exe','cwd','threads','GigEBW','flops','VecPercent',)
+        fields = ('id', 'project', 'start_time','end_time','run_time','queue','status','date','user','cpi','mbw','idle','cat','mem','packetrate','packetsize','gig_ebw','flops','vec_percent',)
 
 class StampedeJobDetailSerializer(serializers.HyperlinkedModelSerializer):
     master_plot = serializers.SerializerMethodField("get_master_plot")
     heat_map = serializers.SerializerMethodField("get_heat_map")
     sys_plot = serializers.SerializerMethodField("get_sys_plot")
     type_list = serializers.SerializerMethodField("get_type_list")
+    gig_ebw = serializers.CharField(source='GigEBW')
+    vec_percent = serializers.CharField(source='VecPercent')
     def get_master_plot(self,obj):
         return stampedeapiviews.master_plot(None, obj.id)
 
@@ -39,7 +43,7 @@ class StampedeJobDetailSerializer(serializers.HyperlinkedModelSerializer):
 
     class Meta:
         model = Job
-        fields = ('id', 'project', 'start_time','end_time','start_epoch','end_epoch','run_time','queue','name','status','nodes','cores','path','date','user','exe','cwd','threads','master_plot','heat_map','sys_plot','type_list')
+        fields = ('id','uid', 'project', 'start_time','end_time','run_time','queue_time','queue','name','status','nodes','cores','wayness','path','date','user','exe','threads','cpi','mbw','idle','cat','mem','packetrate','packetsize','gig_ebw','flops','vec_percent','master_plot','heat_map','sys_plot','type_list')
 
 class LonestarJobSerializer(serializers.HyperlinkedModelSerializer):
     class Meta:

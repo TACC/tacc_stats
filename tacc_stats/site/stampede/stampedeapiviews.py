@@ -178,9 +178,9 @@ def type_list(job_id):
     host0=data.hosts.values()[0]
     for type_name, type in host0.stats.iteritems():
         schema = ' '.join(build_schema(data,type_name))
-        type_list.append( (type_name, schema) )
-
-    return sorted(type_list, key = lambda type_name: type_name[0])
+        type_list.append({'type_name':type_name, 'schema':schema})
+    return type_list;
+    #return sorted(type_list, key = lambda type_name: type_name[0])
 
 def type_info(pk, type_name):
     data = get_data(pk)
@@ -252,4 +252,3 @@ class JobDetailView(DetailView):
         context['server_url'] = serverstring
 
         return context
-
