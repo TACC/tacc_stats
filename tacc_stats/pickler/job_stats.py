@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 import datetime, errno, glob, numpy, os, sys, time, gzip
-import amd64_pmc, intel_snb, batch_acct
+import amd64_pmc, intel_process, batch_acct
 import re
 #import procdump
 import string
@@ -624,7 +624,7 @@ class Job(object):
                                                              dev_name, raw_dev_stats)
             del host.raw_stats
         amd64_pmc.process_job(self)
-        intel_snb.process_job(self)
+        intel_process.process_job(self)
         # Clear mult, width from schemas. XXX
         for schema in self.schemas.itervalues():
             for e in schema.itervalues():

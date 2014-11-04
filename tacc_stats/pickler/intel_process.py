@@ -1,6 +1,6 @@
-## @file intel_snb.py
-# Post-processing for core and uncore SNB events are performed in this file
-# for the pickler. 
+## @file intel_process.py
+# Post-processing for core and uncore NHM/WTM/SNB events 
+# are performed in this file for the pickler. 
 #
 # The registers must be reported in the following order in the stats file:
 # -# CTL registers
@@ -104,6 +104,8 @@ wtm_event_map = {
     WTM_PERF_EVENT(0x0F, 0x10) : 'MEM_UNCORE_RETIRED_REMOTE_DRAM,E',
     WTM_PERF_EVENT(0x0F, 0x20) : 'MEM_UNCORE_RETIRED_LOCAL_DRAM,E',
     WTM_PERF_EVENT(0x10, 0x01) : 'FP_COMP_OPS_EXE_X87,E',
+    WTM_PERF_EVENT(0x10, 0x10) : 'FP_COMP_OPS_EXE_SSE_PACKED,E',
+    WTM_PERF_EVENT(0x10, 0x20) : 'FP_COMP_OPS_EXE_SSE_SCALAR,E',
     WTM_PERF_EVENT(0xCB, 0x01) : 'MEM_LOAD_RETIRED_L1D_HIT,E',              
     'FIXED0'                   : 'INSTRUCTIONS_RETIRED,E',
     'FIXED1'                   : 'CLOCKS_UNHALTED_CORE,E',
@@ -256,11 +258,24 @@ def process_job(job):
         for host in job.hosts.itervalues():
             r2pci.register(host)
 
+    # Backwards compatibility
     if 'intel_pmc3' in job.schemas:
         wtm = reformat_counters(job, 'intel_pmc3',wtm_event_map)
         for host in job.hosts.itervalues():
             wtm.register(host)
+
+    if 'intel_wtm' in job.schemas:
+        wtm = reformat_counters(job, 'intel_wtm',wtm_event_map)
+        for host in job.hosts.itervalues():
+            wtm.register(host)
+
     if 'intel_uncore' in job.schemas:
         wtmunc = reformat_counters(job, 'intel_uncore',wtmunc_event_map)
         for host in job.hosts.itervalues():
             wtmunc.register(host)
+
+    # NHM has the same events as WTM (for our purposes)
+    if 'intel_nhm' in job.schemas:
+        nhm = reformat_counters(job, 'intel_nhm',wtm_event_map)
+        for host in job.hosts.itervalues():
+            nhm.register(host)

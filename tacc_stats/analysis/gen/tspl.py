@@ -86,7 +86,11 @@ class TSPLBase:
       if 'amd64_core' in self.j.hosts.values()[0].stats:
         self.pmc_type='amd64'
       elif 'intel_pmc3' in self.j.hosts.values()[0].stats:
-        self.pmc_type='intel'
+        self.pmc_type='intel_pmc3'
+      elif 'intel_nhm' in self.j.hosts.values()[0].stats:
+        self.pmc_type='intel_nhm'
+      elif 'intel_wtm' in self.j.hosts.values()[0].stats:
+        self.pmc_type='intel_wtm'
       elif 'intel_snb' in self.j.hosts.values()[0].stats:
         self.pmc_type='intel_snb'
       
