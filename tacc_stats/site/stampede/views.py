@@ -31,6 +31,9 @@ import traceback
 def update_comp_info():
     schema_map = {'HighCPI' : ['cpi','>',1.5], 
                   'HighCPLD' : ['cpld','>',1.5], 
+                  'Load_L1Hits' : ['Load_L1Hits','>',1.5], 
+                  'Load_L2Hits' : ['Load_L2Hits','>',1.5], 
+                  'Load_LLCHits' : ['Load_LLCHits','>',1.5], 
                   'MemBw' : ['mbw', '<', 1.0 ],
                   'Catastrophe' : ['cat', '<',0.01] ,
                   'MemUsage' : ['mem','>',31], 
@@ -96,8 +99,13 @@ def update(date,rerun=False):
                 # Assign additional xalt data if available
                 xd = run.objects.using('xalt').filter(job_id = json['id'])
                 if xd:
+                    #r = 0
+                    #for x in xd: r+= x.run_time
                     xd              = xd[0]
-                    print 'Using xalt',xd.job_id
+
+                    #print json['id'],json['run_time'],json['cores'],json['nodes']
+                    #print xd.job_id,r,xd.num_cores,xd.num_nodes
+
                     json['user']    = xd.user
                     json['exe']     = xd.exec_path.split('/')[-1][0:128]
                     json['cwd']     = xd.cwd[0:128]
@@ -105,6 +113,7 @@ def update(date,rerun=False):
                     json['cores']   = xd.num_cores
                     json['nodes']   = xd.num_nodes
                     json['wayness'] = xd.num_cores/xd.num_nodes
+
                 """
                 else: # Otherwise use Lariat Data if available
                     ld.set_job(pickle_file, end_time = date)
@@ -137,6 +146,9 @@ def update_metric_fields(date,rerun=False):
     aud.stage(exam.GigEBW, ignore_qs=[], min_time = 600)
     aud.stage(exam.HighCPI, ignore_qs=[], min_time = 600)
     aud.stage(exam.HighCPLD, ignore_qs=[], min_time = 600)
+    aud.stage(exam.Load_L1Hits, ignore_qs=[], min_time = 600)
+    aud.stage(exam.Load_L2Hits, ignore_qs=[], min_time = 600)
+    aud.stage(exam.Load_LLCHits, ignore_qs=[], min_time = 600)
     aud.stage(exam.MemBw, ignore_qs=[], min_time = 600)
     aud.stage(exam.Catastrophe, ignore_qs=[], min_time = 3600)
     aud.stage(exam.MemUsage, ignore_qs=[], min_time = 600)
@@ -155,9 +167,9 @@ def update_metric_fields(date,rerun=False):
     jobs_list = Job.objects.filter(date = date).exclude(run_time__lt = 600)
 
     # Use mem to see if job was tested.  It will always exist
-    if not rerun:
-        jobs_list = jobs_list.filter(mem__isnull=True)
-
+    #if not rerun:
+    #    jobs_list = jobs_list.filter(Q(cpi = None) | Q(cpi = float('nan')))
+    
     paths = []
     for job in jobs_list:
         paths.append(os.path.join(cfg.pickles_dir,

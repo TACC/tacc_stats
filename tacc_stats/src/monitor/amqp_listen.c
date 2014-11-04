@@ -34,14 +34,24 @@ int consume(const char *hostname, const char* port, const char* archive_dir)
 
   conn = amqp_new_connection();
   socket = amqp_tcp_socket_new(conn);
-  status = amqp_socket_open(socket, hostname, atoi(port));
-  amqp_login(conn, "/", 0, 131072, 0, AMQP_SASL_METHOD_PLAIN, "guest", "guest");
+
+  if (amqp_socket_open(socket, hostname, atoi(port))) {
+    syslog(LOG_ERR,"Error opening RMQ server %s on port %s\n",hostname,port);
+    exit(1);
+  }
+
+  amqp_login(conn, "/", 0, 131072, 0, 
+	     AMQP_SASL_METHOD_PLAIN, "guest", "guest");
   amqp_channel_open(conn, 1);
   amqp_get_rpc_reply(conn);
 
   {
-    amqp_queue_declare_ok_t *r = amqp_queue_declare(conn, 1, amqp_cstring_bytes("tacc_stats"), 0, 1, 0, 0,
-                                 amqp_empty_table);
+    amqp_queue_declare_ok_t *r = 
+      amqp_queue_declare(conn, 1, 
+			 amqp_cstring_bytes("tacc_stats"), 
+			 0, 1, 0, 0,
+			 amqp_empty_table);
+
     amqp_get_rpc_reply(conn);
     queuename = amqp_bytes_malloc_dup(r->queue);
     if (queuename.bytes == NULL) {
@@ -50,13 +60,17 @@ int consume(const char *hostname, const char* port, const char* archive_dir)
     }
   }
 
-  amqp_queue_bind(conn, 1, queuename, amqp_cstring_bytes(exchange), amqp_cstring_bytes(bindingkey),
+  amqp_queue_bind(conn, 1, queuename, 
+		  amqp_cstring_bytes(exchange), 
+		  amqp_cstring_bytes(bindingkey),
                   amqp_empty_table);
   amqp_get_rpc_reply(conn);
 
-  amqp_basic_consume(conn, 1, queuename, amqp_empty_bytes, 0, 0, 0, amqp_empty_table);
+  amqp_basic_consume(conn, 1, queuename, 
+		     amqp_empty_bytes, 
+		     0, 0, 0, amqp_empty_table);
   amqp_get_rpc_reply(conn);
-
+  syslog(LOG_INFO,"Made it this far");
   // Write data to file in hostname directory
   FILE *fd;
   {
@@ -183,7 +197,8 @@ int main(int argc, char *argv[])
   char *port = NULL;
 
   if (argc < 3) {
-    FATAL("Usage: command amqp_listend -s SERVER -a ARCHIVE_DIR -p PORT (5672 is default)\n");
+    syslog(LOG_ERR,"Usage: command amqp_listend -s SERVER -a ARCHIVE_DIR -p PORT (5672 is default)\n");
+    exit(1);
   }
 
   struct option opts[] = {
@@ -209,10 +224,12 @@ int main(int argc, char *argv[])
   }
 
   if (hostname == NULL) {
-    FATAL("Must specify a RMQ server with -s [--server] argument.\n");
+    syslog(LOG_ERR, "Must specify a RMQ server with -s [--server] argument.\n");
+    exit(1);
   }
   if (archive_dir == NULL) {
-    FATAL("Must specify an archive dir -a [--archive_dir] argument.\n");
+    syslog(LOG_ERR, "Must specify an archive dir -a [--archive_dir] argument.\n");
+    exit(1);
   }
   if (port == NULL) {
     port = "5672";

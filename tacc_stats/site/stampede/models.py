@@ -37,7 +37,10 @@ class Job(models.Model):
     GigEBW = models.FloatField(null=True)
     flops = models.FloatField(null=True)
     VecPercent = models.FloatField(null=True)
-    
+    Load_L1Hits = models.BigIntegerField(null=True)
+    Load_L2Hits = models.BigIntegerField(null=True)
+    Load_LLCHits = models.BigIntegerField(null=True)
+
     def __unicode__(self):
         return str(self.id)
 
@@ -51,7 +54,9 @@ class Job(models.Model):
         return ret_val
 
     def sus(self):
-        return self.nodes * self.run_time * 0.0002777777777777778
+        factor = 16
+        if self.queue == 'largemem': factor = 32  
+        return self.nodes * self.run_time * 0.0002777777777777778 * factor
 
 class Host(models.Model):
     name = models.CharField(max_length=128)

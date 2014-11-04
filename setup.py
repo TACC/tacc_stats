@@ -59,7 +59,6 @@ MICRO = 0
 ISRELEASED = True
 VERSION = '%d.%d.%d' % (MAJOR, MINOR, MICRO)
 QUALIFIER = ''
-RMQ = True
 FULLVERSION = VERSION
 write_version = True
 
@@ -138,13 +137,13 @@ def read_site_cfg():
     if cfg_filename:
         config.read(cfg_filename)
     else:
-        print 'Specify a filename e.g. (hostname + .cfg)'
+        print 'Specify a filename e.g. (setup.cfg)'
         sys.exit()
         
     paths = dict(config.items('PATHS'))
     types = dict(config.items('TYPES'))
-
-    return paths,types
+    options = dict(config.items('OPTIONS'))
+    return paths,types,options
 
 def write_stats_x(types):
 
@@ -229,10 +228,13 @@ class CleanCommand(Command):
             except Exception:
                 pass
 
-paths,types = read_site_cfg()
+paths,types,options = read_site_cfg()
 write_stats_x(types)
 write_cfg_file(paths)
 
+RMQ = False
+if options['rmq'] == 'True': 
+    RMQ = True
 
 root='tacc_stats/src/monitor/'
 sources=[
@@ -269,7 +271,6 @@ define_macros=[('STATS_DIR_PATH','\"'+paths['stats_dir']+'\"'),
                ('JOBID_FILE_PATH','\"'+paths['jobid_file']+'\"')]
 if RMQ:
     define_macros.append(('RMQ',True))
-    library_dirs.append("/usr/local/lib64")
     libraries.append("rabbitmq")
 
 flags = ['-D_GNU_SOURCE','-DDEBUG','-Wp,-U_FORTIFY_SOURCE',
@@ -505,6 +506,7 @@ else:
           packages=find_packages(),
           package_data = {'' : ['*.sh.in','*.cfg','*.html','*.png','*.jpg','*.h'] },
           scripts=['build/bin/monitor',
+                   'build/bin/amqp_listend',
                    'tacc_stats/archive.sh',
                    'tacc_stats/analysis/job_sweeper.py',
                    'tacc_stats/analysis/job_plotter.py',
@@ -519,7 +521,9 @@ else:
           description=DESCRIPTION,
           zip_safe=False,
           license=LICENSE,
-          cmdclass={'build_ext' : MyBuildExt, 'clean' : CleanCommand, 'bdist_rpm' : MyBDist_RPM},
+          cmdclass={'build_ext' : MyBuildExt, 
+                    'clean' : CleanCommand, 
+                    'bdist_rpm' : MyBDist_RPM},
           url=URL,
           download_url=DOWNLOAD_URL,
           long_description=LONG_DESCRIPTION,
