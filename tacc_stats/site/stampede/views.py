@@ -99,13 +99,7 @@ def update(date,rerun=False):
                 # Assign additional xalt data if available
                 xd = run.objects.using('xalt').filter(job_id = json['id'])
                 if xd:
-                    #r = 0
-                    #for x in xd: r+= x.run_time
                     xd              = xd[0]
-
-                    #print json['id'],json['run_time'],json['cores'],json['nodes']
-                    #print xd.job_id,r,xd.num_cores,xd.num_nodes
-
                     json['user']    = xd.user
                     json['exe']     = xd.exec_path.split('/')[-1][0:128]
                     json['cwd']     = xd.cwd[0:128]
@@ -137,7 +131,7 @@ def update(date,rerun=False):
                 print pickle_file,'failed'
                 print traceback.format_exc()
                 print date
-            print "Percentage Completed =",100*float(ctr)/num_files
+            #print "Percentage Completed =",100*float(ctr)/num_files
 
 def update_metric_fields(date,rerun=False):
     update_comp_info()

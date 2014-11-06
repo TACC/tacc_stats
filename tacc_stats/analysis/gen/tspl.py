@@ -82,25 +82,22 @@ class TSPLBase:
             float(self.numhosts*16.0)/3600.0 # Need to refactor the 16 into the
                                         # accounting class
 
+    if 'amd64_core' in self.j.hosts.values()[0].stats:
+      self.pmc_type='amd64'
+    elif 'intel_pmc3' in self.j.hosts.values()[0].stats:
+      self.pmc_type='intel_pmc3'
+    elif 'intel_nhm' in self.j.hosts.values()[0].stats:
+      self.pmc_type='intel_nhm'
+    elif 'intel_wtm' in self.j.hosts.values()[0].stats:
+      self.pmc_type='intel_wtm'
+    elif 'intel_snb' in self.j.hosts.values()[0].stats:
+      self.pmc_type='intel_snb'
+
     if isinstance(k1,dict) and isinstance(k2,dict):
-      if 'amd64_core' in self.j.hosts.values()[0].stats:
-        self.pmc_type='amd64'
-      elif 'intel_pmc3' in self.j.hosts.values()[0].stats:
-        self.pmc_type='intel_pmc3'
-      elif 'intel_nhm' in self.j.hosts.values()[0].stats:
-        self.pmc_type='intel_nhm'
-      elif 'intel_wtm' in self.j.hosts.values()[0].stats:
-        self.pmc_type='intel_wtm'
-      elif 'intel_snb' in self.j.hosts.values()[0].stats:
-        self.pmc_type='intel_snb'
       
       if self.pmc_type in k1:
         self.k1=k1[self.pmc_type]
         self.k2=k2[self.pmc_type]
-      else:
-        raise TSPLException(self.pmc_type+
-                            ' not supported for job'+str(self.j.id))
-      
       
       if not self.k1[0] in self.j.schemas:
         raise TSPLException(self.k1[0]+' not supported for job '+str(self.j.id))
@@ -110,8 +107,7 @@ class TSPLBase:
       self.k2=k2
       
       if not self.k1[0] in self.j.schemas:
-        raise TSPLException(self.k1[0]+' not supported for job '+str(self.j.id))
-      
+        raise TSPLException(self.k1[0]+' not supported for job '+str(self.j.id))      
     else:
       raise TSPLException('Input types must match and be lists or dicts: ' +
                           str(type(k1)) + ' ' + str(type(k2)))
@@ -120,7 +116,7 @@ class TSPLBase:
       self.t=(self.j.times-self.j.times[0])
     except:
       raise TSPLException('Time series is '+str(self.j.times))
-
+    
 
     if len(self.t) == 0:
       raise TSPLException('Time range is 0')
