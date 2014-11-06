@@ -31,7 +31,7 @@ class TSPLBase:
       self.f.close()
 
     try: 
-      self.wayness=self.j.acct['cores']/self.j.acct['nodes']
+      self.wayness=int(self.j.acct['cores'])/int(self.j.acct['nodes'])
     except ZeroDivisionError:
       if VERBOSE: print "Read zero nodes, assuming 16 way for job " + str(self.j.id)
       self.wayness=16
