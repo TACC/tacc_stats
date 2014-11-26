@@ -221,14 +221,17 @@ static int intel_snb_qpi_begin(struct stats_type *type)
     { TxL_FLITS_G1_SNP,  TxL_FLITS_G1_HOM, G1_DRS_DATA, G2_NCB_DATA},
   };
 
-  /* 2 buses and 4 devices per bus */
-  char *bus[2] = {"7f", "ff"};
+  /* 2-4 buses and 4 devices per bus */
+  char **bus;
+  int num_buses;
+  num_buses = get_pci_busids(&bus);
+
   char *dev[2] = {"08.2", "09.2"};
   int   ids[2] = {0x3c41, 0x3c42};
   char bus_dev[80];
 
   int i, j;
-  for (i = 0; i < 2; i++) {
+  for (i = 0; i < num_buses; i++) {
     for (j = 0; j < 2; j++) {
 
       snprintf(bus_dev, sizeof(bus_dev), "%s/%s", bus[i], dev[j]);
@@ -293,15 +296,18 @@ static void intel_snb_qpi_collect_dev(struct stats_type *type, char *bus_dev, ch
 
 static void intel_snb_qpi_collect(struct stats_type *type)
 {
-  /* 2 buses and 4 devices per bus */
-  char *bus[2] = {"7f", "ff"};
+  /* 2-4 buses and 4 devices per bus */
+  char **bus;
+  int num_buses;
+  num_buses = get_pci_busids(&bus);
+
   char *dev[2] = {"08.2", "09.2"};
   int   ids[2] = {0x3c41, 0x3c42};
   char bus_dev[80];                                        
   char socket_dev[80];
 
   int i, j;
-  for (i = 0; i < 2; i++) {
+  for (i = 0; i < num_buses; i++) {
     for (j = 0; j < 2; j++) {
       snprintf(bus_dev, sizeof(bus_dev), "%s/%s", bus[i], dev[j]);
       snprintf(socket_dev, sizeof(socket_dev), "%d/%d", i, j);

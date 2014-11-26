@@ -207,14 +207,17 @@ static int intel_snb_r2pci_begin(struct stats_type *type)
     { TxR_INSERTS, RING_BL_USED_ALL, RING_AD_USED_ALL, RING_AK_USED_ALL},
   };
 
-  /* 2 buses and 1 device per bus */
-  char *bus[2] = {"7f", "ff"};
+  /* 2-4 buses and 1 device per bus */
+  char **bus;
+  int num_buses;
+  num_buses = get_pci_busids(&bus);
+
   char *dev[1] = {"13.1"};
   int   ids[1] = {0x3c43};
   char bus_dev[80];
 
   int i, j;
-  for (i = 0; i < 2; i++) {
+  for (i = 0; i < num_buses; i++) {
     for (j = 0; j < 1; j++) {
 
       snprintf(bus_dev, sizeof(bus_dev), "%s/%s", bus[i], dev[j]);
@@ -280,15 +283,18 @@ static void intel_snb_r2pci_collect_dev(struct stats_type *type, char *bus_dev, 
 
 static void intel_snb_r2pci_collect(struct stats_type *type)
 {
-  /* 2 buses and 1 device per bus */
-  char *bus[2] = {"7f", "ff"};
+  /* 2-4 buses and 1 device per bus */
+  char **bus;
+  int num_buses;
+  num_buses = get_pci_busids(&bus);
+
   char *dev[1] = {"13.1"};
   int   ids[1] = {0x3c43};
   char bus_dev[80];                                        
   char socket_dev[80];
   
   int i, j;
-  for (i = 0; i < 2; i++) {
+  for (i = 0; i < num_buses; i++) {
     for (j = 0; j < 1; j++) {
       snprintf(bus_dev, sizeof(bus_dev), "%s/%s", bus[i], dev[j]);      
       snprintf(socket_dev, sizeof(socket_dev), "%d/%d", i, j);      

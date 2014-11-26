@@ -239,7 +239,8 @@ if options['rmq'] == 'True':
 root='tacc_stats/src/monitor/'
 sources=[
     pjoin(root,'schema.c'),pjoin(root,'dict.c'),pjoin(root,'collect.c'),
-    pjoin(root,'stats_file.c'),pjoin(root,'monitor.c'),pjoin(root,'main.c'),pjoin(root,'stats.c')
+    pjoin(root,'stats_file.c'),pjoin(root,'monitor.c'),pjoin(root,'main.c'),
+    pjoin(root,'stats.c'),pjoin(root,'pci_busid_map.c')
     ]
 
 if RMQ: sources.append(pjoin(root,'amqp_listen.c'))
