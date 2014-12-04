@@ -129,18 +129,15 @@ INSTALLED_APPS = (
     'django.contrib.messages',
     'django.contrib.staticfiles',
     #'django_extensions',
-    # Uncomment the next line to enable the admin:
     'django.contrib.admin',
     'south',
-    #'django_pdf',
-    # Uncomment the next line to enable admin documentation:
     # 'django.contrib.admindocs',
     'tacc_stats.site.stampede',
     'tacc_stats.site.lonestar',
     'rest_framework',
     'rest_framework_swagger',
     'django_extensions',
-    'rest_framework_extensions'
+    #'rest_framework_extensions'
 )
 """
 TEMPLATE_CONTEXT_PROCESSORS=(
@@ -162,8 +159,6 @@ REST_FRAMEWORK = {
         'rest_framework.permissions.DjangoModelPermissionsOrAnonReadOnly'
     ],
     'PAGINATE_BY': 10,                 # Default to 10
-    'PAGINATE_BY_PARAM': 'page_size',  # Allow client to override, using `?page_size=xxx`.
-    'MAX_PAGINATE_BY': 100             # Maximum limit allowed when using `?page_size=xxx`.
 }
 
 LOGGING = {
@@ -173,7 +168,7 @@ LOGGING = {
         'file': {
             'level': 'DEBUG',
             'class': 'logging.FileHandler',
-            'filename': '/home/agauli/debug.log',
+            'filename': '/var/log/tacc_stats.log',
         },
     },
     'loggers': {
@@ -204,12 +199,14 @@ SWAGGER_SETTINGS = {
     "api_path": "/",  # Specify the path to your API not a root level
     "enabled_methods": [  # Specify which methods to enable in Swagger UI
         'get',
-        'post',
-        'put',
-        'patch',
-        'delete'
     ],
     "api_key": '', #An API key
     "is_authenticated": False,  # Set to True to enforce user authentication,
     "is_superuser": False,  # Set to True to enforce admin only access
+    "permission_denied_handler": None,
+    "info": {
+        'contact': '',
+        'description': '',
+    },
+    "permission_denied_handler": "apiviews.permission_denied_handler"
 }

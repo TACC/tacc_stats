@@ -26,4 +26,5 @@ analysis/*.sh
 tacc_stats/version.py
 tacc_stats/cfg.py
 *.egg
+.idea/*
 #*

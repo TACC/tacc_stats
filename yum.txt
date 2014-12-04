@@ -1,0 +1,16 @@
+erlang
+librabbitmq
+librabbitmq-tools
+librabbitmq-devel
+libibmad
+libibmad-devel
+libibmad-static
+libibumad
+libibumad-devel
+libibumad-static
+python-matplotlib
+numpy
+scipy
+MySQL-python
+postgresql 
+postgresql-devel

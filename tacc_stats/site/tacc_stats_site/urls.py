@@ -2,18 +2,15 @@ from django.conf.urls import patterns, include, url
 from rest_framework import routers
 import apiviews
 import settings
-from stampede import stampedeapiviews
+
 # Uncomment the next two lines to enable the admin:
 from django.contrib import admin
 admin.autodiscover()
 
 router = routers.DefaultRouter()
 router.register(r'users', apiviews.UserViewSet)
-router.register(r'groups',apiviews.GroupViewSet)
 router.register(r'jobs/stampede',apiviews.StampedeJobsViewSet,'job')
 router.register(r'jobs/lonestar',apiviews.LonestarJobsViewSet,'ls4job')
-#router.register(r'lonestar/jobs',apiviews.LonestarJobsViewSet,'ls4job')
-#router.register(r'stampede/jobs/master_plot/(?P<pk>\d+)/$',stampedeapiviews.JobDetailView,'job-list')
 
 urlpatterns = patterns('',
     # Examples:

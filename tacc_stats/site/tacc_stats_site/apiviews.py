@@ -3,7 +3,7 @@ from rest_framework import viewsets
 from rest_framework_extensions.mixins import PaginateByMaxMixin
 from rest_framework.renderers import JSONRenderer
 from rest_framework.permissions import IsAuthenticatedOrReadOnly
-from serializers import UserSerializer, GroupSerializer, StampedeJobSerializer, StampedeJobDetailSerializer, LonestarJobSerializer,LonestarJobDetailSerializer
+from serializers import UserSerializer, StampedeJobSerializer, StampedeJobDetailSerializer, LonestarJobSerializer,LonestarJobDetailSerializer
 from stampede.models import Job
 from stampede import stampedeapiviews
 from lonestar.models import LS4Job
@@ -11,10 +11,14 @@ from lonestar import lonestarapiviews
 from django.http import HttpResponse
 from django.shortcuts import get_object_or_404
 from rest_framework.response import Response
-from rest_framework.decorators import detail_route, list_route
+from rest_framework.decorators import detail_route
 from rest_framework import status
-from django.core.paginator import Paginator
 from renderers import TACCJSONRenderer
+
+def permission_denied_handler(request):
+    from django.http import HttpResponse
+    return HttpResponse("You do not have required permissions!")
+
 class JSONResponse(HttpResponse):
     """
     An HttpResponse that renders its content into JSON.
@@ -31,15 +35,6 @@ class UserViewSet(viewsets.ModelViewSet):
       queryset = User.objects.all()
       serializer_class = UserSerializer
 
-
-class GroupViewSet(viewsets.ModelViewSet):
-      """
-      API endpoint that allows groups to be viewed or edited.
-      """
-      queryset = Group.objects.all()
-      serializer_class = GroupSerializer
-
-
 class JobsView(object):
      def apply_filter(this,resource_job):
            request = this.request
@@ -51,23 +46,26 @@ class JobsView(object):
            job_id = request.QUERY_PARAMS.get('job_id', None)
            #start_time = request.QUERY_PARAMS.get('start_time', None)
            #end_time = request.QUERY_PARAMS.get('end_time', None)
-           #run_time = request.QUERY_PARAMS.get('run_time', None)
-           #queue_time = request.QUERY_PARAMS.get('queue_time', None)
            queue = request.QUERY_PARAMS.get('queue', None)
            status = request.QUERY_PARAMS.get('status', None)
+
            if user is not None:
                 queryset = queryset.filter(user=user)
            if project_id is not None:
                 queryset = queryset.filter(project=project_id)
            if job_id is not None:
                 queryset = queryset.filter(id=job_id)
+           #if start_time is not None:
+           #     queryset = queryset.filter(start_time__gte=start_time)
+           #if end_time is not None:
+           #     queryset = queryset.filter(end_time__lte=end_time)
            if queue is not None:
                 queryset = queryset.filter(queue=queue)
            if status is not None:
                 queryset = queryset.filter(status=status)
            return queryset
 
-class StampedeJobsViewSet(viewsets.ReadOnlyModelViewSet, PaginateByMaxMixin, JobsView):
+class StampedeJobsViewSet(viewsets.ReadOnlyModelViewSet, JobsView):
     """
     Jobs can be filtered using url query parameters mentioned below (FOR LIST RESPONSE ONLY).
     user -- name of the user
@@ -76,7 +74,6 @@ class StampedeJobsViewSet(viewsets.ReadOnlyModelViewSet, PaginateByMaxMixin, Job
     queue -- name of the queue
     status -- status of the job
     """
-    max_paginate_by = 10
     serializer_class = StampedeJobSerializer
     permission_classes = (IsAuthenticatedOrReadOnly,)
     renderer_classes = (TACCJSONRenderer,)
@@ -85,7 +82,6 @@ class StampedeJobsViewSet(viewsets.ReadOnlyModelViewSet, PaginateByMaxMixin, Job
         Returns jobs run on Stampede.
         """
         queryset = JobsView.apply_filter(self,Job)
-        #paginator = Paginator(queryset, 100)
         serializer = StampedeJobSerializer(queryset,many=True)
         return Response(serializer.data)
 
