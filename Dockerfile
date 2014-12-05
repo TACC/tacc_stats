@@ -15,7 +15,7 @@ RUN yum install -y python python-devel python-setuptools nginx supervisor nfs-ut
 RUN easy_install pip
 
 # setup project code
-COPY . /project
+ADD . /project
 WORKDIR /project
 
 # web server conf
