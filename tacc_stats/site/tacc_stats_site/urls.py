@@ -8,7 +8,6 @@ from django.contrib import admin
 admin.autodiscover()
 
 router = routers.DefaultRouter()
-router.register(r'users', apiviews.UserViewSet)
 router.register(r'jobs/stampede',apiviews.StampedeJobsViewSet,'job')
 router.register(r'jobs/lonestar',apiviews.LonestarJobsViewSet,'ls4job')
 
