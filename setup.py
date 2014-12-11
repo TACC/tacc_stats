@@ -54,7 +54,7 @@ CLASSIFIERS = [
 ]
 
 MAJOR = 2
-MINOR = 0
+MINOR = 1
 MICRO = 0
 ISRELEASED = True
 VERSION = '%d.%d.%d' % (MAJOR, MINOR, MICRO)
@@ -232,18 +232,31 @@ paths,types,options = read_site_cfg()
 write_stats_x(types)
 write_cfg_file(paths)
 
+root='tacc_stats/src/monitor/'
+sources=[
+    pjoin(root,'schema.c'),pjoin(root,'dict.c'),pjoin(root,'collect.c'),
+    pjoin(root,'stats_file.c'),pjoin(root,'stats_buffer.c')
+    ,pjoin(root,'stats.c'),pjoin(root,'pci_busid_map.c')
+    ]
+
+
 RMQ = False
 if options['rmq'] == 'True': 
     RMQ = True
 
-root='tacc_stats/src/monitor/'
-sources=[
-    pjoin(root,'schema.c'),pjoin(root,'dict.c'),pjoin(root,'collect.c'),
-    pjoin(root,'stats_file.c'),pjoin(root,'monitor.c'),pjoin(root,'main.c'),
-    pjoin(root,'stats.c'),pjoin(root,'pci_busid_map.c')
-    ]
-
 if RMQ: sources.append(pjoin(root,'amqp_listen.c'))
+
+MODE = options['mode']
+if MODE == "DAEMON": 
+    print "Building a monitoring daemon."
+    sources.append(pjoin(root,'monitor.c'))
+elif MODE == "CRON": 
+    print "Building an executable to be called by cron."
+    sources.append(pjoin(root,'main.c'))
+else:
+    print "BUILD ERROR: Set mode to either DAEMON or CRON"
+SERVER = options['server']
+FREQUENCY = options['frequency']
 
 for root,dirs,files in os.walk('tacc_stats/src/monitor/'):
     for f in files:
@@ -269,13 +282,14 @@ define_macros=[('STATS_DIR_PATH','\"'+paths['stats_dir']+'\"'),
                ('STATS_VERSION','\"'+VERSION+'\"'),
                ('STATS_PROGRAM','\"tacc_stats\"'),
                ('STATS_LOCK_PATH','\"'+paths['stats_lock']+'\"'),
-               ('JOBID_FILE_PATH','\"'+paths['jobid_file']+'\"')]
+               ('JOBID_FILE_PATH','\"'+paths['jobid_file']+'\"'),
+               ('FREQUENCY',FREQUENCY)]
 if RMQ:
     define_macros.append(('RMQ',True))
     libraries.append("rabbitmq")
 
-flags = ['-D_GNU_SOURCE','-DDEBUG','-Wp,-U_FORTIFY_SOURCE',
-         '-O3','-Wall','-g']
+flags = ['-D_GNU_SOURCE', '-Wp,-U_FORTIFY_SOURCE',
+         '-O3', '-Wall', '-g']#, '-DDEBUG']
 ext_data=dict(sources=sources,
               include_dirs=['tacc_stats/src/monitor/'] + include_dirs,
               library_dirs=library_dirs,
@@ -289,7 +303,6 @@ extensions = []
 cmd = {}
 
 class MyBDist_RPM(bdist_rpm):
-
     # Just a Python distutils bug fix.  
     # Very frustrating, rpms cannot build with extensions
     # without this hack.
@@ -313,94 +326,100 @@ class MyBDist_RPM(bdist_rpm):
         prep = """
 %define _bindir /opt/%{name}
 %define crontab_file /etc/cron.d/%{name}
-%define stats_dir /var/log/tacc_stats
+"""
+        if RMQ:
+            prep += "%define server " + "-s "+SERVER
+        else:
+            prep += "%define server"
+        if MODE == "DAEMON":
+            prep += "\n%define pidfile " + paths['stats_lock']
+        if MODE == "CRON":
+            prep += """
+%define stats_dir /var/log/%{name}
 %define archive_dir /scratch/projects/%{name}/archive
+"""
+        prep += """
 %setup -n %{name}-%{unmangled_version}
 """        
         open(self.prep_script,"w").write(prep)
+        
 
         self.build_script = "build/bdist_rpm_build"        
-        build_cmd = "python setup.py build"
-        if MONITOR_ONLY: build_cmd += ' --monitor-only' 
-        open(self.build_script,"w").write(build_cmd)
+        build_cmds = """
+rm -rf %{buildroot}
+python setup.py build_ext
+"""
+        open(self.build_script,"w").write(build_cmds)
+
 
         self.install_script = "build/bdist_rpm_install"
         install_cmds = """
-rm -rf %{buildroot}
-python setup.py install --single-version-externally-managed -O1 --root=$RPM_BUILD_ROOT --record=INSTALLED_FILES """
-        if MONITOR_ONLY: install_cmds += '--monitor-only' 
-        install_cmds += """
 install -m 0755 -d %{buildroot}/%{_bindir}
-install -m 6755 build/bin/monitor %{buildroot}/%{_bindir}/%{name}
+install -m 6755 build/bin/monitord %{buildroot}/%{_bindir}/%{name}_monitord
+echo %{_bindir}/%{name}_monitord >> %{_builddir}/%{name}-%{unmangled_version}/INSTALLED_FILES
+"""
+        if MODE == "CRON":
+            install_cmds += """
 install -m 0755 tacc_stats/archive.sh %{buildroot}/%{_bindir}/%{name}_archive
-echo %{_bindir}/%{name} >> %{_builddir}/%{name}-%{unmangled_version}/INSTALLED_FILES
 echo %{_bindir}/%{name}_archive >> %{_builddir}/%{name}-%{unmangled_version}/INSTALLED_FILES
-            """
-        if RMQ: install_cmds += """
+"""
+        if RMQ: 
+            install_cmds += """
 install -m 0755 build/bin/amqp_listend %{buildroot}/%{_bindir}/%{name}_listend
 echo %{_bindir}/%{name}_listend >> %{_builddir}/%{name}-%{unmangled_version}/INSTALLED_FILES
-        """
-
+"""     
         open(self.install_script,"w").write(install_cmds)
 
         self.clean_script = None
         self.verify_script = None
 
+
         self.pre_uninstall = "build/bdist_rpm_preuninstall"
-        open(self.pre_uninstall,"w").write(
-            """
+        open(self.pre_uninstall,"w").write("""
 if [ $1 == 0 ]; then
 rm %{crontab_file} || :
 fi
-            """
-            )
-
+""")
         self.post_install = "build/bdist_rpm_postinstall"
-        fd = open(self.post_install,"w")
-        fd.write(
-            """
+
+        if MODE == "CRON":
+            post_install_cmds = """
 (
  archive_min=$(( ((RANDOM * 60) / 32768) %% 60 ))
  archive_hour=$(( (RANDOM %% 2) + 2 ))
-
  echo \"MAILTO=\\"\\"\"
-""")
-        if RMQ:
-            fd.write(
+ echo \"*/10 * * * * root %{_bindir}/%{name}_monitord collect %{server}\"
+ echo \"55 23 * * * root %{_bindir}/%{name}_monitord  rotate %{server}\"
 """
- echo \"*/10 * * * * root %{_bindir}/%{name} -s tacc-stats collect\"
- echo \"55 23 * * * root %{_bindir}/%{name} -s tacc-stats rotate\"
-""")
-        else:
-            fd.write(
-"""
- echo \"*/10 * * * * root %{_bindir}/%{name} collect\"
- echo \"55 23 * * * root %{_bindir}/%{name} rotate\"
-""")
-        fd.write(
-"""
+            if not RMQ:
+                post_install_cmds += """
  echo \"${archive_min} ${archive_hour} * * * root %{_bindir}/%{name}_archive %{stats_dir} %{archive_dir}\"
+"""
+            post_install_cmds += """
 ) > %{crontab_file}
-
 /sbin/service crond restart || :
-""")
-        if RMQ:
-            fd.write(
+%{_bindir}/%{name}_monitord rotate %{server}
 """
-%{_bindir}/%{name} rotate -s tacc-stats
-            """
-            )
-        else:
-            fd.write(
+        elif RMQ and MODE == "DAEMON":
+            post_install_cmds = """
+if [ -f %{pidfile} ]; 
+then
+    echo "Restarting tacc_stats_monitord"
+    kill -9 $(cat %{pidfile})
+    rm -f $(cat %{pidfile})
+fi
+%{_bindir}/%{name}_monitord %{server}
+(
+ echo \"@reboot %{_bindir}/%{name}_monitord %{server}\"
+ echo \"55 23 * * * root cat %{pidfile} | kill \`awk '{print \$1}'\` \"
+) > %{crontab_file}
+/sbin/service crond restart || :
 """
-%{_bindir}/%{name} rotate
-            """
-            )
-        fd.close()
+        open(self.post_install,"w").write(post_install_cmds)
         self.pre_install = None
         self.post_uninstall = None
 
-# Make executable and shared library
+# Make executable
 # C extensions
 class MyBuildExt(build_ext):
     def build_extension(self,ext):
@@ -410,11 +429,6 @@ class MyBuildExt(build_ext):
         ext_path = self.get_ext_fullpath(ext.name)
         depends = sources + ext.depends
         extra_args = ext.extra_compile_args or []
-
-        if os.path.isfile(pjoin('build','bin','monitor')) and \
-                os.path.isfile(pjoin(ext_path)):
-            return
-
         macros = ext.define_macros[:]
         for undef in ext.undef_macros:
             macros.append((undef,))
@@ -432,67 +446,54 @@ class MyBuildExt(build_ext):
         extra_args = ext.extra_link_args or []
 
         language = ext.language or self.compiler.detect_language(sources)
-        
-        objects.remove(pjoin(self.build_temp,'tacc_stats','src',
-                             'monitor','monitor.o'))
-        print objects
+
         if RMQ:
+            self.compiler.link_executable([pjoin(self.build_temp,
+                                                 'tacc_stats','src','monitor',
+                                                 'amqp_listen.o')],
+                                          'build/bin/amqp_listend',
+                                          libraries=ext.libraries,
+                                          library_dirs=ext.library_dirs,
+                                          runtime_library_dirs=ext.runtime_library_dirs,
+                                          extra_postargs=extra_args,
+                                          target_lang=language)
             objects.remove(pjoin(self.build_temp,'tacc_stats','src',
                                  'monitor','amqp_listen.o'))
-            self.compiler.link_executable(
-                [pjoin(self.build_temp,'tacc_stats','src',
-                      'monitor','amqp_listen.o')], 
-                'build/bin/amqp_listend',
-                libraries=ext.libraries,
-                library_dirs=ext.library_dirs,
-                runtime_library_dirs=ext.runtime_library_dirs,
-                extra_postargs=extra_args,
-                target_lang=language)
 
-        self.compiler.link_executable(
-            objects, 'build/bin/monitor',
-            libraries=ext.libraries,
-            library_dirs=ext.library_dirs,
-            runtime_library_dirs=ext.runtime_library_dirs,
-            extra_postargs=extra_args,
-            target_lang=language)
+        self.compiler.link_executable(objects, 
+                                      'build/bin/monitord',
+                                      libraries=ext.libraries,
+                                      library_dirs=ext.library_dirs,
+                                      runtime_library_dirs=ext.runtime_library_dirs,
+                                      extra_postargs=extra_args,
+                                      target_lang=language)
 
-        objects.remove(pjoin(self.build_temp,'tacc_stats','src',
-                             'monitor','main.o'))
-        objects.append(pjoin(self.build_temp,'tacc_stats','src',
-                             'monitor','monitor.o'))
+extensions.append(Extension('tacc_stats.monitor', **ext_data))
 
-        self.compiler.link_shared_object(
-            objects, ext_path,
-            libraries=self.get_libraries(ext),
-            library_dirs=ext.library_dirs,
-            runtime_library_dirs=ext.runtime_library_dirs,
-            extra_postargs=extra_args,
-            export_symbols=self.get_export_symbols(ext),
-            debug=self.debug,
-            build_temp=self.build_temp,
-            target_lang=language)
-
-extensions.append(Extension("tacc_stats.monitor", **ext_data))
-
-cfg_sh(pjoin(os.path.dirname(__file__), 'tacc_stats',
-             'src','monitor','archive.sh.in'),paths)
+if not RMQ:
+    cfg_sh(pjoin(os.path.dirname(__file__), 'tacc_stats',
+                 'src','monitor','archive.sh.in'),paths)
 
 if MONITOR_ONLY:
+    scripts=['build/bin/monitord']
+    if MODE == "CRON":
+        scripts += ['tacc_stats/archive.sh']
+        package_data = {'' : ['*.sh.in'] },
+    else: package_data = {}
     setup(name=DISTNAME,
           version=FULLVERSION,
           maintainer=AUTHOR,
           packages=['tacc_stats/src/monitor'],
-          package_data = {'' : ['*.sh.in'] },
-          scripts=['build/bin/monitor',
-                   'tacc_stats/archive.sh',
-                   ],
+          package_data = package_data,
+          scripts=scripts,
           ext_modules=extensions,
           maintainer_email=EMAIL,
           description=DESCRIPTION,
           zip_safe=False,
           license=LICENSE,
-          cmdclass={'build_ext' : MyBuildExt, 'clean' : CleanCommand, 'bdist_rpm' : MyBDist_RPM},
+          cmdclass={'build_ext' : MyBuildExt, 
+                    'clean' : CleanCommand,
+                    'bdist_rpm' : MyBDist_RPM},
           url=URL,
           download_url=DOWNLOAD_URL,
           long_description=LONG_DESCRIPTION,
@@ -500,20 +501,25 @@ if MONITOR_ONLY:
           platforms='any',
           **setuptools_kwargs)
 else:
+    scripts=['build/bin/monitord',             
+             'tacc_stats/analysis/job_sweeper.py',
+             'tacc_stats/analysis/job_plotter.py',
+             'tacc_stats/site/lonestar/ls4_update_db.py',
+             'tacc_stats/site/stampede/update_db.py',
+             'tacc_stats/pickler/job_pickles.py']
+    if RMQ: scripts += ['build/bin/amqp_listend']
+    if MODE == "CRON":
+        scripts += ['tacc_stats/archive.sh']
+        package_data = {'' : ['*.sh.in'] },
+    else: package_data = {}
+
     setup(name=DISTNAME,
           version=FULLVERSION,
           maintainer=AUTHOR,
           package_dir={'':'.'},
           packages=find_packages(),
           package_data = {'' : ['*.sh.in','*.cfg','*.html','*.png','*.jpg','*.h'] },
-          scripts=['build/bin/monitor',
-                   'build/bin/amqp_listend',
-                   'tacc_stats/archive.sh',
-                   'tacc_stats/analysis/job_sweeper.py',
-                   'tacc_stats/analysis/job_plotter.py',
-                   'tacc_stats/site/lonestar/ls4_update_db.py',
-                   'tacc_stats/site/stampede/update_db.py',
-                   'tacc_stats/pickler/job_pickles.py'],
+          scripts=scripts,
           ext_modules=extensions,
           setup_requires=['nose'],
           install_requires=['argparse','numpy','matplotlib','scipy'],
@@ -523,7 +529,7 @@ else:
           zip_safe=False,
           license=LICENSE,
           cmdclass={'build_ext' : MyBuildExt, 
-                    'clean' : CleanCommand, 
+                    'clean' : CleanCommand,
                     'bdist_rpm' : MyBDist_RPM},
           url=URL,
           download_url=DOWNLOAD_URL,

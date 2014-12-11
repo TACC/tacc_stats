@@ -32,7 +32,7 @@ int get_pci_busids(char ***buses)
 	sprintf(tmp[ctr++], "%2x", bus);
       }
     }
+    *buses = tmp;
   }
-  *buses = tmp;
   return ctr;
 }

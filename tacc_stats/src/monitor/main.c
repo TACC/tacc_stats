@@ -46,8 +46,12 @@ static int open_lock_timeout(const char *path, int timeout)
     goto err;
   }
 
+  // Set timer to wait until signal SIGALRM is sent
   alarm(timeout);
 
+  // Wait until any conflicting lock on the file is released. 
+  // If alarm signal (SIGALRM) is caught then go to signal 
+  // handler set in sigaction structure.
   if (fcntl(fd, F_SETLKW, &lock) < 0) {
     ERROR("cannot lock `%s': %m\n", path);
     goto err;
@@ -157,6 +161,7 @@ int main(int argc, char *argv[])
   else
     FATAL("invalid command `%s'\n", cmd_str);
 
+  // Ensures only one tacc_stats is running at any time
   lock_fd = open_lock_timeout(STATS_LOCK_PATH, lock_timeout);
   if (lock_fd < 0)
     FATAL("cannot acquire lock\n");

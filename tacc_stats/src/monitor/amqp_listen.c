@@ -70,7 +70,7 @@ int consume(const char *hostname, const char* port, const char* archive_dir)
 		     amqp_empty_bytes, 
 		     0, 0, 0, amqp_empty_table);
   amqp_get_rpc_reply(conn);
-  syslog(LOG_INFO,"Made it this far");
+
   // Write data to file in hostname directory
   FILE *fd;
   {
