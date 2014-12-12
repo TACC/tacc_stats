@@ -21,12 +21,13 @@ double current_time;
 char current_jobid[80] = "-";
 int nr_cpus;
 
-volatile sig_atomic_t g_rot_flag=0;
+volatile sig_atomic_t g_begin_flag=0;
 volatile sig_atomic_t g_new_flag = 1;
+
 static void signal_handler(int sig) {
   switch(sig) {    
   case SIGHUP: 
-    g_rot_flag  = 1;
+    g_begin_flag  = 1;
     break;
   case SIGTERM: 
     g_new_flag  = 1;
@@ -36,6 +37,11 @@ static void signal_handler(int sig) {
 
 static void alarm_handler(int sig)
 {
+}
+
+static void alarm_rotate(int sig)
+{
+  g_new_flag = 1;
 }
 
 #define BUF_SIZE 8
@@ -215,15 +221,26 @@ int main(int argc, char *argv[])
   syslog(LOG_INFO, 
 	 "Starting tacc_stats monitoring daemon.\n");
 
+  // Setup alarm to notify when to rotate (every 24hrs)
+  struct sigaction alarm_action = {
+    .sa_handler = &alarm_rotate,
+  };
+  if (sigaction(SIGALRM, &alarm_action, NULL) < 0) {
+    ERROR("cannot set alarm rotate handler: %m\n");
+    goto out;
+  }
+  // Set timer to wait until signal SIGALRM is sent
+  alarm(86400);
+
   while(1) {
 
     /* HUP signal received.  Rotate jobid in or out */
-    if (g_rot_flag) {
+    if (g_begin_flag) {
       if (strcmp(current_jobid,"-") == 0) 
 	cmd = cmd_begin;
       else
 	cmd = cmd_end;
-      g_rot_flag = 0;
+      g_begin_flag = 0;
     }
 
     /* Open the data buffer */    
@@ -305,6 +322,8 @@ int main(int argc, char *argv[])
 	rc = 1;
       }
       g_new_flag = 0;
+      // Set timer to wait until signal SIGALRM is sent
+      alarm(86400);
     }
     
     /* Write data to buffer and ship off node */

@@ -235,8 +235,8 @@ write_cfg_file(paths)
 root='tacc_stats/src/monitor/'
 sources=[
     pjoin(root,'schema.c'),pjoin(root,'dict.c'),pjoin(root,'collect.c'),
-    pjoin(root,'stats_file.c'),pjoin(root,'stats_buffer.c')
-    ,pjoin(root,'stats.c'),pjoin(root,'pci_busid_map.c')
+    pjoin(root,"pci_busid_map.c"),
+    pjoin(root,'stats_file.c'),pjoin(root,'stats_buffer.c'),pjoin(root,'stats.c')
     ]
 
 
@@ -363,6 +363,12 @@ echo %{_bindir}/%{name}_monitord >> %{_builddir}/%{name}-%{unmangled_version}/IN
 install -m 0755 tacc_stats/archive.sh %{buildroot}/%{_bindir}/%{name}_archive
 echo %{_bindir}/%{name}_archive >> %{_builddir}/%{name}-%{unmangled_version}/INSTALLED_FILES
 """
+        else:
+            install_cmds += """
+install -m 0755 tacc_stats/taccstats %{buildroot}/%{_bindir}/taccstats
+echo %{_bindir}/taccstats >> %{_builddir}/%{name}-%{unmangled_version}/INSTALLED_FILES
+"""
+
         if RMQ: 
             install_cmds += """
 install -m 0755 build/bin/amqp_listend %{buildroot}/%{_bindir}/%{name}_listend
@@ -373,13 +379,6 @@ echo %{_bindir}/%{name}_listend >> %{_builddir}/%{name}-%{unmangled_version}/INS
         self.clean_script = None
         self.verify_script = None
 
-
-        self.pre_uninstall = "build/bdist_rpm_preuninstall"
-        open(self.pre_uninstall,"w").write("""
-if [ $1 == 0 ]; then
-rm %{crontab_file} || :
-fi
-""")
         self.post_install = "build/bdist_rpm_postinstall"
 
         if MODE == "CRON":
@@ -391,6 +390,13 @@ fi
  echo \"*/10 * * * * root %{_bindir}/%{name}_monitord collect %{server}\"
  echo \"55 23 * * * root %{_bindir}/%{name}_monitord  rotate %{server}\"
 """
+            self.pre_uninstall = "build/bdist_rpm_preuninstall"
+            open(self.pre_uninstall,"w").write("""
+if [ $1 == 0 ]; then
+rm %{crontab_file} || :
+fi
+""")
+
             if not RMQ:
                 post_install_cmds += """
  echo \"${archive_min} ${archive_hour} * * * root %{_bindir}/%{name}_archive %{stats_dir} %{archive_dir}\"
@@ -400,24 +406,27 @@ fi
 /sbin/service crond restart || :
 %{_bindir}/%{name}_monitord rotate %{server}
 """
-        elif RMQ and MODE == "DAEMON":
+        if MODE == "DAEMON":
             post_install_cmds = """
-if [ -f %{pidfile} ]; 
-then
-    echo "Restarting tacc_stats_monitord"
-    kill -9 $(cat %{pidfile})
-    rm -f $(cat %{pidfile})
-fi
-%{_bindir}/%{name}_monitord %{server}
-(
- echo \"@reboot %{_bindir}/%{name}_monitord %{server}\"
- echo \"55 23 * * * root cat %{pidfile} | kill \`awk '{print \$1}'\` \"
-) > %{crontab_file}
-/sbin/service crond restart || :
+cp %{_bindir}/taccstats /etc/init.d/
+chkconfig --add taccstats
+service taccstats restart
 """
         open(self.post_install,"w").write(post_install_cmds)
         self.pre_install = None
-        self.post_uninstall = None
+        if MODE == "DAEMON":
+            self.post_uninstall = "build/bdist_rpm_post_uninstall"
+            post_uninstall_cmds = """
+chkconfig --del taccstats
+rm /etc/init.d/taccstats
+rmdir %{_bindir}
+"""
+            open(self.post_uninstall,"w").write(post_uninstall_cmds)
+
+#(
+# echo \"55 23 * * * root service taccstats rotate\"
+#) > %{crontab_file}
+#/sbin/service crond restart || :
 
 # Make executable
 # C extensions
@@ -473,13 +482,18 @@ extensions.append(Extension('tacc_stats.monitor', **ext_data))
 if not RMQ:
     cfg_sh(pjoin(os.path.dirname(__file__), 'tacc_stats',
                  'src','monitor','archive.sh.in'),paths)
+if MODE == "DAEMON":
+    cfg_sh(pjoin(os.path.dirname(__file__), 'tacc_stats',
+                 'src','monitor','taccstats.in'),dict(paths.items()+options.items()))
 
 if MONITOR_ONLY:
     scripts=['build/bin/monitord']
     if MODE == "CRON":
         scripts += ['tacc_stats/archive.sh']
         package_data = {'' : ['*.sh.in'] },
-    else: package_data = {}
+    else:
+        scripts += ['tacc_stats/taccstats']
+        package_data = {'' : ['taccstats.in']}
     setup(name=DISTNAME,
           version=FULLVERSION,
           maintainer=AUTHOR,
@@ -511,14 +525,15 @@ else:
     if MODE == "CRON":
         scripts += ['tacc_stats/archive.sh']
         package_data = {'' : ['*.sh.in'] },
-    else: package_data = {}
+    else:
+        scripts += ['tacc_stats/taccstats']
 
     setup(name=DISTNAME,
           version=FULLVERSION,
           maintainer=AUTHOR,
           package_dir={'':'.'},
           packages=find_packages(),
-          package_data = {'' : ['*.sh.in','*.cfg','*.html','*.png','*.jpg','*.h'] },
+          package_data = {'' : ['*.in','*.cfg','*.html','*.png','*.jpg','*.h'] },
           scripts=scripts,
           ext_modules=extensions,
           setup_requires=['nose'],

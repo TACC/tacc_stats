@@ -59,6 +59,7 @@
 #include "trace.h"
 #include "pscanf.h"
 #include "check_pci_id.h"
+#include "pci_busid_map.h"
 
 /*! \name iMC Global Control Register
 

@@ -1,3 +1,6 @@
+#ifndef _BUSMAP_H_
+#define _BUSMAP_H_
+
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -36,3 +39,5 @@ int get_pci_busids(char ***buses)
   }
   return ctr;
 }
+
+#endif
