@@ -12,8 +12,6 @@ Executive Summary
 The tacc_stats repository consists of four complementary modules:
 
 1. `monitor` is a job-oriented and logically structured version of the conventional sysstat system monitor. 
-It is an executable that is meant to be either run at regular intervals using cron or launched as an init.d
-style daemon.
 
 2. `pickler` is a Python module that collects the node-based raw stats 
 data into job-based pickled Python dictionaries.
@@ -52,23 +50,33 @@ currently three modes available:
     $ git clone https://github.com/TACC/tacc_stats
     $ pip install --user -e tacc_stats
 ~~~
+
 Scripts and executables will be installed in 
 '~/.local/bin' and Python modules in '~/.local/lib'.
 
-The `monitor` script must be run as root to read all hardware counters.
+The `monitord` script must be run as root to read all hardware counters.  
 
 ### Detailed Install
 
 1. *Introduction*
-The build system is based on `distutils`.  It configures the C extensions 
-and Python modules for a particular site.  The configure file 
-`setup.cfg` should be customized for your specific system before installation.
+The build system uses Python's `distutils` module.  The C extensions 
+and Python modules for a particular site are configured using the `setup.cfg`.  
+Thus the configure file `setup.cfg` should be customized for your site before installation.
 The installation will place a number of scripts into the Python `bin`
 directory and the modules in the Python `lib` directory.
 
 2. *Configure*
 All configuring should be specified in the `setup.cfg` 
-file. The meaning of every field  in the `[PATH]` section is specified here:
+file. 
+
+The meaning of every field in the `[OPTIONS]` section are as follows:
+
+    `RMQ`               True/False Whether to use RabbitMQ messaging for sending data or rely on rsync
+    `MODE`              DAEMON/CRON Whether to build `monitord` as a cron launched application or daemon service
+    `SERVER`            The server which accepts data from all nodes
+    `FREQUENCY`         The frequency at which samples are taken in DAEMON mode
+
+The meaning of every field  in the `[PATH]` section is specified here:
 
     `stats_dir`          The directory that `monitor` writes to
 
