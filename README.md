@@ -77,8 +77,7 @@ The installation will place a number of scripts into the Python `bin`
 directory and the modules in the Python `lib` directory.
 
 2. *Configure*
-All configuring should be specified in the `setup.cfg` 
-file. 
+All configuration is specified in the `setup.cfg` file. 
 
 The meaning of every field in the `[OPTIONS]` section are as follows:
 
@@ -133,12 +132,12 @@ There are currently three approaches to building and installing the package.
     in `stats_dir` to `tacc_stats_home`.  It is used at TACC to move data from local
     storage on the compute nodes to a central filesystem location.
 
-    3) `python setup.py bdist_rpm --monitor-only`: this builds an rpm in the `tacc_stats/dist`
+    3) `python setup.py bdist_rpm`: this builds an rpm in the `tacc_stats/dist`
     directory.  The rpm will install only the `monitor` package and place a setuid'd root
-    version of monitor called `tacc_stats` in `/opt/tacc_stats`.  It will also modify
+    version of monitor called `tacc_stats_monitord` in `/opt/tacc_stats`.  It will also modify
     crontab to run `tacc_stats` every 10 minutes (configurable) and run `archive.sh`
-    every night at a random time between 2am and 5am. This is a light-weight option
-    most suitable for installations to the compute nodes.
+    every night at a random time between 2am and 5am. This is the preferred method
+    for installations to the compute nodes.
 
     The first two installation methods are most suited to analysis nodes.  They are
     reasonable heavyweight and require several Python packages.  The third approach is
