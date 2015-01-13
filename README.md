@@ -11,8 +11,7 @@ Executive Summary
 -----------------
 The tacc_stats repository consists of four complementary modules:
 
-1. `monitor` is a C-based job-oriented and logically structured version of the
-conventional sysstat system monitor.  
+1. `monitor` is a job-oriented and logically structured version of the conventional sysstat system monitor.  
 
 2. `pickler` is a Python module that collects the node-based raw stats 
 data into job-based pickled Python dictionaries.
@@ -21,14 +20,13 @@ data into job-based pickled Python dictionaries.
 generating plots. 
 
 4. `site` is a Python module based on Django that builds a database and 
-website that allows exploration and visualization of data at the job, user, project, application,
-and/or system level.
+website that allows exploration and visualization of data at the job, user, project, application, and/or system level.
 
 Code Access
 -----------
 To get access to the tacc_stats source code 
 
-    git clone https://github.com/rtevans/tacc_stats
+    git clone https://github.com/TACC/tacc_stats
 
 
 ----------------------------------------------------------------------------
@@ -38,15 +36,24 @@ Building
 ### Quickstart
 These commands quickly build and install the TACC Stats package into your
 '~/.local/' directory.  You should customize the tacc_stats/setup.cfg file
-for your system.  
+for your site specific paths and devices.  The modality of TACC Stats is 
+also chosen under the OPTIONS section of the setup.cfg file.  There are 
+currently three modes available:
+
+1. RabbitMQ sends data off node to central location at collection time (RMQ = True) & TACC Stats is run as a linux-style init.d daemon service (MODE = DAEMON).
+
+2. RabbitMQ sends data off node to central location at collection time (RMQ = True) & TACC Stats is run as a cron job (MODE = CRON).
+
+3. Data is stored on local node and archived daily via rsync to central location (RMQ = FALSE) & TACC Stats is run as a cron job (MODE = CRON).
+   
 ~~~
-    $ git clone https://github.com/rtevans/tacc_stats
+    $ git clone https://github.com/TACC/tacc_stats
     $ pip install --user -e tacc_stats
 ~~~
 Scripts and executables will be installed in 
 '~/.local/bin' and Python modules in '~/.local/lib'.
 
-The `monitor` script must be run as root to read all register files.
+The `monitor` script must be run as root to read all hardware counters.
 
 ### Detailed Install
 
