@@ -72,8 +72,11 @@ file.
 The meaning of every field in the `[OPTIONS]` section are as follows:
 
     `RMQ`               True/False Whether to use RabbitMQ messaging for sending data or rely on rsync
+    
     `MODE`              DAEMON/CRON Whether to build `monitord` as a cron launched application or daemon service
+    
     `SERVER`            The server which accepts data from all nodes
+    
     `FREQUENCY`         The frequency at which samples are taken in DAEMON mode
 
 The meaning of every field  in the `[PATH]` section is specified here:
