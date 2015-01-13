@@ -46,6 +46,7 @@ currently three modes available:
 
 3. Data is stored on local node and archived daily via rsync to central location (RMQ = FALSE) & TACC Stats is run as a cron job (MODE = CRON).
    
+To install TACC Stats on the machine where data will be analyzed do the following:
 ~~~
     $ git clone https://github.com/TACC/tacc_stats
     $ pip install --user -e tacc_stats
@@ -54,7 +55,17 @@ currently three modes available:
 Scripts and executables will be installed in 
 '~/.local/bin' and Python modules in '~/.local/lib'.
 
-The `monitord` script must be run as root to read all hardware counters.  
+To install TACC Stats on the compute nodes the recommended approach is to generate an rpm:
+~~~
+    $ git clone https://github.com/TACC/tacc_stats
+    $ cd tacc_stats
+    $ python setup.py bdist_rpm
+~~~
+
+This will generate an rpm that will install the executable `tacc_stats_monitord`.  When compiled in 
+cron mode without RabbitMQ the installation of the rpm will setup a cron task that rsyncs data daily to the `tacc_stats_home` directory.  When compiled in RabbitMQ mode the rpm will setup a cron task that sends data to the `SERVER` specified in `setup.cfg`.  When compiled in RabbitMQ and DAEMON mode the installation will install the service `taccstats` which can
+be run as a linux-style `/etc/init.d` service.
+
 
 ### Detailed Install
 
