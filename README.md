@@ -11,7 +11,9 @@ Executive Summary
 -----------------
 The tacc_stats repository consists of four complementary modules:
 
-1. `monitor` is a job-oriented and logically structured version of the conventional sysstat system monitor.  
+1. `monitor` is a job-oriented and logically structured version of the conventional sysstat system monitor. 
+It is an executable that is meant to be either run at regular intervals using cron or launched as an init.d
+style daemon.
 
 2. `pickler` is a Python module that collects the node-based raw stats 
 data into job-based pickled Python dictionaries.
