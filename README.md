@@ -79,7 +79,7 @@ directory and the modules in the Python `lib` directory.
 2. *Configure*
 All configuration is specified in the `setup.cfg` file. 
 
-The meaning of every field in the `[OPTIONS]` section are as follows:
+The meaning of every field in the `[OPTIONS]` section are as `follows`:
 
     `RMQ`               True/False Whether to use RabbitMQ messaging for sending data or rely on rsync
     
