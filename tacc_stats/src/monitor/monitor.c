@@ -322,7 +322,7 @@ int main(int argc, char *argv[])
 	rc = 1;
       }
       g_new_flag = 0;
-      // Set timer to wait until signal SIGALRM is sent
+      // Set timer to wait until signal SIGALRM is sent (rotate every 24 hrs)
       alarm(86400);
     }
     

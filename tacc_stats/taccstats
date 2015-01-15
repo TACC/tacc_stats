@@ -146,7 +146,7 @@ case "$1" in
 	rotate
 	;;
     *)
-	echo $"Usage: $0 {start|stop|status|restart|load|unload|rotate}"
+	echo $"Usage: $0 {start|stop|status|restart|begin JOBID|end|rotate}"
 esac
 
 exit $?

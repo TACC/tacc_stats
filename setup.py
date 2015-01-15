@@ -488,6 +488,7 @@ if MODE == "DAEMON":
 
 if MONITOR_ONLY:
     scripts=['build/bin/monitord']
+
     if MODE == "CRON":
         scripts += ['tacc_stats/archive.sh']
         package_data = {'' : ['*.sh.in'] },
@@ -515,7 +516,7 @@ if MONITOR_ONLY:
           platforms='any',
           **setuptools_kwargs)
 else:
-    scripts=[#'build/bin/monitord',             
+    scripts=['build/bin/monitord',             
              'tacc_stats/analysis/job_sweeper.py',
              'tacc_stats/analysis/job_plotter.py',
              'tacc_stats/site/lonestar/ls4_update_db.py',
@@ -523,7 +524,7 @@ else:
              'tacc_stats/site/stampede/update_thresholds.py',
              'tacc_stats/site/stampede/thresholds.cfg',
              'tacc_stats/pickler/job_pickles.py']
-    #if RMQ: scripts += ['build/bin/amqp_listend']
+    if RMQ: scripts += ['build/bin/amqp_listend']
     if MODE == "CRON":
         scripts += ['tacc_stats/archive.sh']
         package_data = {'' : ['*.sh.in'] },
@@ -537,7 +538,7 @@ else:
           packages=find_packages(),
           package_data = {'' : ['*.in','*.cfg','*.html','*.png','*.jpg','*.h'] },
           scripts=scripts,
-          #ext_modules=extensions,
+          ext_modules=extensions,
           setup_requires=['nose'],
           install_requires=['argparse','numpy','matplotlib','scipy'],
           test_suite = 'nose.collector',
