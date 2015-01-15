@@ -28,7 +28,8 @@ from matplotlib.backends.backend_agg import FigureCanvasAgg as FigureCanvas
 from django.core.cache import cache,get_cache 
 import traceback
 
-def update_comp_info():
+def update_comp_info(thresholds):
+    
     schema_map = {'HighCPI' : ['cpi','>',1.5], 
                   'HighCPLD' : ['cpld','>',1.5], 
                   'Load_L1Hits' : ['Load_L1Hits','>',1.5], 
@@ -43,6 +44,9 @@ def update_comp_info():
                   'LowFLOPS' : ['flops','<',10],
                   'VecPercent' : ['VecPercent','<',0.05],
                   'GigEBW' : ['GigEBW','>',1e7]}
+
+    for key,val in thresholds.iteritems():
+        schema_map[key][1:3] = val
 
     for name in schema_map:
         if TestInfo.objects.filter(test_name = name).exists():
