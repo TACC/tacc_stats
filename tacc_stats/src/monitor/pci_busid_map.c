@@ -37,6 +37,9 @@ int get_pci_busids(char ***buses)
     }
     *buses = tmp;
   }
+  if (devptr != NULL)
+    fclose(devptr);
+
   return ctr;
 }
 

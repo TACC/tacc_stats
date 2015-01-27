@@ -8,30 +8,47 @@ django.setup()
 from django.db.models import Q,Sum
 from tacc_stats.site.stampede.models import Job
 from tacc_stats.site.xalt.models import run
-    
-jobs_list = Job.objects.filter(date__range=["2014-10-01","2014-10-31"])
-noibrun_list = jobs_list.filter(exe='unknown')
+from tacc_stats.analysis.gen import lariat_utils
+import tacc_stats.cfg as cfg
+ 
+ld = lariat_utils.LariatData(directory = cfg.lariat_path,
+                             daysback = 2)
 
-print 'Total Jobs',jobs_list.count()
-print '% Jobs using ibrun', (1-float(noibrun_list.count())/jobs_list.count())*100.
+acct_jobs_list = Job.objects.filter(date__range = ["2013-10-01", "2013-10-31"]).exclude(exe = "unknown").exclude(status = "FAILED")
+runs_list = run.objects.using('xalt').exclude(job_id = "unknown")
 
-noibrun_sus = 0
-for job in noibrun_list:
-    noibrun_sus += job.run_time*job.nodes
+ctr = 0
+app_dict = {}
+for job in acct_jobs_list:
+    exec_list = []
 
-sus = 0
-for job in jobs_list:
-    sus += job.run_time*job.nodes
+    factor = 16*0.0002777777777777778
+    if job.queue == "largemem": factor *= 2
 
-print 'Total SUs',16*sus/3600.
-print '% SUs using ibrun',(1-float(noibrun_sus)/sus)*100
+    sus = 0
+    if runs_list.filter(job_id = job.id).exists():
+        runs = runs_list.filter(job_id = job.id)
+        for run in runs: 
+            sus += run.run_time*run.num_nodes*factor
+            exe = run.exec_path.split('/')[-1]
+            app_dict.setdefault(exe, 0.0)
+            app_dict[exe] += sus
+            exec_list.append(exe)
+    else:
+        exec_list = []
+        ld.set_job(str(job.id), end_time = job.date.strftime("%Y-%m-%d"))
+        for run in ld.ld_json[str(job.id)]:
+            sus += int(float(run['runTime']))*int(run['numNodes'])*factor
+            exe = run['exec'].split('/')[-1]
+            app_dict.setdefault(exe, 0.0) 
+            app_dict[exe] += sus
+            exec_list.append(exe)
 
+    print job.id, job.nodes,job.threads,job.sus(),
+    print ' '.join(exec_list)
 
-runs_list = run.objects.using('xalt').filter(date__range=["2014-10-01","2014-10-31"])
+import operator
+sorted_apps = sorted(app_dict.items(), key = operator.itemgetter(1))[::-1]
 
-sus = 0
-for run in runs_list:
-    
-    sus += 16*run.run_time*run.num_nodes
-print 'XALT SUs',sus/3600.
-
+for app in sorted_apps[0:20]:
+    print app

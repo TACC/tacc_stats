@@ -23,6 +23,7 @@ class Job(models.Model):
     date = models.DateField(db_index=True,null=True)
     user = models.CharField(max_length=128, null=True)
     exe = models.CharField(max_length=128, null=True)
+    exe_list = models.TextField(null=True)
     cwd = models.CharField(max_length=128, null=True)
     threads = models.BigIntegerField(null=True)
 

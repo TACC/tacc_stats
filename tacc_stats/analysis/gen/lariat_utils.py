@@ -98,7 +98,7 @@ class LariatData:
       print("Lariat Data for",jobid,"absent.")
       self.ld_json[jobid] = [None]
     if not self.ld_json[jobid][0]: return
-
+    
     self.id=entry['jobID']
     self.user=entry['user']
     self.exc=replace_and_shorten_path_bits(entry['exec'],self.user,60)
