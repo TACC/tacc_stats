@@ -21,18 +21,20 @@ int get_pci_busids(char ***buses)
   else {
     // Discover number of buses
     while (fgets(buf,sizeof(buf)-1, devptr) ) {
-      if (sscanf(buf, "%2x%2x %4x%4x", &bus, &dev, &vendor, &id) == 4 && vendor == 0x8086 && id == 0x3c43) {
+      if (sscanf(buf, "%2x%2x %4x%4x", &bus, &dev, &vendor, &id) == 4 && vendor == 0x8086 && (id == 0x3c43 || id == 0x2f34)) {
 	ctr++;
       }
     }
+
     fseek(devptr, 0, SEEK_SET);
     tmp = (char **)malloc(ctr*sizeof(char *));
     ctr = 0;
     // Get bus ids
     while (fgets(buf,sizeof(buf)-1, devptr) ) {
-      if (sscanf(buf, "%2x%2x %4x%4x", &bus, &dev, &vendor, &id) == 4 && vendor == 0x8086 && id == 0x3c43) {
+      if (sscanf(buf, "%2x%2x %4x%4x", &bus, &dev, &vendor, &id) == 4 && vendor == 0x8086 && (id == 0x3c43 || id == 0x2f34)) {
 	tmp[ctr] = (char*) malloc(4*sizeof(char));
 	sprintf(tmp[ctr++], "%2x", bus);
+	TRACE("%2x\n",bus);
       }
     }
     *buses = tmp;

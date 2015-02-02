@@ -237,7 +237,7 @@ int main(int argc, char *argv[])
       type->st_enabled = 0;
       continue;
     }
-
+    
     if (select_all)
       type->st_selected = 1;
 
