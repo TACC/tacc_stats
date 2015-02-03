@@ -189,7 +189,7 @@ static int intel_hsw_imc_begin_dev(char *bus_dev, uint32_t *events, size_t nr_ev
     goto out;
   }
 
-  ctl = 0x10100UL; // enable freeze (bit 16), freeze (bit 8)
+  ctl = 0x00103UL; // enable freeze (bit 16), freeze (bit 8)
   if (pwrite(pci_fd, &ctl, sizeof(ctl), MC_BOX_CTL) < 0) {
     ERROR("cannot enable freeze of MC counters: %m\n");
     goto out;
@@ -232,7 +232,7 @@ static int intel_hsw_imc_begin_dev(char *bus_dev, uint32_t *events, size_t nr_ev
     goto out;
   }
   
-  ctl = 0x10000UL; // unfreeze counters
+  ctl = 0x00000UL; // unfreeze counters
   if (pwrite(pci_fd, &ctl, sizeof(ctl), MC_BOX_CTL) < 0) {
     ERROR("cannot unfreeze MC counters: %m\n");
     goto out;

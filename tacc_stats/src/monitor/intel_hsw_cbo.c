@@ -316,10 +316,9 @@ static int intel_hsw_cbo_begin(struct stats_type *type)
       continue;
 
     snprintf(cpu, sizeof(cpu), "%d", i);
-    
     if (cpu_is_haswell(cpu))      
       {
-	for (box = 0; box < 18; box++)
+	for (box = 0; box < nr_cpus; box++)
 	  if (intel_hsw_cbo_begin_box(cpu, box, cbo_events[box], 4) == 0)
 	    nr++;
       }
@@ -409,7 +408,7 @@ static void intel_hsw_cbo_collect(struct stats_type *type)
 
     if (cpu_is_haswell(cpu))
       {
-	for (box = 0; box < 18; box++)
+	for (box = 0; box < nr_cpus/2; box++)
 	  {
 	    snprintf(cpu_box, sizeof(cpu_box), "%d/%d", socket_id, box);
 	    intel_hsw_cbo_collect_box(type, cpu, cpu_box, box);

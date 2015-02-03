@@ -7,10 +7,10 @@
   \par Details such as Tables and Figures can be found in:
   "Intel® 64 and IA-32 Architectures Software Developer’s Manual
   Volume 3B: System Programming Guide, Part 2" 
-  Order Number: 253669-047US June 2013 \n
+  Order Number: 325384 January 2015 \n
 
   \note
-  Haswell microarchitectures have signatures 06_60, 06_69, 06_70, 06_71 and EP 06_63. 
+  Haswell microarchitectures have signatures 06_3c, 06_45, 06_46, 06_47 and EP 06_3f. 
   Non-architectural events are listed in Table 19-7, 19-8, and 19-9.  
   Table 19-8 is 06_2a specific, Table 19-9 is 06_2d specific.  
 
@@ -57,7 +57,7 @@
 //@{
 /*! \name Configurable Performance Monitoring Registers
 
-  Control register layout shown in Fig 18-6.  Described on Pg 18-3.
+  Control register layout shown in Fig 18-36.
   These are used to select events and ways to count events.
   ~~~
   [0, 7] Event Select       : Choose Event
@@ -71,7 +71,9 @@
   22 EN                     : Enables counters
   23 INV                    : Inverts Counter Mask
   [24, 31] Counter Mask     : Counts in a cycle must exceed CMASK if set
-  [32, 63] Reserved
+  [32] IN_TX                : In Trans. Rgn
+  [33] IN_TXCP              : In Tx exclude abort
+  [34, 63] Reserved
   ~~~  
 
   Counter registers are 64 bit but 48 bits wide.  These
@@ -317,7 +319,7 @@ static void intel_hsw_collect_cpu(struct stats_type *type, char *cpu)
     ERROR("cannot open `%s': %m\n", msr_path);
     goto out;
   }
-
+  
 #define X(k,r...) \
   ({ \
     uint64_t val = 0; \
