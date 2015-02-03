@@ -21,6 +21,7 @@ generating plots.
 
 4. `site` is a Python module based on Django that builds a database and 
 website that allows exploration and visualization of data at the job, user, project, application, and/or system level.
+It interfaces with a Postgres Database and optionally an XALT Database (https://github.com/Fahey-McLay).
 
 Code Access
 -----------
@@ -37,7 +38,7 @@ Building
 These commands quickly build and install the TACC Stats package into your
 '~/.local/' directory.  You should customize the tacc_stats/setup.cfg file
 for your site specific paths and devices.  The modality of TACC Stats is 
-also chosen under the OPTIONS section of the setup.cfg file.  There are 
+chosen under the OPTIONS section of the setup.cfg file.  There are 
 currently three modes available:
 
 1. RabbitMQ sends data off node to central location at collection time (RMQ = True) & TACC Stats is run as a linux-style init.d daemon service (MODE = DAEMON).
@@ -53,7 +54,8 @@ To install TACC Stats on the machine where data will be analyzed do the followin
 ~~~
 
 Scripts and executables will be installed in 
-'~/.local/bin' and Python modules in '~/.local/lib'.
+'~/.local/bin' and Python modules in '~/.local/lib'.  In order for RMQ mode to recieve data the rabbitmq-server must
+be started and the `amqp_listend` executable started. `amqp_listend -s SERVERNAME -a ARCHIVEDIR` will start a daemon that consumes tacc_stats data from the server running RabbitMQ `SERVERNAME` and outputs the data as textfiles to the `ARCHIVEDIR`.
 
 To install TACC Stats on the compute nodes the recommended approach is to generate an rpm:
 ~~~
@@ -62,9 +64,9 @@ To install TACC Stats on the compute nodes the recommended approach is to genera
     $ python setup.py bdist_rpm
 ~~~
 
-This will generate an rpm that will install the executable `tacc_stats_monitord`.  When compiled in 
+This will generate an rpm that will install the executable `tacc_stats_monitord` in the directory specified by the `exe_path` field in `setup.cfg`.  When compiled in 
 cron mode without RabbitMQ the installation of the rpm will setup a cron task that rsyncs data daily to the `tacc_stats_home` directory.  When compiled in RabbitMQ mode the rpm will setup a cron task that sends data to the `SERVER` specified in `setup.cfg`.  When compiled in RabbitMQ and DAEMON mode the installation will install the service `taccstats` which can
-be run as a linux-style `/etc/init.d` service.
+be run as a linux-style `/etc/init.d` service.  The installation is also compatible with `systemd` type operating systems.
 
 
 ### Detailed Install
@@ -137,7 +139,8 @@ There are currently three approaches to building and installing the package.
     version of monitor called `tacc_stats_monitord` in `/opt/tacc_stats`.  It will also modify
     crontab to run `tacc_stats` every 10 minutes (configurable) and run `archive.sh`
     every night at a random time between 2am and 5am. This is the preferred method
-    for installations to the compute nodes.
+    for installations to the compute nodes.  In the DAEMON mode tacc_stats will be installed
+    as the /etc/init.d service taccstats.
 
     The first two installation methods are most suited to analysis nodes.  They are
     reasonable heavyweight and require several Python packages.  The third approach is
@@ -148,9 +151,10 @@ There are currently three approaches to building and installing the package.
 
 Running
 -------
-Installation method 3 can be used for compute nodes.  In order for 
+Installation method 3 should be used to setup monitoring of compute nodes.  In order for 
 tacc_stats to correcly label records with JOBIDs it is required that
 the job scheduler prolog and epilog contain the lines 
+in CRON mode 
 
 `echo $JOBID > jobid_file`  
 `tacc_stats begin $JOBID`
@@ -159,6 +163,12 @@ and
 
 `tacc_stats end $JOBID`
 `echo 0 > jobid_file`
+
+or in DAEMON mode
+
+`service taccstats begin $JOBID`
+and
+`service taccstats end $JOBID`
 
 respectively.  To perform the pickling of this data it is also necessary to 
 generate an accounting file that contains at least the JOBID and time range 
@@ -176,15 +186,15 @@ raw data efficiently.
 
 
 As mentioned above the `monitor` module produces a light-weight C 
-code called `monitor` which is setuid'd to `/opt/tacc_stats/tacc_stats`.  It is called at the beginning of every job to configure Performance Monitoring Counter registers
-for specific events.  As the job is running tacc_stats is called at regular intervals (the default is 10 mn) to collect the counter registers values at regular time 
+code called `monitor` which is setuid'd to `/opt/tacc_stats/tacc_stats_monitord`.  It is called at the beginning of every job to configure Performance Monitoring Counter registers
+for specific events.  As the job is running `tacc_stats_monitord` is called at regular intervals (the default is 10 mn) to collect the counter registers values at regular time 
 intervals.  This counter data is stored in "raw stats" files.  These
 stats files are node-level data labeled by JOBID and may or may not be
 locally stored, but must be visible to the node as a mount.
 
 ### Running `tacc_stats`
 
-`tacc_stats` can be run manually by:
+`tacc_stats` can be run manually in CRON mode by:
 
     $ tacc_stats begin jobid
     $ tacc_stats collect
@@ -195,23 +205,27 @@ described in the example below, which corresponds to its usage on Stampede.
 #### Example
 
 - Invocation:
-`tacc_stats` runs every 10-minutes (through
+    - CRON
+`tacc_stats_monitord` runs every 10-minutes (through
 cron), and at the beginning and end of every job (through SLURM
 prolog/epilog).  In addition, `tacc_stats` may be directly invoked by
 the user (or application) although we have not advertised this.
-
+    - DAEMON
+`tacc_stats_monitord` runs every 10-minutes, or the frequency in seconds specified in `setup.cfg` under the `FREQUENCY` field (as a DAEMON), and at the beginning and end of every job (through SLURM
+prolog/epilog).
 - Data Handling:
-On each invocation, `tacc_stats` collects and records system statistics
-to a structured text file on ram backed storage local to the node.
-Stats files are rotated at every night at 23:55 localtime, and
-archived at sometime between 02:00--04:00 localtime to Stampede's
-`/scratch` filesystem.  A stats file created at epoch time `EPOCH`, on
+On each invocation, `tacc_stats_monitord` collects and records system statistics
+to a structured text file on ram backed storage local to the node or else sends the 
+data to a central server location where it is immediately written to textfiles by
+the `amqp_listend` daemon.
+Stats files are typically rotated at every night.  
+In CRON mode
+A stats file created at epoch time `EPOCH`, on
 node `HOSTNAME`, will be stored locally as `/var/log/tacc_stats/EPOCH`,
 and archived at
-`/scratch/projects/tacc_stats/archive/HOSTNAME/EPOCH.gz`.  For example
-stats collected on Jun 14 2011 on c101-101, might correspond to files
-`/var/log/tacc_stats/1308027601` and
-`/scratch/projects/tacc_stats/archive/c101-101.stampede.tacc.utexas.edu/1308027601.gz`.
+`/scratch/projects/tacc_stats/archive/HOSTNAME/EPOCH.gz`. 
+In DAEMON mode the data will be immediately sent to a server and 
+available for analysis.
 
 \warning Do not expect all stats files to be created at midnight
 exactly, or even approximately.  As nodes are rebooted, new
@@ -237,7 +251,8 @@ where the 4 optional arguments have the following meaning
   - `jobids`     : individual jobids to pickle
   - 
 No arguments results in all jobs from the previous day getting pickled and stored in the `pickles_dir`
-defined in `setup.cfg`. On Stampede argumentless `job_pickles.py` is run every 24 hours as a `cron` job.
+defined in `setup.cfg`. On Stampede argumentless `job_pickles.py` is run every 24 hours as a `cron` job
+set-up by the user
 
 For pickling data with Intel Sandy Bridge core and uncore counters it is useful to
 modify the event_map dictionaries in `intel_snb.py` to include whatever events you are counting.The dictionaries map a control register value to a Schema name.  
