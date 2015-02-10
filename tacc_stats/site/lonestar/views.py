@@ -27,11 +27,17 @@ def update(meta = None, rerun=False):
                                  daysback = 2)
     
     for jobid, json in meta.json.iteritems():
-        print jobid
+        #print jobid
+        """
+        obj,created = LS4Job.objects.get_or_create(id = jobid)
+        obj.submission_time = json['submission_time']
+        obj.save()
+        continue
+        """
         if rerun:
             if LS4Job.objects.filter(id = jobid).exists():
                 job = LS4Job.objects.filter(id = jobid).delete()
-
+                
         obj,created = LS4Job.objects.get_or_create(id = jobid)
         if not created: continue
         
@@ -50,6 +56,7 @@ def update(meta = None, rerun=False):
         jsondb['end_time'] = json['end_time']
         jsondb['start_epoch'] = json['start_epoch']
         jsondb['end_epoch'] = json['end_epoch']
+        jsondb['submission_time'] = json['submission_time']
         jsondb['run_time'] = json['run_time']
         jsondb['queue'] = json['queue']
         jsondb['name'] = json['name']
