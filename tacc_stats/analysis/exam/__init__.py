@@ -16,5 +16,6 @@ from tacc_stats.analysis.exam.c3_state import C3State
 from tacc_stats.analysis.exam.packetrate import PacketRate
 from tacc_stats.analysis.exam.packetsize import PacketSize
 from tacc_stats.analysis.exam.gige_bw import GigEBW
+from tacc_stats.analysis.exam.mic_usage import MICUsage
 from tacc_stats.analysis.exam.exams import Auditor
 
