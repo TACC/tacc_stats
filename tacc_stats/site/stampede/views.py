@@ -106,6 +106,7 @@ def update(date,rerun=False):
                     xd              = xd[0]
                     json['user']    = xd.user
                     json['exe']     = xd.exec_path.split('/')[-1][0:128]
+                    json['exec_path']     = xd.exec_path
                     json['cwd']     = xd.cwd[0:128]
                     json['threads'] = xd.num_threads
                     json['cores']   = xd.num_cores
@@ -120,6 +121,7 @@ def update(date,rerun=False):
                     print 'Using lariat',ld.id
                     json['user']    = ld.user
                     json['exe']     = ld.exc.split('/')[-1]
+                    json['exec_path'] = ld.exc
                     json['cwd']     = ld.cwd[0:128]
                     json['threads'] = ld.threads
                     if ld.cores: json['cores'] = ld.cores
