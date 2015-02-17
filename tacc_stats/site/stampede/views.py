@@ -5,8 +5,8 @@ from django.db.models import Q
 
 import os,sys,pwd
 from tacc_stats.analysis import exam
-from tacc_stats.site.stampede.models import Job, Host, TestInfo
-from tacc_stats.site.xalt.models import run
+from tacc_stats.site.stampede.models import Job, Host, Libraries, TestInfo
+from tacc_stats.site.xalt.models import run, join_run_object, lib
 import tacc_stats.cfg as cfg
 
 import tacc_stats.analysis.plot as plots
@@ -111,7 +111,9 @@ def update(date,rerun=False):
                     json['cores']   = xd.num_cores
                     json['nodes']   = xd.num_nodes
                     json['wayness'] = xd.num_cores/xd.num_nodes
+                    
 
+                    
                 """
                 else: # Otherwise use Lariat Data if available
                     ld.set_job(pickle_file, end_time = date)
@@ -125,6 +127,17 @@ def update(date,rerun=False):
                     if ld.wayness: json['wayness'] = ld.wayness
                 """
                 obj, created = Job.objects.update_or_create(**json)
+
+                if xd:
+                    for join in join_run_object.objects.using('xalt').filter(run_id = xd.run_id):
+                        try:
+                            object_path = lib.objects.using('xalt').get(obj_id = join.obj_id).object_path
+                            module_name = lib.objects.using('xalt').get(obj_id = join.obj_id).module_name
+                            if not module_name: module_name = 'none'
+                            library = Libraries(object_path = object_path, module_name = module_name)
+                            library.save()
+                            library.jobs.add(obj)
+                        except: pass
 
                 for host_name in hosts:
                     h = Host(name=host_name)

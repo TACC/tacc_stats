@@ -32,3 +32,55 @@ class run(models.Model):
 
     def __unicode__(self):
         return str(self.run_id)
+
+class join_run_object(models.Model):
+    join_id = models.PositiveIntegerField(primary_key=True)
+    obj_id  = models.PositiveIntegerField()
+    run_id  = models.PositiveIntegerField()
+
+    class Meta:
+        db_table = "join_run_object"
+
+    def __unicode__(self):
+        return str(self.run_id)
+
+class lib(models.Model):
+    obj_id      = models.PositiveIntegerField(primary_key=True)
+    object_path = models.CharField(max_length=1024)
+    syshost     = models.CharField(max_length=64)
+    hash_id     = models.CharField(max_length=40)
+    module_name = models.CharField(max_length=64)
+    timestamp   = models.FloatField()
+    lib_type    = models.CharField(max_length=2)
+
+    class Meta:
+        db_table = "xalt_object"
+    
+    def __unicode__(self):
+        return str(self.obj_id)
+
+class join_link_object(models.Model):
+
+    class Meta:
+        db_table = "join_link_object"
+    join_id  = models.PositiveIntegerField(primary_key=True)
+    obj_id   = models.PositiveIntegerField()
+    link_id  = models.PositiveIntegerField()
+
+    def __unicode__(self):
+        return str(self.join_id)
+
+class link(models.Model):
+    link_id      = models.PositiveIntegerField(primary_key=True)
+    uuid         = models.CharField(max_length=36)
+    hash_id      = models.CharField(max_length=40)
+    date         = models.DateTimeField(null=True)
+    link_program = models.CharField(max_length=10)
+    build_user   = models.CharField(max_length=64)
+    build_syshost =  models.CharField(max_length=64)
+    build_epoch  = models.FloatField()
+    exit_code    = models.IntegerField()
+    exec_path    = models.CharField(max_length=1024)
+
+    def __unicode__(self):
+        return str(self.link_id)
