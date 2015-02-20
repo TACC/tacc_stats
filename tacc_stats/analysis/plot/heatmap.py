@@ -11,9 +11,11 @@ class HeatMap(Plot):
 
     self.k1 = k1
     self.k2 = k2
-    super(HeatMap,self).__init__(processes=processes,aggregate=aggregate,**kwargs)
+    super(HeatMap,self).__init__(processes=processes,
+                                 aggregate=aggregate,
+                                 **kwargs)
 
-  def plot(self,jobid,job_data=None):
+  def plot(self,jobid,job_data=None):    
     self.setup(jobid,job_data=job_data)
     ts=self.ts
 

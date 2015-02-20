@@ -5,62 +5,124 @@ import tacc_stats.analysis.exam as exams
 ### Test exams
 filelist = [os.path.join(os.path.dirname(os.path.abspath(__file__)),'1835740_ref')] * 3
 
+#### VecPercent
+def vecpercent_test():
+    print("VecPercent Test")
+    aud = exams.Auditor(processes=1)
+    aud.stage(exams.VecPercent)
+    aud.run(filelist)
+    aud.test(exams.VecPercent,threshold=30)
+    assert (aud.results['VecPercent'].values().count(True)) == 1
+
+#### GigE bandwidth
+def gige_bw_test():
+    print("GigEBW Test")
+    aud = exams.Auditor(processes=1)
+    print("aggregated?",exams.GigEBW.aggregate)
+    aud.stage(exams.GigEBW)
+    aud.run(filelist)
+    aud.test(exams.GigEBW,threshold=0)
+    assert (aud.results['GigEBW'].values().count(True)) == 1
+
+#### Maximum Packet Rate Test
+"""
+def gigepacketrate_test():
+    print("GigEPacketRate Test")
+    aud = exams.Auditor(processes=1)
+    aud.stage(exams.GigEPacketRate,threshold=0)
+    aud.run(filelist)
+    aud.test()
+    assert (aud.results['GigEPacketRate'].values().count(True)) == 1
+"""
+#### Maximum Packet Rate Test
+def packetrate_test():
+    print("PacketRate Test")
+    aud = exams.Auditor(processes=1)
+    aud.stage(exams.PacketRate)
+    aud.run(filelist)
+    aud.test(exams.PacketRate,threshold=0)
+    assert (aud.results['PacketRate'].values().count(True)) == 1
+
+#### Mean Packet Size Test
+def packetsize_test():
+    print("PacketSize Test")
+    aud = exams.Auditor(processes=1)
+    aud.stage(exams.PacketSize,threshold=10000)
+    aud.run(filelist)
+    aud.test(exams.PacketSize,threshold=10000)
+    assert (aud.results['PacketSize'].values().count(True)) == 1
+
 #### Max Memory Usage Test
 def memusage_test():
     print("MemUsage Test")
-    mem_test = exams.MemUsage(processes=1,threshold=1000)
-    mem_test.run(filelist)
-    assert len(mem_test.failed()) == 1
+    aud = exams.Auditor(processes=1)
+    aud.stage(exams.MemUsage)
+    aud.run(filelist)
+    aud.test(exams.MemUsage,threshold=100)
+    assert (aud.results['MemUsage'].values().count(True)) == 1
 
 #### CPI Test
 def cpi_test():
-    print("CPI Test")
-    cpi_test = exams.HighCPI(processes=1,threshold=.01)
-    cpi_test.run(filelist)
-    assert len(cpi_test.failed()) == 1
+    print("HighCPI Test")
+    aud = exams.Auditor(processes=1)
+    aud.stage(exams.HighCPI)
+    aud.run(filelist)
+    aud.test(exams.HighCPI,threshold=0.01)
+    assert (aud.results['HighCPI'].values().count(True)) == 1
 
 #### Node Imbalance
 def imb_test():
-    print("Imbalance test")
-    imb_test = exams.Imbalance(['intel_snb'],['LOAD_L1D_ALL'],
-                               processes=1,threshold=0.01)
-    imb_test.run(filelist)
-    imb_test.top_jobs()
-    assert len(imb_test.failed()) == 1
+    print("Imbalance Test")
+    aud = exams.Auditor(processes=1)
+    aud.stage(exams.Imbalance)
+    aud.run(filelist)
+    aud.test(exams.Imbalance,threshold=0.01)
+    assert (aud.results['Imbalance'].values().count(True)) == 1
 
 #### Idle
 def idle_test():
-    print("Idle host test")
-    idle_test = exams.Idle(processes=1,threshold=0.0)
-    idle_test.run(filelist)
-    assert len((idle_test.failed())) == 1
+    print("Idle Test")
+    aud = exams.Auditor(processes=1)
+    aud.stage(exams.Idle)
+    aud.run(filelist)
+    aud.test(exams.Idle,threshold=0.01)
+    assert (aud.results['Idle'].values().count(True)) == 1
 
 #### Catastrophic
 def cat_test():
-    print("Catastrophic test")
-    cat_test = exams.Catastrophe(processes=1,threshold=10)
-    cat_test.run(filelist)
-    assert len(cat_test.failed()) == 1
+    print("Catastrophe Test")
+    aud = exams.Auditor(processes=1)
+    aud.stage(exams.Catastrophe)
+    aud.run(filelist)
+    aud.test(exams.Catastrophe,threshold=10)
+    assert (aud.results['Catastrophe'].values().count(True)) == 1
 
 #### Low FLOPS test
 def flops_test():
-    print("Low FLOPS test")
-    flops_test = exams.LowFLOPS(processes=1,threshold=1e9)
-    flops_test.run(filelist)
-    assert len(flops_test.failed()) == 1
+    print("Low Flops Test")
+    aud = exams.Auditor(processes=1)
+    aud.stage(exams.LowFLOPS,threshold=10e6)
+    aud.run(filelist)
+    aud.test(exams.LowFLOPS,threshold=10e6)
+    assert (aud.results['LowFLOPS'].values().count(True)) == 1
+
 
 #### Memory Bandwidth
 def mbw_test():
-    print("Memory BW test")
-    bw_test = exams.MemBw(processes=1,threshold=0.1)
-    bw_test.test(filelist[0])
-    bw_test.run(filelist)
-    assert len(bw_test.failed()) == 1 
+    print("Memory Bandwidth Test")
+    aud = exams.Auditor(processes=1)
+    aud.stage(exams.MemBw,threshold=0.1)
+    aud.run(filelist)
+    aud.test(exams.MemBw,threshold=0.1)
+    assert (aud.results['MemBw'].values().count(True)) == 1
 
 #### Metadata Rate
 def mdr_test():
-    print("MetaDataRate test")
-    md_test = exams.MetaDataRate(processes=1,threshold=0.1)
-    md_test.run(filelist)
-    assert len(md_test.failed()) == 1
+    print("MetaData Rate Test")
+    aud = exams.Auditor(processes=1)
+    aud.stage(exams.MetaDataRate,threshold=0.1)
+    aud.run(filelist)
+    aud.test(exams.MetaDataRate,threshold=0.1)
+    assert (aud.results['MetaDataRate'].values().count(True)) == 1
+
 

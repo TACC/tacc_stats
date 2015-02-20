@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 import datetime, errno, glob, numpy, os, sys, time, gzip
-import amd64_pmc, intel_snb, batch_acct
+import amd64_pmc, intel_process, batch_acct
 import re
 #import procdump
 import string
@@ -312,11 +312,12 @@ class Host(object):
             try:
                 c = line[0]
                 if c.isdigit():
-                    str_time, str_jobid = line.split()
                     try:
-                        rec_time = float(str_time)
-                    except ValueError:
-                        rec_time = long(str_time)
+                        str_time,str_jobid,hostname = line.split()
+                    except:
+                        str_time, str_jobid = line.split()
+
+                    rec_time = float(str_time)
                     rec_jobid = set(str_jobid.split(','))
                     if self.job.id in rec_jobid:
                         self.trace("file `%s' rec_time %d, rec_jobid `%s'\n",
@@ -346,14 +347,15 @@ class Host(object):
                 c = line[0]
                 if c.isdigit():
                     skip = False
-                    str_time, str_jobid = line.split()
 
                     try:
-                        rec_time = float(str_time)
-                    except ValueError:
-                        rec_time = long(str_time)
+                        str_time,str_jobid,hostname = line.split()
+                    except:
+                        str_time, str_jobid = line.split()
 
+                    rec_time = float(str_time)
                     rec_jobid = set(str_jobid.split(','))
+
                     if self.job.id not in rec_jobid:
                         line = file.next()
                         if line.startswith(SF_MARK_CHAR): 
@@ -492,7 +494,7 @@ class Job(object):
             # TODO Keep bad_hosts.
             try: host_name = host_name.split('.')[0]
             except: pass
-            
+
             host = Host(self, host_name, self.stats_home + '/archive',self.batch_acct.name_ext )
             if host.gather_stats():
                 self.hosts[host_name] = host
@@ -624,7 +626,7 @@ class Job(object):
                                                              dev_name, raw_dev_stats)
             del host.raw_stats
         amd64_pmc.process_job(self)
-        intel_snb.process_job(self)
+        intel_process.process_job(self)
         # Clear mult, width from schemas. XXX
         for schema in self.schemas.itervalues():
             for e in schema.itervalues():

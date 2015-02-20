@@ -22,7 +22,7 @@
 	  <th> cores </th>
 	  <th> nodes </th>
 	  <th> threads/task </th>
-	  <th> HWM (GB on node) </th>
+
 	</tr>
         <tr bgcolor="{{job.color}}">
 	  <td><a href="{% url 'stampede:job'  job.id %}">{{ job.id }}</a>
@@ -40,8 +40,41 @@
           <td align=right>{{ job.cores }}</td>
           <td align=right>{{ job.nodes }}</td>
           <td align=right>{{ job.threads }}</td>
-          <td align=right>{{ job.mem|stringformat:".3e" }}</td>
         </tr>
+	<tr><th> Test </th> <th> Measured </th> <th> Threshold </th> <th> Result </th>
+        <tr>
+	  {% for key,value in testinfo_dict.items %}
+	  <tr> <th> {{ key }} </th> 
+	   <th> {{ value.0|stringformat:"0.2e" }} </th>
+	   <th> {{ value.1|stringformat:"0.2e" }} </th>
+	   <th> {{ value.2 }} </th> </tr>
+	  {% endfor %}
+<!---	  <th> MBW </th>
+	  <th> Idle </th>
+	  <th> Catastrophe </th>
+	  <th> Mem HWM (GB) </th>
+	  <th> Max IB Packet Rate (B) </th>
+	  <th> Ave IB Packet Size (B) </th>
+	  <th> GigE BW (B)</th>
+	  <th> Ave GFLOPS </th>
+	  <th> Vec Percent </th> --->
+	</tr>
+<!---	<tr>
+	  {% for test in test_list %}
+	  <td align=right>{{ job.test.test_name }}</td>
+	  {% endfor %}
+          <td align=right>{{ job.cpi|stringformat:".2f" }}</td>
+          <td align=right>{{ job.mbw|stringformat:".2f" }}</td>
+          <td align=right>{{ job.idle|stringformat:".2f" }}</td>
+          <td align=right>{{ job.cat|stringformat:".2f" }}</td>
+          <td align=right>{{ job.mem|stringformat:".2e" }}</td>
+          <td align=right>{{ job.packetrate|stringformat:".2e" }}</td>
+          <td align=right>{{ job.packetsize|stringformat:".2e" }}</td>
+          <td align=right>{{ job.GigEBW|stringformat:".2e" }}</td>
+          <td align=right>{{ job.flops|stringformat:".2f" }}</td>
+          <td align=right>{{ job.VecPercent|stringformat:".2f" }}</td>--->
+	</tr>
+
    </table>
    <p><font size="5">Working Directory: {{job.cwd}}</font></p><p> <a href={{ client_url }}> Client Logs</a>   <a href={{ server_url }}> Server Logs</a></p>
    <hr>

@@ -14,7 +14,7 @@ class Imbalance(Test):
     if aggregate:
       kwargs['min_hosts'] = 2
     kwargs['aggregate'] = aggregate
-    kwargs['waynesses']=16
+    kwargs['waynesses']=[16]
     super(Imbalance,self).__init__(processes=processes,**kwargs)
 
   def compute_metric(self):

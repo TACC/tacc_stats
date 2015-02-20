@@ -31,7 +31,7 @@ class TSPLBase:
       self.f.close()
 
     try: 
-      self.wayness=self.j.acct['cores']/self.j.acct['nodes']
+      self.wayness=int(self.j.acct['cores'])/int(self.j.acct['nodes'])
     except ZeroDivisionError:
       if VERBOSE: print "Read zero nodes, assuming 16 way for job " + str(self.j.id)
       self.wayness=16
@@ -47,22 +47,6 @@ class TSPLBase:
     except:
       raise TSPLException('Something is funny with file' + file )
     
-    """
-    try:
-      self.wayness=int(re.findall('\d+',self.j.acct['granted_pe'])[0])
-    except AttributeError:
-      raise TSPLException("Pickle file broken: " + file)
-    except KeyError:
-      try:
-        self.wayness=self.j.acct['cores']/self.j.acct['nodes']
-      except ZeroDivisionError:
-        if VERBOSE: print "Read zero nodes, assuming 16 way for job " + str(self.j.id)
-        self.wayness=16
-      except TypeError:
-        raise TSPLException('Something is funny with job ' +str(self.j.id) +
-                            ' ' + str(self.j.acct['cores']) + ' ' +
-                            str(self.j.acct['nodes']))
-    """
     try:
       self.queue=self.j.acct['queue']
     except KeyError:
@@ -98,21 +82,22 @@ class TSPLBase:
             float(self.numhosts*16.0)/3600.0 # Need to refactor the 16 into the
                                         # accounting class
 
+    if 'amd64_core' in self.j.hosts.values()[0].stats:
+      self.pmc_type='amd64'
+    elif 'intel_pmc3' in self.j.hosts.values()[0].stats:
+      self.pmc_type='intel_pmc3'
+    elif 'intel_nhm' in self.j.hosts.values()[0].stats:
+      self.pmc_type='intel_nhm'
+    elif 'intel_wtm' in self.j.hosts.values()[0].stats:
+      self.pmc_type='intel_wtm'
+    elif 'intel_snb' in self.j.hosts.values()[0].stats:
+      self.pmc_type='intel_snb'
+
     if isinstance(k1,dict) and isinstance(k2,dict):
-      if 'amd64_core' in self.j.hosts.values()[0].stats:
-        self.pmc_type='amd64'
-      elif 'intel_pmc3' in self.j.hosts.values()[0].stats:
-        self.pmc_type='intel'
-      elif 'intel_snb' in self.j.hosts.values()[0].stats:
-        self.pmc_type='intel_snb'
       
       if self.pmc_type in k1:
         self.k1=k1[self.pmc_type]
         self.k2=k2[self.pmc_type]
-      else:
-        raise TSPLException(self.pmc_type+
-                            ' not supported for job'+str(self.j.id))
-      
       
       if not self.k1[0] in self.j.schemas:
         raise TSPLException(self.k1[0]+' not supported for job '+str(self.j.id))
@@ -122,8 +107,7 @@ class TSPLBase:
       self.k2=k2
       
       if not self.k1[0] in self.j.schemas:
-        raise TSPLException(self.k1[0]+' not supported for job '+str(self.j.id))
-      
+        raise TSPLException(self.k1[0]+' not supported for job '+str(self.j.id))      
     else:
       raise TSPLException('Input types must match and be lists or dicts: ' +
                           str(type(k1)) + ' ' + str(type(k2)))
@@ -132,7 +116,7 @@ class TSPLBase:
       self.t=(self.j.times-self.j.times[0])
     except:
       raise TSPLException('Time series is '+str(self.j.times))
-
+    
 
     if len(self.t) == 0:
       raise TSPLException('Time range is 0')
@@ -162,7 +146,7 @@ class TSPLBase:
 
     self.title='ID: %(ID)s, u: %(u)s, q: %(queue)s, N: %(name)s, '\
                 'D: %(date)s, NH: %(nh)d' % \
-           { 'ID' : self.j.id,'u': 'userxxx', 'queue': self.queue,
+           { 'ID' : self.j.id,'u': self.owner, 'queue': self.queue,
              'name': tspl_utils.string_shorten(self.j.acct['name'],15),
              'nh' : self.numhosts,
              'date': self.end_date }

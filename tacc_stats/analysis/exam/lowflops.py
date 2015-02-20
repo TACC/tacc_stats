@@ -4,9 +4,9 @@ from scipy.stats import tmean
 
 class LowFLOPS(Test):
   k1={'amd64' : ['amd64_core','amd64_sock','cpu'],
-      'intel_snb' : [ 'intel_snb', 'intel_snb', 'intel_snb', 'cpu'],}
+      'intel_snb' : [ 'intel_snb', 'intel_snb', 'intel_snb']}
   k2={'amd64' : ['SSE_FLOPS', 'DRAM',      'user'],
-      'intel_snb' : ['SIMD_D_256','SSE_D_ALL','LOAD_L1D_ALL','user'],}
+      'intel_snb' : ['SIMD_D_256','SSE_D_ALL','LOAD_L1D_ALL']}
 
   peak={'amd64' : [2.3e9*16*2, 24e9, 1.],
         'intel_snb' : [ 16*2.7e9*2, 16*2.7e9/2.*64., 1.],}
@@ -17,28 +17,22 @@ class LowFLOPS(Test):
   def compute_metric(self):
 
     gfloprate = 0
-    gdramrate = 0
-    gcpurate  = 0
-
     if self.ts.pmc_type == 'amd64' :
       gfloprate += self.arc(self.ts.data[0])
-      gdramrate += self.arc(self.ts.data[1])
-      gcpurate  += self.arc(self.ts.data[2])
-        
-    elif self.ts.pmc_type == 'intel_snb':
-      gfloprate += self.arc(self.ts.data[0])+self.arc(self.ts.data[1])
-      gdramrate += self.arc(self.ts.data[2])
-      gcpurate  += self.arc(self.ts.data[3])
 
-    # Percent of peak
-    pfr=gfloprate/self.peak[self.ts.pmc_type][0]
-    pdr=gdramrate/self.peak[self.ts.pmc_type][1]
-    pcr=gcpurate/(self.ts.wayness*100.)
+    if self.ts.pmc_type == 'intel_snb':
+      schema = self.ts.j.get_schema('intel_snb')
+      if 'ERROR' in schema: return
+      data = self.ts.j.aggregate_stats('intel_snb')
 
-    if (pcr > 0.5):
-      self.metric = pfr/pdr 
-    else: 
-      self.metric = 0
+      try:
+        flops = numpy.diff(data[0][:,schema['SSE_DOUBLE_SCALAR'].index] + 2*data[0][:,schema['SSE_DOUBLE_PACKED'].index] + 4*data[0][:,schema['SIMD_DOUBLE_256'].index])/numpy.diff(self.ts.t)
+      except: 
+        flops = numpy.diff(data[0][:,schema['SSE_D_ALL'].index] + 4*data[0][:,schema['SIMD_D_256'].index])/numpy.diff(self.ts.t)
+
+      flops = flops/data[1]
+
+    self.metric = tmean(flops)/1.0e9
 
     return
 

@@ -278,8 +278,8 @@ static int intel_wtm_begin(struct stats_type *type)
   uint64_t events[] = {
     MEM_UNCORE_RETIRED_REMOTE_DRAM,
     MEM_UNCORE_RETIRED_LOCAL_DRAM,
-    FP_COMP_OPS_EXE_X87,
-    MEM_LOAD_RETIRED_L1D_HIT,
+    FP_COMP_OPS_EXE_SSE_FP_PACKED,
+    FP_COMP_OPS_EXE_SSE_FP_SCALAR,
   };
 
   int i;

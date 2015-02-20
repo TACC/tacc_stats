@@ -23,28 +23,42 @@ class Job(models.Model):
     date = models.DateField(db_index=True,null=True)
     user = models.CharField(max_length=128, null=True)
     exe = models.CharField(max_length=128, null=True)
+    exec_path = models.CharField(max_length=1024, null=True)
+    exe_list = models.TextField(null=True)
     cwd = models.CharField(max_length=128, null=True)
     threads = models.BigIntegerField(null=True)
 
     cpi = models.FloatField(null=True)
+    cpld = models.FloatField(null=True)
     mbw = models.FloatField(null=True)
     idle = models.FloatField(null=True)
     cat = models.FloatField(null=True)
     mem = models.FloatField(null=True)
+    packetrate = models.FloatField(null=True)
+    packetsize = models.FloatField(null=True)
+    GigEBW = models.FloatField(null=True)
+    flops = models.FloatField(null=True)
+    VecPercent = models.FloatField(null=True)
+    Load_L1Hits = models.BigIntegerField(null=True)
+    Load_L2Hits = models.BigIntegerField(null=True)
+    Load_LLCHits = models.BigIntegerField(null=True)
 
     def __unicode__(self):
         return str(self.id)
 
     def color(self):
-
         if self.status == 'COMPLETED': 
             ret_val = "lightblue"
         elif self.status == 'FAILED':
             ret_val = "red"
         else:
             ret_val = "silver"
-
         return ret_val
+
+    def sus(self):
+        factor = 16
+        if self.queue == 'largemem': factor = 32  
+        return self.nodes * self.run_time * 0.0002777777777777778 * factor
 
 class Host(models.Model):
     name = models.CharField(max_length=128)
@@ -54,7 +68,30 @@ class Host(models.Model):
     def __unicode__(self):
         return str(self.name)
 
+class Libraries(models.Model):
+    object_path = models.CharField(max_length=1024)
+    module_name = models.CharField(max_length=64)
+    jobs = models.ManyToManyField(Job)
+
+    class Meta: ordering = ('object_path',)
+
+    def __unicode__(self):
+        return str(self.object_path)
+
+
 class JobForm(ModelForm):
     class Meta:
         model = Job
         fields = ['id']
+
+class TestInfo(models.Model):
+    test_name = models.CharField(max_length=128)
+    field_name = models.CharField(max_length=128)
+    threshold = models.FloatField(null=True)
+
+    # Computed Metric .op. Threshold
+    comparator = models.CharField(max_length=2)
+
+    def __unicode__(self):
+        return str(self.test_name)
+

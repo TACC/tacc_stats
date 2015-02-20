@@ -55,6 +55,7 @@
 #include "trace.h"
 #include "pscanf.h"
 #include "check_pci_id.h"
+#include "pci_busid_map.h"
 
 /*! \name HAU Global Control Register
 
@@ -231,14 +232,16 @@ static int intel_snb_hau_begin(struct stats_type *type)
     { REQUESTS_READS, REQUESTS_WRITES, CLOCKTICKS, IMC_WRITES},
   };
 
-  /* 2 buses and 1 device per bus */
-  char *bus[2] = {"7f", "ff"};
+  /* 2-4 buses and 1 device per bus */
+  char **bus;
+  int num_buses;
+  num_buses = get_pci_busids(&bus);
   char *dev[1] = {"0e.1"};
   int   ids[1] = {0x3c46};
   char bus_dev[80];
 
   int i, j;
-  for (i = 0; i < 2; i++) {
+  for (i = 0; i < num_buses; i++) {
     for (j = 0; j < 1; j++) {
       snprintf(bus_dev, sizeof(bus_dev), "%s/%s", bus[i], dev[j]);      
       if (check_pci_id(bus_dev,ids[j]))
@@ -299,15 +302,17 @@ static void intel_snb_hau_collect_dev(struct stats_type *type, char *bus_dev, ch
 
 static void intel_snb_hau_collect(struct stats_type *type)
 {
-  /* 2 buses and 1 device per bus */
-  char *bus[2] = {"7f", "ff"};
+  /* 2-4 buses and 1 device per bus */
+  char **bus;
+  int num_buses;
+  num_buses = get_pci_busids(&bus);
   char *dev[1] = {"0e.1"};
   int   ids[1] = {0x3c46};
   char bus_dev[80];       
   char socket_dev[80];
 
   int i, j;
-  for (i = 0; i < 2; i++) {
+  for (i = 0; i < num_buses; i++) {
     for (j = 0; j < 1; j++) {
 
       snprintf(bus_dev, sizeof(bus_dev), "%s/%s", bus[i], dev[j]);

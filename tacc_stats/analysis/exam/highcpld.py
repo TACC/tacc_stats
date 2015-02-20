@@ -8,6 +8,6 @@ class HighCPLD(Test):
 
   def compute_metric(self):
 
-    cpld += self.arc(self.ts.data[0])/self.arc(self.ts.data[1])
+    cpld = self.arc(self.ts.data[0])/self.arc(self.ts.data[1])
 
     self.metric = cpld

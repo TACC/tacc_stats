@@ -1,3 +1,5 @@
 include tacc_stats/src/monitor/*.h
-include tacc_stats/src/monitor/*.sh.in
-include tacc_stats/*/*.sh.in
+recursive-include tacc_stats/site/stampede/templates *
+recursive-include tacc_stats/site/lonestar/templates *
+include tacc_stats/src/monitor/*.in
+include tacc_stats/*/*.in

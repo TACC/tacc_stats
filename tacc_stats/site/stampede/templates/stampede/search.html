@@ -1,18 +1,70 @@
 <html>
 <head>
-    <title>TACC Stats</title>
+    <title>TACC Stats Stampede</title>
 </head>
-<body>
-<h1>TACC Stats Home</h1>
-<h2>Job Dates</h2>
+<body bgcolor="#BDBDBD">
+<p>
+<font size="8" color="#002868"> TACC</font> <font size="8" color="#bf0a30"> Stats</font> <font color="ffffff" face="comic sans ms" >Stampede</font>
+</p>
+<p>
+<img src="/media/stampede.jpg"
+<img width="250" src="/media/TACC_logo.png" />
+</p>
+
+{% if error %}
+   <p style="color: red;">Requested search failed.</p>
+{% endif %}
+
+<font size="4">
+
+Search Using JOBID:
+<form action="{% url 'stampede:search' %}" method="get">
+  <input type="text" name ="jobid">
+  <input type="submit" value="Search">
+</form>
+
+
+<form action="{% url 'stampede:search' %}" method="get">
+
+<table>
+<tr><td>UID</td><td><input type="text" name="uid"></td></tr>
+<tr><td>User Name </td><td><input type="text" name ="user"></td></tr>
+<tr><td>Project </td><td><input type="text" name ="project"></td></tr>
+<tr><td>Executable </td><td><input type="text" name ="exe__icontains"></td>
+<tr><td>Search Field </td><td><input type="text" name ="opt_field0"></td><td>Value</td><td><input type="text" name ="value0"></td></tr>
+<tr><td></td><td><input type="text" name ="opt_field1"></td><td></td><td><input type="text" name ="value1"></td></tr><tr><td></td><td><input type="text" name ="opt_field2"></td><td></td><td><input type="text" name ="value2"></td></tr>
+<p>
+<hr>
+Search Using Combined Fields:
+<p>
+  Start Date <input type="date" name="date__gte">
+  End Date <input type="date" name="date__lte">
+</p>
+</p>
+</tr>
+</table>
+  <input type="submit" value="Search">
+</form>
+</font>
+</div>
+<hr>
+<div id="browse">
 {% if date_list %}
+
  <table border="1" cellpadding="5">
-   {% for date in date_list %}
-        <tr><th><a href="date/{{date}}">{{date}} </th></tr>
+{% for month, dates in date_list %}
+   <tr><th>{{month}}</th>
+   {% for date in dates %}
+     <th><a href="date/{{date.0}}">{{date.1}}</th>
    {% endfor %}
+{% endfor %}
+</tr>
 {% else %}
     <p> No job data available </p>
 {% endif %}   
-
+</div>
+<!--- Percentage jobs with CPI over {{cpi_thresh }} = {{cpi_per}} --->
+ 
 </body>
+
 </html>

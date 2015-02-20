@@ -267,7 +267,6 @@ static int intel_nhm_begin_cpu(char *cpu, uint64_t *events, size_t nr_events)
 #define MEM_LOAD_RETIRED_L3_HIT        PERF_EVENT(0xCB, 0x0C)
 #define MEM_LOAD_RETIRED_L3_MISS       PERF_EVENT(0xCB, 0x10) /* May be same as 0x0F/0x10 + 0x0F/0x20. */
 
-#define DTLB_LOAD_MISSES_WALK_CYCLES   PERF_EVENT(0x08, 0x04)
 #define FP_COMP_OPS_EXE_SSE_FP_PACKED  PERF_EVENT(0x10, 0x10)
 #define FP_COMP_OPS_EXE_SSE_FP_SCALAR  PERF_EVENT(0x10, 0x20)
 
@@ -278,8 +277,8 @@ static int intel_nhm_begin(struct stats_type *type)
   uint64_t events[] = {
     MEM_UNCORE_RETIRED_REMOTE_DRAM,
     MEM_UNCORE_RETIRED_LOCAL_DRAM,
-    FP_COMP_OPS_EXE_X87,
-    MEM_LOAD_RETIRED_L1D_HIT,
+    FP_COMP_OPS_EXE_SSE_FP_PACKED,
+    FP_COMP_OPS_EXE_SSE_FP_SCALAR
   };
 
   int i;

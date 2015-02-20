@@ -4,8 +4,9 @@ from django.views.generic import DetailView, ListView
 from django.db.models import Q
 
 import os,sys,pwd
-
-from tacc_stats.site.stampede.models import Job, Host, JobForm
+from tacc_stats.analysis import exam
+from tacc_stats.site.stampede.models import Job, Host, Libraries, TestInfo
+from tacc_stats.site.xalt.models import run, join_run_object, lib
 import tacc_stats.cfg as cfg
 
 import tacc_stats.analysis.plot as plots
@@ -27,118 +28,177 @@ from matplotlib.backends.backend_agg import FigureCanvasAgg as FigureCanvas
 from django.core.cache import cache,get_cache 
 import traceback
 
-def update(date,rerun=False):
+def update_comp_info(thresholds = None):
+    
+    schema_map = {'HighCPI' : ['cpi','>',1.5], 
+                  'HighCPLD' : ['cpld','>',1.5], 
+                  'Load_L1Hits' : ['Load_L1Hits','>',1.5], 
+                  'Load_L2Hits' : ['Load_L2Hits','>',1.5], 
+                  'Load_LLCHits' : ['Load_LLCHits','>',1.5], 
+                  'MemBw' : ['mbw', '<', 1.0 ],
+                  'Catastrophe' : ['cat', '<',0.01] ,
+                  'MemUsage' : ['mem','>',31], 
+                  'PacketRate' : ['packetrate','>',0], 
+                  'PacketSize' : ['packetsize','>',0],
+                  'Idle' : ['idle','>',0.99],
+                  'LowFLOPS' : ['flops','<',10],
+                  'VecPercent' : ['VecPercent','<',0.05],
+                  'GigEBW' : ['GigEBW','>',1e7]}
+    if thresholds:
+        for key,val in thresholds.iteritems():
+            schema_map[key][1:3] = val
 
+    for name in schema_map:
+        if TestInfo.objects.filter(test_name = name).exists():
+            TestInfo.objects.filter(test_name = name).delete()
+
+        obj = TestInfo(test_name = name, 
+                       field_name = schema_map[name][0], 
+                       comparator = schema_map[name][1], 
+                       threshold = schema_map[name][2])
+        obj.save()
+
+def update(date,rerun=False):
     ld = lariat_utils.LariatData(directory = cfg.lariat_path,
                                  daysback = 2)
-
     tz = pytz.timezone('US/Central')
-
     pickle_dir = os.path.join(cfg.pickles_dir,date)
 
     ctr = 0
-
     for root, directory, pickle_files in os.walk(pickle_dir):
         num_files = len(pickle_files)
         print "Number of pickle files in",root,'=',num_files
         for pickle_file in sorted(pickle_files):
             ctr += 1
-            print pickle_file
+
             try:
-                if rerun:
-                    if Job.objects.filter(id = pickle_file).exists():
-                        job = Job.objects.filter(id = pickle_file).delete()
-            
-                obj,created = Job.objects.get_or_create(id = pickle_file)
-            except: 
+                if rerun: pass
+                elif Job.objects.filter(id = pickle_file).exists(): continue
+            except:
                 print pickle_file,"doesn't look like a pickled job"
                 continue
-            if not created: 
-                if len(obj.host_set.all()) > 0: 
-                    continue 
-                try:
-                    pickle_path = os.path.join(root,str(pickle_file))
-                    with open(pickle_path, 'rb') as f:
-                        hosts = np.load(f).hosts.keys()
-                        for host_name in hosts:
-                            h = Host(name=host_name)
-                            h.save()
-                            h.jobs.add(obj)
-                except: pass
-                continue
 
             try:
-
                 pickle_path = os.path.join(root,str(pickle_file))
                 with open(pickle_path, 'rb') as f:
                     data = np.load(f)
                     json = data.acct
                     hosts = data.hosts.keys()
-
                 del json['yesno'], json['unknown']
-                json['run_time'] = json['end_time'] - json['start_time']
-
-                json['path'] = pickle_path
-                json['start_epoch'] = json['start_time']
-                json['end_epoch'] = json['end_time']
-                        
                 utc_start = datetime.utcfromtimestamp(json['start_time']).replace(tzinfo=pytz.utc)
                 utc_end = datetime.utcfromtimestamp(json['end_time']).replace(tzinfo=pytz.utc)
+                json['run_time'] = json['end_time'] - json['start_time']
+                json['start_epoch'] = json['start_time']
+                json['end_epoch'] = json['end_time']
                 json['start_time'] = utc_start.astimezone(tz)
                 json['end_time'] =  utc_end.astimezone(tz)
                 json['date'] = json['end_time'].date()
-                
-                ld.set_job(pickle_file, end_time = date)
-                
-                json['exe'] = ld.exc.split('/')[-1]
-                json['cwd'] = ld.cwd[0:128]
-                json['threads'] = ld.threads
                 json['name'] = json['name'][0:128]
-                if ld.cores: json['cores'] = ld.cores
-                if ld.nodes: json['nodes'] = ld.nodes
-                if ld.wayness: json['wayness'] = ld.wayness
 
                 try: json['user']=pwd.getpwuid(int(json['uid']))[0]
-                except: json['user']=ld.user
+                except: json['user']='unknown'
 
-                obj = Job(**json)
-                obj.save()
+                ### If xalt or lariat data is available 
+                ### add info to the tacc_stats_site_db 
+                # Assign additional xalt data if available
+                xd = run.objects.using('xalt').filter(job_id = json['id'])
+                if xd:
+                    xd              = xd[0]
+                    json['user']    = xd.user
+                    json['exe']     = xd.exec_path.split('/')[-1][0:128]
+                    json['exec_path']     = xd.exec_path
+                    json['cwd']     = xd.cwd[0:128]
+                    json['threads'] = xd.num_threads
+                    json['cores']   = xd.num_cores
+                    json['nodes']   = xd.num_nodes
+                    json['wayness'] = xd.num_cores/xd.num_nodes
+                    
+
+                    
+                """
+                else: # Otherwise use Lariat Data if available
+                    ld.set_job(pickle_file, end_time = date)
+                    print 'Using lariat',ld.id
+                    json['user']    = ld.user
+                    json['exe']     = ld.exc.split('/')[-1]
+                    json['exec_path'] = ld.exc
+                    json['cwd']     = ld.cwd[0:128]
+                    json['threads'] = ld.threads
+                    if ld.cores: json['cores'] = ld.cores
+                    if ld.nodes: json['nodes'] = ld.nodes
+                    if ld.wayness: json['wayness'] = ld.wayness
+                """
+                obj, created = Job.objects.update_or_create(**json)
+
+                if xd:
+                    for join in join_run_object.objects.using('xalt').filter(run_id = xd.run_id):
+                        try:
+                            object_path = lib.objects.using('xalt').get(obj_id = join.obj_id).object_path
+                            module_name = lib.objects.using('xalt').get(obj_id = join.obj_id).module_name
+                            if not module_name: module_name = 'none'
+                            library = Libraries(object_path = object_path, module_name = module_name)
+                            library.save()
+                            library.jobs.add(obj)
+                        except: pass
 
                 for host_name in hosts:
                     h = Host(name=host_name)
-                    print host_name
                     h.save()
                     h.jobs.add(obj)
-
             except: 
                 print json
                 print pickle_file,'failed'
                 print traceback.format_exc()
                 print date
-            print "Percentage Completed =",100*float(ctr)/num_files
+            #print "Percentage Completed =",100*float(ctr)/num_files
 
-def update_test_field(date,test,metric,rerun=False):
-    print "Run",test.__class__.__name__,"test for",date
+def update_metric_fields(date,rerun=False):
+    update_comp_info()
+    aud = exam.Auditor(processes=2)
     
-    kwargs = { 'date' : date, 
-               'run_time__gte' : test.min_time,
-               'nodes__gte' : test.min_hosts
-               }
+    aud.stage(exam.GigEBW, ignore_qs=[], min_time = 600)
+    aud.stage(exam.HighCPI, ignore_qs=[], min_time = 600)
+    aud.stage(exam.HighCPLD, ignore_qs=[], min_time = 600)
+    aud.stage(exam.Load_L1Hits, ignore_qs=[], min_time = 600)
+    aud.stage(exam.Load_L2Hits, ignore_qs=[], min_time = 600)
+    aud.stage(exam.Load_LLCHits, ignore_qs=[], min_time = 600)
+    aud.stage(exam.MemBw, ignore_qs=[], min_time = 600)
+    aud.stage(exam.Catastrophe, ignore_qs=[], min_time = 3600)
+    aud.stage(exam.MemUsage, ignore_qs=[], min_time = 600)
+    aud.stage(exam.PacketRate, ignore_qs=[], min_time = 600)
+    aud.stage(exam.PacketSize, ignore_qs=[], min_time = 600)
+    aud.stage(exam.Idle,min_hosts=2, ignore_qs=[], min_time = 600)
+    aud.stage(exam.LowFLOPS, ignore_qs=[], min_time = 600)
+    aud.stage(exam.VecPercent, ignore_qs=[], min_time = 600)
+
+    print 'Run the following tests for:',date
+    for name, test in aud.measures.iteritems():
+        print name
+        obj = TestInfo.objects.get(test_name = name)
+        print obj.field_name,obj.threshold,obj.comparator
+
+    jobs_list = Job.objects.filter(date = date).exclude(run_time__lt = 600)
+
+    # Use mem to see if job was tested.  It will always exist
+    #if not rerun:
+    #    jobs_list = jobs_list.filter(Q(cpi = None) | Q(cpi = float('nan')))
     
-    jobs_list = Job.objects.filter(**kwargs).exclude(Q(queue__in=test.ignore_qs) | Q(status__in = test.ignore_status))
-
-    if not rerun:
-        jobs_list = jobs_list.filter(Q(**{metric : None}) | Q(**{metric : float('nan')}))
-
     paths = []
     for job in jobs_list:
-        paths.append(os.path.join(cfg.pickles_dir,job.date.strftime('%Y-%m-%d'),str(job.id)))
+        paths.append(os.path.join(cfg.pickles_dir,
+                                  job.date.strftime('%Y-%m-%d'),
+                                  str(job.id)))
+    num_jobs = jobs_list.count()
+    print '# Jobs to be tested:',num_jobs
+    if num_jobs == 0 : return
 
-    print '# Jobs to be tested:',len(jobs_list)
-    test.run(paths)
-    for jid in test.results.keys(): 
-        jobs_list.filter(id = jid).update(**{metric : test.results[jid]['metric']})
+    aud.run(paths)
+    print 'finished computing metrics'
 
+    for name, results in aud.metrics.iteritems():
+        obj = TestInfo.objects.get(test_name = name)
+        for jobid in results.keys():
+            jobs_list.filter(id = jobid).update(**{ obj.field_name : results[jobid]})
 
 def sys_plot(request, pk):
 
@@ -160,9 +220,9 @@ def sys_plot(request, pk):
             name = str(racks[r])+'-'+str(nodes[n])
             if name in hosts: x[n][r] = 1.0
 
-    fig = Figure(figsize=(25,6))
+    fig = Figure(figsize=(17,5))
     ax=fig.add_subplot(1,1,1)
-
+    fig.tight_layout()
     ax.set_yticks(range(len(nodes)))
     ax.set_yticklabels(nodes,fontsize=6)
     ax.set_xticks(range(len(racks)))
@@ -179,8 +239,15 @@ def sys_plot(request, pk):
 
 
 def dates(request):
-    
-    date_list = os.listdir(cfg.pickles_dir)
+
+    date_list = []
+    dates = Job.objects.values_list('date',flat=True).distinct()
+    for date in dates:
+        try:
+            date_list.append(date.strftime('%Y-%m-%d'))
+        except: 
+            pass
+
     date_list = sorted(date_list, key=lambda d: map(int, d.split('-')))
 
     month_dict ={}
@@ -194,100 +261,82 @@ def dates(request):
 
     date_list = month_dict
     field = {}
-    # Computed Metrics
-    """
-    completed_list = Job.objects.filter(run_time__gte = 3600,date__year = 2014).exclude(status__in=['CANCELLED','FAILED'])
-    
-    field['cpi_thresh'] = 0.75
-    field['cpi_job_list']  = completed_list.exclude(Q(cpi = float('nan')) | Q(cpi = None) ).filter(cpi__gte = field['cpi_thresh'])
-    field['cpi_per'] = 100*len(field['cpi_job_list'])/float(len(completed_list))
-    """
+
     field['date_list'] = sorted(date_list.iteritems())
-    return render_to_response("stampede/dates.html", field)
+    return render_to_response("stampede/search.html", field)
 
 def search(request):
 
-    if 'q' in request.GET:
-        q = request.GET['q']
+    if 'jobid' in request.GET:
         try:
-            job = Job.objects.get(id = q)
+            job = Job.objects.get(id = request.GET['jobid'])
             return HttpResponseRedirect("/stampede/job/"+str(job.id)+"/")
         except: pass
+    try:
+        fields = request.GET.dict()
+        new_fields = {k:v for k,v in fields.items() if v}
+        fields = new_fields
 
-    if 'u' in request.GET:
-        u = request.GET['u']
-        try:
-            return index(request, uid = u)
-        except: pass
+        if 'opt_field0' in fields.keys() and 'value0' in fields.keys():
+            fields[fields['opt_field0']] = fields['value0']
+            del fields['opt_field0'], fields['value0']
+        if 'opt_field1' in fields.keys() and 'value1' in fields.keys():
+            fields[fields['opt_field1']] = fields['value1']
+            del fields['opt_field1'], fields['value1']
+        if 'opt_field2' in fields.keys() and 'value2' in fields.keys():
+            fields[fields['opt_field2']] = fields['value2']
+            del fields['opt_field2'], fields['value2']
 
-    if 'n' in request.GET:
-        user = request.GET['n']
-        try:
-            return index(request, user = user)
-        except: pass
+        print 'search', fields
+        return index(request, **fields)
+    except: pass
 
-    if 'p' in request.GET:
-        project = request.GET['p']
-        try:
-            return index(request, project = project)
-        except: pass
+    return render(request, 'stampede/search.html', {'error' : True})
 
-    if 'x' in request.GET:
-        x = request.GET['x']
-        try:
-            return index(request, exe = x)
-        except: pass
 
-    return render(request, 'stampede/dates.html', {'error' : True})
-
-def index(request, date = None, uid = None, project = None, user = None, exe = None, report=None):
-    
-    field = {}
+def index(request, **field):
+    print 'index',field
     name = ''
-    if date:
-        name+=date+'-'
-        field['date'] = date
-    if uid:
-        name+=uid+'-'
-        field['uid'] = uid
-    if user:
-        name+=user+'-'
-        field['user'] = user
-    if project:
-        name+=project+'-'
-        field['project'] = project
-    if exe:
-        name+=exe+'-'
-        field['exe__icontains'] = exe
+    for key, val in field.iteritems():
+        name += '['+key+'='+val+']-'
 
-    field['run_time__gte'] = 60 
+    if 'run_time__gte' in field: pass
+    else: field['run_time__gte'] = 60
 
-    job_list = Job.objects.filter(**field).order_by('-id')
+    order_key = '-id'
+    if 'order_key' in field: 
+        order_key = field['order_key']
+        del field['order_key']
 
+    job_list = Job.objects.filter(**field).order_by(order_key)
+
+    field['name'] = name + 'search'
+    field['histograms'] = hist_summary(job_list)
+    
     field['job_list'] = job_list
-    field['nj'] = len(job_list)
+    field['nj'] = job_list.count()
 
     # Computed Metrics
     field['cat_job_list']  = job_list.filter(Q(cat__lte = 0.001) | Q(cat__gte = 1000)).exclude(cat = float('nan'))
     
     completed_list = job_list.exclude(status__in=['CANCELLED','FAILED']).order_by('-id')
     field['idle_job_list'] = completed_list.filter(idle__gte = 0.99)
-    field['mem_job_list'] = completed_list.filter(mem__gte = 30)
+    field['mem_job_list'] = completed_list.filter(mem__lte = 30, queue = 'largemem')
 
-    field['cpi_thresh'] = 1.0
+    field['cpi_thresh'] = 1.5
     field['cpi_job_list']  = completed_list.exclude(cpi = float('nan')).filter(cpi__gte = field['cpi_thresh'])
-    field['cpi_per'] = 100*len(field['cpi_job_list'])/float(len(completed_list))
+    field['cpi_per'] = 100*field['cpi_job_list'].count()/float(completed_list.count())
+
+    field['gigebw_thresh'] = 2**20
+    field['gigebw_job_list']  = completed_list.exclude(GigEBW = float('nan')).filter(GigEBW__gte = field['gigebw_thresh'])
 
     field['idle_job_list'] = list_to_dict(field['idle_job_list'],'idle')
     field['cat_job_list'] = list_to_dict(field['cat_job_list'],'cat')
     field['cpi_job_list'] = list_to_dict(field['cpi_job_list'],'cpi')
     field['mem_job_list'] = list_to_dict(field['mem_job_list'],'mem')
+    field['gigebw_job_list'] = list_to_dict(field['gigebw_job_list'],'GigEBW')
 
-    if report: 
-        field['report'] = report 
-        field['name'] = name 
-        return render_to_pdf("stampede/index.html", field)
-    else:  return render_to_response("stampede/index.html", field)
+    return render_to_response("stampede/index.html", field)
 
 def list_to_dict(job_list,metric):
     job_dict={}
@@ -295,36 +344,15 @@ def list_to_dict(job_list,metric):
         job_dict.setdefault(job.user,[]).append((job.id,round(job.__dict__[metric],3)))
     return job_dict
     
+def hist_summary(job_list):
 
-def hist_summary(request, date = None, uid = None, project = None, user = None, exe = None, report = None):
-
-    field = {}
-    name = ''
-    if date:
-        field['date'] = date
-        name+=date+'-'
-    if uid:
-        field['uid'] = uid
-        name+=uid+'-'
-    if user:
-        field['user'] = user
-        name+=user+'-'
-    if project:
-        field['project'] = project
-        name+=project+'-'
-    if exe:
-        field['exe__icontains'] = exe
-        name+=exe+'-'
-
-    field['run_time__gte'] = 60 
-
-    job_list = Job.objects.filter(**field).exclude(status__in=['CANCELLED','FAILED'])
+    job_list = job_list.exclude(status__in=['CANCELLED','FAILED'])
     fig = Figure(figsize=(16,6))
 
     # Run times
     job_times = np.array(job_list.values_list('run_time',flat=True))/3600.
     ax = fig.add_subplot(221)
-    ax.hist(job_times, max(5, 5*np.log(len(job_list))),log=True)
+    ax.hist(job_times, max(5, 5*np.log(len(job_times))),log=True)
     ax.set_xlim((0,max(job_times)+1))
     ax.set_ylabel('# of jobs')
     ax.set_xlabel('# hrs')
@@ -333,46 +361,61 @@ def hist_summary(request, date = None, uid = None, project = None, user = None, 
     # Number of cores
     job_size =  np.array(job_list.values_list('cores',flat=True))
     ax = fig.add_subplot(222)
-    ax.hist(job_size, max(5, 5*np.log(len(job_list))),log=True)
+    ax.hist(job_size, max(5, 5*np.log(len(job_size))),log=True)
     ax.set_xlim((0,max(job_size)+1))
     ax.set_title('Run Sizes for Completed Jobs')
     ax.set_xlabel('# cores')
+    
+    first = 'cpi'
+    second = 'flops'
+
+    tmp = job_list.exclude(Q(**{first : None}) | Q(**{first : float('nan')}) | Q(**{second : None}) | Q(**{second : float('nan')}))
+
+    cpi = []
+    gflops = []
+    
+    for job in tmp: 
+        cpi.append(getattr(job,first))
+        gflops.append(getattr(job,second))
 
     try:
         # CPI
-        job_cpi = np.array(job_list.exclude(Q(**{'cpi' : None}) | Q(**{'cpi' : float('nan')})).values_list('cpi',flat=True))
+        job_cpi = np.array(cpi)
         ax = fig.add_subplot(223)
+        job_cpi = job_cpi[job_cpi<5.0]
         mean_cpi = job_cpi.mean()
-        var_cpi = job_cpi.var()
-        job_cpi = job_cpi[job_cpi<4.0]
-        ax.hist(job_cpi, max(5, 5*np.log(len(job_list))),log=True)
-        #ax.set_xlim(0,min(job_cpi.max(),4.0))
+        std_cpi = job_cpi.std()
+        ax.hist(job_cpi, max(5, 5*np.log(len(job_cpi))),log=True)
         ax.set_ylabel('# of jobs')
-        ax.set_title('CPI for Successful Jobs over 1 hr '+r'$\bar{Mean}=$'+'{0:.2f}'.format(mean_cpi)+' '+r'$Var=$' +  '{0:.2f}'.format(var_cpi))
+        ax.set_title('CPI (Jobs > 1 hr) '+r'$\bar{Mean}=$'+'{0:.2f}'.format(mean_cpi)+' '+r'$\pm$' +  '{0:.2f}'.format(std_cpi))
         ax.set_xlabel('CPI')
     except: pass
     try:
-        # MBW
-        job_mbw = np.array(job_list.exclude(Q(**{'mbw' : None}) | Q(**{'mbw' : float('nan')})).values_list('mbw',flat=True))
+        # FLOPS
+        job_flops = np.array(gflops)
+        job_flops = job_flops[job_flops<400]
+        mean_flops = job_flops.mean()
+        std_flops = job_flops.std()
         ax = fig.add_subplot(224)        
-        job_mbw = job_mbw[job_mbw < 1.0]
-        ax.hist(job_mbw, max(5, 5*np.log(len(job_list))))
-        #ax.set_xlim(0,job_mbw.max())
+        ax.hist(job_flops, max(5, 5*np.log(len(job_flops))),log=True)
         ax.set_ylabel('# of jobs')
-        ax.set_title('MBW for Successful Jobs over 1 hr')
-        ax.set_xlabel('MBW')
+        ax.set_title('GFLOPS/Node (Jobs > 1 hr) '+r'$\bar{Mean}=$'+'{0:.2f}'.format(mean_flops)+' '+r'$\pm$' +  '{0:.2f}'.format(std_flops))
+        ax.set_xlabel('GFLOPS')
     except: pass
     fig.subplots_adjust(hspace=0.5)      
     canvas = FigureCanvas(fig)
     
-    if report:
-        response = HttpResponse(content_type='image/pdf')
-        response['Content-Disposition'] = "attachment; filename="+name+"hist.pdf"
-        fig.savefig(response, format='pdf')
-    else:
-        response = HttpResponse(content_type='image/png')
-        response['Content-Disposition'] = "attachment; filename="+name+"hist.png"
-        fig.savefig(response, format='png')
+    import StringIO,base64,urllib
+    imgdata = StringIO.StringIO()
+    fig.savefig(imgdata, format='png')
+    imgdata.seek(0)
+    response = "data:image/png;base64,%s" % base64.b64encode(imgdata.buf)
+    
+    """
+    response = HttpResponse(content_type='data:image/png;base64')
+    response['Content-Disposition'] = "attachment; filename="+name+"hist.png"
+    fig.savefig(response, format='png')
+    """
 
     return response
 
@@ -425,11 +468,35 @@ class JobDetailView(DetailView):
 
         data = get_data(job.id)
 
+        import operator
+        comp = {'>': operator.gt, '>=': operator.ge,
+                '<': operator.le, '<=': operator.le,
+                '==': operator.eq}
+        
+        testinfo_dict = {}
+        for obj in TestInfo.objects.all():
+            obj.test_name,
+            test_type = getattr(sys.modules[exam.__name__],obj.test_name)
+            test = test_type(min_time=0,ignore_qs=[])
+            try: 
+                metric = test.test(job.path,data)
+                setattr(job,obj.field_name,metric)
+                result = comp[obj.comparator](metric, obj.threshold)
+                
+                if result: string = 'Failed'
+                else: string = 'Passed'
+                testinfo_dict[obj.test_name] = (metric,obj.threshold,string)
+            except: continue
+
+        context['testinfo_dict'] = testinfo_dict
+
         type_list = []
         host_list = []
 
         for host_name, host in data.hosts.iteritems():
             host_list.append(host_name)
+        if len(host_list) != job.nodes:
+            job.status = str(job.nodes-len(host_list))+"_NODES_MISSING"
         host0=data.hosts.values()[0]
         for type_name, type in host0.stats.iteritems():
             schema = ' '.join(build_schema(data,type_name))
@@ -483,26 +550,3 @@ def type_detail(request, pk, type_name):
 
     return render_to_response("stampede/type_detail.html",{"type_name" : type_name, "jobid" : pk, "stats_data" : stats, "schema" : schema})
 
-"""
-from django.template.loader import get_template
-from django.template import Context
-import ho.pisa as pisa
-import cStringIO as StringIO
-import cgi
-
-def render_to_pdf(template_src, context_dict):
-    template = get_template(template_src)
-    context = Context(context_dict)
-    html  = template.render(context)
-    
-    result = StringIO.StringIO()
-    
-    pdf = pisa.pisaDocument(StringIO.StringIO(html.encode("UTF-8")), dest=result)
-    
-    response = HttpResponse(result.getvalue(), \
-                                mimetype='application/pdf',)
-    
-    response['Content-Disposition'] = "attachment; filename="+context_dict['name']+"report.pdf"
-
-    return response
-"""

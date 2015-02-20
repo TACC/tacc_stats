@@ -2,6 +2,9 @@
 import os,sys
 from datetime import timedelta,datetime
 os.environ['DJANGO_SETTINGS_MODULE']='tacc_stats.site.tacc_stats_site.settings'
+import django
+django.setup()
+
 from tacc_stats.site.lonestar import views
 from tacc_stats.pickler import MetaData as MetaData
 
@@ -15,7 +18,7 @@ except:
 
 for root,dirnames,filenames in os.walk(path):
     for directory in dirnames:
-
+        print directory
         date = datetime.strptime(directory,'%Y-%m-%d')
         if max(date.date(),start.date()) > min(date.date(),end.date()): continue
         print 'Run update for',date.date()
