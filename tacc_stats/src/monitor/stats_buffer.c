@@ -27,10 +27,11 @@
 #define SF_MARK_CHAR '%'
 
 
-#define sf_printf(sf, fmt, args...)					\
-  do {									\
-    asprintf(&(sf->sf_data), "%s"fmt, sf->sf_data, ##args);		\
-  } while (0)
+#define sf_printf(sf, fmt, args...) do {			\
+    char *tmp_string = sf->sf_data;				\
+    asprintf(&(sf->sf_data), "%s"fmt, sf->sf_data, ##args);	\
+    free(tmp_string);						\
+  } while(0)
 
 #ifdef RMQ
 static int send(struct stats_buffer *sf)
@@ -85,14 +86,14 @@ int stats_wr_hdr(struct stats_buffer *sf)
   uname(&uts_buf);
   pscanf("/proc/uptime", "%llu", &uptime);
   
-  sf->sf_data = "";
-  sf_printf(sf, "%c%s %s\n", SF_PROPERTY_CHAR, STATS_PROGRAM, STATS_VERSION);
+  sf->sf_data = strdup("");
 
+  sf_printf(sf, "%c%s %s\n", SF_PROPERTY_CHAR, STATS_PROGRAM, STATS_VERSION);
   sf_printf(sf, "%chostname %s\n", SF_PROPERTY_CHAR, uts_buf.nodename);
   sf_printf(sf, "%cuname %s %s %s %s\n", SF_PROPERTY_CHAR, uts_buf.sysname,
             uts_buf.machine, uts_buf.release, uts_buf.version);
   sf_printf(sf, "%cuptime %llu\n", SF_PROPERTY_CHAR, uptime);
-
+  
   size_t i = 0;
   struct stats_type *type;
   while ((type = stats_type_for_each(&i)) != NULL) {
@@ -122,7 +123,7 @@ int stats_wr_hdr(struct stats_buffer *sf)
   }
 
   send(sf);
-
+  free(sf->sf_data);
   return 0;
 }
 
@@ -149,7 +150,7 @@ int stats_buffer_mark(struct stats_buffer *sf, const char *fmt, ...)
 int stats_buffer_write(struct stats_buffer *sf)
 {
   int rc = 0;
-  sf->sf_data="";
+  sf->sf_data=strdup("");
 
   struct utsname uts_buf;
   uname(&uts_buf);
@@ -196,7 +197,7 @@ int stats_buffer_write(struct stats_buffer *sf)
   free(sf->sf_mark);
   free(sf->sf_data);
 
-  memset(sf, 0, sizeof(struct stats_buffer));
+  memset(sf, 0, sizeof(*sf));
 
   return rc;
 }

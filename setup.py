@@ -476,6 +476,15 @@ class MyBuildExt(build_ext):
                                       runtime_library_dirs=ext.runtime_library_dirs,
                                       extra_postargs=extra_args,
                                       target_lang=language)
+        self.compiler.link_shared_object(objects, 
+                                         ext_path,
+                                         libraries=ext.libraries,
+                                         library_dirs=ext.library_dirs,
+                                         runtime_library_dirs=ext.runtime_library_dirs,
+                                         extra_postargs=extra_args,
+                                         debug=self.debug,
+                                         build_temp=self.build_temp,
+                                         target_lang=language)
 
 extensions.append(Extension('tacc_stats.monitor', **ext_data))
 
