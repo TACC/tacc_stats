@@ -29,7 +29,9 @@
 #ifdef RMQ
 #define sf_printf(sf, fmt, args...)					\
   do {									\
+    char *tmp_string = sf->sf_data;					\
     asprintf(&(sf->sf_data), "%s"fmt, sf->sf_data, ##args);		\
+    free(tmp_string);							\
     fprintf(sf->sf_file, fmt, ##args);					\
   } while (0)
 static int rmq_send(struct stats_file *sf)
@@ -164,7 +166,7 @@ static int sf_wr_hdr(struct stats_file *sf)
   uname(&uts_buf);
   pscanf("/proc/uptime", "%llu", &uptime);
   
-  sf->sf_data = "";
+  sf->sf_data = strdup("");
   sf_printf(sf, "%c%s %s\n", SF_PROPERTY_CHAR, STATS_PROGRAM, STATS_VERSION);
 
   sf_printf(sf, "%chostname %s\n", SF_PROPERTY_CHAR, uts_buf.nodename);
@@ -254,7 +256,7 @@ int stats_file_close(struct stats_file *sf)
   if (sf->sf_empty)
     sf_wr_hdr(sf);
 
-  sf->sf_data="";
+  sf->sf_data=strdup("");
   fseek(sf->sf_file, 0, SEEK_END);
 
   struct utsname uts_buf;
