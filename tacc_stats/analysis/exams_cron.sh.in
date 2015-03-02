@@ -7,8 +7,10 @@ export PATH=$prog_dir:$PATH:python_path
 
 if [ "$1" == "" ]; then
   y=`date -d yesterday +%Y-%m-%d`
+  z=`date -d yesterday +%Y-%m-%d`
 else
   y=$1
+  z=$2
 fi
 
 tsd=pickles_dir
@@ -24,8 +26,7 @@ export PYTHONUNBUFFERED=yes
 export PYTHONPATH=${prog_dir}../lib:${PYTHONPATH}
 cd ${od}
 
-${wd}/job_sweeper.py -p 2 -start ${y} -end ${y} -t 1.0   -plot -wide -test Imbalance        -o ${od} > ${od}/imbalance-${y}.log 2>&1
-${wd}/job_sweeper.py -p 2 -start ${y} -end ${y} -t 1.0   -plot -wide -test HighCPI          -o ${od} > ${od}/highcpi-${y}.log 2>&1
-${wd}/job_sweeper.py -p 2 -start ${y} -end ${y} -t 0.999 -plot -wide -test Idle             -o ${od} > ${od}/idle-${y}.log 2>&1
-${wd}/job_sweeper.py -p 2 -start ${y} -end ${y} -t 0.001 -plot -wide -test LowFLOPS         -o ${od} > ${od}/lowflops-${y}.log 2>&1
-${wd}/job_sweeper.py -p 2 -start ${y} -end ${y} -t 0.001 -plot -wide -test Catastrophe -N 2 -o ${od} > ${od}/catastrophe-${y}.log 2>&1
+${wd}/job_sweeper.py -p 2  ${y}  ${z} -t 1.0   -test Imbalance        -o ${od} > ${od}/imbalance-${y}.log 2>&1
+${wd}/job_sweeper.py -p 2  ${y}  ${z} -t 1.0   -test HighCPI          -o ${od} > ${od}/highcpi-${y}.log 2>&1
+${wd}/job_sweeper.py -p 2  ${y}  ${z} -t 0.999 -test Idle             -o ${od} > ${od}/idle-${y}.log 2>&1
+${wd}/job_sweeper.py -p 2  ${y}  ${z} -t 0.001 -test Catastrophe -N 2 -o ${od} > ${od}/catastrophe-${y}.log 2>&1

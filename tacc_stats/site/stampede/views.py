@@ -73,7 +73,8 @@ def update(date,rerun=False):
 
             try:
                 if rerun: pass
-                elif Job.objects.filter(id = pickle_file).exists(): continue
+                elif Job.objects.filter(id = pickle_file).exists(): 
+                    continue                
             except:
                 print pickle_file,"doesn't look like a pickled job"
                 continue
@@ -106,7 +107,7 @@ def update(date,rerun=False):
                     xd              = xd[0]
                     json['user']    = xd.user
                     json['exe']     = xd.exec_path.split('/')[-1][0:128]
-                    json['exec_path']     = xd.exec_path
+                    json['exec_path'] = xd.exec_path
                     json['cwd']     = xd.cwd[0:128]
                     json['threads'] = xd.num_threads
                     json['cores']   = xd.num_cores
@@ -240,29 +241,16 @@ def sys_plot(request, pk):
 
 def dates(request):
 
-    date_list = []
-    dates = Job.objects.values_list('date',flat=True).distinct()
-    for date in dates:
-        try:
-            date_list.append(date.strftime('%Y-%m-%d'))
-        except: 
-            pass
-
-    date_list = sorted(date_list, key=lambda d: map(int, d.split('-')))
-
     month_dict ={}
-
-    for date in date_list:
-        y,m,d = date.split('-')
+    dates = Job.objects.dates('date','day')
+    for date in dates:
+        y,m,d = date.strftime('%Y-%m-%d').split('-')
         key = y+' / '+m
-        if key not in month_dict: month_dict[key] = []
-        date_pair = (date, d)
-        month_dict[key].append(date_pair)
-
-    date_list = month_dict
+        month_dict.setdefault(key, [])
+        month_dict[key].append((y+'-'+m+'-'+d, d))
+        
     field = {}
-
-    field['date_list'] = sorted(date_list.iteritems())
+    field['date_list'] = sorted(month_dict.iteritems())
     return render_to_response("stampede/search.html", field)
 
 def search(request):

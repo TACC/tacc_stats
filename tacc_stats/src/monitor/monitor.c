@@ -312,8 +312,6 @@ int main(int argc, char *argv[])
 	     current_jobid);
       stats_buffer_mark(&sf, "%s %s", "end", current_jobid);      
     } 
-    else
-      syslog(LOG_INFO,"Collect data for jobid %s\n",current_jobid);
 
     /* Send header at start.  Causes receiver to rotate files. */
     if (g_new_flag) {

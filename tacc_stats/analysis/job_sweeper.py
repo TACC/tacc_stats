@@ -14,7 +14,8 @@ def top_jobs(auditor,name):
     for jobid in auditor.metrics[name].keys():
         if not auditor.metrics[name][jobid]: continue
         acct = auditor.accts[jobid]
-        user = pwd.getpwuid(int(acct['uid']))[0]
+        try: user = pwd.getpwuid(int(acct['uid']))[0]
+        except: user = acct['uid']
         sus = (acct['end_time']-acct['start_time'])*16.0/3600
         jobs.setdefault(user,[]).append((jobid, 
                                          sus,
@@ -45,8 +46,6 @@ def get_filelist(start,end,pickles_dir=None):
             date = datetime.strptime(directory,'%Y-%m-%d')
             if max(date.date(),start.date()) > min(date.date(),end.date()): 
                 continue
-            print('for date',date.date())
-            print(tspl_utils.getfilelist(os.path.join(root,directory)))
             filelist.extend(tspl_utils.getfilelist(os.path.join(root,directory)))
         break
     return filelist
@@ -121,8 +120,8 @@ def main(**args):
                                   prefix=test_type.__name__,outdir=args['o'],
                                   processes=args['p'],threshold=threshold,
                                   wide=args['wide'],save=True)
-        plotter.run(failed[test_type.__name__])
-    return failed
+        plotter.run(failed_jobs[test_type.__name__])
+    return failed_jobs
 
 if __name__ == '__main__':
     import argparse

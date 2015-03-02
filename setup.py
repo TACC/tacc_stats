@@ -130,19 +130,16 @@ else:
 
 def read_site_cfg():
     config = ConfigParser.ConfigParser()
-
     cfg_filename = os.path.abspath('setup.cfg')
+    config.read(cfg_filename)
+    options = dict(config.items('OPTIONS'))
 
-    print 'Read configure file ' + cfg_filename    
-    if cfg_filename:
-        config.read(cfg_filename)
-    else:
-        print 'Specify a filename e.g. (setup.cfg)'
-        sys.exit()
-        
+    config = ConfigParser.ConfigParser()
+    site_cfg = os.path.abspath(os.path.join('cfg',options['site_cfg']))
+    config.read(site_cfg)    
     paths = dict(config.items('PATHS'))
     types = dict(config.items('TYPES'))
-    options = dict(config.items('OPTIONS'))
+
     return paths,types,options
 
 def write_stats_x(types):
@@ -191,12 +188,10 @@ class CleanCommand(Command):
         self._clean_me = []
         self._clean_trees = []
         self._clean_exclude = []
-
         for root, dirs, files in os.walk('tacc_stats'):
             for f in files:
                 if f in self._clean_exclude:
                     continue
-
                 if os.path.splitext(f)[-1] in ('.pyc', '.so', '.o',
                                                '.pyo', '.x',
                                                '.pyd'):
@@ -204,18 +199,14 @@ class CleanCommand(Command):
             for d in dirs:
                 if d == '__pycache__':
                     self._clean_trees.append(pjoin(root, d))
-
         for d in os.listdir(os.getcwd()):
             if '.egg' in d:
                 self._clean_trees.append(d)
-
         for d in ('build', 'dist'):
             if os.path.exists(d):
                 self._clean_trees.append(d)
-
     def finalize_options(self):
         pass
-
     def run(self):
         for clean_me in self._clean_me:
             try:
@@ -239,11 +230,9 @@ sources=[
     pjoin(root,'stats_file.c'),pjoin(root,'stats_buffer.c'),pjoin(root,'stats.c')
     ]
 
-
 RMQ = False
 if options['rmq'] == 'True': 
     RMQ = True
-
 if RMQ: sources.append(pjoin(root,'amqp_listen.c'))
 
 MODE = options['mode']
@@ -289,7 +278,7 @@ if RMQ:
     libraries.append("rabbitmq")
 
 flags = ['-D_GNU_SOURCE', '-Wp,-U_FORTIFY_SOURCE',
-         '-O3', '-Wall', '-g']#, '-DDEBUG']
+         '-O3', '-Wall', '-g', '-UDEBUG']
 ext_data=dict(sources=sources,
               include_dirs=['tacc_stats/src/monitor/'] + include_dirs,
               library_dirs=library_dirs,
@@ -330,7 +319,7 @@ class MyBDist_RPM(bdist_rpm):
         if RMQ:
             prep += "%define server " + "-s "+SERVER
         else:
-            prep += "%define server"
+            prep += "%define server \"\""
         if MODE == "DAEMON":
             prep += "\n%define pidfile " + paths['stats_lock']
         if MODE == "CRON":
@@ -343,14 +332,12 @@ class MyBDist_RPM(bdist_rpm):
 """        
         open(self.prep_script,"w").write(prep)
         
-
         self.build_script = "build/bdist_rpm_build"        
         build_cmds = """
 rm -rf %{buildroot}
 python setup.py build_ext
 """
         open(self.build_script,"w").write(build_cmds)
-
 
         self.install_script = "build/bdist_rpm_install"
         install_cmds = """
@@ -368,7 +355,6 @@ echo %{_bindir}/%{name}_archive >> %{_builddir}/%{name}-%{unmangled_version}/INS
 install -m 0755 tacc_stats/taccstats %{buildroot}/%{_bindir}/taccstats
 echo %{_bindir}/taccstats >> %{_builddir}/%{name}-%{unmangled_version}/INSTALLED_FILES
 """
-
         if RMQ: 
             install_cmds += """
 install -m 0755 build/bin/amqp_listend %{buildroot}/%{_bindir}/%{name}_listend
@@ -422,11 +408,6 @@ rm /etc/init.d/taccstats
 rmdir %{_bindir}
 """
             open(self.post_uninstall,"w").write(post_uninstall_cmds)
-
-#(
-# echo \"55 23 * * * root service taccstats rotate\"
-#) > %{crontab_file}
-#/sbin/service crond restart || :
 
 # Make executable
 # C extensions

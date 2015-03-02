@@ -57,7 +57,7 @@ class Job(models.Model):
 
     def sus(self):
         factor = 16
-        if self.queue == 'largemem': factor = 32  
+        if self.queue == 'largemem': factor = 64 # double charge rate
         return self.nodes * self.run_time * 0.0002777777777777778 * factor
 
 class Host(models.Model):

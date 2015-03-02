@@ -4,109 +4,80 @@
 </head>
 <body>
 {% if job %}
-   <h2> Job Summary    </h2>
- <table border="1" cellpadding="5" style=font-family:"arial">
-        <tr>
-	  <th> Job ID </th>
-	  <th> UID </th>
-	  <th> user </th>
-	  <th> project </th>
-	  <th> executable </th>
-	  <th> start time </th>
-	  <th> end time </th>
-	  <th> run time (s)</th>
-	  <th> queue </th>
-	  <th> name </th>
-	  <th> status </th>
-	  <th> wayness </th>
-	  <th> cores </th>
-	  <th> nodes </th>
-	  <th> threads/task </th>
-
-	</tr>
-        <tr bgcolor="{{job.color}}">
-	  <td><a href="{% url 'stampede:job'  job.id %}">{{ job.id }}</a>
-	  <td><a href="{% url 'stampede:uid_view' job.uid %}" >{{ job.uid }}</td>           
-	  <td><a href="{% url 'stampede:uid_view' job.uid %}" >{{ job.user }}</td>
-          <td><a href="{% url 'stampede:project_view' job.project %}">{{ job.project }}</td>
-          <td><a href="{% url 'stampede:exe_view' job.exe %}" >{{ job.exe }}</td>
-          <td align=right>{{ job.start_time }}</td>
-          <td align=right>{{ job.end_time }}</td>
-          <td align=right>{{ job.run_time }}</td>
-          <td align=right>{{ job.queue }}</td>
-          <td align=right>{{ job.name }}</td>
-          <td align=right>{{ job.status }}</td>
-          <td align=right>{{ job.wayness }}</td>
-          <td align=right>{{ job.cores }}</td>
-          <td align=right>{{ job.nodes }}</td>
-          <td align=right>{{ job.threads }}</td>
-        </tr>
-	<tr><th> Test </th> <th> Measured </th> <th> Threshold </th> <th> Result </th>
-        <tr>
-	  {% for key,value in testinfo_dict.items %}
-	  <tr> <th> {{ key }} </th> 
-	   <th> {{ value.0|stringformat:"0.2e" }} </th>
-	   <th> {{ value.1|stringformat:"0.2e" }} </th>
-	   <th> {{ value.2 }} </th> </tr>
-	  {% endfor %}
-<!---	  <th> MBW </th>
-	  <th> Idle </th>
-	  <th> Catastrophe </th>
-	  <th> Mem HWM (GB) </th>
-	  <th> Max IB Packet Rate (B) </th>
-	  <th> Ave IB Packet Size (B) </th>
-	  <th> GigE BW (B)</th>
-	  <th> Ave GFLOPS </th>
-	  <th> Vec Percent </th> --->
-	</tr>
-<!---	<tr>
-	  {% for test in test_list %}
-	  <td align=right>{{ job.test.test_name }}</td>
-	  {% endfor %}
-          <td align=right>{{ job.cpi|stringformat:".2f" }}</td>
-          <td align=right>{{ job.mbw|stringformat:".2f" }}</td>
-          <td align=right>{{ job.idle|stringformat:".2f" }}</td>
-          <td align=right>{{ job.cat|stringformat:".2f" }}</td>
-          <td align=right>{{ job.mem|stringformat:".2e" }}</td>
-          <td align=right>{{ job.packetrate|stringformat:".2e" }}</td>
-          <td align=right>{{ job.packetsize|stringformat:".2e" }}</td>
-          <td align=right>{{ job.GigEBW|stringformat:".2e" }}</td>
-          <td align=right>{{ job.flops|stringformat:".2f" }}</td>
-          <td align=right>{{ job.VecPercent|stringformat:".2f" }}</td>--->
-	</tr>
-
-   </table>
-   <p><font size="5">Working Directory: {{job.cwd}}</font></p><p> <a href={{ client_url }}> Client Logs</a>   <a href={{ server_url }}> Server Logs</a></p>
-   <hr>
-<p><center>     <font size="6"> Snapshot Plots </font></p>
-    <table>
-      <tr>
-	<td>
-	  <div id="dv01"> 
-	    <img src="{% url 'stampede:master_plot' job.id %}" alt="job less than time resolution"/> 
-	  </div>
-	</td>
-	<td>
-	  <div id="dv02">
-              <img src="{% url 'stampede:heat_map' job.id %}" alt="heat map failed"/> 
-           </div>
-        </td>
-     </table>
-</center>
+   <h2>Job Detail</h2>
 <p>
-<img src="{% url 'stampede:sys_plot' job.id %}" alt="sys plot failed" align="left"/> 
+ <table border="1" cellpadding="5" style="font-family:arial">
+  <tr><th>Job ID</th><th>UID</th><th>user</th><th>project</th><th>executable</th><th>start time</th><th>end time</th>
+      <th>run time (s)</th><th>queue</th><th>name</th><th>status</th><th>wayness</th><th>cores</th><th>nodes</th><th>threads</th></tr>
+  <tr bgcolor="{{job.color}}"><td><a href="{% url 'stampede:job'  job.id %}">{{ job.id }}</a>
+                              <td><a href="{% url 'stampede:uid_view' job.uid %}" >{{ job.uid }}</td>           
+	                      <td><a href="{% url 'stampede:uid_view' job.uid %}" >{{ job.user }}</td>
+                              <td><a href="{% url 'stampede:project_view' job.project %}">{{ job.project }}</td>
+                              <td><a href="{% url 'stampede:exe_view' job.exe %}" >{{ job.exe }}</td>
+                              <td align=right>{{ job.start_time }}</td>
+                              <td align=right>{{ job.end_time }}</td>
+                              <td align=right>{{ job.run_time }}</td>
+                              <td align=right>{{ job.queue }}</td>
+                              <td align=right>{{ job.name }}</td>
+                              <td align=right>{{ job.status }}</td>
+                              <td align=right>{{ job.wayness }}</td>
+                              <td align=right>{{ job.cores }}</td>
+                              <td align=right>{{ job.nodes }}</td>
+                              <td align=right>{{ job.threads }}</td></tr>
+ </table>
 </p>
-<hr>
-<center><h2> Schema Summary: Choose Type Name below to access plots and counts of Performance Events. </h2></center>
-    <table border="1" cellpadding="5"  style=font-family:"arial">
+
+<p>
+<table border="0" align="top" cellpadding="0" cellspacing="0" style="margin-right:30px;width:60%;">
+   <tr><th align=left>Executable Path     </th><td>{{job.exec_path}}</td></tr>
+   <tr><th align=left>Working Path        </th><td>{{job.cwd}}      </td></tr>
+   <tr><th align=left>Links to Splunk Logs</th><td><a href={{ client_url }}>Client Logs</a> <a href={{ server_url }}>Server Logs</a></td></tr>
+</table>
+</p>
+<p>
+<table border="0" align="left" cellpadding="1" cellspacing="0" style="border:1px solid {{ job.color }};margin-right:30px;width:30%;">
+  <tr><th>Test</th><th>Measured</th><th>Threshold</th><th>Result</th></tr>
+  {% for key,val in testinfo_dict.items %}
+    <tr align=center><th>{{ key }}</th><td>{{ val.0|stringformat:"0.2e" }}</td><td>{{ val.1|stringformat:"0.2e" }}</td><td>{{ val.2 }}</td></tr>
+  {% endfor %}
+</table>
+
+<table border="0" align="left" cellpadding="0" cellspacing="0" style="width:30%;">
+   <tr><th>Runtime Objects</th></tr>
+   {% for lib in job.libraries_set.all %}
+     <tr><td align=left>{{ lib }}</td></tr>
+   {% endfor %}
+</table>
+</p>
+
+<p>
+  <table style="width=100%;">
+    <center><tr><td><hr></td></tr>
+    <tr><td>Snapshot Plots</td></tr>
+    <tr><td><img src="{% url 'stampede:master_plot' job.id %}" alt="job less than time resolution" width="auto"/></td>
+	<td><img src="{% url 'stampede:heat_map' job.id %}" alt="heat map failed" width="auto"/></td>
+  </table>
+</p>
+
+
+<p>
+<h2>Choose Type Name below to access plots and raw counts of Performance Events</h2>
+    <table border="1" cellpadding="5" style="font-family:arial">
       <tr><th>Type Name</th><th>Recorded Performance Events</th></tr>
          {% for type_name, schema in type_list %}
-            <tr><td><a href="{{ type_name }}/">{{ type_name }}</a></td><<td>{{ schema }}</td></tr>
+            <tr><td><a href="{{ type_name }}/">{{ type_name }}</a></td><td>{{ schema }}</td></tr>
          {% endfor %}
     </table>
 
 {% else %}
     <h1>Job not found</h1>
 {% endif %}
+</p>
+
+<center><h2>System View</h2></center>
+<p>
+<img src="{% url 'stampede:sys_plot' job.id %}" alt="sys plot failed" align="left"/> 
+</p>
+
 </body>
 </html>

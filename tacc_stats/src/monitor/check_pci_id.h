@@ -16,7 +16,7 @@ static int check_pci_id(char * bus_dev, int id) {
   pci_fd = open(pci_path, O_RDONLY);
   if (pread(pci_fd, &pci_vendor, sizeof(pci_vendor), 0x00) < 0 
       || pread(pci_fd, &pci_device, sizeof(pci_device), 0x02) < 0) {
-    ERROR("cannot read device vendor or id: %m\n");
+    TRACE("cannot read device vendor or id: %m\n");
     goto out;
   }
   if (pci_vendor != 0x8086 || pci_device != id) goto out;
