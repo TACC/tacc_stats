@@ -64,7 +64,7 @@ To install TACC Stats on the compute nodes the recommended approach is to genera
     $ python setup.py bdist_rpm
 ~~~
 This will generate an rpm in the newly created dist/ directory. 
-To configure the build for a particular site, create a file in the `cfg/` directory similar to the other $system.cfg files already in there, with paths configured for your system's setup.  Paths must be set and Types of devices to collect will be labeled True to activate or False to deactivate.  The chip device collectors will test whether it monitor is running on the correct architecture for the given collector.  This allows multiple chip architectures to be collected using the same build.
+To configure the build for a particular site, create a new file in the `cfg/` directory similar to the other $system.cfg files already in there, with paths configured for your system's setup.  Place the name of that file in the top-level directory file `setup.cfg` on the `SITE_CFG` line.  Paths must be set and Types of devices to collect will be labeled True to activate or False to deactivate.  The chip device collectors will test whether it monitor is running on the correct architecture for the given collector.  This allows multiple chip architectures to be collected using the same build.
 Note `hsw`, `snb`, `wtm`, `nhm`, `amd` are for Haswell, Sandybridge/Ivy Bridge, Westmere, Nehalem, and AMD architectures.
 The corresponding hyper-threaded versions will be suffixed with a `_ht` if available.
 
