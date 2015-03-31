@@ -8,7 +8,7 @@
 <p>
  <table border="1" cellpadding="5" style="font-family:arial">
   <tr><th>Job ID</th><th>UID</th><th>user</th><th>project</th><th>executable</th><th>start time</th><th>end time</th>
-      <th>run time (s)</th><th>queue</th><th>name</th><th>status</th><th>wayness</th><th>cores</th><th>nodes</th><th>threads</th></tr>
+      <th>run time (s)</th><th>requested time (s)</th><th>queue</th><th>name</th><th>status</th><th>wayness</th><th>cores</th><th>nodes</th><th>threads</th></tr>
   <tr bgcolor="{{job.color}}"><td><a href="{% url 'stampede:job'  job.id %}">{{ job.id }}</a>
                               <td><a href="{% url 'stampede:uid_view' job.uid %}" >{{ job.uid }}</td>           
 	                      <td><a href="{% url 'stampede:uid_view' job.uid %}" >{{ job.user }}</td>
@@ -17,6 +17,7 @@
                               <td align=right>{{ job.start_time }}</td>
                               <td align=right>{{ job.end_time }}</td>
                               <td align=right>{{ job.run_time }}</td>
+                              <td align=right>{{ job.requested_time }}</td>
                               <td align=right>{{ job.queue }}</td>
                               <td align=right>{{ job.name }}</td>
                               <td align=right>{{ job.status }}</td>
@@ -46,6 +47,13 @@
    <tr><th>Runtime Objects</th></tr>
    {% for lib in job.libraries_set.all %}
      <tr><td align=left>{{ lib }}</td></tr>
+   {% endfor %}
+</table>
+
+<table border="0" align="left" cellpadding="0" cellspacing="0" style="width:30%;">
+   <tr><th>Modules Loaded at Runtime</th></tr>
+   {% for obj in job.libraries_set.all %}
+     <tr><td align=left>{{ obj.module_name }}</td></tr>
    {% endfor %}
 </table>
 </p>

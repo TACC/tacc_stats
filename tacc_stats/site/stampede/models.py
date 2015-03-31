@@ -12,6 +12,7 @@ class Job(models.Model):
     start_epoch =  models.PositiveIntegerField(null=True)
     end_epoch = models.PositiveIntegerField(null=True)
     run_time = models.PositiveIntegerField(null=True)
+    requested_time = models.PositiveIntegerField(null=True)
     queue_time = models.PositiveIntegerField(null=True)
     queue = models.CharField(max_length=16, null=True)
     name =  models.CharField(max_length=128, null=True)
@@ -39,9 +40,11 @@ class Job(models.Model):
     GigEBW = models.FloatField(null=True)
     flops = models.FloatField(null=True)
     VecPercent = models.FloatField(null=True)
+    Load_All    = models.BigIntegerField(null=True)
     Load_L1Hits = models.BigIntegerField(null=True)
     Load_L2Hits = models.BigIntegerField(null=True)
     Load_LLCHits = models.BigIntegerField(null=True)
+    CPU_Usage = models.FloatField(null=True)
 
     def __unicode__(self):
         return str(self.id)

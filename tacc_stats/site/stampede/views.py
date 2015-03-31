@@ -85,10 +85,12 @@ def update(date,rerun=False):
                     data = np.load(f)
                     json = data.acct
                     hosts = data.hosts.keys()
-                del json['yesno'], json['unknown']
+                del json['yesno']
                 utc_start = datetime.utcfromtimestamp(json['start_time']).replace(tzinfo=pytz.utc)
                 utc_end = datetime.utcfromtimestamp(json['end_time']).replace(tzinfo=pytz.utc)
                 json['run_time'] = json['end_time'] - json['start_time']
+                json['requested_time'] = json['unknown']*60
+                del json['unknown']
                 json['start_epoch'] = json['start_time']
                 json['end_epoch'] = json['end_time']
                 json['start_time'] = utc_start.astimezone(tz)
@@ -189,6 +191,7 @@ def update_metric_fields(date,rerun=False):
         paths.append(os.path.join(cfg.pickles_dir,
                                   job.date.strftime('%Y-%m-%d'),
                                   str(job.id)))
+        
     num_jobs = jobs_list.count()
     print '# Jobs to be tested:',num_jobs
     if num_jobs == 0 : return

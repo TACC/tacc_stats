@@ -42,6 +42,7 @@ class Auditor():
     pool.map(unwrap,zip([self]*len(filelist),filelist,[kwargs]*len(filelist)))
     pool.close()
     pool.join()
+
   # Compute metric
   def get_measurements(self,jobpath):
     with open(jobpath) as fd:
