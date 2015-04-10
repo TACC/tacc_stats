@@ -43,7 +43,10 @@ def update_comp_info(thresholds = None):
                   'Idle' : ['idle','>',0.99],
                   'LowFLOPS' : ['flops','<',10],
                   'VecPercent' : ['VecPercent','<',0.05],
-                  'GigEBW' : ['GigEBW','>',1e7]}
+                  'GigEBW' : ['GigEBW','>',1e7],
+                  'CPU_Usage' : ['CPU_Usage','<',800],
+                  'Load_All' : ['Load_All','<',1e7],
+                  }
     if thresholds:
         for key,val in thresholds.iteritems():
             schema_map[key][1:3] = val
@@ -100,7 +103,7 @@ def update(date,rerun=False):
 
                 try: json['user']=pwd.getpwuid(int(json['uid']))[0]
                 except: json['user']='unknown'
-
+                json['wayness'] = json['cores']/json['nodes']
                 ### If xalt or lariat data is available 
                 ### add info to the tacc_stats_site_db 
                 # Assign additional xalt data if available
@@ -157,7 +160,7 @@ def update(date,rerun=False):
 
 def update_metric_fields(date,rerun=False):
     update_comp_info()
-    aud = exam.Auditor(processes=2)
+    aud = exam.Auditor(processes=4)
     
     aud.stage(exam.GigEBW, ignore_qs=[], min_time = 600)
     aud.stage(exam.HighCPI, ignore_qs=[], min_time = 600)
@@ -170,9 +173,11 @@ def update_metric_fields(date,rerun=False):
     aud.stage(exam.MemUsage, ignore_qs=[], min_time = 600)
     aud.stage(exam.PacketRate, ignore_qs=[], min_time = 600)
     aud.stage(exam.PacketSize, ignore_qs=[], min_time = 600)
-    aud.stage(exam.Idle,min_hosts=2, ignore_qs=[], min_time = 600)
+    aud.stage(exam.Idle, ignore_qs=[], min_time = 600)
     aud.stage(exam.LowFLOPS, ignore_qs=[], min_time = 600)
     aud.stage(exam.VecPercent, ignore_qs=[], min_time = 600)
+    aud.stage(exam.CPU_Usage, ignore_qs = [], min_time = 600)
+    aud.stage(exam.Load_All, ignore_qs = [], min_time = 600)
 
     print 'Run the following tests for:',date
     for name, test in aud.measures.iteritems():
@@ -183,8 +188,8 @@ def update_metric_fields(date,rerun=False):
     jobs_list = Job.objects.filter(date = date).exclude(run_time__lt = 600)
 
     # Use mem to see if job was tested.  It will always exist
-    #if not rerun:
-    #    jobs_list = jobs_list.filter(Q(cpi = None) | Q(cpi = float('nan')))
+    if not rerun:
+        jobs_list = jobs_list.filter(Load_L1Hits = None)
     
     paths = []
     for job in jobs_list:
