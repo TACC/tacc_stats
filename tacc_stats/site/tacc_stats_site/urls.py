@@ -15,8 +15,7 @@ urlpatterns = patterns('',
     # url(r'^admin/doc/', include('django.contrib.admindocs.urls')),
 
     # Uncomment the next line to enable the admin:
-    url(r'^lonestar/', include('lonestar.urls', namespace="lonestar"),name='lonestar'),
-    url(r'^stampede/', include('stampede.urls', namespace="stampede"),name='stampede'),
+    url(r'^platform/', include('platform.urls', namespace="platform"),name='platform'),
     
     url(r'^admin/', include(admin.site.urls)),
 )

@@ -7,13 +7,14 @@ from django.db import models, migrations
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('stampede', '0005_auto_20150217_0933'),
-        ]
+        ('platform', '0002_auto_20150126_1700'),
+    ]
+
     operations = [
-        migrations.AddField(
+        migrations.AlterField(
             model_name='job',
-            name='exec_path',
-            field=models.CharField(max_length=1024, null=True),
+            name='exe_list',
+            field=models.CharField(max_length=16384, null=True),
             preserve_default=True,
-            ),
+        ),
         ]

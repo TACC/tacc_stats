@@ -7,14 +7,13 @@ from django.db import models, migrations
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('lonestar', '0001_initial'),
-    ]
-
+        ('platform', '0005_auto_20150217_0933'),
+        ]
     operations = [
         migrations.AddField(
-            model_name='ls4job',
-            name='submission_time',
-            field=models.PositiveIntegerField(null=True),
+            model_name='job',
+            name='exec_path',
+            field=models.CharField(max_length=1024, null=True),
             preserve_default=True,
-        ),
-    ]
+            ),
+        ]

@@ -5,7 +5,7 @@ from django.db.models import Q
 
 import os,sys,pwd
 from tacc_stats.analysis import exam
-from tacc_stats.site.stampede.models import Job, Host, Libraries, TestInfo
+from tacc_stats.site.platform.models import Job, Host, Libraries, TestInfo
 from tacc_stats.site.xalt.models import run, join_run_object, lib
 import tacc_stats.cfg as cfg
 
@@ -248,9 +248,9 @@ def sys_plot(request, pk):
 
 
 def dates(request):
-
     month_dict ={}
     dates = Job.objects.dates('date','day')
+
     for date in dates:
         y,m,d = date.strftime('%Y-%m-%d').split('-')
         key = y+' / '+m
@@ -259,14 +259,14 @@ def dates(request):
         
     field = {}
     field['date_list'] = sorted(month_dict.iteritems())
-    return render_to_response("stampede/search.html", field)
+    return render_to_response("platform/search.html", field)
 
 def search(request):
 
     if 'jobid' in request.GET:
         try:
             job = Job.objects.get(id = request.GET['jobid'])
-            return HttpResponseRedirect("/stampede/job/"+str(job.id)+"/")
+            return HttpResponseRedirect("/platform/job/"+str(job.id)+"/")
         except: pass
     try:
         fields = request.GET.dict()
@@ -287,7 +287,7 @@ def search(request):
         return index(request, **fields)
     except: pass
 
-    return render(request, 'stampede/search.html', {'error' : True})
+    return render(request, 'platform/search.html', {'error' : True})
 
 
 def index(request, **field):
@@ -332,7 +332,7 @@ def index(request, **field):
     field['mem_job_list'] = list_to_dict(field['mem_job_list'],'mem')
     field['gigebw_job_list'] = list_to_dict(field['gigebw_job_list'],'GigEBW')
 
-    return render_to_response("stampede/index.html", field)
+    return render_to_response("platform/index.html", field)
 
 def list_to_dict(job_list,metric):
     job_dict={}
@@ -544,5 +544,5 @@ def type_detail(request, pk, type_name):
             temp.append(raw_stats[t,event]*scale)
         stats.append((times[t],temp))
 
-    return render_to_response("stampede/type_detail.html",{"type_name" : type_name, "jobid" : pk, "stats_data" : stats, "schema" : schema})
+    return render_to_response("platform/type_detail.html",{"type_name" : type_name, "jobid" : pk, "stats_data" : stats, "schema" : schema})
 

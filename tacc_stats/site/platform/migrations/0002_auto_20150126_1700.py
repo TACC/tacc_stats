@@ -7,14 +7,14 @@ from django.db import models, migrations
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('stampede', '0006_auto_20150217_1528'),
+        ('platform', '0001_initial'),
     ]
 
     operations = [
         migrations.AddField(
             model_name='job',
-            name='requested_time',
-            field=models.PositiveIntegerField(null=True),
+            name='exe_list',
+            field=models.CharField(max_length=1024, null=True),
             preserve_default=True,
         ),
     ]

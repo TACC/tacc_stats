@@ -7,14 +7,13 @@ from django.db import models, migrations
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('stampede', '0002_auto_20150126_1700'),
+        ('platform', '0008_auto_20150330_1107'),
     ]
 
     operations = [
-        migrations.AlterField(
+        migrations.RenameField(
             model_name='job',
-            name='exe_list',
-            field=models.CharField(max_length=16384, null=True),
-            preserve_default=True,
+            old_name='cpu_usage',
+            new_name='CPU_Usage',
         ),
-        ]
+    ]

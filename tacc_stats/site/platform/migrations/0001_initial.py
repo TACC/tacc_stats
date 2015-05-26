@@ -76,7 +76,7 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name='host',
             name='jobs',
-            field=models.ManyToManyField(to='stampede.Job'),
+            field=models.ManyToManyField(to='platform.Job'),
             preserve_default=True,
         ),
     ]
