@@ -396,13 +396,14 @@ fi
             post_install_cmds = """
 cp %{_bindir}/taccstats /etc/init.d/
 chkconfig --add taccstats
-service taccstats restart
+/sbin/service taccstats restart
 """
         open(self.post_install,"w").write(post_install_cmds)
         self.pre_install = None
         if MODE == "DAEMON":
             self.post_uninstall = "build/bdist_rpm_post_uninstall"
             post_uninstall_cmds = """
+/sbin/service taccstats stop
 chkconfig --del taccstats
 rm /etc/init.d/taccstats
 rmdir %{_bindir}
