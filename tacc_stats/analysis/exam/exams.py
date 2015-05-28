@@ -129,6 +129,7 @@ class Test(object):
 
   def test(self,jobpath,job_data):
     # Setup job data and filter out unwanted jobs
+    print(jobpath,job_data)
     if not self.setup(jobpath,job_data=job_data): return
     # Compute metric of interest
     self.compute_metric()

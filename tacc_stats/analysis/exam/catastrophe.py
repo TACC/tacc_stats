@@ -6,9 +6,13 @@ class Catastrophe(Test):
 
   # Hash value must be a list
   k1={'amd64' : ['amd64_sock'],
-      'intel_snb': ['intel_snb']}
+      'intel_snb' : ['intel_snb'],
+      'intel_hsw' : ['intel_hsw']
+      }
   k2={'amd64' : ['DRAM'],
-      'intel_snb': ['LOAD_L1D_ALL']}
+      'intel_snb' : ['LOAD_L1D_ALL'],
+      'intel_hsw' : ['LOAD_L1D_ALL']
+      }
   comp_operator = '<'
 
   def compute_fit_params(self,ind):

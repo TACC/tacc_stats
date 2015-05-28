@@ -37,7 +37,9 @@ cbo_event_map = {
     CBOX_PERF_EVENT(0x00, 0x00) : 'CLOCK_TICKS,E',
     CBOX_PERF_EVENT(0x11, 0x01) : 'RxR_OCCUPANCY,E',
     CBOX_PERF_EVENT(0x1F, 0x00) : 'COUNTER0_OCCUPANCY,E',
-    CBOX_PERF_EVENT(0x34, 0x03) : 'LLC_LOOKUP,E',
+    CBOX_PERF_EVENT(0x34, 0x03) : 'LLC_LOOKUP_DATA_READ,E',
+    CBOX_PERF_EVENT(0x34, 0x11) : 'LLC_LOOKUP_ANY,E',
+    CBOX_PERF_EVENT(0x34, 0x05) : 'LLC_LOOKUP_WRITE,E',
     }
 ## Home Agent Unit events
 def HAU_PERF_EVENT(event, umask):
@@ -220,43 +222,20 @@ class reformat_counters:
                 
         host.stats[self.name] = dev_stats
 
+intel_xeon = {'intel_snb' : cpu_event_map, 'intel_snb_cbo' : cbo_event_map, 'intel_snb_hau' : hau_event_map, 
+              'intel_snb_imc' : imc_event_map,  'intel_snb_qpi' : qpi_event_map, 'intel_snb_pcu' : pcu_event_map, 'intel_snb_r2pci' : r2pci_event_map,
+              'intel_hsw' : cpu_event_map, 'intel_hsw_cbo' : cbo_event_map, 'intel_hsw_hau' : hau_event_map, 
+              'intel_hsw_imc' : imc_event_map,  'intel_hsw_qpi' : qpi_event_map, 'intel_hsw_pcu' : pcu_event_map, 'intel_hsw_r2pci' : r2pci_event_map}
+
 
 def process_job(job):
 
-    if 'intel_snb' in job.schemas:
-        snb = reformat_counters(job, 'intel_snb', cpu_event_map)
-        for host in job.hosts.itervalues():
-            snb.register(host)
-
-    if 'intel_snb_cbo' in job.schemas:
-        cbo = reformat_counters(job, 'intel_snb_cbo',cbo_event_map)
-        for host in job.hosts.itervalues():
-            cbo.register(host)
-
-    if 'intel_snb_hau' in job.schemas:
-        hau = reformat_counters(job, 'intel_snb_hau',hau_event_map)
-        for host in job.hosts.itervalues():
-            hau.register(host)
-    
-    if 'intel_snb_imc' in job.schemas:
-        imc = reformat_counters(job, 'intel_snb_imc',imc_event_map)
-        for host in job.hosts.itervalues():
-            imc.register(host)
-
-    if 'intel_snb_qpi' in job.schemas:
-        qpi = reformat_counters(job, 'intel_snb_qpi',qpi_event_map)
-        for host in job.hosts.itervalues():
-            qpi.register(host)  
-
-    if 'intel_snb_pcu' in job.schemas:
-        pcu = reformat_counters(job, 'intel_snb_pcu',pcu_event_map)
-        for host in job.hosts.itervalues():
-            pcu.register(host)
-
-    if 'intel_snb_r2pci' in job.schemas:
-        r2pci = reformat_counters(job, 'intel_snb_r2pci',r2pci_event_map)
-        for host in job.hosts.itervalues():
-            r2pci.register(host)
+    # These events work for SNB,IVB,HSW at this time 2015/05/27
+    for device, mapping in intel_xeon.iteritems():
+        if device in job.schemas:
+            d = reformat_counters(job, device, mapping)
+            for host in job.hosts.itervalues():
+                d.register(host)
 
     # Backwards compatibility
     if 'intel_pmc3' in job.schemas:

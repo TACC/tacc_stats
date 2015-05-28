@@ -439,9 +439,12 @@ def master_plot(request, pk):
 
 def heat_map(request, pk):    
     data = get_data(pk)
-    hm = plots.HeatMap(k1=['intel_snb','intel_snb'],
-                       k2=['CLOCKS_UNHALTED_REF',
-                           'INSTRUCTIONS_RETIRED'],
+    hm = plots.HeatMap(k1={'intel_snb' : ['intel_snb','intel_snb'],
+                           'intel_hsw' : ['intel_hsw','intel_hsw']
+                           },
+                       k2={'intel_snb' : ['CLOCKS_UNHALTED_REF',
+                           'intel_hsw' : 'INSTRUCTIONS_RETIRED']
+                           },
                        lariat_data="pass")
     hm.plot(pk,job_data=data)
     return figure_to_response(hm)

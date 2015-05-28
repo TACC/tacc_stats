@@ -15,6 +15,10 @@ class MasterPlot(Plot):
       'intel_snb' : ['intel_snb_imc', 'intel_snb_imc', 'intel_snb', 
                      'lnet', 'lnet', 'ib_sw','ib_sw','cpu',
                      'intel_snb', 'intel_snb', 'intel_snb', 'mem', 'mem','mem'],
+      'intel_hsw' : ['intel_hsw_imc', 'intel_hsw_imc', 'intel_hsw', 
+                     'lnet', 'lnet', 'ib_sw','ib_sw','cpu',
+                     'intel_hsw', 'intel_hsw', 'intel_hsw', 'mem', 'mem','mem'],
+
       }
   
   k2={'amd64':
@@ -45,6 +49,11 @@ class MasterPlot(Plot):
                      'rx_bytes','tx_bytes', 'rx_bytes','tx_bytes','user',
                      'SSE_DOUBLE_SCALAR', 'SSE_DOUBLE_PACKED', 
                      'SIMD_DOUBLE_256', 'MemUsed', 'FilePages','Slab'],
+      'intel_hsw' : ['CAS_READS', 'CAS_WRITES', 'LOAD_L1D_ALL',
+                     'rx_bytes','tx_bytes', 'rx_bytes','tx_bytes','user',
+                     'SSE_DOUBLE_SCALAR', 'SSE_DOUBLE_PACKED', 
+                     'SIMD_DOUBLE_256', 'MemUsed', 'FilePages','Slab'],
+
       }
 
   fname='master'
@@ -93,6 +102,8 @@ class MasterPlot(Plot):
         if 'FP_COMP_OPS_EXE_SSE_PACKED' in schema and 'FP_COMP_OPS_EXE_SSE_SCALAR' in schema:
           flops = 2*stats[0][:,schema['FP_COMP_OPS_EXE_SSE_PACKED'].index]+stats[0][:,schema['FP_COMP_OPS_EXE_SSE_SCALAR'].index]
         else: print("FLOP stats not available for JOBID",self.ts.j.id)
+      elif self.ts.pmc_type == 'intel_hsw' :
+        print('Haswell does not support FLOP counters')
       else: 
         print(self.ts.pmc_type + ' not currently supported')
         continue
@@ -103,7 +114,7 @@ class MasterPlot(Plot):
         ax.set_ylabel('Dbl GFLOPS')
       except: print("FLOP plot not available for JOBID",self.ts.j.id)
     # Plot key 2
-    if self.ts.pmc_type == 'intel_snb':
+    if self.ts.pmc_type == 'intel_snb' or self.ts.pmc_type == 'intel_hsw':
       idx0=k2_tmp.index('CAS_READS')
       idx1=k2_tmp.index('CAS_WRITES')
     if self.ts.pmc_type == 'intel_pmc3' or self.ts.pmc_type == 'intel_nhm' or self.ts.pmc_type == 'intel_wtm' :
@@ -124,7 +135,7 @@ class MasterPlot(Plot):
     plot(self.fig.add_subplot(6,cols,4*shift), [idx0,idx1], 3600., 1024.**2, ylabel='Total lnet MB/s')
 
     # Plot remaining IB sum rate
-    if self.ts.pmc_type == 'intel_snb' :
+    if self.ts.pmc_type == 'intel_snb' or self.ts.pmc_type == 'intel_hsw':
       idx2=k1_tmp.index('ib_sw')
       idx3=idx2 + k1_tmp[idx2+1:].index('ib_sw') + 1
     if self.ts.pmc_type == 'intel_pmc3' or self.ts.pmc_type == 'intel_nhm' or self.ts.pmc_type == 'intel_wtm':
