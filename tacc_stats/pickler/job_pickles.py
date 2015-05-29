@@ -36,8 +36,9 @@ def job_pickle(reader_inst,
                               tacc_stats_home, 
                               host_list_dir, acct)
 
-    with open(os.path.join(date_dir, job.id), 'wb') as pickle_file:
-        pickle.dump(job, pickle_file, pickle.HIGHEST_PROTOCOL)
+    if job:
+        with open(os.path.join(date_dir, job.id), 'wb') as pickle_file:
+            pickle.dump(job, pickle_file, pickle.HIGHEST_PROTOCOL)
 
 class JobPickles:
 
@@ -47,7 +48,7 @@ class JobPickles:
         self.start = kwargs.get('start',None)
         self.end = kwargs.get('end',None)
         if not self.start: self.start = (datetime.now()-timedelta(days=1))
-        if not self.end:   self.end   = datetime.now()
+        if not self.end:   self.end   = (datetime.now()+timedelta(days=1))
 
         self.seek = kwargs.get('seek',cfg.seek)
         self.tacc_stats_home = kwargs.get('tacc_stats_home',cfg.tacc_stats_home)

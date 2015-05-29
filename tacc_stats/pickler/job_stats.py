@@ -237,15 +237,14 @@ class Host(object):
                 base, dot, ext = ent.partition(".")
                 if not base.isdigit():
                     continue
-                if ext != "gz":
-                    continue
+                #if ext != "gz":
+                #    continue
                 # Support for filenames of the form %Y%m%d
                 if re.match('^[0-9]{4}[0-1][0-9][0-3][0-9]$', base):
                     base = (datetime.datetime.strptime(base,"%Y%m%d") - datetime.datetime(1970,1,1)).total_seconds()
                 # Prune to files that might overlap with job.
                 ent_start = long(base)
                 ent_end = ent_start + 2*RAW_STATS_TIME_MAX
-
                 if ((ent_start <= job_start) and (job_start <= ent_end)) or ((ent_start <= job_end) and (job_end <= ent_end)) or (max(job_start, ent_start) <= min(job_end, ent_end)) :
                     full_path = os.path.join(raw_host_stats_dir, ent)
                     path_list.append((full_path, ent_start))
@@ -413,6 +412,9 @@ class Host(object):
                 with gzip.open(path) as file:
                     self.read_stats_file(file)
             except IOError as ioe:
+                with open(path) as file:
+                    self.read_stats_file(file)
+            except IOError as ioe:
                 self.error("read error for file %s\n", path)
 
         # begin_mark = 'begin %s' % self.job.id # No '%'.
@@ -490,6 +492,10 @@ class Job(object):
         if len(host_list) == 0:
             self.error("empty host list\n")
             return False
+
+        # Try this out
+        if self.acct['nodes'] != len(host_list): return False
+
         for host_name in host_list:
             # TODO Keep bad_hosts.
             try: host_name = host_name.split('.')[0]
@@ -682,8 +688,11 @@ def from_acct(acct, stats_home, host_list_dir, batch_acct):
     stats_home as the base directory, running all required processing.
     """
     job = Job(acct, stats_home, host_list_dir, batch_acct)
-    job.gather_stats() and job.munge_times() and job.process_stats()
-    return job
+    if job.gather_stats() and job.munge_times() and job.process_stats():
+        return job
+    else:
+        return False
+    
 
 
 def from_id(id, **kwargs):
