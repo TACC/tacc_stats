@@ -29,23 +29,6 @@ class TSPLBase:
       except EOFError as e:
         raise TSPLException('End of file found for: ' + file)
       self.f.close()
-
-    try: 
-      self.wayness=int(self.j.acct['cores'])/int(self.j.acct['nodes'])
-    except ZeroDivisionError:
-      if VERBOSE: print "Read zero nodes, assuming 16 way for job " + str(self.j.id)
-      self.wayness=16
-    except KeyError:
-      try:
-        self.wayness=int(re.findall('\d+',self.j.acct['granted_pe'])[0])
-      except AttributeError:
-        raise TSPLException("Pickle file broken: " + file)
-    except TypeError:
-      raise TSPLException('Something is funny with job ' +str(self.j.id) +
-                            ' ' + str(self.j.acct['cores']) + ' ' +
-                            str(self.j.acct['nodes']))
-    except:
-      raise TSPLException('Something is funny with file' + file )
     
     try:
       self.queue=self.j.acct['queue']
@@ -78,9 +61,6 @@ class TSPLBase:
     if self.numhosts == 0:
       raise TSPLException('No hosts in job '+ str(self.j.id))
 
-    self.su=float(self.j.acct['end_time'] - self.j.acct['start_time'])* \
-            float(self.numhosts*16.0)/3600.0 # Need to refactor the 16 into the
-                                        # accounting class
 
     if 'amd64_core' in self.j.hosts.values()[0].stats:
       self.pmc_type='amd64'
@@ -92,6 +72,29 @@ class TSPLBase:
       self.pmc_type='intel_wtm'
     elif 'intel_snb' in self.j.hosts.values()[0].stats:
       self.pmc_type='intel_snb'
+    elif 'intel_hsw' in self.j.hosts.values()[0].stats:
+      self.pmc_type='intel_hsw'
+
+    default_wayness = {"amd64_cores" : 4, "intel_pmc3" : 8, "intel_nhm" : 12, 
+                       "intel_wtm" : 12, "intel_snb" : 16, "intel_hsw" : 24}
+
+    try: 
+      self.wayness=int(self.j.acct['cores'])/int(self.j.acct['nodes'])
+    except ZeroDivisionError:
+      if VERBOSE: print "Read zero nodes, assuming 16 way for job " + str(self.j.id)
+      self.wayness=default_wayness[self.pmc_type]
+    except KeyError:
+      try:
+        self.wayness=int(re.findall('\d+',self.j.acct['granted_pe'])[0])
+      except AttributeError:
+        raise TSPLException("Pickle file broken: " + file)
+    except TypeError:
+      raise TSPLException('Something is funny with job ' +str(self.j.id) +
+                            ' ' + str(self.j.acct['cores']) + ' ' +
+                            str(self.j.acct['nodes']))
+    except:
+      raise TSPLException('Something is funny with file' + file )
+
 
     if isinstance(k1,dict) and isinstance(k2,dict):
       

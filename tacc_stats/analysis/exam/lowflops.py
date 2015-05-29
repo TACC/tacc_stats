@@ -4,12 +4,13 @@ from scipy.stats import tmean
 
 class LowFLOPS(Test):
   k1={'amd64' : ['amd64_core','amd64_sock','cpu'],
-      'intel_snb' : [ 'intel_snb', 'intel_snb', 'intel_snb']}
+      'intel_snb' : [ 'intel_snb', 'intel_snb', 'intel_snb'],
+      'intel_hsw' : [ 'intel_hsw', 'intel_hsw', 'intel_hsw']
+      }
   k2={'amd64' : ['SSE_FLOPS', 'DRAM',      'user'],
-      'intel_snb' : ['SIMD_D_256','SSE_D_ALL','LOAD_L1D_ALL']}
-
-  peak={'amd64' : [2.3e9*16*2, 24e9, 1.],
-        'intel_snb' : [ 16*2.7e9*2, 16*2.7e9/2.*64., 1.],}
+      'intel_snb' : ['SIMD_D_256','SSE_D_ALL','LOAD_L1D_ALL'],
+      'intel_hsw' : ['SIMD_D_256','SSE_D_ALL','LOAD_L1D_ALL']
+      }
 
   # If metric is less than threshold then flag 
   comp_operator = '<'
@@ -19,6 +20,10 @@ class LowFLOPS(Test):
     gfloprate = 0
     if self.ts.pmc_type == 'amd64' :
       gfloprate += self.arc(self.ts.data[0])
+      
+    if self.ts.pmc_type == 'intel_hsw':
+      print "Haswell chips do not have FLOP counters"
+      return
 
     if self.ts.pmc_type == 'intel_snb':
       schema = self.ts.j.get_schema('intel_snb')

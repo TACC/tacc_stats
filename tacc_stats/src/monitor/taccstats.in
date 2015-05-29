@@ -17,13 +17,11 @@ status() {
 }
 
 pid_status() {
-    if [ -e $PID_FILE ] ; then
-	if [ "ps -p `cat $PID_FILE` > /dev/null" ] ; then
-	    if [ "$1" != "quiet" ] ; then
-		echo "tacc_stats_monitord is running"
-	    fi
-	    RETVAL=1
+    if pidof tacc_stats_monitord > /dev/null; then
+	if [ "$1" != "quiet" ] ; then
+	    echo "tacc_stats_monitord is running"
 	fi
+	RETVAL=1
     else
 	if [ "$1" != "quiet" ] ; then 
 	    echo "tacc_stats_monitord is not running"	
@@ -34,12 +32,10 @@ pid_status() {
 
 job_status() {
     if [ -e $JOBID_FILE ] ; then
-	if [ "`cat $JOBID_FILE` > /dev/null" ] ; then
-	    if [ "$1" != "quiet" ] ; then
-		echo "Job ID `cat $JOBID_FILE` is loaded"
-	    fi
-	    RETVAL=1
+	if [ "$1" != "quiet" ] ; then
+	    echo "Job ID `cat $JOBID_FILE` is loaded"
 	fi
+	RETVAL=1
     else
 	if [ "$1" != "quiet" ] ; then
 	    echo "No Job ID is loaded"
@@ -62,11 +58,11 @@ stop() {
 	echo "stopping tacc_stats_monitord"
         cat ${PID_FILE} | kill -9 `awk '{print $1}'`	
        	rm -f ${PID_FILE}
-    if [ -e $JOBID_FILE ] ; then
-	rm -f $JOBID_FILE
-    fi
     else
 	echo "no instance of tacc_stats_monitord running"
+    fi
+    if [ -e $JOBID_FILE ] ; then
+	rm -f $JOBID_FILE
     fi
 }    
 

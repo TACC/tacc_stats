@@ -43,11 +43,17 @@ def get_filelist(start,end,pickles_dir=None):
     filelist = []
     for root,dirnames,filenames in os.walk(pickles_dir):
         for directory in dirnames:
-            date = datetime.strptime(directory,'%Y-%m-%d')
-            if max(date.date(),start.date()) > min(date.date(),end.date()): 
+            try:
+                date = datetime.strptime(directory,'%Y-%m-%d')
+                if max(date.date(),start.date()) > min(date.date(),end.date()): 
+                    continue
+            except:
+                print directory,"does not have date format"
                 continue
             filelist.extend(tspl_utils.getfilelist(os.path.join(root,directory)))
+
         break
+    print filelist
     return filelist
 
 def test_report(auditor, test_type):

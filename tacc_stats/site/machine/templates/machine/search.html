@@ -1,13 +1,13 @@
 <html>
 <head>
-    <title>TACC Stats Stampede</title>
+    <title>TACC Stats</title>
 </head>
 <body bgcolor="#BDBDBD">
 <p>
-<font size="8" color="#002868"> TACC</font> <font size="8" color="#bf0a30"> Stats</font> <font color="ffffff" face="comic sans ms" >Stampede</font>
+<font size="8" color="#002868"> TACC</font> <font size="8" color="#bf0a30"> Stats</font> <font color="ffffff" face="comic sans ms" >Search page</font>
 </p>
 <p>
-<img src="/media/stampede.jpg"
+<img src="/media/machine.jpg"
 <img width="250" src="/media/TACC_logo.png" />
 </p>
 
@@ -18,13 +18,13 @@
 <font size="4">
 
 Search Using JOBID:
-<form action="{% url 'stampede:search' %}" method="get">
+<form action="{% url 'machine:search' %}" method="get">
   <input type="text" name ="jobid">
   <input type="submit" value="Search">
 </form>
 
 
-<form action="{% url 'stampede:search' %}" method="get">
+<form action="{% url 'machine:search' %}" method="get">
 
 <table>
 <tr><td>UID</td><td><input type="text" name="uid"></td></tr>

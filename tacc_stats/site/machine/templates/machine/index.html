@@ -17,9 +17,9 @@
      <p> <li>GigE BW > {{ gigebw_thresh|stringformat:"0.3e" }} B
 	<table border="2" cellpadding="5" style=font-family:"arial" width:"50%">
 	 {% for key,values in gigebw_job_list.items %} 
-	 <tr><td><a href="{% url 'stampede:user_view'  key %}"> {{ key }}</a> </td>
+	 <tr><td><a href="{% url 'machine:user_view'  key %}"> {{ key }}</a> </td>
 	   {% for v,d in values %} 
-	      <td><a href="{% url 'stampede:job'  v %}">{{ v }}</a>({{ d|stringformat:"0.3e" }})</td>
+	      <td><a href="{% url 'machine:job'  v %}">{{ v }}</a>({{ d|stringformat:"0.3e" }})</td>
 	   {% endfor %}
 	 </tr>
 	 {% endfor %}
@@ -31,9 +31,9 @@
      <p> <li>Memory HWM < 30 GB on a Largemem Node
 	<table border="2" cellpadding="5" style=font-family:"arial" width:"50%">
 	 {% for key,values in mem_job_list.items %} 
-	 <tr><td><a href="{% url 'stampede:user_view'  key %}"> {{ key }}</a> </td>
+	 <tr><td><a href="{% url 'machine:user_view'  key %}"> {{ key }}</a> </td>
 	   {% for v,d in values %} 
-	      <td><a href="{% url 'stampede:job'  v %}">{{ v }}</a>({{ d }})</td>
+	      <td><a href="{% url 'machine:job'  v %}">{{ v }}</a>({{ d }})</td>
 	   {% endfor %}
 	 </tr>
 	 {% endfor %}
@@ -45,9 +45,9 @@
      <p> <li>Idle-ness
 	 	<table border="2" cellpadding="5" style=font-family:"arial" width:"50%">
 	 {% for key,values in idle_job_list.items %} 
-	 <tr><td><a href="{% url 'stampede:user_view'  key %}"> {{ key }}</a> </td>
+	 <tr><td><a href="{% url 'machine:user_view'  key %}"> {{ key }}</a> </td>
 	   {% for v,d in values %} 
-	      <td><a href="{% url 'stampede:job'  v %}">{{ v }}</a>({{ d }})</td>
+	      <td><a href="{% url 'machine:job'  v %}">{{ v }}</a>({{ d }})</td>
 	   {% endfor %}
 	 </tr>
 	 {% endfor %}
@@ -59,9 +59,9 @@
      <p> <li>Catastrophic failure 
 	 	<table border="2" cellpadding="5" style=font-family:"arial" width:"50%">
 	 {% for key,values in cat_job_list.items %} 
-	 <tr><td><a href="{% url 'stampede:user_view'  key %}"> {{ key }}</a> </td>
+	 <tr><td><a href="{% url 'machine:user_view'  key %}"> {{ key }}</a> </td>
 	   {% for v,d in values %} 
-	      <td><a href="{% url 'stampede:job'  v %}">{{ v }}</a>({{ d }})</td>
+	      <td><a href="{% url 'machine:job'  v %}">{{ v }}</a>({{ d }})</td>
 	   {% endfor %}
 	 </tr>
 	 {% endfor %}
@@ -73,9 +73,9 @@
      <p> <li>High CPI (>{{cpi_thresh}},%{{cpi_per}}) 
 	 	<table border="2" cellpadding="5" style=font-family:"arial" width:"50%">
 	 {% for key,values in cpi_job_list.items %} 
-	 <tr><td><a href="{% url 'stampede:user_view'  key %}"> {{ key }}</a> </td>
+	 <tr><td><a href="{% url 'machine:user_view'  key %}"> {{ key }}</a> </td>
 	   {% for v,d in values %} 
-	     <td> <a href="{% url 'stampede:job'  v %}">{{ v }}</a>({{ d }})</td>
+	     <td> <a href="{% url 'machine:job'  v %}">{{ v }}</a>({{ d }})</td>
 	   {% endfor %}
 	 </tr>
 	 {% endfor %}
@@ -103,10 +103,10 @@
 	</tr>
     {% for job in job_list %}
         <tr bgcolor="{{job.color}}">
-          <td><a href="{% url 'stampede:job'  job.id %}">{{ job.id }}</a>
-          <td><a href="{% url 'stampede:user_view' job.user %}" >{{ job.user }}</td> 
-          <td align=right><a href="{% url 'stampede:project_view' job.project %}" >{{ job.project }}</td>
-          <td align=right><a href="{% url 'stampede:exe_view' job.exe %}" >{{ job.exe }}</td>
+          <td><a href="{% url 'machine:job'  job.id %}">{{ job.id }}</a>
+          <td><a href="{% url 'machine:user_view' job.user %}" >{{ job.user }}</td> 
+          <td align=right><a href="{% url 'machine:project_view' job.project %}" >{{ job.project }}</td>
+          <td align=right><a href="{% url 'machine:exe_view' job.exe %}" >{{ job.exe }}</td>
 
           <td align=right>{{ job.start_time }}</td>
           <td align=right>{{ job.end_time }}</td>

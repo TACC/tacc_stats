@@ -11,23 +11,29 @@ ADMINS = (
 
 MANAGERS = ADMINS
 
+# Give a name that is unique for the computing platform
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql_psycopg2',
-        'NAME': 'tacc_stats_site_db',                     
+        'NAME'  : 'comet_db'
+        #'ENGINE': 'django.db.backends.sqlite3',
+        #'NAME': os.path.join(DIR, 'comet_db'),                     
         'USER': 'rtevans',
         'PASSWORD': '',
         'HOST': 'tacc-stats',         
         'PORT': '5432',               
-        },
-    'xalt' : {
-        'ENGINE' : 'django.db.backends.mysql',
-        'NAME' : 'xalt',
-        'USER' : 'xaltUser',
-        'PASSWORD' : 'kutwgbh',
-        'HOST' : 'tacc-stats'
-        }        
+        }
+# Uncomment this portion if an xalt database exists
+#    'xalt' : {
+#        'ENGINE' : 'django.db.backends.mysql',
+#        'NAME' : 'xalt',
+#        'USER' : 'xaltUser',
+#        'PASSWORD' : 'kutwgbh',
+#        'HOST' : 'tacc-stats'
+#    }        
     }
+
+
 
 # Hosts/domain names that are valid for this site; required if DEBUG is False
 # See https://docs.djangoproject.com/en/1.5/ref/settings/#allowed-hosts
@@ -138,8 +144,7 @@ INSTALLED_APPS = (
     #'django_pdf',
     # Uncomment the next line to enable admin documentation:
     # 'django.contrib.admindocs',
-    'tacc_stats.site.stampede',
-    'tacc_stats.site.lonestar',
+    'tacc_stats.site.machine',
 )
 """
 TEMPLATE_CONTEXT_PROCESSORS=(
