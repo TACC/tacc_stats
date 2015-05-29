@@ -155,7 +155,7 @@ class SLURMAcct(BatchAcct):
       ('end_time', int, 'Epoch time job ended'),
       ('queue_time', int, 'Epoch time job entered queue'),
       ('queue', str, 'Name of the SLURM partition'),
-      ('unknown', int, 'minutes requested?'),
+      ('requested_time', int, 'minutes requested'),
       ('name', str, 'Name given to job by user'),
       ('status', str, 'SLURM job finish state: COMPLETED, FAILED, etc.'),
       ('nodes', int, 'Nodes requested'),

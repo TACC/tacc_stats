@@ -1,10 +1,9 @@
 from exams import Test
 
 class CPU_Usage(Test):
-  k1={'amd64' : ['cpu'],
-      'intel_snb' : ['cpu'],}
-  k2={'amd64' : ['user'],
-      'intel_snb' : ['user'],}
+  k1 = ['cpu']
+  k2 = ['user']
+
   comp_operator = '<'
 
   def compute_metric(self):

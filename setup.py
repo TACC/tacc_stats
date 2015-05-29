@@ -510,10 +510,9 @@ else:
     scripts=['build/bin/monitord',             
              'tacc_stats/analysis/job_sweeper.py',
              'tacc_stats/analysis/job_plotter.py',
-             'tacc_stats/site/lonestar/ls4_update_db.py',
-             'tacc_stats/site/stampede/update_db.py',
-             'tacc_stats/site/stampede/update_thresholds.py',
-             'tacc_stats/site/stampede/thresholds.cfg',
+             'tacc_stats/site/machine/update_db.py',
+             'tacc_stats/site/machine/update_thresholds.py',
+             'tacc_stats/site/machine/thresholds.cfg',
              'tacc_stats/pickler/job_pickles.py']
     if RMQ: scripts += ['build/bin/amqp_listend']
     if MODE == "CRON":

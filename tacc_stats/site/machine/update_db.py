@@ -5,7 +5,7 @@ os.environ['DJANGO_SETTINGS_MODULE']='tacc_stats.site.tacc_stats_site.settings'
 import django
 django.setup()
 
-from tacc_stats.site.stampede import views
+from tacc_stats.site.machine import views
 import tacc_stats.cfg as cfg
 
 try:
@@ -17,10 +17,11 @@ except:
 
 for root,dirnames,filenames in os.walk(cfg.pickles_dir):
     for directory in dirnames:
-
-        date = datetime.strptime(directory,'%Y-%m-%d')
-        if max(date.date(),start.date()) > min(date.date(),end.date()): continue
-        print 'Run update for',date.date()
+        try:
+            date = datetime.strptime(directory,'%Y-%m-%d')
+            if max(date.date(),start.date()) > min(date.date(),end.date()): continue
+            print 'Run update for',date.date()
+        except: continue
 
         views.update(directory,rerun=False)        
         views.update_metric_fields(directory,rerun=False)

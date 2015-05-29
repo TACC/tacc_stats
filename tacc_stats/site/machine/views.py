@@ -5,7 +5,7 @@ from django.db.models import Q
 
 import os,sys,pwd
 from tacc_stats.analysis import exam
-from tacc_stats.site.stampede.models import Job, Host, Libraries, TestInfo
+from tacc_stats.site.machine.models import Job, Host, Libraries, TestInfo
 from tacc_stats.site.xalt.models import run, join_run_object, lib
 import tacc_stats.cfg as cfg
 
@@ -62,8 +62,7 @@ def update_comp_info(thresholds = None):
         obj.save()
 
 def update(date,rerun=False):
-    ld = lariat_utils.LariatData(directory = cfg.lariat_path,
-                                 daysback = 2)
+
     tz = pytz.timezone('US/Central')
     pickle_dir = os.path.join(cfg.pickles_dir,date)
 
@@ -73,7 +72,7 @@ def update(date,rerun=False):
         print "Number of pickle files in",root,'=',num_files
         for pickle_file in sorted(pickle_files):
             ctr += 1
-
+            print pickle_file
             try:
                 if rerun: pass
                 elif Job.objects.filter(id = pickle_file).exists(): 
@@ -89,52 +88,43 @@ def update(date,rerun=False):
                     json = data.acct
                     hosts = data.hosts.keys()
                 del json['yesno']
-                utc_start = datetime.utcfromtimestamp(json['start_time']).replace(tzinfo=pytz.utc)
-                utc_end = datetime.utcfromtimestamp(json['end_time']).replace(tzinfo=pytz.utc)
+                utc_start = datetime.utcfromtimestamp(
+                    json['start_time']).replace(tzinfo=pytz.utc)
+                utc_end = datetime.utcfromtimestamp(
+                    json['end_time']).replace(tzinfo=pytz.utc)
                 json['run_time'] = json['end_time'] - json['start_time']
-                json['requested_time'] = json['unknown']*60
-                del json['unknown']
+
+                if json.has_key('unknown'):
+                    json['requested_time'] = json['unknown']*60
+                    del json['unknown']
+                else: json['requested_time'] = json['requested_time']*60
+
                 json['start_epoch'] = json['start_time']
                 json['end_epoch'] = json['end_time']
                 json['start_time'] = utc_start.astimezone(tz)
                 json['end_time'] =  utc_end.astimezone(tz)
                 json['date'] = json['end_time'].date()
                 json['name'] = json['name'][0:128]
+                json['wayness'] = json['cores']/json['nodes']
 
                 try: json['user']=pwd.getpwuid(int(json['uid']))[0]
                 except: json['user']='unknown'
-                json['wayness'] = json['cores']/json['nodes']
-                ### If xalt or lariat data is available 
-                ### add info to the tacc_stats_site_db 
-                # Assign additional xalt data if available
-                xd = run.objects.using('xalt').filter(job_id = json['id'])
-                if xd:
-                    xd              = xd[0]
-                    json['user']    = xd.user
+                
+                ### If xalt is available add data to the DB 
+                try:
+                    xd = run.objects.using('xalt').filter(job_id = json['id'])[0]
+                    jsn['user']    = xd.user
                     json['exe']     = xd.exec_path.split('/')[-1][0:128]
                     json['exec_path'] = xd.exec_path
                     json['cwd']     = xd.cwd[0:128]
                     json['threads'] = xd.num_threads
-                    json['cores']   = xd.num_cores
-                    json['nodes']   = xd.num_nodes
-                    json['wayness'] = xd.num_cores/xd.num_nodes
+                except: xd = False 
                     
-
-                    
-                """
-                else: # Otherwise use Lariat Data if available
-                    ld.set_job(pickle_file, end_time = date)
-                    print 'Using lariat',ld.id
-                    json['user']    = ld.user
-                    json['exe']     = ld.exc.split('/')[-1]
-                    json['exec_path'] = ld.exc
-                    json['cwd']     = ld.cwd[0:128]
-                    json['threads'] = ld.threads
-                    if ld.cores: json['cores'] = ld.cores
-                    if ld.nodes: json['nodes'] = ld.nodes
-                    if ld.wayness: json['wayness'] = ld.wayness
-                """
                 obj, created = Job.objects.update_or_create(**json)
+                for host_name in hosts:
+                    h = Host(name=host_name)
+                    h.save()
+                    h.jobs.add(obj)
 
                 if xd:
                     for join in join_run_object.objects.using('xalt').filter(run_id = xd.run_id):
@@ -147,10 +137,6 @@ def update(date,rerun=False):
                             library.jobs.add(obj)
                         except: pass
 
-                for host_name in hosts:
-                    h = Host(name=host_name)
-                    h.save()
-                    h.jobs.add(obj)
             except: 
                 print json
                 print pickle_file,'failed'
@@ -162,22 +148,22 @@ def update_metric_fields(date,rerun=False):
     update_comp_info()
     aud = exam.Auditor(processes=4)
     
-    aud.stage(exam.GigEBW, ignore_qs=[], min_time = 600)
-    aud.stage(exam.HighCPI, ignore_qs=[], min_time = 600)
-    aud.stage(exam.HighCPLD, ignore_qs=[], min_time = 600)
-    aud.stage(exam.Load_L1Hits, ignore_qs=[], min_time = 600)
-    aud.stage(exam.Load_L2Hits, ignore_qs=[], min_time = 600)
-    aud.stage(exam.Load_LLCHits, ignore_qs=[], min_time = 600)
-    aud.stage(exam.MemBw, ignore_qs=[], min_time = 600)
-    aud.stage(exam.Catastrophe, ignore_qs=[], min_time = 3600)
-    aud.stage(exam.MemUsage, ignore_qs=[], min_time = 600)
-    aud.stage(exam.PacketRate, ignore_qs=[], min_time = 600)
-    aud.stage(exam.PacketSize, ignore_qs=[], min_time = 600)
-    aud.stage(exam.Idle, ignore_qs=[], min_time = 600)
-    aud.stage(exam.LowFLOPS, ignore_qs=[], min_time = 600)
-    aud.stage(exam.VecPercent, ignore_qs=[], min_time = 600)
-    aud.stage(exam.CPU_Usage, ignore_qs = [], min_time = 600)
-    aud.stage(exam.Load_All, ignore_qs = [], min_time = 600)
+    aud.stage(exam.GigEBW, ignore_qs=[], min_time = 0)
+    aud.stage(exam.HighCPI, ignore_qs=[], min_time = 0)
+    aud.stage(exam.HighCPLD, ignore_qs=[], min_time = 0)
+    aud.stage(exam.Load_L1Hits, ignore_qs=[], min_time = 0)
+    aud.stage(exam.Load_L2Hits, ignore_qs=[], min_time = 0)
+    aud.stage(exam.Load_LLCHits, ignore_qs=[], min_time = 0)
+    aud.stage(exam.MemBw, ignore_qs=[], min_time = 0)
+    aud.stage(exam.Catastrophe, ignore_qs=[], min_time = 0)
+    aud.stage(exam.MemUsage, ignore_qs=[], min_time = 0)
+    aud.stage(exam.PacketRate, ignore_qs=[], min_time = 0)
+    aud.stage(exam.PacketSize, ignore_qs=[], min_time = 0)
+    aud.stage(exam.Idle, ignore_qs=[], min_time = 0)
+    aud.stage(exam.LowFLOPS, ignore_qs=[], min_time = 0)
+    aud.stage(exam.VecPercent, ignore_qs=[], min_time = 0)
+    aud.stage(exam.CPU_Usage, ignore_qs = [], min_time = 0)
+    aud.stage(exam.Load_All, ignore_qs = [], min_time = 0)
 
     print 'Run the following tests for:',date
     for name, test in aud.measures.iteritems():
@@ -185,7 +171,7 @@ def update_metric_fields(date,rerun=False):
         obj = TestInfo.objects.get(test_name = name)
         print obj.field_name,obj.threshold,obj.comparator
 
-    jobs_list = Job.objects.filter(date = date).exclude(run_time__lt = 600)
+    jobs_list = Job.objects.filter(date = date).exclude(run_time__lt = 0)
 
     # Use mem to see if job was tested.  It will always exist
     if not rerun:
@@ -259,14 +245,14 @@ def dates(request):
         
     field = {}
     field['date_list'] = sorted(month_dict.iteritems())
-    return render_to_response("stampede/search.html", field)
+    return render_to_response("machine/search.html", field)
 
 def search(request):
 
     if 'jobid' in request.GET:
         try:
             job = Job.objects.get(id = request.GET['jobid'])
-            return HttpResponseRedirect("/stampede/job/"+str(job.id)+"/")
+            return HttpResponseRedirect("/machine/job/"+str(job.id)+"/")
         except: pass
     try:
         fields = request.GET.dict()
@@ -287,7 +273,7 @@ def search(request):
         return index(request, **fields)
     except: pass
 
-    return render(request, 'stampede/search.html', {'error' : True})
+    return render(request, 'machine/search.html', {'error' : True})
 
 
 def index(request, **field):
@@ -332,7 +318,7 @@ def index(request, **field):
     field['mem_job_list'] = list_to_dict(field['mem_job_list'],'mem')
     field['gigebw_job_list'] = list_to_dict(field['gigebw_job_list'],'GigEBW')
 
-    return render_to_response("stampede/index.html", field)
+    return render_to_response("machine/index.html", field)
 
 def list_to_dict(job_list,metric):
     job_dict={}
@@ -442,8 +428,10 @@ def heat_map(request, pk):
     hm = plots.HeatMap(k1={'intel_snb' : ['intel_snb','intel_snb'],
                            'intel_hsw' : ['intel_hsw','intel_hsw']
                            },
-                       k2={'intel_snb' : ['CLOCKS_UNHALTED_REF',
-                           'intel_hsw' : 'INSTRUCTIONS_RETIRED']
+                       k2={'intel_snb' : ['CLOCKS_UNHALTED_REF', 
+                                          'INSTRUCTIONS_RETIRED'],
+                           'intel_hsw' : ['CLOCKS_UNHALTED_REF', 
+                                          'INSTRUCTIONS_RETIRED']
                            },
                        lariat_data="pass")
     hm.plot(pk,job_data=data)
@@ -524,8 +512,10 @@ def type_plot(request, pk, type_name):
     schema = build_schema(data,type_name)
     schema = [x.split(',')[0] for x in schema]
 
-    k1 = {'intel_snb' : [type_name]*len(schema)}
-    k2 = {'intel_snb': schema}
+    k1 = {'intel_snb' : [type_name]*len(schema),
+          'intel_hsw' : [type_name]*len(schema)}
+    k2 = {'intel_snb': schema,
+          'intel_hsw': schema}
 
     tp = plots.DevPlot(k1=k1,k2=k2,lariat_data='pass')
     tp.plot(pk,job_data=data)
@@ -547,5 +537,5 @@ def type_detail(request, pk, type_name):
             temp.append(raw_stats[t,event]*scale)
         stats.append((times[t],temp))
 
-    return render_to_response("stampede/type_detail.html",{"type_name" : type_name, "jobid" : pk, "stats_data" : stats, "schema" : schema})
+    return render_to_response("machine/type_detail.html",{"type_name" : type_name, "jobid" : pk, "stats_data" : stats, "schema" : schema})
 

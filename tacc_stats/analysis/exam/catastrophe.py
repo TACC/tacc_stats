@@ -49,6 +49,7 @@ class Catastrophe(Test):
     #  |
     #  |
     #  V
-
-    self.metric = numpy.array(vals).min()
+    try:
+      self.metric = numpy.array(vals).min()
+    except: pass
     return

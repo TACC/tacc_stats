@@ -1,6 +1,6 @@
 <html>
 <head>
-    <title>TACC Stampede: Job details</title>
+    <title>TACC: Job details</title>
 </head>
 <body>
 {% if job %}
@@ -9,11 +9,11 @@
  <table border="1" cellpadding="5" style="font-family:arial">
   <tr><th>Job ID</th><th>UID</th><th>user</th><th>project</th><th>executable</th><th>start time</th><th>end time</th>
       <th>run time (s)</th><th>requested time (s)</th><th>queue</th><th>name</th><th>status</th><th>wayness</th><th>cores</th><th>nodes</th><th>threads</th></tr>
-  <tr bgcolor="{{job.color}}"><td><a href="{% url 'stampede:job'  job.id %}">{{ job.id }}</a>
-                              <td><a href="{% url 'stampede:uid_view' job.uid %}" >{{ job.uid }}</td>           
-	                      <td><a href="{% url 'stampede:uid_view' job.uid %}" >{{ job.user }}</td>
-                              <td><a href="{% url 'stampede:project_view' job.project %}">{{ job.project }}</td>
-                              <td><a href="{% url 'stampede:exe_view' job.exe %}" >{{ job.exe }}</td>
+  <tr bgcolor="{{job.color}}"><td><a href="{% url 'machine:job'  job.id %}">{{ job.id }}</a>
+                              <td><a href="{% url 'machine:uid_view' job.uid %}" >{{ job.uid }}</td>           
+	                      <td><a href="{% url 'machine:uid_view' job.uid %}" >{{ job.user }}</td>
+                              <td><a href="{% url 'machine:project_view' job.project %}">{{ job.project }}</td>
+                              <td><a href="{% url 'machine:exe_view' job.exe %}" >{{ job.exe }}</td>
                               <td align=right>{{ job.start_time }}</td>
                               <td align=right>{{ job.end_time }}</td>
                               <td align=right>{{ job.run_time }}</td>
@@ -62,8 +62,8 @@
   <table style="width=100%;">
     <center><tr><td><hr></td></tr>
     <tr><td>Snapshot Plots</td></tr>
-    <tr><td><img src="{% url 'stampede:master_plot' job.id %}" alt="job less than time resolution" width="auto"/></td>
-	<td><img src="{% url 'stampede:heat_map' job.id %}" alt="heat map failed" width="auto"/></td>
+    <tr><td><img src="{% url 'machine:master_plot' job.id %}" alt="job less than time resolution" width="auto"/></td>
+	<td><img src="{% url 'machine:heat_map' job.id %}" alt="heat map failed" width="auto"/></td>
   </table>
 </p>
 
@@ -84,7 +84,7 @@
 
 <center><h2>System View</h2></center>
 <p>
-<img src="{% url 'stampede:sys_plot' job.id %}" alt="sys plot failed" align="left"/> 
+<img src="{% url 'machine:sys_plot' job.id %}" alt="sys plot failed" align="left"/> 
 </p>
 
 </body>
