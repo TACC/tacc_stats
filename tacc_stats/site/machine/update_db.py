@@ -13,7 +13,7 @@ try:
     end   = datetime.strptime(sys.argv[2],"%Y-%m-%d")
 except:
     start = datetime.now() - timedelta(days=1)
-    end   = start
+    end   = datetime.now() + timedelta(days=1)
 
 for root,dirnames,filenames in os.walk(cfg.pickles_dir):
     for directory in dirnames:

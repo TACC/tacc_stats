@@ -140,7 +140,9 @@ class TSPLBase:
 ###                 for i in range(len(self.k1))]
 
     g=self.j.hosts[self.j.hosts.keys()[0]]
-    self.size=len(g.stats[self.k1[0]].values()[0])
+
+    
+    self.size=len(self.j.times)#g.stats[self.k1[0]].values()[0])
 
     d=datetime.datetime.fromtimestamp(self.j.acct['start_time'])
     self.start_date=d.strftime('%Y-%m-%d %H:%M:%S')
@@ -229,6 +231,7 @@ class TSPLBase:
   
   def assemble(self,index,host,jndex):
     data=self.data
+
     v=numpy.zeros_like(data[0][host][jndex])
     for i in index:
       i2=abs(i)

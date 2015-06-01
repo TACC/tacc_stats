@@ -60,7 +60,6 @@ class MasterPlot(Plot):
 
   def plot(self,jobid,job_data=None):
     if not self.setup(jobid,job_data=job_data): return
-    
     wayness=self.ts.wayness
     if self.lariat_data != 'pass':
       if self.lariat_data.wayness and self.lariat_data.wayness < self.ts.wayness:
@@ -120,8 +119,10 @@ class MasterPlot(Plot):
     if self.ts.pmc_type == 'intel_pmc3' or self.ts.pmc_type == 'intel_nhm' or self.ts.pmc_type == 'intel_wtm' :
       idx0=k2_tmp.index('MEM_UNCORE_RETIRED_REMOTE_DRAM')
       idx1=k2_tmp.index('MEM_UNCORE_RETIRED_LOCAL_DRAM')
-    plot(self.fig.add_subplot(6,cols,2*shift), [idx0,idx1], 3600., 1.0/64.0*1024.*1024.*1024., ylabel='Total Mem BW GB/s')
-
+    try: 
+      plot(self.fig.add_subplot(6,cols,2*shift), [idx0,idx1], 3600., 1.0/64.0*1024.*1024.*1024., ylabel='Total Mem BW GB/s')
+    except:
+      pass
     #Plot key 3
     idx0=k2_tmp.index('MemUsed')
     idx1=k2_tmp.index('FilePages')

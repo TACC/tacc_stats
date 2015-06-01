@@ -193,7 +193,10 @@ def update_metric_fields(date,rerun=False):
     for name, results in aud.metrics.iteritems():
         obj = TestInfo.objects.get(test_name = name)
         for jobid in results.keys():
-            jobs_list.filter(id = jobid).update(**{ obj.field_name : results[jobid]})
+            try:
+                jobs_list.filter(id = jobid).update(**{ obj.field_name : results[jobid]})
+            except:
+                pass
 
 def sys_plot(request, pk):
 

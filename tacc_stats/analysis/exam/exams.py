@@ -128,10 +128,13 @@ class Test(object):
     return avg/self.ts.numhosts
 
   def test(self,jobpath,job_data):
-    # Setup job data and filter out unwanted jobs
-    if not self.setup(jobpath,job_data=job_data): return
-    # Compute metric of interest
-    self.compute_metric()
+    try:
+      # Setup job data and filter out unwanted jobs
+      if not self.setup(jobpath,job_data=job_data): return
+      # Compute metric of interest
+      self.compute_metric()
+    except: 
+      pass
     return self.metric
 
 

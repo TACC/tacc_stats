@@ -6,7 +6,7 @@ DEBUG = False
 TEMPLATE_DEBUG = DEBUG
 
 ADMINS = (
-    # ('Your Name', 'your_email@example.com'),
+    ('Richard Todd Evans', 'rtevans@tacc.utexas.edu'),
 )
 
 MANAGERS = ADMINS
@@ -15,9 +15,9 @@ MANAGERS = ADMINS
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql_psycopg2',
-        'NAME'  : 'comet_db'
+        'NAME'  : 'maverick_db',
         #'ENGINE': 'django.db.backends.sqlite3',
-        #'NAME': os.path.join(DIR, 'comet_db'),                     
+        #'NAME': os.path.join(DIR, 'maverick_db'),                     
         'USER': 'rtevans',
         'PASSWORD': '',
         'HOST': 'tacc-stats',         

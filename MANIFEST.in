@@ -1,6 +1,6 @@
 include tacc_stats/src/monitor/*.h
-recursive-include tacc_stats/site/stampede/templates *
-recursive-include tacc_stats/site/lonestar/templates *
+recursive-include tacc_stats/site/machine/templates *
+recursive-include tacc_stats/site/machine/templates *
 include tacc_stats/src/monitor/*.in
 include tacc_stats/*/*.in
 include cfg/*
