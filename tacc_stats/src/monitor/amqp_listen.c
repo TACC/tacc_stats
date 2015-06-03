@@ -30,7 +30,7 @@ int consume(const char *hostname, const char* port, const char* archive_dir)
   amqp_bytes_t queuename;
 
   exchange = "amq.direct";
-  bindingkey = "tacc_stats";
+  bindingkey = HOST_NAME_EXT;
 
   conn = amqp_new_connection();
   socket = amqp_tcp_socket_new(conn);
@@ -48,7 +48,7 @@ int consume(const char *hostname, const char* port, const char* archive_dir)
   {
     amqp_queue_declare_ok_t *r = 
       amqp_queue_declare(conn, 1, 
-			 amqp_cstring_bytes("tacc_stats"), 
+			 amqp_cstring_bytes(bindingkey), 
 			 0, 1, 0, 0,
 			 amqp_empty_table);
 

@@ -165,7 +165,7 @@ def write_cfg_file(paths):
     try:
         for name,path in paths.iteritems():
             a.write(name + " = " + "\"" + path + "\"" + "\n")
-        a.write("seek = 0\n")
+        a.write("seek = 0\n")        
     finally:
         a.close()
 
@@ -272,6 +272,7 @@ define_macros=[('STATS_DIR_PATH','\"'+paths['stats_dir']+'\"'),
                ('STATS_PROGRAM','\"tacc_stats\"'),
                ('STATS_LOCK_PATH','\"'+paths['stats_lock']+'\"'),
                ('JOBID_FILE_PATH','\"'+paths['jobid_file']+'\"'),
+               ('HOST_NAME_EXT','\"'+paths['host_name_ext']+'\"'),
                ('FREQUENCY',FREQUENCY)]
 if RMQ:
     define_macros.append(('RMQ',True))

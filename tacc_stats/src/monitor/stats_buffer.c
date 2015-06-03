@@ -42,7 +42,7 @@ static int send(struct stats_buffer *sf)
   amqp_socket_t *socket = NULL;
   amqp_connection_state_t conn;
   exchange = "amq.direct";
-  routingkey = "tacc_stats";
+  routingkey = HOST_NAME_EXT;
   conn = amqp_new_connection();
   socket = amqp_tcp_socket_new(conn);
   status = amqp_socket_open(socket, sf->sf_host, atoi(sf->sf_port));
