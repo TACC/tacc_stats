@@ -1,22 +1,46 @@
 <html>
 <head>
     <title>TACC Stats </title>
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.1/css/bootstrap.min.css">
+<!---    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.1/css/bootstrap-theme.min.css">--->
+    <link rel="stylesheet" href="https://bootswatch.com/spacelab/bootstrap.min.css">
+
+    <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.1/js/bootstrap.min.js"></script>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <style type="text/css">
+    .navbar-brand{
+        position: absolute;
+        width: 100%;
+        left: 0;
+        text-align: center;
+        margin: auto;
+    }
+    </style>
 </head>
 <body>
-    <h1>Job {{ jobid }} / Type {{ type_name }}</h1>
-    <h2>Rates Aggregated over devices</h2>
-<img src="{% url 'machine:type_plot' jobid type_name %}"/>
+<div class="container-fluid">
+    <h2>Job {{ jobid }} / Type {{ type_name }}</h2>
+    <h4>Rates Aggregated over devices</h4>
+<img src="{% url 'machine:type_plot' jobid type_name %}" style="max-width:100%;"/>
 {% if stats_data %}
-    <h2>Counts Aggregated over devices and hosts</h2>
-    <table border="1" cellpadding="5">
+<h4>Counts Aggregated over devices and hosts</h4>
+<div class="table-responsive">
+  <table class="table table-condensed table-bordered" style="max-width:100%;">
+    <thead>
       <tr><th>record</th>{% for key in schema %} <th>{{key}}</th>{% endfor %}</tr>
+    </thead>
+    <tbody>
       {% for time, values in stats_data %}
-          <tr><th>{{time}}</th>{% for value in values %}<th>{{ value|stringformat:"e" }} </th> {% endfor %}</tr>
+      <tr><th>{{time}}</th>{% for value in values %}<th>{{ value|stringformat:"0.2e" }} </th> {% endfor %}</tr>
       {% endfor %}
-    </table>
-
+    </tbody>
+  </table>
+</div>
 {% else %}
-    <h1>Type not found</h1>
+<h1>Type not found</h1>
 {% endif %}
+</div>
 </body>
 </html>

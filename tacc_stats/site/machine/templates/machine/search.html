@@ -1,70 +1,132 @@
 <html>
 <head>
     <title>TACC Stats</title>
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.1/css/bootstrap.min.css">
+<!---    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.1/css/bootstrap-theme.min.css"> --->
+    <link rel="stylesheet" href="https://bootswatch.com/spacelab/bootstrap.min.css">
+    <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.1/js/bootstrap.min.js"></script>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <style type="text/css">
+    .navbar-brand{
+        position: absolute;
+        width: 100%;
+        left: 0;
+        text-align: center;
+        margin: auto;
+    }
+    </style>
 </head>
-<body bgcolor="#BDBDBD">
-<p>
-<font size="8" color="#002868"> TACC</font> <font size="8" color="#bf0a30"> Stats</font> <font color="ffffff" face="comic sans ms" >Search page</font>
-</p>
-<p>
-<img src="/media/machine.jpg"
-<img width="250" src="/media/TACC_logo.png" />
-</p>
 
+<body>
+  <div class="container-fluid">
+
+    <nav class="navbar navbar-default" role="navigation">
+	<div class="navbar-header"><a href="https://www.tacc.utexas.edu"> <img src="/media/TACC_logo.png" style="max-width:50%;"/></a></div>
+	<center>{{ machine_name }}</center>
+	<a><form class="navbar-form navbar-right" action="{% url 'machine:search' %}" method="get" role="search"> 	    
+	    <div class="form-group">
+	    <input type="text" class="form-control" name ="jobid" placeholder="Job ID">
+	  </div>
+	  <button type="submit" class="btn btn-default">find job</button>
+	</form></a>
+      
+    </ul>
+  </nav>
+
+<div class="row">
+  <div class="col-md-offset-3 col-md-4">
+    <center>   
+      <font size="8" color="#002868"> TACC</font> <font size="8" color="#bf0a30"> Stats
+      </font> 
+      <p>
+	a job-level resource usage monitoring tool
+      </p>
+    </center>
+  </div>
+</div>
+<!----
+<img src="/media/machine.jpg"
+</p>
+---->
 {% if error %}
    <p style="color: red;">Requested search failed.</p>
 {% endif %}
-
-<font size="4">
-
-Search Using JOBID:
-<form action="{% url 'machine:search' %}" method="get">
-  <input type="text" name ="jobid">
-  <input type="submit" value="Search">
-</form>
-
+<hr/>
 
 <form action="{% url 'machine:search' %}" method="get">
 
-<table>
-<tr><td>UID</td><td><input type="text" name="uid"></td></tr>
-<tr><td>User Name </td><td><input type="text" name ="user"></td></tr>
-<tr><td>Project </td><td><input type="text" name ="project"></td></tr>
-<tr><td>Executable </td><td><input type="text" name ="exe__icontains"></td>
-<tr><td>Search Field </td><td><input type="text" name ="opt_field0"></td><td>Value</td><td><input type="text" name ="value0"></td></tr>
-<tr><td></td><td><input type="text" name ="opt_field1"></td><td></td><td><input type="text" name ="value1"></td></tr><tr><td></td><td><input type="text" name ="opt_field2"></td><td></td><td><input type="text" name ="value2"></td></tr>
-<p>
-<hr>
-Search Using Combined Fields:
-<p>
-  Start Date <input type="date" name="date__gte">
-  End Date <input type="date" name="date__lte">
-</p>
-</p>
-</tr>
-</table>
-  <input type="submit" value="Search">
+<h4>Search for jobs on multiple fields </h4>
+</br>
+<div class="row">
+  <div class="col-md-1"><label>Start Date</label></div>
+  <div class="col-md-3"><input type="date" class="form-control input-sm" name="date__gte"></div>
+  <div class="col-md-1"></div>
+  <div class="col-md-1"><label>End Date</label></div>
+  <div class="col-md-3"><input type="date" class="form-control input-sm" name="date__lte"></div>
+</div>
+</br>
+<div class="row">
+    <div class="col-md-2"><label for="uid">UID</label></div>
+    <div class="col-md-2"><input type="text"  class="form-control input-sm" name="uid"></div>
+</div>
+<div class="row">
+    <div class="col-md-2"><label for="uid">User Name</label></div>
+    <div class="col-md-2"><input type="text" class="form-control input-sm" name="user"></div>
+</div>
+<div class="row">
+    <div class="col-md-2"><label for="uid">Project</label></div>
+    <div class="col-md-2"><input type="text" class="form-control input-sm" name="project"></div>
+</div>
+<div class="row">
+    <div class="col-md-2"><label for="uid">Executable</label></div>
+    <div class="col-md-2"><input type="text" class="form-control input-sm" name="exe__icontains"></div>
+</div>
+<br/>
+<div class="row">
+    <div class="col-md-2"><label for="uid">Search field</label></div>
+    <div class="col-md-2">
+        <input type="text" class="form-control input-sm" name="opt_field1">
+        <input type="text" class="form-control input-sm" name="opt_field2">
+        <input type="text" class="form-control input-sm" name="opt_field3">
+    </div>
+    <div class="col-md-1"></div>
+    <div class="col-md-1"><label for="uid">Value</label></div>
+    <div class="col-md-2">
+        <input type="text" class="form-control input-sm" name="value1">
+        <input type="text" class="form-control input-sm" name="value2">
+        <input type="text" class="form-control input-sm" name="value3">
+    </div>
+</div>
+<br/>
+
+<button type="submit" class="btn btn-default">Search</button>
 </form>
-</font>
+
+
 </div>
 <hr>
-<div id="browse">
-{% if date_list %}
 
- <table border="1" cellpadding="5">
+
+<div class="container-fluid">
+<h4>View all jobs for a given date </h4>
+{% if date_list %}
+<nav class="navbar navbar-default" role="navigation">
+<ul class="pagination">
 {% for month, dates in date_list %}
-   <tr><th>{{month}}</th>
+   <li><a href="/machine/date/{{month}}">{{month}}</a></li>
    {% for date in dates %}
-     <th><a href="date/{{date.0}}">{{date.1}}</th>
+     <li><a href="/machine/date/{{date.0}}">{{date.1}}</a></li>
    {% endfor %}
+</br>
 {% endfor %}
-</tr>
+
+</nav>
 {% else %}
     <p> No job data available </p>
 {% endif %}   
 </div>
-<!--- Percentage jobs with CPI over {{cpi_thresh }} = {{cpi_per}} --->
  
 </body>
-
 </html>

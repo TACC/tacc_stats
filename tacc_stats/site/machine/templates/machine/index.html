@@ -1,90 +1,121 @@
 <html>
 <head>
     <title>TACC Stats</title>
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.1/css/bootstrap.min.css">
+    <!----<link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.1/css/bootstrap-theme.min.css">---->
+    <link rel="stylesheet" href="https://bootswatch.com/spacelab/bootstrap.min.css">
+    <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.1/js/bootstrap.min.js"></script>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <style type="text/css">
+    .navbar-brand{
+        position: absolute;
+        width: 100%;
+        left: 0;
+        text-align: center;
+        margin: auto;
+    }
+    </style>
 </head>
 <body>
 
-<font face="verdana" color ="blue" size="4">{{ name }}</font>
-<img src="{{ histograms }}" />
+  <div class="container-fluid">
 
-<h1># Jobs over 1 mn in run time = {{nj}}</h1>
+    <nav class="navbar navbar-default" role="navigation">
+      <div class="navbar-header"><a href="https://www.tacc.utexas.edu"> <img src="/media/TACC_logo.png" style="max-width:50%;"/></a></div>
+      <center><a href="/machine/">TACC Stats Home</a></center>
+
+      <a><form class="navbar-form navbar-right" action="{% url 'machine:search' %}" method="get" role="search"> 
+	  <div class="form-group">
+	    <input type="text" class="form-control" name ="jobid" placeholder="Job ID">
+	  </div>
+	  <button type="submit" class="btn btn-default">find job</button>
+	</form>
+      </a>      
+</ul>
+</nav>
+
+<h4>{{ name }}</h4>
+<img src="{{ histograms }}" style="max-width:100%;"/>
+
 <hr>
-{% if job_list %}
-    <h1>Job Listing</h1>
-<p>Jobs flagged for:
 
+<div class="table-responsive">
+  <h4>Flagged Jobs:</h4>
+  <table class="table table-condensed" style="max-width=100%;">
     {% if gigebw_job_list %}
-     <p> <li>GigE BW > {{ gigebw_thresh|stringformat:"0.3e" }} B
-	<table border="2" cellpadding="5" style=font-family:"arial" width:"50%">
-	 {% for key,values in gigebw_job_list.items %} 
-	 <tr><td><a href="{% url 'machine:user_view'  key %}"> {{ key }}</a> </td>
-	   {% for v,d in values %} 
-	      <td><a href="{% url 'machine:job'  v %}">{{ v }}</a>({{ d|stringformat:"0.3e" }})</td>
-	   {% endfor %}
-	 </tr>
-	 {% endfor %}
-	 </table>
-     </li></p>
-     {% endif %}
-
+    <tr>
+      <th>GigE BW > {{ gigebw_thresh|stringformat:"0.3e" }} B</th>
+    </tr>
+    {% for key,values in gigebw_job_list.items %} 
+    <tr><td><a href="{% url 'machine:user_view' key %}"> {{ key }}</a> </td>
+      {% for v,d in values %} 
+      <td><a href="{% url 'machine:job' v %}">{{ v }}</a>({{ d|stringformat:"0.3e" }})</td>
+      {% endfor %}
+    </tr>
+    {% endfor %}
+    {% endif %}
+    
     {% if mem_job_list %}
-     <p> <li>Memory HWM < 30 GB on a Largemem Node
-	<table border="2" cellpadding="5" style=font-family:"arial" width:"50%">
-	 {% for key,values in mem_job_list.items %} 
-	 <tr><td><a href="{% url 'machine:user_view'  key %}"> {{ key }}</a> </td>
-	   {% for v,d in values %} 
-	      <td><a href="{% url 'machine:job'  v %}">{{ v }}</a>({{ d }})</td>
-	   {% endfor %}
-	 </tr>
-	 {% endfor %}
-	 </table>
-     </li></p>
-     {% endif %}
+    <tr>
+      <th>Memory HWM less than 30 GB on a Largemem</th>
+    </tr>
+    {% for key,values in mem_job_list.items %} 
+    <tr><td><a href="{% url 'machine:user_view' key %}"> {{ key }}</a> </td>
+      {% for v,d in values %} 
+      <td><a href="{% url 'machine:job' v %}">{{ v }}</a>({{ d }})</td>
+      {% endfor %}
+    </tr>
+    {% endfor %}
+    {% endif %}
+    
 
     {% if idle_job_list %}
-     <p> <li>Idle-ness
-	 	<table border="2" cellpadding="5" style=font-family:"arial" width:"50%">
-	 {% for key,values in idle_job_list.items %} 
-	 <tr><td><a href="{% url 'machine:user_view'  key %}"> {{ key }}</a> </td>
-	   {% for v,d in values %} 
-	      <td><a href="{% url 'machine:job'  v %}">{{ v }}</a>({{ d }})</td>
-	   {% endfor %}
-	 </tr>
-	 {% endfor %}
-	 </table>
-     </li></p>
-     {% endif %}
-
+    <tr>
+      <th>Idle Nodes Present</th>
+    </tr>
+    {% for key,values in idle_job_list.items %} 
+    <tr>
+      <td><a href="{% url 'machine:user_view'  key %}"> {{ key }}</a></td>
+      {% for v,d in values %} 
+      <td><a href="{% url 'machine:job'  v %}">{{ v }}</a>({{ d }})</td>
+      {% endfor %}
+    </tr>
+    {% endfor %}
+    {% endif %}
+    
     {% if cat_job_list %}
-     <p> <li>Catastrophic failure 
-	 	<table border="2" cellpadding="5" style=font-family:"arial" width:"50%">
-	 {% for key,values in cat_job_list.items %} 
-	 <tr><td><a href="{% url 'machine:user_view'  key %}"> {{ key }}</a> </td>
-	   {% for v,d in values %} 
-	      <td><a href="{% url 'machine:job'  v %}">{{ v }}</a>({{ d }})</td>
-	   {% endfor %}
-	 </tr>
-	 {% endfor %}
-	 </table>
-     </li></p>
+    <tr>
+      <th>Sudden Performance Drop</th>
+    </tr>
+    {% for key,values in cat_job_list.items %} 
+    <tr><td><a href="{% url 'machine:user_view'  key %}"> {{ key }}</a> </td>
+      {% for v,d in values %} 
+      <td><a href="{% url 'machine:job'  v %}">{{ v }}</a>({{ d }})</td>
+      {% endfor %}
+    </tr>
+    {% endfor %}
     {% endif %}
-
+    
     {% if cpi_job_list %}
-     <p> <li>High CPI (>{{cpi_thresh}},%{{cpi_per}}) 
-	 	<table border="2" cellpadding="5" style=font-family:"arial" width:"50%">
-	 {% for key,values in cpi_job_list.items %} 
-	 <tr><td><a href="{% url 'machine:user_view'  key %}"> {{ key }}</a> </td>
-	   {% for v,d in values %} 
-	     <td> <a href="{% url 'machine:job'  v %}">{{ v }}</a>({{ d }})</td>
-	   {% endfor %}
-	 </tr>
-	 {% endfor %}
-	 </table>
-     </li> </p>
+    <tr>
+      <th>High CPI ({{cpi_thresh}}, %{{cpi_per|stringformat:"0.1f"}})</th>
+    </tr>
+    {% for key,values in cpi_job_list.items %} 
+    <tr><td><a href="{% url 'machine:user_view' key %}">{{ key }}</a></td>
+      {% for v,d in values %} 
+      <td><a href="{% url 'machine:job' v %}">{{ v }}</a>({{ d|stringformat:"0.1f" }})</td>
+      {% endfor %}
+    </tr>
+    {% endfor %}
     {% endif %}
-</p>
+  </table>
+</div>
 
-    <table border="1" cellpadding="5" style=font-family:"arial" width:"50%">
+<h3># Jobs over 1 mn in run time = {{nj}}</h3>
+    <table class="table table-condensed table-bordered">
+      <thead>
         <tr>
 	  <th> Job ID </th>
 	  <th> user </th>	  
@@ -101,13 +132,15 @@
 	  <th>nodes</th>
 	  <th> SUs </th>
 	</tr>
-    {% for job in job_list %}
+      </thead>
+      <tbody>
+	{% for job in job_list %}
         <tr bgcolor="{{job.color}}">
           <td><a href="{% url 'machine:job'  job.id %}">{{ job.id }}</a>
           <td><a href="{% url 'machine:user_view' job.user %}" >{{ job.user }}</td> 
           <td align=right><a href="{% url 'machine:project_view' job.project %}" >{{ job.project }}</td>
           <td align=right><a href="{% url 'machine:exe_view' job.exe %}" >{{ job.exe }}</td>
-
+	  
           <td align=right>{{ job.start_time }}</td>
           <td align=right>{{ job.end_time }}</td>
           <td align=right>{{ job.run_time }}</td>
@@ -119,11 +152,9 @@
           <td align=right>{{ job.nodes }}</td>
 	  <td align=right>{{ job.sus|stringformat:".2f" }} </td>
         </tr>
-    {% endfor %} 
+	{% endfor %}
+      <tbody> 
     </table>
-{% else %}
-    <p>No jobs are available.</p>
-{% endif %}
 
 </body>
 </html>

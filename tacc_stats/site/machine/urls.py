@@ -34,6 +34,9 @@ urlpatterns = patterns('',
 
                        url(r'^date/(?P<date>\d{4}-\d{2}-\d{2})/$', 
                            index, name='date_view'),
+                       url(r'^date/(?P<date>\d{4}-\d{2})/$', 
+                           index, name='date_view'),
+
                        url(r'^uid/(?P<uid>\d+?)/$',
                            index, name='uid_view'),
                        url(r'^user/(?P<user>\w+?)/$',

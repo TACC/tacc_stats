@@ -51,9 +51,9 @@ class Job(models.Model):
 
     def color(self):
         if self.status == 'COMPLETED': 
-            ret_val = "lightblue"
+            ret_val = "E1EDFA"
         elif self.status == 'FAILED':
-            ret_val = "red"
+            ret_val = "FFB2B2"
         else:
             ret_val = "silver"
         return ret_val

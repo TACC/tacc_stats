@@ -32,6 +32,6 @@ class DevPlot(Plot):
       self.ax.set_ylabel(events[i],size='small')
     self.ax.set_xlabel("Time (hr)")
     self.fig.subplots_adjust(hspace=0.5)
-    #self.fig.tight_layout()
+    self.fig.tight_layout()
 
     self.output('devices')
