@@ -111,6 +111,7 @@ def update(date,rerun=False):
                 except: json['user']='unknown'
                 
                 ### If xalt is available add data to the DB 
+                xd = None
                 try:
                     xd = run.objects.using('xalt').filter(job_id = json['id'])[0]
                     json['user']    = xd.user
