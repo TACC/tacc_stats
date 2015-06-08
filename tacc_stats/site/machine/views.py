@@ -113,7 +113,7 @@ def update(date,rerun=False):
                 ### If xalt is available add data to the DB 
                 try:
                     xd = run.objects.using('xalt').filter(job_id = json['id'])[0]
-                    jsn['user']    = xd.user
+                    json['user']    = xd.user
                     json['exe']     = xd.exec_path.split('/')[-1][0:128]
                     json['exec_path'] = xd.exec_path
                     json['cwd']     = xd.cwd[0:128]
