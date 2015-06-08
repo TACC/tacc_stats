@@ -111,23 +111,28 @@
 
 
 <div class="container-fluid">
+
 <h4>View all jobs for a given date </h4>
 {% if date_list %}
+
 <nav class="navbar navbar-default" role="navigation">
-<ul class="pagination">
+
 {% for month, dates in date_list %}
+<ul class="pagination">
    <li><a href="/machine/date/{{month}}">{{month}}</a></li>
    {% for date in dates %}
      <li><a href="/machine/date/{{date.0}}">{{date.1}}</a></li>
    {% endfor %}
-</br>
+</ul>
 {% endfor %}
 
 </nav>
+
 {% else %}
     <p> No job data available </p>
 {% endif %}   
 </div>
+
  
 </body>
 </html>

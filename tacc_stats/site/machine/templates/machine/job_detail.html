@@ -21,6 +21,7 @@
 <body>
 
   <div class="container-fluid">
+
     <nav class="navbar navbar-default" role="navigation">
       <div class="navbar-header"><a href="https://www.tacc.utexas.edu"> <img src="/media/TACC_logo.png" style="max-width:50%;"/></a></div>
       <center><a href="/machine/">TACC Stats Home</a></center>
@@ -75,7 +76,7 @@
 <hr>
 </br>
 <div class="row">
-  <div class="col-sm-6">
+  <div class="col-sm-5">
     <table class="table table-condensed table-bordered" style="max-width:30%;">
       <thead><th>Test</th><th>Measured</th><th>Threshold</th><th>Result</th></thead>
       <tbody>
@@ -85,20 +86,19 @@
       </tbody>
     </table>
   </div>
-
   <div class="col-sm-3">
     <table style="max-width:30%;">
-      <tr><th>Runtime Objects linked to</th></tr>
-      {% for lib in job.libraries_set.all %}
-      <tr><td align=left>{{ lib }}</td></tr>
+      <tr><th>Modules Loaded</th></tr>
+      {% for obj in job.libraries_set.all %}
+      <tr><td align=left>{{ obj.module_name }}</td></tr>
       {% endfor %}
     </table>
   </div>
-  <div class="col-sm-3">
+  <div class="col-sm-4">
     <table style="max-width:30%;">
-      <tr><th>Modules Loaded at Runtime</th></tr>
-      {% for obj in job.libraries_set.all %}
-      <tr><td align=left>{{ obj.module_name }}</td></tr>
+      <tr><th>Objects linked</th></tr>
+      {% for lib in job.libraries_set.all %}
+      <tr><td align=left>{{ lib }}</td></tr>
       {% endfor %}
     </table>
   </div>
