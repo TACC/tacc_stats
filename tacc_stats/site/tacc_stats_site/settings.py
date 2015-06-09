@@ -15,7 +15,7 @@ MANAGERS = ADMINS
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql_psycopg2',
-        'NAME'  : 'maverick_db',
+        'NAME'  : 'tacc_stats_site_db',
         #'ENGINE': 'django.db.backends.sqlite3',
         #'NAME': os.path.join(DIR, 'maverick_db'),                     
         'USER': 'rtevans',

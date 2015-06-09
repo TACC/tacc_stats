@@ -20,7 +20,7 @@ def main(**args):
     for host_name, host in data.hosts.iteritems():
         print "Host:",host_name
         print "Types:",host.stats.keys()
-
+        print host.marks
         if not args['type']: pass
         elif args['type'] in host.stats: 
             host.stats = { args['type'] : host.stats[args['type']] }

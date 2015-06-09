@@ -72,10 +72,10 @@ def update(date,rerun=False):
         print "Number of pickle files in",root,'=',num_files
         for pickle_file in sorted(pickle_files):
             ctr += 1
-            print pickle_file
             try:
                 if rerun: pass
                 elif Job.objects.filter(id = pickle_file).exists(): 
+                    print pickle_file,' exists'
                     continue                
             except:
                 print pickle_file,"doesn't look like a pickled job"
@@ -118,9 +118,8 @@ def update(date,rerun=False):
                     json['exe']     = xd.exec_path.split('/')[-1][0:128]
                     json['exec_path'] = xd.exec_path
                     json['cwd']     = xd.cwd[0:128]
-                    json['threads'] = xd.num_threads
-                except: xd = False 
-                    
+                    json['threads'] = xd.num_threads                    
+                except: pass
                 obj, created = Job.objects.update_or_create(**json)
                 for host_name in hosts:
                     h = Host(name=host_name)
@@ -128,6 +127,7 @@ def update(date,rerun=False):
                     h.jobs.add(obj)
 
                 if xd:
+                    print obj.exec_path
                     for join in join_run_object.objects.using('xalt').filter(run_id = xd.run_id):
                         try:
                             object_path = lib.objects.using('xalt').get(obj_id = join.obj_id).object_path
@@ -139,11 +139,10 @@ def update(date,rerun=False):
                         except: pass
 
             except: 
-                print json
                 print pickle_file,'failed'
                 print traceback.format_exc()
                 print date
-            #print "Percentage Completed =",100*float(ctr)/num_files
+            print "Percentage Completed =",100*float(ctr)/num_files
 
 def update_metric_fields(date,rerun=False):
     update_comp_info()

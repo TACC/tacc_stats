@@ -51,7 +51,7 @@ class Auditor():
         self.accts[job_data.id] = job_data.acct
         self.paths[job_data.id] = jobpath
       except EOFError as e:
-        raise TSPLException('End of file found for: ' + jobpath)
+        raise tspl.TSPLException('End of file found for: ' + jobpath)
 
     for name, measure in self.measures.iteritems():
       self.metrics[name][job_data.id] = measure.test(jobpath,job_data)
