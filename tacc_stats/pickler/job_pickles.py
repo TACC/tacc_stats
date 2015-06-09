@@ -22,23 +22,34 @@ def job_pickle(reader_inst,
 
     date_dir = os.path.join(pickle_dir,
                             datetime.fromtimestamp(reader_inst['end_time']).strftime('%Y-%m-%d'))
+
     try: os.makedirs(date_dir)
     except: pass
     
-    if os.path.exists(os.path.join(date_dir, reader_inst['id'])): 
+    pickle_file = os.path.join(date_dir, reader_inst['id'])
 
-        print(reader_inst['id'] + " exists, don't reprocess")
-        return
+    validated = False
+    if os.path.exists(pickle_file):
+        validated = True
+        with open(pickle_file) as fd:
+            try:
+                job = pickle.load(fd)
+                for host in job.hosts.values():
+                    if not host.marks.has_key('begin %s' % job.id) or not host.marks.has_key('end %s' % job.id):
+                        validated = False
+                        break
+            except: 
+                validated = False
+                
+    if not validated:
+        print(reader_inst['id'] + " is not validated: process")
+        with open(pickle_file,'w') as fd:
+            job = job_stats.from_acct(reader_inst, 
+                                      tacc_stats_home, 
+                                      host_list_dir, acct)            
+            if job: pickle.dump(job, fd, pickle.HIGHEST_PROTOCOL)
     else:
-        print("process Job",reader_inst['id'])
-
-    job = job_stats.from_acct(reader_inst, 
-                              tacc_stats_home, 
-                              host_list_dir, acct)
-
-    if job:
-        with open(os.path.join(date_dir, job.id), 'wb') as pickle_file:
-            pickle.dump(job, pickle_file, pickle.HIGHEST_PROTOCOL)
+        print(reader_inst['id'] + " is validated: do not process")
 
 class JobPickles:
 
@@ -93,6 +104,7 @@ class JobPickles:
             reader = self.acct.reader(start_time=self.start,
                                       end_time=self.end,
                                       seek=self.seek)
+        #map(self.partial_pickle,reader)
         self.pool.map(self.partial_pickle,reader)
 
 if __name__ == '__main__':

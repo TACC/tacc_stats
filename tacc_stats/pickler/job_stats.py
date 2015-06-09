@@ -323,7 +323,7 @@ class Host(object):
                                    file.name, rec_time, rec_jobid)
                         self.times.append(rec_time)
                         break
-                elif line.startswith('% begin'):
+                elif line.startswith('%begin'):
                     rec_jobid.add(line.split()[2])
                     if self.job.id in rec_jobid:
                         self.times.append(rec_time)
@@ -417,14 +417,14 @@ class Host(object):
             except IOError as ioe:
                 self.error("read error for file %s\n", path)
 
-        # begin_mark = 'begin %s' % self.job.id # No '%'.
-        # if not begin_mark in self.marks:
-        #     self.error("no begin mark found\n")
-        #     return False
-        # end_mark = 'end %s' % self.job.id # No '%'.
-        # if not end_mark in self.marks:
-        #     self.error("no end mark found\n")
-        #     return False
+        begin_mark = 'begin %s' % self.job.id # No '%'.
+        if not begin_mark in self.marks:
+            self.error("no begin mark found\n")
+            return False
+        end_mark = 'end %s' % self.job.id # No '%'.
+        if not end_mark in self.marks:
+            self.error("no end mark found\n")
+            return False
         return self.raw_stats
 
     def get_stats(self, type_name, dev_name, key_name):
@@ -504,6 +504,7 @@ class Job(object):
             host = Host(self, host_name, self.stats_home + '/archive',self.batch_acct.name_ext )
             if host.gather_stats():
                 self.hosts[host_name] = host
+            else: break
         if not self.hosts:
             self.error("no good hosts\n")
             return False

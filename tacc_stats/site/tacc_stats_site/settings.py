@@ -2,7 +2,7 @@
 import os
 DIR = os.path.dirname(os.path.abspath(__file__))
 
-DEBUG = True
+DEBUG = False
 TEMPLATE_DEBUG = DEBUG
 
 ADMINS = (
@@ -15,22 +15,22 @@ MANAGERS = ADMINS
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql_psycopg2',
-        'NAME'  : 'maverick_db',
+        'NAME'  : 'tacc_stats_site_db',
         #'ENGINE': 'django.db.backends.sqlite3',
         #'NAME': os.path.join(DIR, 'maverick_db'),                     
         'USER': 'rtevans',
         'PASSWORD': '',
         'HOST': 'tacc-stats',         
         'PORT': '5432',               
-        }
-# Uncomment this portion if an xalt database exists
-#    'xalt' : {
-#        'ENGINE' : 'django.db.backends.mysql',
-#        'NAME' : 'xalt',
-#        'USER' : 'xaltUser',
-#        'PASSWORD' : 'kutwgbh',
-#        'HOST' : 'tacc-stats'
-#    }        
+        },
+    # Uncomment this portion if an xalt database exists
+    'xalt' : {
+        'ENGINE' : 'django.db.backends.mysql',
+        'NAME' : 'xalt',
+        'USER' : 'xaltUser',
+        'PASSWORD' : 'kutwgbh',
+        'HOST' : 'tacc-stats'
+        }        
     }
 
 
