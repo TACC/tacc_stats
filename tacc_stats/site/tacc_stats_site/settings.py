@@ -2,7 +2,7 @@
 import os
 DIR = os.path.dirname(os.path.abspath(__file__))
 
-DEBUG = True
+DEBUG = False
 TEMPLATE_DEBUG = DEBUG
 
 ADMINS = (
@@ -22,15 +22,15 @@ DATABASES = {
         'PASSWORD': '',
         'HOST': 'tacc-stats',         
         'PORT': '5432',               
-        }
-# Uncomment this portion if an xalt database exists
-#    'xalt' : {
-#        'ENGINE' : 'django.db.backends.mysql',
-#        'NAME' : 'xalt',
-#        'USER' : 'xaltUser',
-#        'PASSWORD' : 'kutwgbh',
-#        'HOST' : 'tacc-stats'
-#    }        
+        },
+    # Uncomment this portion if an xalt database exists
+    'xalt' : {
+        'ENGINE' : 'django.db.backends.mysql',
+        'NAME' : 'xalt',
+        'USER' : 'xaltUser',
+        'PASSWORD' : 'kutwgbh',
+        'HOST' : 'tacc-stats'
+        }        
     }
 
 
