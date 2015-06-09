@@ -248,7 +248,7 @@ def dates(request, error = False):
     field = {}
     field["machine_name"] = cfg.host_name_ext
 
-    field['date_list'] = sorted(month_dict.iteritems())
+    field['date_list'] = sorted(month_dict.iteritems())[::-1]
     field['error'] = error
     return render_to_response("machine/search.html", field)
 
