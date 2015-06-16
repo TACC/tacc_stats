@@ -21,18 +21,18 @@ double current_time;
 char current_jobid[80] = "-";
 int nr_cpus;
 
-volatile sig_atomic_t g_begin_flag=0;
-volatile sig_atomic_t g_new_flag = 1;
+static volatile sig_atomic_t g_begin_flag=0;
+static volatile sig_atomic_t g_new_flag = 1;
 
-static void signal_handler(int sig) {
-  switch(sig) {    
-  case SIGHUP: 
-    g_begin_flag  = 1;
-    break;
-  case SIGTERM: 
-    g_new_flag  = 1;
-    break;
-  }
+
+static void signal_load_job(int sig)
+{
+  g_begin_flag = 1;
+}
+
+static void signal_stop(int sig)
+{
+  g_new_flag = 1;
 }
 
 static void alarm_handler(int sig)
@@ -193,13 +193,6 @@ int main(int argc, char *argv[])
     cmd_end,
   } cmd;
 
-  // Ensures only one monitord is running at any time on a node
-  lock_fd = open_lock_timeout(STATS_LOCK_PATH, lock_timeout);
-  if (lock_fd < 0) {
-    fprintf(stderr,"cannot acquire lock\n");
-    exit(1);
-  }
-
   nr_cpus = sysconf(_SC_NPROCESSORS_ONLN);
 
   /* Close out the standard file descriptors */
@@ -207,9 +200,23 @@ int main(int argc, char *argv[])
   close(STDOUT_FILENO);
   close(STDERR_FILENO);
 
-  /* Set up signal for terminating daemon */
-  signal(SIGHUP, signal_handler);
-  signal(SIGTERM, signal_handler);
+  /* Set up signal for loading/unloading job */
+  struct sigaction job_action = {
+    .sa_handler = &signal_load_job,
+  };
+  if (sigaction(SIGHUP, &job_action, NULL) < 0) {
+    ERROR("cannot set job signal");
+    goto out;
+  }
+
+  /* Set up signal for rotating data file */
+  struct sigaction stop_action = {
+    .sa_handler = &signal_stop,
+  };
+  if (sigaction(SIGTERM, &stop_action, NULL) < 0) {
+    ERROR("cannot stop tacc_stats daemon cleanly");
+    goto out;
+  }
 
   int enable_all = 1;
   int select_all = (arg_count == 0);
@@ -232,6 +239,16 @@ int main(int argc, char *argv[])
   // Set timer to wait until signal SIGALRM is sent
   alarm(86400);
 
+  // Ensures only one monitord is running at any time on a node
+  lock_fd = open_lock_timeout(STATS_LOCK_PATH, lock_timeout);
+  if (lock_fd < 0) {
+    fprintf(stderr,"cannot acquire lock\n");
+    exit(1);
+  }
+
+  ///////////////////////
+  // START OF MAIN LOOP//
+  ///////////////////////
   while(1) {
 
     /* HUP signal received.  Rotate jobid in or out */
@@ -300,7 +317,8 @@ int main(int argc, char *argv[])
 
     /* On begin set mark to "begin JOBID", and similar for end. */
     if (cmd == cmd_begin) {
-      pscanf(JOBID_FILE_PATH, "%79s", current_jobid);
+      if (pscanf(JOBID_FILE_PATH, "%79s", current_jobid) < 0)
+	ERROR("JOB ID file is missing\n");
       syslog(LOG_INFO, 
 	     "Starting tacc_stats monitoring daemon for jobid %s.\n",
 	     current_jobid);
@@ -316,7 +334,7 @@ int main(int argc, char *argv[])
     /* Send header at start.  Causes receiver to rotate files. */
     if (g_new_flag) {
       if (stats_wr_hdr(&sf) < 0) {
-	fprintf(stderr,"rotate signal failed : %m\n");
+	ERROR("Rotate signal failed : %m\n");
 	rc = 1;
       }
       g_new_flag = 0;
@@ -336,7 +354,7 @@ int main(int argc, char *argv[])
     if (cmd == cmd_end) strcpy(current_jobid, "-");
     cmd = cmd_collect;
 
-    // Sleep for X seconds
+    // Sleep for FREQUENCY seconds
     sleep(FREQUENCY);
   }
 

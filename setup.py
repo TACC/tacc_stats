@@ -263,6 +263,10 @@ if types['ib'] == 'True' or types['ib_sw'] == 'True' or types['ib_ext'] == 'True
     library_dirs=['/opt/ofed/lib64']
     libraries=['ibmad']
 
+if types['mic'] == 'True':
+    library_dirs += ['/usr/lib64']
+    libraries += ['scif', 'micmgmt']
+    
 if types['llite'] == 'True' or types ['lnet'] == 'True' or \
         types['mdc'] == 'True' or types['osc'] == 'True':
     sources.append('tacc_stats/src/monitor/lustre_obd_to_mnt.c')
@@ -407,7 +411,7 @@ chkconfig --add taccstats
 /sbin/service taccstats stop
 chkconfig --del taccstats
 rm /etc/init.d/taccstats
-rmdir %{_bindir}
+rm -rf %{_bindir}
 """
             open(self.post_uninstall,"w").write(post_uninstall_cmds)
 

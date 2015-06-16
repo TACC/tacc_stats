@@ -9,7 +9,7 @@
 PATH=/opt/tacc_stats:/bin:/sbin:/usr/bin
 PID_FILE=/var/lock/tacc_stats_lock
 SERVER=tacc-stats.tacc.utexas.edu
-JOBID_FILE=/var/run/TACC_jobid
+JOBID_FILE=/var/run/JOBID
 
 status() {
     pid_status
