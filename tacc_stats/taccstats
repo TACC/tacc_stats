@@ -47,9 +47,15 @@ job_status() {
 start() {
     pid_status quiet
     if [ $RETVAL = 0 ] ; then 
+<<<<<<< HEAD
 	echo "starting tacc_statsd"
 	tacc_statsd -s ${SERVER}
 #	sleep 0.1
+=======
+	echo "starting tacc_stats_monitord"
+	tacc_stats_monitord -s ${SERVER}
+	sleep 0.1
+>>>>>>> 6990bfd41f3c9465a2fbceb2b45b0ab06407fd28
     fi
 }
 	
@@ -98,8 +104,12 @@ begin() {
 	echo "Loading Job ID $1 to tacc_statsd"
 	echo $1 > $JOBID_FILE
 	cat ${PID_FILE} | kill -HUP `awk '{print $1}'`	
+<<<<<<< HEAD
 
 #	sleep 0.1
+=======
+	sleep 0.1
+>>>>>>> 6990bfd41f3c9465a2fbceb2b45b0ab06407fd28
     else
 	echo "Job ID `cat $JOBID_FILE` is currently loaded"
     fi

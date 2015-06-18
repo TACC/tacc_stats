@@ -50,7 +50,7 @@ currently three modes available:
 To install TACC Stats on the machine where data will be analyzed do the following:
 ~~~
     $ git clone https://github.com/TACC/tacc_stats
-    $ pip install --user -e tacc_stats
+    $ pip install --user -e tacc_stats/
 ~~~
 
 Scripts and executables will be installed in 

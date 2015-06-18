@@ -49,7 +49,7 @@ start() {
     if [ $RETVAL = 0 ] ; then 
 	echo "starting tacc_statsd"
 	tacc_statsd -s ${SERVER}
-#	sleep 0.1
+	sleep 0.1
     fi
 }
 	
@@ -98,8 +98,7 @@ begin() {
 	echo "Loading Job ID $1 to tacc_statsd"
 	echo $1 > $JOBID_FILE
 	cat ${PID_FILE} | kill -HUP `awk '{print $1}'`	
-
-#	sleep 0.1
+	sleep 0.1
     else
 	echo "Job ID `cat $JOBID_FILE` is currently loaded"
     fi
