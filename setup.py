@@ -33,11 +33,11 @@ TACC Stats unifies and extends the measurements taken by Linux monitoring utilit
 """
 
 DISTNAME = 'tacc_stats'
-LICENSE = 'BSD'
+LICENSE = 'LGPL'
 AUTHOR = "Texas Advanced Computing Center"
 EMAIL = "rtevans@tacc.utexas.edu"
 URL = "http://www.tacc.utexas.edu"
-DOWNLOAD_URL = ''
+DOWNLOAD_URL = 'https://github.com/TACC/tacc_stats'
 CLASSIFIERS = [
     'Development Status :: 1 - Beta',
     'Environment :: Console',
@@ -55,7 +55,7 @@ CLASSIFIERS = [
 
 MAJOR = 2
 MINOR = 1
-MICRO = 0
+MICRO = 1
 ISRELEASED = True
 VERSION = '%d.%d.%d' % (MAJOR, MINOR, MICRO)
 QUALIFIER = ''
@@ -121,12 +121,6 @@ short_version = '%s'
 
 if write_version:
     write_version_py()
-
-if '--monitor-only' in sys.argv:
-    MONITOR_ONLY = True
-    sys.argv.remove('--monitor-only')
-else:
-    MONITOR_ONLY = False
 
 def read_site_cfg():
     config = ConfigParser.ConfigParser()
@@ -347,24 +341,19 @@ python setup.py build_ext
         self.install_script = "build/bdist_rpm_install"
         install_cmds = """
 install -m 0755 -d %{buildroot}/%{_bindir}
-install -m 6755 build/bin/monitord %{buildroot}/%{_bindir}/%{name}_monitord
-echo %{_bindir}/%{name}_monitord >> %{_builddir}/%{name}-%{unmangled_version}/INSTALLED_FILES
+install -m 6755 build/bin/monitor %{buildroot}/%{_bindir}/%{name}
+echo %{_bindir}/%{name} >> %{_builddir}/%{name}-%{unmangled_version}/INSTALLED_FILES
 """
         if MODE == "CRON":
             install_cmds += """
-install -m 0755 tacc_stats/archive.sh %{buildroot}/%{_bindir}/%{name}_archive
-echo %{_bindir}/%{name}_archive >> %{_builddir}/%{name}-%{unmangled_version}/INSTALLED_FILES
+install -m 0755 tacc_stats/archive.sh %{buildroot}/%{_bindir}/archive
+echo %{_bindir}/archive >> %{_builddir}/%{name}-%{unmangled_version}/INSTALLED_FILES
 """
-        else:
+        if MODE == "DAEMON":
             install_cmds += """
 install -m 0755 tacc_stats/taccstats %{buildroot}/%{_bindir}/taccstats
 echo %{_bindir}/taccstats >> %{_builddir}/%{name}-%{unmangled_version}/INSTALLED_FILES
 """
-        if RMQ: 
-            install_cmds += """
-install -m 0755 build/bin/amqp_listend %{buildroot}/%{_bindir}/%{name}_listend
-echo %{_bindir}/%{name}_listend >> %{_builddir}/%{name}-%{unmangled_version}/INSTALLED_FILES
-"""     
         open(self.install_script,"w").write(install_cmds)
 
         self.clean_script = None
@@ -378,8 +367,8 @@ echo %{_bindir}/%{name}_listend >> %{_builddir}/%{name}-%{unmangled_version}/INS
  archive_min=$(( ((RANDOM * 60) / 32768) %% 60 ))
  archive_hour=$(( (RANDOM %% 2) + 2 ))
  echo \"MAILTO=\\"\\"\"
- echo \"*/10 * * * * root %{_bindir}/%{name}_monitord collect %{server}\"
- echo \"55 23 * * * root %{_bindir}/%{name}_monitord  rotate %{server}\"
+ echo \"*/10 * * * * root %{_bindir}/%{name} collect %{server}\"
+ echo \"55 23 * * * root %{_bindir}/%{name} rotate %{server}\"
 """
             self.pre_uninstall = "build/bdist_rpm_preuninstall"
             open(self.pre_uninstall,"w").write("""
@@ -387,15 +376,14 @@ if [ $1 == 0 ]; then
 rm %{crontab_file} || :
 fi
 """)
-
             if not RMQ:
                 post_install_cmds += """
- echo \"${archive_min} ${archive_hour} * * * root %{_bindir}/%{name}_archive %{stats_dir} %{archive_dir}\"
+echo \"${archive_min} ${archive_hour} * * * root %{_bindir}/archive %{stats_dir} %{archive_dir}\"
 """
             post_install_cmds += """
 ) > %{crontab_file}
 /sbin/service crond restart || :
-%{_bindir}/%{name}_monitord rotate %{server}
+%{_bindir}/%{name} rotate %{server}
 """
         if MODE == "DAEMON":
             post_install_cmds = """
@@ -405,15 +393,18 @@ chkconfig --add taccstats
 """
         open(self.post_install,"w").write(post_install_cmds)
         self.pre_install = None
+
+        self.post_uninstall = "build/bdist_rpm_post_uninstall"
         if MODE == "DAEMON":
-            self.post_uninstall = "build/bdist_rpm_post_uninstall"
             post_uninstall_cmds = """
 /sbin/service taccstats stop
 chkconfig --del taccstats
 rm /etc/init.d/taccstats
+"""
+        post_uninstall_cmds = """
 rm -rf %{_bindir}
 """
-            open(self.post_uninstall,"w").write(post_uninstall_cmds)
+        open(self.post_uninstall,"w").write(post_uninstall_cmds)
 
 # Make executable
 # C extensions
@@ -457,7 +448,7 @@ class MyBuildExt(build_ext):
                                  'monitor','amqp_listen.o'))
 
         self.compiler.link_executable(objects, 
-                                      'build/bin/monitord',
+                                      'build/bin/monitor',
                                       libraries=ext.libraries,
                                       library_dirs=ext.library_dirs,
                                       runtime_library_dirs=ext.runtime_library_dirs,
@@ -482,74 +473,47 @@ if MODE == "DAEMON":
     cfg_sh(pjoin(os.path.dirname(__file__), 'tacc_stats',
                  'src','monitor','taccstats.in'),dict(paths.items()+options.items()))
 
-if MONITOR_ONLY:
-    scripts=['build/bin/monitord']
 
-    if MODE == "CRON":
-        scripts += ['tacc_stats/archive.sh']
-        package_data = {'' : ['*.sh.in'] },
-    else:
-        scripts += ['tacc_stats/taccstats']
-        package_data = {'' : ['taccstats.in']}
-    setup(name=DISTNAME,
-          version=FULLVERSION,
-          maintainer=AUTHOR,
-          packages=['tacc_stats/src/monitor'],
-          package_data = package_data,
-          scripts=scripts,
-          ext_modules=extensions,
-          maintainer_email=EMAIL,
-          description=DESCRIPTION,
-          zip_safe=False,
-          license=LICENSE,
-          cmdclass={'build_ext' : MyBuildExt, 
-                    'clean' : CleanCommand,
-                    'bdist_rpm' : MyBDist_RPM},
-          url=URL,
-          download_url=DOWNLOAD_URL,
-          long_description=LONG_DESCRIPTION,
-          classifiers=CLASSIFIERS,
-          platforms='any',
-          **setuptools_kwargs)
+scripts=['build/bin/monitord',             
+         'tacc_stats/analysis/job_sweeper.py',
+         'tacc_stats/analysis/job_plotter.py',
+         'tacc_stats/site/machine/update_db.py',
+         'tacc_stats/site/machine/update_thresholds.py',
+         'tacc_stats/site/machine/thresholds.cfg',
+         'tacc_stats/pickler/job_pickles.py']
+
+if RMQ: scripts += ['build/bin/amqp_listend']
+if MODE == "CRON":
+    scripts += ['tacc_stats/archive.sh']
+    package_data = {'' : ['*.sh.in'] },
 else:
-    scripts=['build/bin/monitord',             
-             'tacc_stats/analysis/job_sweeper.py',
-             'tacc_stats/analysis/job_plotter.py',
-             'tacc_stats/site/machine/update_db.py',
-             'tacc_stats/site/machine/update_thresholds.py',
-             'tacc_stats/site/machine/thresholds.cfg',
-             'tacc_stats/pickler/job_pickles.py']
-    if RMQ: scripts += ['build/bin/amqp_listend']
-    if MODE == "CRON":
-        scripts += ['tacc_stats/archive.sh']
-        package_data = {'' : ['*.sh.in'] },
-    else:
-        scripts += ['tacc_stats/taccstats']
+    DISTNAME += "d"
+    scripts += ['tacc_stats/taccstats']
 
-    setup(name=DISTNAME,
-          version=FULLVERSION,
-          maintainer=AUTHOR,
-          package_dir={'':'.'},
-          packages=find_packages(),
-          package_data = {'' : ['*.in','*.cfg','*.html','*.png','*.jpg','*.h'] },
-          scripts=scripts,
-          ext_modules=extensions,
-          setup_requires=['nose'],
-          install_requires=['argparse','numpy','matplotlib','scipy'],
-          test_suite = 'nose.collector',
-          maintainer_email=EMAIL,
-          description=DESCRIPTION,
-          zip_safe=False,
-          license=LICENSE,
-          cmdclass={'build_ext' : MyBuildExt, 
-                    'clean' : CleanCommand,
-                    'bdist_rpm' : MyBDist_RPM},
-          url=URL,
-          download_url=DOWNLOAD_URL,
-          long_description=LONG_DESCRIPTION,
-          classifiers=CLASSIFIERS,
-          platforms='any',
-          **setuptools_kwargs)
+setup(name=DISTNAME,
+      version=FULLVERSION,
+      maintainer=AUTHOR,
+      package_dir={'':'.'},
+      packages=find_packages(),
+      package_data = {'' : ['*.in','*.cfg','*.html','*.png','*.jpg','*.h'] },
+      scripts=scripts,
+      ext_modules=extensions,
+      setup_requires=['nose'],
+      install_requires=['argparse','numpy','matplotlib','scipy'],
+      test_suite = 'nose.collector',
+      maintainer_email=EMAIL,
+      description=DESCRIPTION,
+      zip_safe=False,
+      license=LICENSE,
+      cmdclass={'build_ext' : MyBuildExt, 
+                'clean' : CleanCommand,
+                'bdist_rpm' : MyBDist_RPM},
+      url=URL,
+      download_url=DOWNLOAD_URL,
+      long_description=LONG_DESCRIPTION,
+      classifiers=CLASSIFIERS,
+      platforms='any',
+      **setuptools_kwargs)
 
 for name,path in paths.iteritems():
     if os.path.exists(path): print ">>>", path, 'exists'

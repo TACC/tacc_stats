@@ -6,7 +6,7 @@
 # Source function library
 . /etc/init.d/functions
 
-PATH=exe_path:/bin:/sbin:/usr/bin
+PATH=/opt/tacc_statsd:/bin:/sbin:/usr/bin
 PID_FILE=stats_lock
 SERVER=server
 JOBID_FILE=jobid_file
@@ -17,14 +17,14 @@ status() {
 }
 
 pid_status() {
-    if pidof tacc_stats_monitord > /dev/null; then
+    if pidof tacc_statsd > /dev/null; then
 	if [ "$1" != "quiet" ] ; then
-	    echo "tacc_stats_monitord is running"
+	    echo "tacc_statsd is running"
 	fi
 	RETVAL=1
     else
 	if [ "$1" != "quiet" ] ; then 
-	    echo "tacc_stats_monitord is not running"	
+	    echo "tacc_statsd is not running"	
 	fi
 	RETVAL=0		   
     fi
@@ -47,19 +47,20 @@ job_status() {
 start() {
     pid_status quiet
     if [ $RETVAL = 0 ] ; then 
-	echo "starting tacc_stats_monitord"
-	tacc_stats_monitord -s ${SERVER}
+	echo "starting tacc_statsd"
+	tacc_statsd -s ${SERVER}
+#	sleep 0.1
     fi
 }
 	
 stop() {
     pid_status quiet
     if [ $RETVAL = 1 ] ; then 
-	echo "stopping tacc_stats_monitord"
+	echo "stopping tacc_statsd"
         cat ${PID_FILE} | kill -9 `awk '{print $1}'`	
        	rm -f ${PID_FILE}
     else
-	echo "no instance of tacc_stats_monitord running"
+	echo "no instance of tacc_statsd running"
     fi
     if [ -e $JOBID_FILE ] ; then
 	rm -f $JOBID_FILE
@@ -74,17 +75,17 @@ restart() {
 rotate() {
    pid_status quiet
    if [ $RETVAL = 1 ] ; then 
-       echo "rotating tacc_stats_monitord"
+       echo "rotating tacc_statsd"
        cat ${PID_FILE} | kill `awk '{print $1}'`	
    else
-       echo "no instance of tacc_stats_monitord running"
+       echo "no instance of tacc_statsd running"
    fi
 }
 
 begin() {
     pid_status quiet
     if [ $RETVAL = 0 ] ; then 
-	echo "No tacc_stats_monitord running"
+	echo "No tacc_statsd running"
 	exit 0
     fi
     if [ -z "$1" ] ; then
@@ -94,9 +95,11 @@ begin() {
 
     job_status quiet
     if [ $RETVAL = 0 ] ; then 
-	echo "Loading Job ID $1 to tacc_stats_monitord"
+	echo "Loading Job ID $1 to tacc_statsd"
 	echo $1 > $JOBID_FILE
 	cat ${PID_FILE} | kill -HUP `awk '{print $1}'`	
+
+#	sleep 0.1
     else
 	echo "Job ID `cat $JOBID_FILE` is currently loaded"
     fi
@@ -105,13 +108,13 @@ begin() {
 end() {
     pid_status quiet
     if [ $RETVAL = 0 ] ; then 
-	echo "No tacc_stats_monitord running"
+	echo "No tacc_statsd running"
 	exit 0
     fi
 
     job_status quiet
     if [ $RETVAL = 1 ] ; then 
-	echo "unloading Job ID `cat ${JOBID_FILE}` from tacc_stats_monitord"
+	echo "unloading Job ID `cat ${JOBID_FILE}` from tacc_statsd"
 	cat ${PID_FILE} | kill -HUP `awk '{print $1}'`	
 	rm -f ${JOBID_FILE}
     else

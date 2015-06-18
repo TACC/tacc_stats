@@ -24,19 +24,13 @@ int nr_cpus;
 static volatile sig_atomic_t g_begin_flag=0;
 static volatile sig_atomic_t g_new_flag = 1;
 
+static void alarm_handler(int sig)
+{
+}
 
 static void signal_load_job(int sig)
 {
   g_begin_flag = 1;
-}
-
-static void signal_stop(int sig)
-{
-  g_new_flag = 1;
-}
-
-static void alarm_handler(int sig)
-{
 }
 
 static void alarm_rotate(int sig)
@@ -140,12 +134,25 @@ int main(int argc, char *argv[])
     exit(EXIT_FAILURE);
   }
 
+  // This block will force begin to wait until initialization is complete
+  sigset_t mask;
+  sigemptyset(&mask);
+  sigaddset(&mask, SIGHUP);
+  sigprocmask(SIG_BLOCK, &mask, NULL);
+
   /* Daemon Specific initialization */
   int lock_fd = -1;
   int lock_timeout = 30;
   char *host = NULL;
   char *port = NULL;
   int rc = 0;
+
+  // Ensures only one monitord is running at any time on a node
+  lock_fd = open_lock_timeout(STATS_LOCK_PATH, lock_timeout);
+  if (lock_fd < 0) {
+    ERROR("cannot acquire lock\n");
+    exit(1);
+  }
 
   struct option opts[] = {
     { "help", 0, 0, 'h' },
@@ -200,24 +207,6 @@ int main(int argc, char *argv[])
   close(STDOUT_FILENO);
   close(STDERR_FILENO);
 
-  /* Set up signal for loading/unloading job */
-  struct sigaction job_action = {
-    .sa_handler = &signal_load_job,
-  };
-  if (sigaction(SIGHUP, &job_action, NULL) < 0) {
-    ERROR("cannot set job signal");
-    goto out;
-  }
-
-  /* Set up signal for rotating data file */
-  struct sigaction stop_action = {
-    .sa_handler = &signal_stop,
-  };
-  if (sigaction(SIGTERM, &stop_action, NULL) < 0) {
-    ERROR("cannot stop tacc_stats daemon cleanly");
-    goto out;
-  }
-
   int enable_all = 1;
   int select_all = (arg_count == 0);
   
@@ -228,28 +217,39 @@ int main(int argc, char *argv[])
   syslog(LOG_INFO, 
 	 "Starting tacc_stats monitoring daemon.\n");
 
-  // Setup alarm to notify when to rotate (every 24hrs)
+  // Setup rotation handler alarm_action
   struct sigaction alarm_action = {
     .sa_handler = &alarm_rotate,
   };
+  // SIGALRM for auto rotation
   if (sigaction(SIGALRM, &alarm_action, NULL) < 0) {
     ERROR("cannot set alarm rotate handler: %m\n");
     goto out;
   }
-  // Set timer to wait until signal SIGALRM is sent
+  // SIGTERM for manual rotation
+  if (sigaction(SIGTERM, &alarm_action, NULL) < 0) {
+    ERROR("cannot set manual rotation handler.");
+    goto out;
+  }
+  // Set timer to send SIGALRM  (every 24hrs)
   alarm(86400);
 
-  // Ensures only one monitord is running at any time on a node
-  lock_fd = open_lock_timeout(STATS_LOCK_PATH, lock_timeout);
-  if (lock_fd < 0) {
-    fprintf(stderr,"cannot acquire lock\n");
-    exit(1);
+  // Setup job loading/unloading handler job_action
+  struct sigaction job_action = {
+    .sa_handler = &signal_load_job,
+  };
+  // SIGHUP for job loading/unloading
+  if (sigaction(SIGHUP, &job_action, NULL) < 0) {
+    ERROR("cannot set job loading/unloading signal");
+    goto out;
   }
 
   ///////////////////////
   // START OF MAIN LOOP//
   ///////////////////////
   while(1) {
+    
+    sigprocmask(SIG_BLOCK, &mask, NULL);
 
     /* HUP signal received.  Rotate jobid in or out */
     if (g_begin_flag) {
@@ -355,6 +355,8 @@ int main(int argc, char *argv[])
     cmd = cmd_collect;
 
     // Sleep for FREQUENCY seconds
+    sigprocmask(SIG_UNBLOCK, &mask, NULL);
+    if (g_begin_flag) { continue;}
     sleep(FREQUENCY);
   }
 
