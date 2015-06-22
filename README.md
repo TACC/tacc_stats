@@ -3,38 +3,43 @@ tacc_stats Documentation               {#mainpage}
 
 Authors
 -------
+R. Todd Evans  (<mailto:rtevans@tacc.utexas.edu>) 
 Bill Barth     (<mailto:bbarth@tacc.utexas.edu>)    
-R. Todd Evans  (<mailto:rtevans@tacc.utexas.edu>)  
+ 
 
 
-Executive Summary
+Description
 -----------------
-The tacc_stats repository consists of four complementary modules:
+The tacc_stats package provides the tools to monitor resource usage of HPC systems at multiple levels of resolution.
 
-1. `monitor` is a job-oriented and logically structured version of the conventional sysstat system monitor. 
+The package is organized into four heirarchical modules.  The core of the package is the `monitor` module.  This module collects data from the compute nodes.  It produces raw text files that may then be processed by the `pickler` module.
+The `pickler` module processes the raw node-level text files into a single binary Python pickle file for each job.  The pickle files may then be tested and plotted by the `analysis` module.  Finally, the `site` module ingests data from the pickle files and `analysis` module's tests into a database that may be queried using a web interface.  Additional details for each module follow:
 
-2. `pickler` is a Python module that collects the node-based raw stats 
-data into job-based pickled Python dictionaries.
+1. `monitor` is an automatic node-level system monitor that collects resource usage data from hardware performance counters and the /proc filesystem.  It can be set up to operate in two different modes.  The first mode is driven by `cron` and relies on copies over the shared file-system to aggregate data.  The second mode operates as a daemon and is controlled by the `/etc/init.d/taccstats` script.  Both versions require a signal inidicating the start and end of each job.  This is accomplished at TACC using the prolog and epilog scripts that are run by the job scheduler at the start and end of each job. 
 
-3. `analysis` is a Python module that runs over a job list performing tests, computing metrics, and 
-generating plots. 
+2. `pickler` is a Python module that processes the node-level data into job-level pickled Python dictionaries.  It attempts to clean the data by handling counter overflow and standarding units of measurement.  It also translates chip event codes (in hex) to human readable event names.  
 
-4. `site` is a Python module based on Django that builds a database and 
+3. `analysis` is a Python module that performs tests, computes metrics, and generates plots on jobs or groups of jobs. 
+
+4. `site` is a Python module built on Django that builds a database and 
 website that allows exploration and visualization of data at the job, user, project, application, and/or system level.
-It interfaces with a Postgres Database and optionally an XALT Database (https://github.com/Fahey-McLay).
+It interfaces with a Postgres Database and optionally an XALT Database (https://github.com/Fahey-McLay).  Tests are automatically applied daily to all jobs.  These tests attempt to identify jobs that were distressed or performing in a sub-optimal manner.  Plots are also generated on the fly to represent data at several levels.  
 
 Code Access
 -----------
-To get access to the tacc_stats source code 
+To get access to the tacc_stats source code clone this repository:
 
     git clone https://github.com/TACC/tacc_stats
 
 
 ----------------------------------------------------------------------------
 
-Building
+Building tacc_stats
 --------
-### Quickstart
+
+### `monitor` module
+
+
 These commands quickly build and install the TACC Stats package into your
 '~/.local/' directory.  You should customize the tacc_stats/setup.cfg file
 for your site specific paths and devices.  The modality of TACC Stats is 
