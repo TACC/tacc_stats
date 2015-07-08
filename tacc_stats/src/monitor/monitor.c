@@ -151,7 +151,7 @@ int main(int argc, char *argv[])
   lock_fd = open_lock_timeout(STATS_LOCK_PATH, lock_timeout);
   if (lock_fd < 0) {
     ERROR("cannot acquire lock\n");
-    exit(1);
+    exit(EXIT_FAILURE);
   }
 
   struct option opts[] = {
@@ -363,5 +363,5 @@ int main(int argc, char *argv[])
  out:
     return rc;
     
-    exit(EXIT_SUCCESS);
+    exit(EXIT_FAILURE);
 }

@@ -116,8 +116,8 @@ int filter(const struct dirent *dir)
   strcat(path, dir->d_name);
 
   if (stat(path, &dirinfo) < 0) {
-    perror("processdir() ==> stat()");
-    exit(EXIT_FAILURE);
+    ERROR("processdir() ==> stat()");
+    return -1;
   }
   pwd = getpwuid(dirinfo.st_uid);
   return !fnmatch("[1-9]*", dir->d_name, 0) && ( 0 != dirinfo.st_uid && 68 != dirinfo.st_uid && strcmp("postfix", pwd->pw_name) && strcmp("rpc", pwd->pw_name) && strcmp("rpcuser", pwd->pw_name) && strcmp("dbus", pwd->pw_name) && strcmp("daemon", pwd->pw_name) && strcmp("ntp", pwd->pw_name)); 
@@ -131,7 +131,7 @@ static void proc_collect(struct stats_type *type)
 
   n = scandir("/proc", &namelist, filter, 0);
   if (n < 0)
-    perror("Not enough memory.");
+    ERROR("Not enough memory.");
   else {
     while(n--) {
       proc_collect_pid(type, namelist[n]->d_name);
