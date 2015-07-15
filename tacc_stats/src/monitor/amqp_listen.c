@@ -110,10 +110,10 @@ int consume(const char *hostname, const char* port, const char* archive_dir)
 	line = wsep(&data_buf);
 	hostname = wsep(&data_buf);
       }	
-      free(tmp_buf);
+
       // Make directory for host hostname if it doesn't exist
       char *stats_dir_path = strf("%s/%s",archive_dir,hostname);
-
+      free(tmp_buf);
       if (mkdir(stats_dir_path, 0777) < 0) {
 	if (errno != EEXIST)
 	  syslog(LOG_ERR, "cannot create directory `%s': %m\n", stats_dir_path);
