@@ -211,15 +211,17 @@ in CRON mode
 
 and
 
-`tacc_stats end $JOBID`
+`tacc_stats end $JOBID`    
 `echo 0 > jobid_file`
 
 and in DAEMON mode
 
-`service taccstats start`
-`service taccstats begin $JOBID`
+`service taccstats start`    
+`service taccstats begin $JOBID`  
+
 and
-`service taccstats end $JOBID`
+
+`service taccstats end`  
 
 respectively.  To perform the pickling of this data it is also necessary to
 generate an accounting file that contains at least the JOBID and time range
