@@ -393,7 +393,7 @@ chkconfig --add taccstats
 """
         open(self.post_install,"w").write(post_install_cmds)
         self.pre_install = None
-
+        
         self.post_uninstall = "build/bdist_rpm_post_uninstall"
         if MODE == "DAEMON":
             post_uninstall_cmds = """
@@ -401,9 +401,9 @@ chkconfig --add taccstats
 chkconfig --del taccstats
 rm /etc/init.d/taccstats
 """
-        post_uninstall_cmds = """
-rm -rf %{_bindir}
-"""
+        post_uninstall_cmds = """ """
+#rm -rf %{_bindir}
+#"""
         open(self.post_uninstall,"w").write(post_uninstall_cmds)
 
 # Make executable
