@@ -94,6 +94,7 @@ class Test(object):
 
   # Sets up particular combination of events and filters
   def setup(self,job_path,job_data=None):
+
     try:
       if self.aggregate:
         self.ts=tspl.TSPLSum(job_path,self.k1,self.k2,job_data=job_data)

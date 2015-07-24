@@ -211,22 +211,24 @@ in CRON mode
 
 and
 
-`tacc_stats end $JOBID`
+`tacc_stats end $JOBID`    
 `echo 0 > jobid_file`
 
 and in DAEMON mode
 
-`service taccstats start`
-`service taccstats begin $JOBID`
+`service taccstats start`    
+`service taccstats begin $JOBID`  
+
 and
-`service taccstats end $JOBID`
+
+`service taccstats end`  
 
 respectively.  To perform the pickling of this data it is also necessary to
 generate an accounting file that contains at least the JOBID and time range
 that the job ran.  The pickling will currently work without modification on
 SGE job schedulers.  It will also work on any accounting file with the format
 
-`$JOBID : UID : Project ID : Junk : Start time : End time : Time place in queue : SLURM partition : Junk : Job name : Job completion status : Nodes : Cores`
+`Job ID ($JOBID) : User ID ($UID) : Project ID ($ACCOUNT) : Junk ($BATCH) : Start time ($START) : End time ($END) : Time job entered in queue ($SUBMIT) : SLURM partition ($PARTITION) : Requested Time ($LIMIT) : Job name ($JOBNAME) : Job completion status ($JOBSTATE) : Nodes ($NODECNT) : Cores ($PROCS)`
 
 for each record using the SLURM interface (set by the `batch_system` field in the site-specific configuration file).  In addition to the accounting file, a directory of host-file logs (hosts belonging to a particular job) must be
 generated. The host file directories should have the form

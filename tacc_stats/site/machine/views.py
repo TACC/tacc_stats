@@ -45,6 +45,7 @@ def update_comp_info(thresholds = None):
                   'VecPercent' : ['VecPercent','<',0.05],
                   'GigEBW' : ['GigEBW','>',1e7],
                   'CPU_Usage' : ['CPU_Usage','<',800],
+                  'MIC_Usage' : ['MIC_Usage','>',0.0],
                   'Load_All' : ['Load_All','<',1e7],
                   }
     if thresholds:
@@ -72,10 +73,10 @@ def update(date,rerun=False):
         print "Number of pickle files in",root,'=',num_files
         for pickle_file in sorted(pickle_files):
             ctr += 1
+            print pickle_file
             try:
                 if rerun: pass
                 elif Job.objects.filter(id = pickle_file).exists(): 
-                    print pickle_file,' exists'
                     continue                
             except:
                 print pickle_file,"doesn't look like a pickled job"
@@ -118,8 +119,9 @@ def update(date,rerun=False):
                     json['exe']     = xd.exec_path.split('/')[-1][0:128]
                     json['exec_path'] = xd.exec_path
                     json['cwd']     = xd.cwd[0:128]
-                    json['threads'] = xd.num_threads                    
-                except: pass
+                    json['threads'] = xd.num_threads
+                except: xd = False 
+                    
                 obj, created = Job.objects.update_or_create(**json)
                 for host_name in hosts:
                     h = Host(name=host_name)
@@ -127,7 +129,6 @@ def update(date,rerun=False):
                     h.jobs.add(obj)
 
                 if xd:
-                    print obj.exec_path
                     for join in join_run_object.objects.using('xalt').filter(run_id = xd.run_id):
                         try:
                             object_path = lib.objects.using('xalt').get(obj_id = join.obj_id).object_path
@@ -163,6 +164,7 @@ def update_metric_fields(date,rerun=False):
     aud.stage(exam.LowFLOPS, ignore_qs=[], min_time = 0)
     aud.stage(exam.VecPercent, ignore_qs=[], min_time = 0)
     aud.stage(exam.CPU_Usage, ignore_qs = [], min_time = 0)
+    aud.stage(exam.MIC_Usage, ignore_qs = [], min_time = 0)
     aud.stage(exam.Load_All, ignore_qs = [], min_time = 0)
 
     print 'Run the following tests for:',date
@@ -174,8 +176,8 @@ def update_metric_fields(date,rerun=False):
     jobs_list = Job.objects.filter(date = date).exclude(run_time__lt = 0)
 
     # Use mem to see if job was tested.  It will always exist
-    if not rerun:
-        jobs_list = jobs_list.filter(Load_L1Hits = None)
+    #if not rerun:
+        #jobs_list = jobs_list.filter(Load_L1Hits = None)
     
     paths = []
     for job in jobs_list:
@@ -416,12 +418,15 @@ def master_plot(request, pk):
 def heat_map(request, pk):    
     data = get_data(pk)
     hm = plots.HeatMap(k1={'intel_snb' : ['intel_snb','intel_snb'],
-                           'intel_hsw' : ['intel_hsw','intel_hsw']
+                           'intel_hsw' : ['intel_hsw','intel_hsw'],
+                           'intel_pmc3' : ['intel_pmc3','intel_pmc3']
                            },
                        k2={'intel_snb' : ['CLOCKS_UNHALTED_REF', 
                                           'INSTRUCTIONS_RETIRED'],
                            'intel_hsw' : ['CLOCKS_UNHALTED_REF', 
-                                          'INSTRUCTIONS_RETIRED']
+                                          'INSTRUCTIONS_RETIRED'],
+                           'intel_pmc3' : ['CLOCKS_UNHALTED_REF', 
+                                           'INSTRUCTIONS_RETIRED']                           
                            },
                        lariat_data="pass")
     hm.plot(pk,job_data=data)
@@ -451,7 +456,7 @@ class JobDetailView(DetailView):
                 '==': operator.eq}
         
         
-
+        print ">>>>>>>>>>>>>>>>>>>>>>>>"
         testinfo_dict = {}
         for obj in TestInfo.objects.all():
             obj.test_name,
@@ -459,10 +464,10 @@ class JobDetailView(DetailView):
             test = test_type(min_time=0,ignore_qs=[])
             try: 
                 metric = test.test(job.path,data)
+                print metric
                 if not metric: continue            
                 setattr(job,obj.field_name,metric)
                 result = comp[obj.comparator](metric, obj.threshold)
-                
                 if result: string = 'Failed'
                 else: string = 'Passed'
                 testinfo_dict[obj.test_name] = (metric,obj.threshold,string)
@@ -512,9 +517,13 @@ def type_plot(request, pk, type_name):
     schema = [x.split(',')[0] for x in schema]
 
     k1 = {'intel_snb' : [type_name]*len(schema),
-          'intel_hsw' : [type_name]*len(schema)}
+          'intel_hsw' : [type_name]*len(schema),
+          'intel_pmc3' : [type_name]*len(schema)
+          }
     k2 = {'intel_snb': schema,
-          'intel_hsw': schema}
+          'intel_hsw': schema,
+          'intel_pmc3': schema
+          }
 
     tp = plots.DevPlot(k1=k1,k2=k2,lariat_data='pass')
     tp.plot(pk,job_data=data)

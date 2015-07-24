@@ -45,6 +45,7 @@ class Job(models.Model):
     Load_L2Hits = models.BigIntegerField(null=True)
     Load_LLCHits = models.BigIntegerField(null=True)
     CPU_Usage = models.FloatField(null=True)
+    MIC_Usage = models.FloatField(null=True)
 
     def __unicode__(self):
         return str(self.id)
