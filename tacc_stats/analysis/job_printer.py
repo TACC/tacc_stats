@@ -3,9 +3,22 @@ import sys, os
 import cPickle as pickle
 from datetime import datetime
 from tacc_stats import cfg as cfg
+from tacc_stats.pickler import batch_acct,job_stats
 
 def main(**args):
-    with open(args['file']) as fd:
+
+    acct = batch_acct.factory(cfg.batch_system,
+                              cfg.acct_path,
+                              cfg.host_name_ext)
+
+    reader = acct.find_jobids(args['jobid']).next()
+    
+    date_dir = os.path.join(cfg.pickles_dir,
+                            datetime.fromtimestamp(reader['end_time']).strftime('%Y-%m-%d'))
+    pickle_file = os.path.join(date_dir, reader['id'])
+
+
+    with open(pickle_file) as fd:
         data = pickle.load(fd)
 
     print "Hosts:", data.hosts.keys()    

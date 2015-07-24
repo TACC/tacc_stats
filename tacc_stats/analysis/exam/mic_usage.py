@@ -1,22 +1,24 @@
 from exams import Test
 
-class MICUsage(Test):
-  k1 = ['ib_sw', 'net']      
-  k2 = ['scif0/1','mic0' ]
+class MIC_Usage(Test):
+  k1 = ['mic']      
+  k2 = ['user_sum']
   comp_operator = '>'
-  aggregate = False
   
   def compute_metric(self):
-    data = {}
-    data1 = 0
+
+    total = 0.0
+    user_total = 0.0
+    self.metric = 0.0
     for hostn,host in self.ts.j.hosts.iteritems():
-      data[hostn] = host.get_stats('net','mic0','rx_bytes')#+host.get_stats('net','mic0','tx_bytes')]
-      if len(data[hostn]) > 2:
-        data1 += data[hostn][-2]-data[hostn][0]
+      user = host.get_stats('mic','0','user_sum')[0:-1]
+      jiffy = host.get_stats('mic','0','jiffy_counter')[0:-1]
 
-    if data1 > 1000: print self.ts.j.acct,data1
+      if len(jiffy) < 2: return
+      total += jiffy[-1] - jiffy[0]
+      user_total += user[-1] - user[0]
 
-    self.metric = data1#self.arc(data)
-
-    
+    if total > 0 and total < 1e15:
+        self.metric = user_total/float(244*total)
+        print self.metric
     return

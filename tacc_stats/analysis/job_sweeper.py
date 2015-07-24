@@ -79,7 +79,8 @@ def test_report(auditor, test_type):
         for job in user[1]:
             if job[3]: 
                 job_paths.append(auditor.paths[job[0]])
-                test_report += "=>{0} {1:0.2f} {2:0.2f}\n".format(job[0],
+                print job
+                test_report += "=>{0} {1:0.2f} {2}\n".format(job[0],
                                                                   job[1],
                                                                   job[2])
         print(test_report)

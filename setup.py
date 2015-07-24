@@ -474,7 +474,7 @@ if MODE == "DAEMON":
                  'src','monitor','taccstats.in'),dict(paths.items()+options.items()))
 
 
-scripts=['build/bin/monitord',             
+scripts=['build/bin/monitor',             
          'tacc_stats/analysis/job_sweeper.py',
          'tacc_stats/analysis/job_plotter.py',
          'tacc_stats/site/machine/update_db.py',
