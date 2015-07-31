@@ -1,25 +1,29 @@
 from exams import Test
 
+# Compute host- and time-averaged MIC user fraction
+
+# Single mic usage < 1
+# Double mic usage < 2
+
 class MIC_Usage(Test):
   k1 = ['mic']      
   k2 = ['user_sum']
   comp_operator = '>'
   
   def compute_metric(self):
-
-    total = 0.0
-    user_total = 0.0
+    # Get mic stats aggregated over all hosts and mics
     self.metric = 0.0
-    for hostn,host in self.ts.j.hosts.iteritems():
-      user = host.get_stats('mic','0','user_sum')[0:-1]
-      jiffy = host.get_stats('mic','0','jiffy_counter')[0:-1]
+    schema = self.ts.j.schemas['mic']
+    stats,Nhosts,Ndevs = self.ts.j.aggregate_stats('mic')
 
-      if len(jiffy) < 2: return
-      total += jiffy[-1] - jiffy[0]
-      user_total += user[-1] - user[0]
-    
-    metric = user_total/float(244*total)
-    if metric < 1:
-      self.metric = metric
-      print self.metric
+    # Get index of relevant events
+    us_index = schema['user_sum'].index
+    jc_index = schema['jiffy_counter'].index
+    th_index = schema['threads_core'].index
+    nc_index = schema['num_cores'].index
+
+    # Compute user fraction over run
+    # Assume threads*cores is constant in time
+    self.metric = Nhosts * (stats[-1, us_index] - stats[0, us_index])*float( (stats[-1, jc_index]-stats[0, jc_index]) * stats[0, th_index] * stats[0, nc_index] )**-1
     return
+
