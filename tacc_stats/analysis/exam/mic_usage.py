@@ -17,8 +17,9 @@ class MIC_Usage(Test):
       if len(jiffy) < 2: return
       total += jiffy[-1] - jiffy[0]
       user_total += user[-1] - user[0]
-
-    if total > 0 and total < 1e15:
-        self.metric = user_total/float(244*total)
-        print self.metric
+    
+    metric = user_total/float(244*total)
+    if metric < 1:
+      self.metric = metric
+      print self.metric
     return
