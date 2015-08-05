@@ -1,4 +1,5 @@
 from plots import Plot
+from tacc_stats.analysis.gen import tspl_utils
 from matplotlib.figure import Figure
 import numpy 
 
@@ -108,9 +109,11 @@ class MasterPlot(Plot):
         continue
 
       try:
-        ax.plot((self.ts.t[:-1]+self.ts.t[1:])/(3600*2.0),
-                (numpy.diff(flops)/numpy.diff(self.ts.t))/1.0e9)
+        flops = numpy.diff(flops)/numpy.diff(self.ts.t)/1.0e9
+        ax.step(self.ts.t/3600., numpy.append(flops,[flops[-1]]), where="post")
         ax.set_ylabel('Dbl GFLOPS')
+        ax.set_xlim([0.,self.ts.t[-1]/3600.])
+        tspl_utils.adjust_yaxis_range(ax,0.1)
       except: print("FLOP plot not available for JOBID",self.ts.j.id)
     # Plot key 2
     if self.ts.pmc_type == 'intel_snb' or self.ts.pmc_type == 'intel_hsw':

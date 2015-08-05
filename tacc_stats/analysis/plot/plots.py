@@ -92,21 +92,19 @@ class Plot(object):
   def plot_lines(self,ax,index,xscale=1.0,yscale=1.0,xlabel='',ylabel='',
                  do_rate=True):
 
-    tmid=(self.ts.t[:-1]+self.ts.t[1:])/2.0
     ax.hold=True
-    for k in self.ts.j.hosts.keys():
 
+    for k in self.ts.j.hosts.keys():
       v=self.ts.assemble(index,k,0)
       if do_rate:
-        rate=numpy.divide(numpy.diff(v),numpy.diff(self.ts.t))
-        ax.plot(tmid/xscale,rate/yscale)
+        val=numpy.divide(numpy.diff(v),numpy.diff(self.ts.t))
       else:
-        val=(v[:-1]+v[1:])/2.0
-        ax.plot(tmid/xscale,val/yscale)
+        val=(v[:-1]+v[1:])/(2.0)
+      ax.step(self.ts.t/xscale,numpy.append(val,[val[-1]])/yscale,where="post")
     tspl_utils.adjust_yaxis_range(ax,0.1)
     ax.yaxis.set_major_locator(matplotlib.ticker.MaxNLocator(nbins=6))
     self.setlabels(ax,index,xlabel,ylabel,yscale)
-
+    ax.set_xlim([0,self.ts.t[-1]/3600.])
   # Plots "time histograms" for every host
   # This code is likely inefficient
   def plot_thist(self,ax,index,xscale=1.0,yscale=1.0,xlabel='',ylabel='',
