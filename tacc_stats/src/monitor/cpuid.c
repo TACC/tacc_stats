@@ -81,7 +81,8 @@ int signature(processor_t p, char *cpu, int *nr_ctrs) {
     goto out;
   case IVYBRIDGE:
     if (strncmp(vendor, "GenuineIntel", 12) == 0 &&
-	strncmp(signature, "06_3e", 5) == 0) {
+	(strncmp(signature, "06_3a", 5) == 0 ||
+	 strncmp(signature, "06_3e", 5) == 0)) {
       rc = 1;
       TRACE("Ivy Bridge %s\n", signature);
     }
@@ -99,16 +100,26 @@ int signature(processor_t p, char *cpu, int *nr_ctrs) {
 	(strncmp(signature, "06_3c", 5) == 0 || 
 	 strncmp(signature, "06_45", 5) == 0 || 
 	 strncmp(signature, "06_46", 5) == 0 || 
-	 strncmp(signature, "06_47", 5) == 0 || 
 	 strncmp(signature, "06_3f", 5) == 0)) {
       rc = 1;
       TRACE("Haswell %s\n", signature);
     }
     goto out;
   case BROADWELL:
-    if (strncmp(vendor, "GenuineIntel", 12) != 0)
-      goto out;
-    ERROR("broadwell processor signature unknown %s\n",signature);
+    if (strncmp(vendor, "GenuineIntel", 12) == 0 &&
+	(strncmp(signature, "06_3d", 5) == 0 || 
+	 strncmp(signature, "06_47", 5) == 0)) {
+      rc = 1;
+      TRACE("Broadwell %s\n", signature);
+    }
+    goto out;
+  case SKYLAKE:
+    if (strncmp(vendor, "GenuineIntel", 12) == 0 &&
+	(strncmp(signature, "06_4e", 5) == 0 || 
+	 strncmp(signature, "06_5e", 5) == 0)) {
+      rc = 1;
+      TRACE("Skylake %s\n", signature);
+    }
     goto out;
   case AMD_10H:
     if (strncmp(vendor, "AuthenticAMD", 12) != 0) {
@@ -117,8 +128,7 @@ int signature(processor_t p, char *cpu, int *nr_ctrs) {
     }
   default:
     ERROR("unknown processor signature %s\n",signature);
-    goto out;
-
+    goto out;    
   }
   
  out:

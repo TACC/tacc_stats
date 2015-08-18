@@ -7,7 +7,8 @@ typedef enum {
   AMD_10H,
   NEHALEM, WESTMERE, 
   SANDYBRIDGE, IVYBRIDGE, 
-  HASWELL, BROADWELL
+  HASWELL, BROADWELL,
+  SKYLAKE
 } processor_t;
   
 // Return 1 for true and 0 for false
