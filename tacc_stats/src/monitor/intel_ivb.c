@@ -1,16 +1,16 @@
 /*! 
- \file intel_hsw.c
+ \file intel_ivb.c
  \author Todd Evans 
- \brief Performance Monitoring Counters for Intel Haswell Processors
+ \brief Performance Monitoring Counters for Intel Ivy Bridge Processors
 
 
   \par Details such as Tables and Figures can be found in:
   "Intel® 64 and IA-32 Architectures Software Developer’s Manual
   Volume 3B: System Programming Guide, Part 2" 
-  Order Number: 325384 January 2015 \n
+  Order Number: 253669-047US June 2013 \n
 
   \note
-  Haswell microarchitectures have signatures 06_3c, 06_45, 06_46, 06_47 and EP 06_3f. 
+  Ivy Bridge microarchitectures have signatures 06_3e. 
   Non-architectural events are listed in Table 19-7, 19-8, and 19-9.  
   Table 19-8 is 06_2a specific, Table 19-9 is 06_2d specific.  
 
@@ -27,7 +27,7 @@
 
   \par MSR address layout of registers:
 
-  There are 20 logical processors on a Haswell EP E52660v3 with Hyperthreading disabled.
+  There are 16 logical processors on Stampede with Hyperthreading disabled.
   There are 8 configurable and 3 fixed counter registers per processor.
 
   IA32_PMCx (CTRx) MSRs start at address 0C1H and occupy a contiguous block of MSR
@@ -57,7 +57,7 @@
 //@{
 /*! \name Configurable Performance Monitoring Registers
 
-  Control register layout shown in Fig 18-36.
+  Control register layout shown in Fig 18-6.  Described on Pg 18-3.
   These are used to select events and ways to count events.
   ~~~
   [0, 7] Event Select       : Choose Event
@@ -71,9 +71,7 @@
   22 EN                     : Enables counters
   23 INV                    : Inverts Counter Mask
   [24, 31] Counter Mask     : Counts in a cycle must exceed CMASK if set
-  [32] IN_TX                : In Trans. Rgn
-  [33] IN_TXCP              : In Tx exclude abort
-  [34, 63] Reserved
+  [32, 63] Reserved
   ~~~  
 
   Counter registers are 64 bit but 48 bits wide.  These
@@ -161,7 +159,7 @@
 
   To change events to count:
   -# Define event below
-  -# Modify events array in intel_hsw_begin()
+  -# Modify events array in intel_ivb_begin()
 */
 #define PERF_EVENT(event, umask) \
   ( (event) \
@@ -196,7 +194,7 @@
 
 
 //! Configure and start counters for a cpu
-static int intel_hsw_begin_cpu(char *cpu, uint64_t *events, size_t nr_events)
+static int intel_ivb_begin_cpu(char *cpu, uint64_t *events, size_t nr_events)
 {
   int rc = -1;
   char msr_path[80];
@@ -272,7 +270,7 @@ static int intel_hsw_begin_cpu(char *cpu, uint64_t *events, size_t nr_events)
 }
 
 //! Configure and start counters
-static int intel_hsw_begin(struct stats_type *type)
+static int intel_ivb_begin(struct stats_type *type)
 {
   int nr = 0;
 
@@ -292,18 +290,17 @@ static int intel_hsw_begin(struct stats_type *type)
     char cpu[80];
     int nr_events = 0;
     snprintf(cpu, sizeof(cpu), "%d", i);
-    if (signature(HASWELL, cpu, &nr_events))
-      if (intel_hsw_begin_cpu(cpu, events, nr_events) == 0)
+    if (signature(IVYBRIDGE, cpu, &nr_events))
+      if (intel_ivb_begin_cpu(cpu, events, nr_events) == 0)
 	nr++;
   }
-  
   if (nr == 0) 
     type->st_enabled = 0;
   return nr > 0 ? 0 : -1;
 }
 
 //! Collect values in counters for cpu
-static void intel_hsw_collect_cpu(struct stats_type *type, char *cpu)
+static void intel_ivb_collect_cpu(struct stats_type *type, char *cpu)
 {
   struct stats *stats = NULL;
   char msr_path[80];
@@ -321,7 +318,7 @@ static void intel_hsw_collect_cpu(struct stats_type *type, char *cpu)
     ERROR("cannot open `%s': %m\n", msr_path);
     goto out;
   }
-  
+
 #define X(k,r...) \
   ({ \
     uint64_t val = 0; \
@@ -339,21 +336,23 @@ static void intel_hsw_collect_cpu(struct stats_type *type, char *cpu)
 }
 
 //! Collect values in counters
-static void intel_hsw_collect(struct stats_type *type)
+static void intel_ivb_collect(struct stats_type *type)
 {
   int i;
   for (i = 0; i < nr_cpus; i++) {
     char cpu[80];
+    int nr_events = 0;
     snprintf(cpu, sizeof(cpu), "%d", i);
-    intel_hsw_collect_cpu(type, cpu);
+    if (signature(IVYBRIDGE, cpu, &nr_events))
+      intel_ivb_collect_cpu(type, cpu);
   }
 }
 
 //! Definition of stats entry for this type
-struct stats_type intel_hsw_stats_type = {
-  .st_name = "intel_hsw",
-  .st_begin = &intel_hsw_begin,
-  .st_collect = &intel_hsw_collect,
+struct stats_type intel_ivb_stats_type = {
+  .st_name = "intel_ivb",
+  .st_begin = &intel_ivb_begin,
+  .st_collect = &intel_ivb_collect,
 #define X SCHEMA_DEF
   .st_schema_def = JOIN(KEYS),
 #undef X

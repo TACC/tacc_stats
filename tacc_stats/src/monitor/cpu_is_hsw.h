@@ -14,6 +14,7 @@ static void get_cpuid_signature(int cpuid_file, char* signature)
   int family_code = (eax & 0xF00) >> 8;
   int extended_family_code = (eax & 0xFF00000) >> 16;
 
+  printf("%x\n",edx);
   snprintf(signature,sizeof(signature),"%02x_%x", extended_family_code | family_code, extended_model | model);
 
 }

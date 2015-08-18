@@ -7,13 +7,16 @@
 static void get_cpuid_signature(int cpuid_file, char* signature)
 {
   int ebx = 0, ecx = 0, edx = 0, eax = 1;
-  __asm__ ("cpuid": "=b" (ebx), "=c" (ecx), "=d" (edx), "=a" (eax):"a" (eax));
+  __asm__ ("cpuid"
+	   : "=a" (eax), "=b" (ebx), "=c" (ecx), "=d" (edx)
+	   :"a" (eax));
 
   int model = (eax & 0x0FF) >> 4;
   int extended_model = (eax & 0xF0000) >> 12;
   int family_code = (eax & 0xF00) >> 8;
   int extended_family_code = (eax & 0xFF00000) >> 16;
-
+  int ht = (edx & 0x10000000) >> 28;
+  printf("%d\n", ht);
   snprintf(signature,sizeof(signature),"%02x_%x", extended_family_code | family_code, extended_model | model);
 
 }

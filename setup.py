@@ -219,9 +219,10 @@ write_cfg_file(paths)
 
 root='tacc_stats/src/monitor/'
 sources=[
-    pjoin(root,'schema.c'),pjoin(root,'dict.c'),pjoin(root,'collect.c'),
-    pjoin(root,"pci_busid_map.c"),
-    pjoin(root,'stats_file.c'),pjoin(root,'stats_buffer.c'),pjoin(root,'stats.c')
+    pjoin(root,'schema.c'),pjoin(root,'dict.c'),
+    pjoin(root,'cpuid.c'),pjoin(root,'collect.c'),
+    pjoin(root,"pci_busid_map.c"),pjoin(root,'stats_file.c'),
+    pjoin(root,'stats_buffer.c'),pjoin(root,'stats.c')
     ]
 
 RMQ = False
@@ -277,11 +278,10 @@ if RMQ:
     libraries.append("rabbitmq")
 
 flags = ['-D_GNU_SOURCE', '-Wp,-U_FORTIFY_SOURCE',
-         '-O3', '-Wall', '-g', '-UDEBUG']
+         '-O3', '-Wall', '-g', '-DDEBUG']
 ext_data=dict(sources=sources,
               include_dirs=['tacc_stats/src/monitor/'] + include_dirs,
               library_dirs=library_dirs,
-              runtime_library_dirs=library_dirs,
               libraries=libraries,
               extra_compile_args = flags,
               define_macros=define_macros
@@ -441,7 +441,6 @@ class MyBuildExt(build_ext):
                                           'build/bin/amqp_listend',
                                           libraries=ext.libraries,
                                           library_dirs=ext.library_dirs,
-                                          runtime_library_dirs=ext.runtime_library_dirs,
                                           extra_postargs=extra_args,
                                           target_lang=language)
             objects.remove(pjoin(self.build_temp,'tacc_stats','src',
@@ -451,14 +450,12 @@ class MyBuildExt(build_ext):
                                       'build/bin/monitor',
                                       libraries=ext.libraries,
                                       library_dirs=ext.library_dirs,
-                                      runtime_library_dirs=ext.runtime_library_dirs,
                                       extra_postargs=extra_args,
                                       target_lang=language)
         self.compiler.link_shared_object(objects, 
                                          ext_path,
                                          libraries=ext.libraries,
                                          library_dirs=ext.library_dirs,
-                                         runtime_library_dirs=ext.runtime_library_dirs,
                                          extra_postargs=extra_args,
                                          debug=self.debug,
                                          build_temp=self.build_temp,

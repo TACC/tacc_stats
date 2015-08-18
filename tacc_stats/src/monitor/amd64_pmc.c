@@ -11,6 +11,7 @@
 #include <fcntl.h>
 #include "stats.h"
 #include "trace.h"
+#include "cpuid.h"
 
 // The performance monitor counters are used by software to count
 // specific events that occur in the processor.  [The Performance
@@ -173,12 +174,13 @@ static int amd64_pmc_begin(struct stats_type *type)
   for (i = 0; i < nr_cpus; i++) {
     char cpu[80];
     snprintf(cpu, sizeof(cpu), "%d", i);
-
-    if (cpu_is_amd64_10h(cpu))
-      if (amd64_pmc_begin_cpu(cpu, events[i % 4], 4) == 0) /* HARD */
+    int nr_events = 0;
+    if (signature(AMD_10H, cpu, &nr_events))
+      if (amd64_pmc_begin_cpu(cpu, events[i % 4], nr_events) == 0)
         nr++;
   }
-
+  if (nr == 0)
+    type->st_enabled = 0;
   return nr > 0 ? 0 : -1;
 }
 
@@ -223,8 +225,8 @@ static void amd64_pmc_collect(struct stats_type *type)
   for (i = 0; i < nr_cpus; i++) {
     char cpu[80];
     snprintf(cpu, sizeof(cpu), "%d", i);
-
-    if (cpu_is_amd64_10h(cpu))
+    int nr_events = 0;
+    if (signature(AMD_10H, cpu, &nr_events))
       amd64_pmc_collect_cpu(type, cpu);
   }
 }

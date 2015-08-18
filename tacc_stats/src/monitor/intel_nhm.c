@@ -11,6 +11,7 @@
 #include <fcntl.h>
 #include "stats.h"
 #include "trace.h"
+#include "cpuid.h"
 
 // Nehalem microarchitectures have signature 06_1a,06_1e,06_1f,06_2e with non-architectural events
 // listed in Table 19-11.
@@ -83,80 +84,6 @@ in post processing
   X(PERF_GLOBAL_OVF_CTRL, "C", "")
 */
 
-static void get_cpuid_signature(int cpuid_file, char* signature)
-{
-  int ebx = 0, ecx = 0, edx = 0, eax = 1;
-  __asm__ ("cpuid": "=b" (ebx), "=c" (ecx), "=d" (edx), "=a" (eax):"a" (eax));
-
-  int model = (eax & 0x0FF) >> 4;
-  int extended_model = (eax & 0xF0000) >> 12;
-  int family_code = (eax & 0xF00) >> 8;
-  int extended_family_code = (eax & 0xFF00000) >> 16;
-
-  snprintf(signature,sizeof(signature),"%02x_%x", extended_family_code | family_code, extended_model | model);
-
-}
-static int cpu_is_nehalem(char *cpu)
-{
-  char cpuid_path[80];
-  int cpuid_fd = -1;
-  uint32_t buf[4];
-  int rc = 0;
-  char signature[5];
-
-  /* Open /dev/cpuid/cpu/cpuid. */
-  snprintf(cpuid_path, sizeof(cpuid_path), "/dev/cpu/%s/cpuid", cpu);
-  cpuid_fd = open(cpuid_path, O_RDONLY);
-  if (cpuid_fd < 0) {
-    ERROR("cannot open `%s': %m\n", cpuid_path);
-    goto out;
-  }
-  
-  /* Get cpu vendor. */
-  if (pread(cpuid_fd, buf, sizeof(buf), 0x0) < 0) {
-    ERROR("cannot read cpu vendor through `%s': %m\n", cpuid_path);
-    goto out;
-  }
-
-  buf[0] = buf[2], buf[2] = buf[3], buf[3] = buf[0];
-  TRACE("cpu %s, vendor `%.12s'\n", cpu, (char*) buf + 4);
-
-  if (strncmp((char*) buf + 4, "GenuineIntel", 12) != 0)
-    goto out; /* CentaurHauls? */
-
-  if (pread(cpuid_fd, buf, sizeof(buf), 0x0A) < 0) {
-    ERROR("cannot read `%s': %m\n", cpuid_path);
-    goto out;
-  }
-
-  TRACE("cpu %s, buf %08x %08x %08x %08x\n", cpu, buf[0], buf[1], buf[2], buf[3]);
-
-  get_cpuid_signature(cpuid_fd,signature);
-  TRACE("cpu%s, CPUID Signature %s\n", cpu, signature);
-  if (strncmp(signature, "06_1a", 5) !=0 && strncmp(signature, "06_1e", 5) !=0  && strncmp(signature, "06_1f", 5) !=0 && strncmp(signature, "06_2e", 5) !=0)
-    goto out;
-
-
-
-  int perf_ver = buf[0] & 0xff;
-  TRACE("cpu %s, perf_ver %d\n", cpu, perf_ver);
-  switch (perf_ver) {
-  default:
-    ERROR("unknown perf monitoring version %d\n", perf_ver);
-    goto out;
-  case 0:
-    goto out;
-  case 1:
-    goto out;
-  case 2:
-    /* Adds IA32_PERF_GLOBAL_CTRL, IA32_PERF_GLOBAL_STATUS,
-       IA32_PERF_GLOBAL_CTRL. */
-    goto out;
-  case 3:
-    /* Close enough. */
-    rc = 1;
-    break;
-  }
 
   /*
     EAX[31:24] Number of arch events supported per logical processor
@@ -179,24 +106,6 @@ static int cpu_is_nehalem(char *cpu)
     EDX[12:5] Number of Bits in the Fixed Counters (width)
     EDX[4:0] Number of Fixed Counters
   */
-
-#ifdef DEBUG
-  int nr_ctrs = (buf[0] >> 8) & 0xFF;
-  int ctr_width = (buf[0] >> 16) & 0xFF;
-
-  int nr_fixed_ctrs = buf[3] & 0x1F;
-  int fixed_ctr_width = (buf[3] >> 5) & 0xFF;
-
-  TRACE("nr_ctrs %d, ctr_width %d, nr_fixed_ctrs %d, fixed_ctr_width %d\n",
-        nr_ctrs, ctr_width, nr_fixed_ctrs, fixed_ctr_width);
-#endif
-
- out:
-  if (cpuid_fd >= 0)
-    close(cpuid_fd);
-
-  return rc;
-}
 
 static int intel_nhm_begin_cpu(char *cpu, uint64_t *events, size_t nr_events)
 {
@@ -284,12 +193,15 @@ static int intel_nhm_begin(struct stats_type *type)
   int i;
   for (i = 0; i < nr_cpus; i++) {
     char cpu[80];
+    int nr_events = 0;
     snprintf(cpu, sizeof(cpu), "%d", i);
-
-    if (cpu_is_nehalem(cpu))
-      if (intel_nhm_begin_cpu(cpu, events, 4) == 0)
-	nr++; /* HARD */
+    if (signature(NEHALEM, cpu, &nr_events))
+      if (intel_nhm_begin_cpu(cpu, events, nr_events) == 0)
+	nr++;
   }
+
+  if (nr == 0) 
+    type->st_enabled = 0;
 
   return nr > 0 ? 0 : -1;
 }
@@ -335,9 +247,9 @@ static void intel_nhm_collect(struct stats_type *type)
 
   for (i = 0; i < nr_cpus; i++) {
     char cpu[80];
+    int nr_events = 0;
     snprintf(cpu, sizeof(cpu), "%d", i);
-
-    if (cpu_is_nehalem(cpu))
+    if (signature(NEHALEM, cpu, &nr_events))
       intel_nhm_collect_cpu(type, cpu);
   }
 }

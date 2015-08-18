@@ -53,7 +53,7 @@
 #include <fcntl.h>
 #include "stats.h"
 #include "trace.h"
-#include "cpu_is_snb.h"
+#include "cpuid.h"
 
 //@{
 /*! \name Configurable Performance Monitoring Registers
@@ -272,7 +272,7 @@ static int intel_snb_begin_cpu(char *cpu, uint64_t *events, size_t nr_events)
 
 //! Configure and start counters
 static int intel_snb_begin(struct stats_type *type)
-{
+{  
   int nr = 0;
 
   uint64_t events[] = {
@@ -289,13 +289,15 @@ static int intel_snb_begin(struct stats_type *type)
   int i;
   for (i = 0; i < nr_cpus; i++) {
     char cpu[80];
+    int nr_events = 0;
     snprintf(cpu, sizeof(cpu), "%d", i);
-
-    if (cpu_is_sandybridge(cpu))
-      if (intel_snb_begin_cpu(cpu, events, 8) == 0)
+    if (signature(SANDYBRIDGE, cpu, &nr_events))
+      if (intel_snb_begin_cpu(cpu, events, nr_events) == 0)
 	nr++;
   }
 
+  if (nr == 0) 
+    type->st_enabled = 0;
   return nr > 0 ? 0 : -1;
 }
 
@@ -341,9 +343,9 @@ static void intel_snb_collect(struct stats_type *type)
   int i;
   for (i = 0; i < nr_cpus; i++) {
     char cpu[80];
+    int nr_events = 0;
     snprintf(cpu, sizeof(cpu), "%d", i);
-
-    if (cpu_is_sandybridge(cpu))
+    if (signature(SANDYBRIDGE, cpu, &nr_events))
       intel_snb_collect_cpu(type, cpu);
   }
 }
