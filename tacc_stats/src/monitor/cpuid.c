@@ -3,6 +3,7 @@
 /* Will autoset AMD to 4 counters */
 #include <stdio.h>
 #include <unistd.h>
+#include <string.h>
 #include <fcntl.h>
 #include "trace.h"
 #include "cpuid.h"
@@ -45,19 +46,23 @@ int signature(processor_t p, char *cpu, int *nr_ctrs) {
   snprintf(signature, sizeof(signature) + 1,"%02x_%x", family, model);
   TRACE("cpu %s, signature %.5s\n", cpu, signature);
 
+  /* Get number of perf counters */
   if (strncmp(vendor, "GenuineIntel", 12) == 0) {
     if (pread(cpuid_fd, buf, sizeof(buf), 0x0A) < 0) {
       ERROR("cannot read number of performance counters through `%s': %m\n", cpuid_path);
       goto out;
     }
     *nr_ctrs = (buf[0] >> 8) & 0xFF;    
-    TRACE("Number of performance counters = %d\n", *nr_ctrs);
   }
-  else if (strncmp((char*) buf + 4, "AuthenticAMD", 12) == 0) {
+  else if (strncmp(vendor, "AuthenticAMD", 12) == 0) {
     *nr_ctrs = 4;
   }
-  else
+  else {
     ERROR("cannot read number of counters through `%s': %m\n", cpuid_path);
+    goto out;
+  }
+
+  TRACE("Number of performance counters = %d\n", *nr_ctrs);
 
   switch(p) {
   case NEHALEM:
@@ -122,10 +127,11 @@ int signature(processor_t p, char *cpu, int *nr_ctrs) {
     }
     goto out;
   case AMD_10H:
-    if (strncmp(vendor, "AuthenticAMD", 12) != 0) {
+    if (strncmp(vendor, "AuthenticAMD", 12) == 0) {
       rc = 1;
-      goto out;
+      TRACE("AMD_10h %s\n", signature);
     }
+    goto out;
   default:
     ERROR("unknown processor signature %s\n",signature);
     goto out;    

@@ -39,7 +39,7 @@
   X(CTR1, "E,W=48", ""), \
   X(CTR2, "E,W=48", ""), \
   X(CTR3, "E,W=48", "")
-
+/*
 static int cpu_is_amd64_10h(char *cpu)
 {
   char cpuid_path[80];
@@ -47,7 +47,6 @@ static int cpu_is_amd64_10h(char *cpu)
   uint32_t buf[8];
   int rc = 0;
 
-  /* Open /dev/cpuid/CPU/cpuid. */
   snprintf(cpuid_path, sizeof(cpuid_path), "/dev/cpu/%s/cpuid", cpu);
   cpuid_fd = open(cpuid_path, O_RDONLY);
   if (cpuid_fd < 0) {
@@ -55,7 +54,6 @@ static int cpu_is_amd64_10h(char *cpu)
     goto out;
   }
 
-  /* Do cpuid 0, 1 to get cpu vendor, family.  */
   if (pread(cpuid_fd, buf, sizeof(buf), 0x0) < 0) {
     ERROR("cannot read cpu vendor through `%s': %m\n", cpuid_path);
     goto out;
@@ -94,7 +92,7 @@ static int cpu_is_amd64_10h(char *cpu)
 
   return rc;
 }
-
+*/
 static int amd64_pmc_begin_cpu(char *cpu, uint64_t events[], size_t nr_events)
 {
   int rc = -1;

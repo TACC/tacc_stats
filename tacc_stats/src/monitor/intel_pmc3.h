@@ -239,3 +239,4 @@ static void intel_pmc3_collect_cpu(struct stats_type *type, char *cpu)
   if (msr_fd >= 0)
     close(msr_fd);
 }
+
