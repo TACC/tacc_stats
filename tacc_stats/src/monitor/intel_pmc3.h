@@ -205,7 +205,7 @@ static int intel_pmc3_begin_cpu(char *cpu, uint64_t *events, size_t nr_events)
 }
 
 //! Collect values in counters for cpu
-static void intel_pmc3_collect_cpu(struct stats_type *type, char *cpu)
+static void intel_pmc3_collect_cpu(struct stats_type *type, char *cpu, int nr_events)
 {
   struct stats *stats = NULL;
   char msr_path[80];
@@ -223,20 +223,55 @@ static void intel_pmc3_collect_cpu(struct stats_type *type, char *cpu)
     ERROR("cannot open `%s': %m\n", msr_path);
     goto out;
   }
-  
-#define X(k,r...) \
-  ({ \
-    uint64_t val = 0; \
-    if (pread(msr_fd, &val, sizeof(val), IA32_##k) < 0) \
-      ERROR("cannot read `%s' (%08X) through `%s': %m\n", #k, IA32_##k, msr_path); \
-    else \
-      stats_set(stats, #k, val); \
-  })
-  KEYS;
+
+#define X(k,r...)							\
+    ({									\
+      uint64_t val = 0;							\
+      if (pread(msr_fd, &val, sizeof(val), IA32_##k) < 0)		\
+	ERROR("cannot read `%s' (%08X) through `%s': %m\n", #k, IA32_##k, msr_path); \
+      else								\
+	stats_set(stats, #k, val);					\
+    })
+    KEYS;
 #undef X
 
  out:
   if (msr_fd >= 0)
     close(msr_fd);
 }
+/*
+static int intel_pmc3_begin(struct stats_type *type)
+{
+  int nr = 0;
 
+  int i;
+  for (i = 0; i < nr_cpus; i++) {
+    char cpu[80];
+    int nr_events = 0;
+    snprintf(cpu, sizeof(cpu), "%d", i);
+
+    int p = signature(cpu, &nr_events);
+    uint64_t *events = get_events(p);
+
+    if (intel_pmc3_begin_cpu(cpu, events, nr_events) == 0)
+      nr++;
+  }
+
+  if (nr == 0)
+    type->st_enabled = 0;
+
+  return nr > 0 ? 0 : -1;
+}
+*/
+/*
+static void intel_pmc3_collect(struct stats_type *type)
+{
+  int i;
+
+  for (i = 0; i < nr_cpus; i++) {
+    char cpu[80];
+    snprintf(cpu, sizeof(cpu), "%d", i);
+    intel_pmc3_collect_cpu(type, cpu, nr_events);
+  }
+}
+*/

@@ -109,16 +109,15 @@ static int intel_snb_begin(struct stats_type *type)
   return nr > 0 ? 0 : -1;
 }
 
-//! Collect values in counters
 static void intel_snb_collect(struct stats_type *type)
 {
   int i;
   for (i = 0; i < nr_cpus; i++) {
     char cpu[80];
-    int nr_events = 0;
     snprintf(cpu, sizeof(cpu), "%d", i);
-    if (signature(SANDYBRIDGE, cpu, &nr_events))
-      intel_pmc3_collect_cpu(type, cpu);
+   int nr_events = 0;
+   if (signature(SANDYBRIDGE, cpu, &nr_events))
+     intel_pmc3_collect_cpu(type, cpu, nr_events);
   }
 }
 

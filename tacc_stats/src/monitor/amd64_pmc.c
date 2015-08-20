@@ -182,7 +182,7 @@ static int amd64_pmc_begin(struct stats_type *type)
   return nr > 0 ? 0 : -1;
 }
 
-static void amd64_pmc_collect_cpu(struct stats_type *type, char *cpu)
+static void amd64_pmc_collect_cpu(struct stats_type *type, char *cpu, int nr_events)
 {
   char msr_path[80];
   int msr_fd = -1;
@@ -199,14 +199,16 @@ static void amd64_pmc_collect_cpu(struct stats_type *type, char *cpu)
     ERROR("cannot open `%s': %m\n", msr_path);
     goto out;
   }
-
-#define X(k,r...) \
-  ({ \
-    uint64_t val = 0; \
-    if (pread(msr_fd, &val, sizeof(val), MSR_PERF_##k) < 0) \
+  int ctr = 0;
+#define X(k,r...)							\
+  ({									\
+    uint64_t val = 0;							\
+    if (pread(msr_fd, &val, sizeof(val), MSR_PERF_##k) < 0)		\
       ERROR("cannot read `%s' (%08X) through `%s': %m\n", #k, MSR_PERF_##k, msr_path); \
-    else \
-      stats_set(stats, #k, val); \
+    else								\
+      stats_set(stats, #k, val);					\
+    if (++ctr == nr_events)						\
+      goto out;								\
   })
   KEYS;
 #undef X
@@ -219,13 +221,12 @@ static void amd64_pmc_collect_cpu(struct stats_type *type, char *cpu)
 static void amd64_pmc_collect(struct stats_type *type)
 {
   int i;
-
   for (i = 0; i < nr_cpus; i++) {
     char cpu[80];
     snprintf(cpu, sizeof(cpu), "%d", i);
     int nr_events = 0;
     if (signature(AMD_10H, cpu, &nr_events))
-      amd64_pmc_collect_cpu(type, cpu);
+      amd64_pmc_collect_cpu(type, cpu, nr_events);
   }
 }
 

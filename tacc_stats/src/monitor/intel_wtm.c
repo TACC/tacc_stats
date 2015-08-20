@@ -21,7 +21,6 @@
 #define MEM_LOAD_RETIRED_L2_HIT        PERF_EVENT(0xCB, 0x02)
 #define MEM_LOAD_RETIRED_L3_HIT        PERF_EVENT(0xCB, 0x0C)
 #define MEM_LOAD_RETIRED_L3_MISS       PERF_EVENT(0xCB, 0x10) /* May be same as 0x0F/0x10 + 0x0F/0x20. */
-
 #define DTLB_LOAD_MISSES_WALK_CYCLES   PERF_EVENT(0x08, 0x04)
 #define FP_COMP_OPS_EXE_SSE_FP_PACKED  PERF_EVENT(0x10, 0x10)
 #define FP_COMP_OPS_EXE_SSE_FP_SCALAR  PERF_EVENT(0x10, 0x20)
@@ -55,15 +54,15 @@ static int intel_wtm_begin(struct stats_type *type)
 static void intel_wtm_collect(struct stats_type *type)
 {
   int i;
-
   for (i = 0; i < nr_cpus; i++) {
     char cpu[80];
-    int nr_events = 0;
     snprintf(cpu, sizeof(cpu), "%d", i);
+    int nr_events = 0;
     if (signature(WESTMERE, cpu, &nr_events))
-      intel_pmc3_collect_cpu(type, cpu);
+      intel_pmc3_collect_cpu(type, cpu, nr_events);
   }
 }
+
 
 struct stats_type intel_wtm_stats_type = {
   .st_name = "intel_wtm",

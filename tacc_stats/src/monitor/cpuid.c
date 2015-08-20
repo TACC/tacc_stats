@@ -45,7 +45,7 @@ int signature(processor_t p, char *cpu, int *nr_ctrs) {
   unsigned family = ((buf[0] & 0xFF00000) >> 16) | ((buf[0] & 0xF00) >> 8);
   snprintf(signature, sizeof(signature) + 1,"%02x_%x", family, model);
   TRACE("cpu %s, signature %.5s\n", cpu, signature);
-
+  
   /* Get number of perf counters */
   if (strncmp(vendor, "GenuineIntel", 12) == 0) {
     if (pread(cpuid_fd, buf, sizeof(buf), 0x0A) < 0) {

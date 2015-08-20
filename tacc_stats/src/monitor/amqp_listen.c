@@ -44,6 +44,7 @@ int consume(const char *hostname, const char* port, const char* archive_dir)
 	     AMQP_SASL_METHOD_PLAIN, "guest", "guest");
   amqp_channel_open(conn, 1);
   amqp_get_rpc_reply(conn);
+  syslog(LOG_INFO, "Connect to RMQ server on host %s port %s queue %s\n",hostname,port,bindingkey);
 
   {
     amqp_queue_declare_ok_t *r = 
@@ -53,6 +54,7 @@ int consume(const char *hostname, const char* port, const char* archive_dir)
 			 amqp_empty_table);
 
     amqp_get_rpc_reply(conn);
+    syslog(LOG_INFO,"start trying to get data\n");
     queuename = amqp_bytes_malloc_dup(r->queue);
     if (queuename.bytes == NULL) {
       syslog(LOG_ERR, "Out of memory while copying queue name\n");

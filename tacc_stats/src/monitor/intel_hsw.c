@@ -104,14 +104,16 @@ static int intel_hsw_begin(struct stats_type *type)
   return nr > 0 ? 0 : -1;
 }
 
-//! Collect values in counters
 static void intel_hsw_collect(struct stats_type *type)
 {
   int i;
+
   for (i = 0; i < nr_cpus; i++) {
     char cpu[80];
     snprintf(cpu, sizeof(cpu), "%d", i);
-    intel_pmc3_collect_cpu(type, cpu);
+    int nr_events = 0;
+    if (signature(HASWELL, cpu, &nr_events))
+      intel_pmc3_collect_cpu(type, cpu, nr_events);
   }
 }
 
