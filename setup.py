@@ -438,7 +438,7 @@ class MyBuildExt(build_ext):
             self.compiler.link_executable([pjoin(self.build_temp,
                                                  'tacc_stats','src','monitor',
                                                  'amqp_listen.o')],
-                                          'build/bin/amqp_listend',
+                                          'build/bin/listend',
                                           libraries=ext.libraries,
                                           library_dirs=ext.library_dirs,
                                           extra_postargs=extra_args,
@@ -479,7 +479,7 @@ scripts=['build/bin/monitor',
          'tacc_stats/site/machine/thresholds.cfg',
          'tacc_stats/pickler/job_pickles.py']
 
-if RMQ: scripts += ['build/bin/amqp_listend']
+if RMQ: scripts += ['build/bin/listend']
 if MODE == "CRON":
     scripts += ['tacc_stats/archive.sh']
     package_data = {'' : ['*.sh.in'] },

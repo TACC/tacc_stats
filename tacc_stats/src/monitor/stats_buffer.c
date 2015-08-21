@@ -173,7 +173,7 @@ int stats_buffer_write(struct stats_buffer *sf)
   size_t i = 0;
   struct stats_type *type;
   while ((type = stats_type_for_each(&i)) != NULL) {
-    if (!(type->st_enabled && type->st_selected))
+    if (!(type->st_enabled))
       continue;
 
     size_t j = 0;

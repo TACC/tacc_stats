@@ -39,22 +39,29 @@ int consume(const char *hostname, const char* port, const char* archive_dir)
     syslog(LOG_ERR,"Error opening RMQ server %s on port %s\n",hostname,port);
     exit(1);
   }
-
-  amqp_login(conn, "/", 0, 131072, 0, 
-	     AMQP_SASL_METHOD_PLAIN, "guest", "guest");
+ 
+  amqp_rpc_reply_t rep = 
+    amqp_login(conn, "/", 0, 131072, 0, 
+	       AMQP_SASL_METHOD_PLAIN, "guest", "guest");
+  if (AMQP_RESPONSE_NORMAL != rep.reply_type) {
+    syslog(LOG_ERR,"Error logging into RMQ server %s on port %s\n",
+	   hostname,port);
+    exit(1);
+  }
+  
   amqp_channel_open(conn, 1);
   amqp_get_rpc_reply(conn);
-  syslog(LOG_INFO, "Connect to RMQ server on host %s port %s queue %s\n",hostname,port,bindingkey);
+  syslog(LOG_INFO, "Connect to RMQ server on host %s port %s queue %s\n",
+	 hostname,port,bindingkey);
 
   {
+    syslog(LOG_INFO,"start trying to get data \n");
     amqp_queue_declare_ok_t *r = 
       amqp_queue_declare(conn, 1, 
 			 amqp_cstring_bytes(bindingkey), 
 			 0, 1, 0, 0,
 			 amqp_empty_table);
-
     amqp_get_rpc_reply(conn);
-    syslog(LOG_INFO,"start trying to get data\n");
     queuename = amqp_bytes_malloc_dup(r->queue);
     if (queuename.bytes == NULL) {
       syslog(LOG_ERR, "Out of memory while copying queue name\n");
