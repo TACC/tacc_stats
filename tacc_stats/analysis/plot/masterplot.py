@@ -90,31 +90,31 @@ class MasterPlot(Plot):
     ax = self.fig.add_subplot(6,cols,1*shift)
     schema = self.ts.j.get_schema(self.ts.pmc_type)
 
-    for host_name in self.ts.j.hosts.keys():
-      stats = self.ts.j.aggregate_stats(self.ts.pmc_type,host_names=[host_name])
-      if self.ts.pmc_type == 'intel_snb' :    
-        if 'SSE_D_ALL' in schema:
-          flops = stats[0][:,schema['SSE_D_ALL'].index]+4*stats[0][:,schema['SIMD_D_256'].index]          
-        elif 'SSE_DOUBLE_SCALAR' in schema:
-          flops = stats[0][:,schema['SSE_DOUBLE_SCALAR'].index]+2*stats[0][:,schema['SSE_DOUBLE_PACKED'].index]+4*stats[0][:,schema['SIMD_DOUBLE_256'].index]          
-        else: print("FLOP stats not available for JOBID",self.ts.j.id)
-      elif self.ts.pmc_type == 'intel_pmc3' or self.ts.pmc_type == 'intel_nhm' or self.ts.pmc_type == 'intel_wtm':
-        if 'FP_COMP_OPS_EXE_SSE_PACKED' in schema and 'FP_COMP_OPS_EXE_SSE_SCALAR' in schema:
-          flops = 2*stats[0][:,schema['FP_COMP_OPS_EXE_SSE_PACKED'].index]+stats[0][:,schema['FP_COMP_OPS_EXE_SSE_SCALAR'].index]
-        else: print("FLOP stats not available for JOBID",self.ts.j.id)
-      elif self.ts.pmc_type == 'intel_hsw' :
-        print('Haswell does not support FLOP counters')
-      else: 
-        print(self.ts.pmc_type + ' not currently supported')
-        continue
+    try:
+      for host_name in self.ts.j.hosts.keys():
+        stats = self.ts.j.aggregate_stats(self.ts.pmc_type,host_names=[host_name])
+        if self.ts.pmc_type == 'intel_snb' :    
+          if 'SSE_D_ALL' in schema:
+            flops = stats[0][:,schema['SSE_D_ALL'].index]+4*stats[0][:,schema['SIMD_D_256'].index]          
+          elif 'SSE_DOUBLE_SCALAR' in schema:
+            flops = stats[0][:,schema['SSE_DOUBLE_SCALAR'].index]+2*stats[0][:,schema['SSE_DOUBLE_PACKED'].index]+4*stats[0][:,schema['SIMD_DOUBLE_256'].index]          
+          else: print("FLOP stats not available for JOBID",self.ts.j.id)
+        elif self.ts.pmc_type == 'intel_pmc3' or self.ts.pmc_type == 'intel_nhm' or self.ts.pmc_type == 'intel_wtm':
+          if 'FP_COMP_OPS_EXE_SSE_PACKED' in schema and 'FP_COMP_OPS_EXE_SSE_SCALAR' in schema:
+            flops = 2*stats[0][:,schema['FP_COMP_OPS_EXE_SSE_PACKED'].index]+stats[0][:,schema['FP_COMP_OPS_EXE_SSE_SCALAR'].index]
+          else: print("FLOP stats not available for JOBID",self.ts.j.id)
+        elif self.ts.pmc_type == 'intel_hsw' :
+          print('Haswell does not support FLOP counters')
+        else: 
+          print(self.ts.pmc_type + ' not currently supported')
+          continue
 
-      try:
         flops = numpy.diff(flops)/numpy.diff(self.ts.t)/1.0e9
         ax.step(self.ts.t/3600., numpy.append(flops,[flops[-1]]), where="post")
         ax.set_ylabel('Dbl GFLOPS')
         ax.set_xlim([0.,self.ts.t[-1]/3600.])
-        tspl_utils.adjust_yaxis_range(ax,0.1)
-      except: print("FLOP plot not available for JOBID",self.ts.j.id)
+      tspl_utils.adjust_yaxis_range(ax,0.1)
+    except: print("FLOP plot not available for JOBID",self.ts.j.id)
     # Plot key 2
     if self.ts.pmc_type == 'intel_snb' or self.ts.pmc_type == 'intel_hsw':
       idx0=k2_tmp.index('CAS_READS')
