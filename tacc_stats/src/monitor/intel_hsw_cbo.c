@@ -49,7 +49,7 @@
 #include "stats.h"
 #include "trace.h"
 #include "pscanf.h"
-#include "cpu_is_hsw.h"
+#include "cpuid.h"
 
 /*! \name CBo Performance Monitoring Global Control Registers
 
@@ -154,7 +154,7 @@
   Can filter by opcode, MESIF state, node, core, thread
  */
 #define CBOX_FILTER0(...)  \
-  ( (0x0ULL << 0)  \
+  ( (0x1ULL << 0)  \
   | (0x00ULL << 10) \
   | (0x3FULL << 18)  \
   | (0x000ULL << 23) \
@@ -184,7 +184,7 @@
   | (umask << 8) \
   | (0ULL << 17) \
   | (0ULL << 18) \
-  | (0ULL << 19) \
+  | (1ULL << 19) \
   | (1ULL << 22) \
   | (0ULL << 23) \
   | (0x01ULL << 24) \
@@ -277,58 +277,40 @@ static int intel_hsw_cbo_begin(struct stats_type *type)
 {
   int nr = 0;
 
-  uint64_t cbo_events[18][4] = {
-    { RxR_OCCUPANCY, LLC_LOOKUP_DATA_READ, LLC_LOOKUP_ANY, LLC_LOOKUP_WRITE, },
-    { RxR_OCCUPANCY, LLC_LOOKUP_DATA_READ, LLC_LOOKUP_ANY, LLC_LOOKUP_WRITE, },
-    { RxR_OCCUPANCY, LLC_LOOKUP_DATA_READ, LLC_LOOKUP_ANY, LLC_LOOKUP_WRITE, },
-    { RxR_OCCUPANCY, LLC_LOOKUP_DATA_READ, LLC_LOOKUP_ANY, LLC_LOOKUP_WRITE, },
-    { RxR_OCCUPANCY, LLC_LOOKUP_DATA_READ, LLC_LOOKUP_ANY, LLC_LOOKUP_WRITE, },
-    { RxR_OCCUPANCY, LLC_LOOKUP_DATA_READ, LLC_LOOKUP_ANY, LLC_LOOKUP_WRITE, },
-    { RxR_OCCUPANCY, LLC_LOOKUP_DATA_READ, LLC_LOOKUP_ANY, LLC_LOOKUP_WRITE, },
-    { RxR_OCCUPANCY, LLC_LOOKUP_DATA_READ, LLC_LOOKUP_ANY, LLC_LOOKUP_WRITE, },
-    { RxR_OCCUPANCY, LLC_LOOKUP_DATA_READ, LLC_LOOKUP_ANY, LLC_LOOKUP_WRITE, },
-    { RxR_OCCUPANCY, LLC_LOOKUP_DATA_READ, LLC_LOOKUP_ANY, LLC_LOOKUP_WRITE, },
-    { RxR_OCCUPANCY, LLC_LOOKUP_DATA_READ, LLC_LOOKUP_ANY, LLC_LOOKUP_WRITE, },
-    { RxR_OCCUPANCY, LLC_LOOKUP_DATA_READ, LLC_LOOKUP_ANY, LLC_LOOKUP_WRITE, },
-    { RxR_OCCUPANCY, LLC_LOOKUP_DATA_READ, LLC_LOOKUP_ANY, LLC_LOOKUP_WRITE, },
-    { RxR_OCCUPANCY, LLC_LOOKUP_DATA_READ, LLC_LOOKUP_ANY, LLC_LOOKUP_WRITE, },
-    { RxR_OCCUPANCY, LLC_LOOKUP_DATA_READ, LLC_LOOKUP_ANY, LLC_LOOKUP_WRITE, },
-    { RxR_OCCUPANCY, LLC_LOOKUP_DATA_READ, LLC_LOOKUP_ANY, LLC_LOOKUP_WRITE, },
-    { RxR_OCCUPANCY, LLC_LOOKUP_DATA_READ, LLC_LOOKUP_ANY, LLC_LOOKUP_WRITE, },
-    { RxR_OCCUPANCY, LLC_LOOKUP_DATA_READ, LLC_LOOKUP_ANY, LLC_LOOKUP_WRITE, },
+  uint64_t events[] = {
+    RxR_OCCUPANCY, 
+    LLC_LOOKUP_DATA_READ, 
+    LLC_LOOKUP_ANY, 
+    LLC_LOOKUP_WRITE,
   };
 
   int i;
   for (i = 0; i < nr_cpus; i++) {
     char cpu[80];
-    char core_id_path[80];
+    int pkg_id = -1;
     int core_id = -1;
+    int smt_id = -1;
     int box;
-    /* Only program uncore counters on core 0 of a socket. */
-
-    snprintf(core_id_path, sizeof(core_id_path), "/sys/devices/system/cpu/cpu%d/topology/core_id", i);
-    if (pscanf(core_id_path, "%d", &core_id) != 1) {
-      ERROR("cannot read core id file `%s': %m\n", core_id_path); /* errno */
-      continue;
-    }
-
-    if (core_id != 0)
-      continue;
-
+    int nr_events;
+    int nr_procs = 0;
     snprintf(cpu, sizeof(cpu), "%d", i);
-    if (cpu_is_haswell(cpu))      
-      {
-	for (box = 0; box < nr_cpus; box++)
-	  if (intel_hsw_cbo_begin_box(cpu, box, cbo_events[box], 4) == 0)
-	    nr++;
-      }
-  }
+    if (signature(HASWELL, cpu, &nr_events))
+      topology(cpu, &nr_procs, &pkg_id, &core_id, &smt_id);
 
+    if (core_id == 0 && smt_id == 0) {
+      for (box = 0; box < nr_procs; box++)
+	if (intel_hsw_cbo_begin_box(cpu, box, events, 4) == 0)
+	  nr++;
+    }
+  }
+  
+  if (nr == 0)
+    type->st_enabled = 0;  
   return nr > 0 ? 0 : -1;
 }
 
 //! Collect values in counters for a CBo
-static void intel_hsw_cbo_collect_box(struct stats_type *type, char *cpu, char* cpu_box, int box)
+static void intel_hsw_cbo_collect_box(struct stats_type *type, char *cpu, int pkg_id, int box)
 {
   struct stats *stats = NULL;
   char msr_path[80];
@@ -336,12 +318,13 @@ static void intel_hsw_cbo_collect_box(struct stats_type *type, char *cpu, char* 
   int offset;
   offset = 16*box;
 
-  stats = get_current_stats(type, cpu_box);
+  char pkg_box[80];
+  snprintf(pkg_box, sizeof(pkg_box), "%d/%d", pkg_id, box);
+  TRACE("cpu %s\n", cpu);
+  TRACE("pkg_id/box %s\n", pkg_box);
+  stats = get_current_stats(type, pkg_box);
   if (stats == NULL)
     goto out;
-
-  TRACE("cpu %s\n", cpu);
-  TRACE("socket/box %s\n", cpu_box);
 
   snprintf(msr_path, sizeof(msr_path), "/dev/cpu/%s/msr", cpu);
   msr_fd = open(msr_path, O_RDONLY);
@@ -369,51 +352,20 @@ static void intel_hsw_cbo_collect_box(struct stats_type *type, char *cpu, char* 
 //! Collect values in counters
 static void intel_hsw_cbo_collect(struct stats_type *type)
 {
-
   int i;
-
   for (i = 0; i < nr_cpus; i++) {
     char cpu[80];
-    char core_id_path[80];
-
-    char socket[80];
-    char socket_id_path[80];
-
-    char cpu_box[80];
-
-    int socket_id = -1;
+    int pkg_id = -1;
     int core_id = -1;
+    int smt_id = -1;
     int box;
-
-    /* Only collect uncore counters on core 0 of a socket. */
-    snprintf(core_id_path, sizeof(core_id_path), 
-	     "/sys/devices/system/cpu/cpu%d/topology/core_id", i);
-    if (pscanf(core_id_path, "%d", &core_id) != 1) {
-      ERROR("cannot read core id file `%s': %m\n", core_id_path);
-      continue;
-    }
-    if (core_id != 0)
-      continue;
-
-    /* Get socket number. */
-    snprintf(socket_id_path, sizeof(socket_id_path), 
-	     "/sys/devices/system/cpu/cpu%d/topology/physical_package_id", i);
-    if (pscanf(socket_id_path, "%d", &socket_id) != 1) {
-      ERROR("cannot read socket id file `%s': %m\n", socket_id_path);
-      continue;
-    }
-
+    int nr_procs = 0;
     snprintf(cpu, sizeof(cpu), "%d", i);
-    snprintf(socket, sizeof(socket), "%d", socket_id);
+    topology(cpu, &nr_procs, &pkg_id, &core_id, &smt_id);
 
-    if (cpu_is_haswell(cpu))
-      {
-	for (box = 0; box < nr_cpus/2; box++)
-	  {
-	    snprintf(cpu_box, sizeof(cpu_box), "%d/%d", socket_id, box);
-	    intel_hsw_cbo_collect_box(type, cpu, cpu_box, box);
-	  }
-      }
+    if (core_id == 0 && smt_id == 0)
+      for (box = 0; box < nr_procs; box++)
+	intel_hsw_cbo_collect_box(type, cpu, pkg_id, box);
   }
 }
 

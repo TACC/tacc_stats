@@ -57,9 +57,7 @@ static void intel_nhm_collect(struct stats_type *type)
   for (i = 0; i < nr_cpus; i++) {
     char cpu[80];
     snprintf(cpu, sizeof(cpu), "%d", i);
-    int nr_events = 0;
-    if (signature(NEHALEM, cpu, &nr_events))
-      intel_pmc3_collect_cpu(type, cpu, nr_events);
+    intel_pmc3_collect_cpu(type, cpu);
   }
 }
 

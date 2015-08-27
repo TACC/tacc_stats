@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <unistd.h>
 #include <sched.h>
+#include <fcntl.h>
 
 void cpuID(unsigned i, unsigned j, unsigned regs[4]) {
 
@@ -11,7 +12,7 @@ void cpuID(unsigned i, unsigned j, unsigned regs[4]) {
 }
 
 
-int topology()
+int topology(int core)
 {
   unsigned int regs[4];
   int i;
@@ -46,9 +47,13 @@ int topology()
 
   cpuID(0xB,0,regs);
   unsigned int x2APIC_ID = regs[3] & 0xFFFFFFFF;
+  printf("APIC ID %X\n",x2APIC_ID);
 
-  // Test for x2APIC
-  cpuID(0xB, 0, regs);
+  char cpuid_path[80];
+  int cpuid_fd = -1;
+  snprintf(cpuid_path, sizeof(cpuid_path), "/dev/cpu/%d/cpuid", core);
+  cpuid_fd = open(cpuid_path, O_RDONLY);	
+  
   if (regs[1] != 0)
     {
       int SMT_Mask_Width;
@@ -59,17 +64,23 @@ int topology()
       int SMT_ID, Core_ID, Pkg_ID;
       for (i=0;i<=max_leaf;i++)
 	{
+	  unsigned int buf[4];       	  
+	  pread(cpuid_fd, buf, sizeof(buf), i*0x100000000 | 0xB );
+	  printf("%s %d %d %X %d\n",cpuid_path,buf[0],buf[1],buf[2],buf[3]);
+
 	  cpuID(0xB,i,regs);
+	  printf("%d %d %X %d\n",regs[0],regs[1],regs[2],regs[3]);
 	  if ((regs[1] & 0xFFFF) == 0) 
 	    break;
-
-	  if (i == 0)
+	  // SMT level type
+	  if (((regs[2] >> 8) & 0xFF) == 1)
 	    {	      
 	      SMT_Mask_Width = regs[0] & 0xF;
 	      SMT_Select_Mask = ~((-1) << SMT_Mask_Width);
 	      SMT_ID = x2APIC_ID & SMT_Select_Mask;
 	    }
-	  if (i == 1)
+	  // Core level type
+	  else if (((regs[2] >> 8) & 0xFF) == 2)
 	    {	     
 	      CorePlus_Mask_Width = regs[0] & 0xF;
 	      CoreOnly_Select_Mask = ~((-1) << CorePlus_Mask_Width) ^ SMT_Select_Mask;
@@ -77,7 +88,7 @@ int topology()
 	      Pkg_Select_Mask = (-1) << CorePlus_Mask_Width;
 	      Pkg_ID = (x2APIC_ID & Pkg_Select_Mask) >> CorePlus_Mask_Width;
 	      printf("Pkg_ID Core_ID SMT_ID %d %d %d\n",Pkg_ID,Core_ID,SMT_ID);
-	      break;
+	      //break;
 	    }
 	}
     }
@@ -100,14 +111,14 @@ int main(int argc, char *argv[]) {
       CPU_ZERO( &set );
       CPU_SET( core, &set );
       printf("Logical Core %d\n",core) ;
-
+      
       if (sched_setaffinity( getpid(), sizeof( cpu_set_t ), &set ))
 	{
 	  perror( "sched_setaffinity" );
 	  goto out;
 	}
       
-      topology();
+      topology(core);
       printf("\n");
     }
 

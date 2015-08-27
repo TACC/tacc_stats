@@ -19,9 +19,11 @@ static int check_pci_id(char * bus_dev, int id) {
     TRACE("cannot read device vendor or id: %m\n");
     goto out;
   }
-  if (pci_vendor != 0x8086 || pci_device != id) goto out;
+  if (pci_vendor != 0x8086 || pci_device != id) 
+    goto out;
 
   rc = 1;
+
  out:
   if (pci_fd >= 0)
     close(pci_fd);

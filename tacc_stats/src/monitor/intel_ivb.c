@@ -109,13 +109,10 @@ static int intel_ivb_begin(struct stats_type *type)
 static void intel_ivb_collect(struct stats_type *type)
 {
   int i;
-
   for (i = 0; i < nr_cpus; i++) {
     char cpu[80];
     snprintf(cpu, sizeof(cpu), "%d", i);
-    int nr_events = 0;
-    if (signature(IVYBRIDGE, cpu, &nr_events))
-      intel_pmc3_collect_cpu(type, cpu, nr_events);
+    intel_pmc3_collect_cpu(type, cpu);
   }
 }
 //! Definition of stats entry for this type

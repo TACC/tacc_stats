@@ -1,5 +1,5 @@
 /*! 
- \file intel_hsw_qpi.c
+ \file intel_ivb_qpi.c
  \author Todd Evans 
  \brief Performance Monitoring Counters for Intel Sandy Bridge QPI Link Layer (QPI)
 
@@ -140,7 +140,7 @@
   
   To change events to count:
   -# Define event below
-  -# Modify events array in intel_hsw_qpi_begin()
+  -# Modify events array in intel_ivb_qpi_begin()
 */
 #define QPI_PERF_EVENT(event, umask) \
   ( (event) \
@@ -164,7 +164,7 @@
 #define G2_NCB_DATA       QPI_PERF_EVENT(0x03,0x04) //!< for data bandwidth, flits x 8B/time
 //@}
 
-static int intel_hsw_qpi_begin_dev(char *bus_dev, uint32_t *events, size_t nr_events)
+static int intel_ivb_qpi_begin_dev(char *bus_dev, uint32_t *events, size_t nr_events)
 {
   int rc = -1;
   char pci_path[80];
@@ -212,12 +212,12 @@ static int intel_hsw_qpi_begin_dev(char *bus_dev, uint32_t *events, size_t nr_ev
   return rc;
 }
 
-static int intel_hsw_qpi_begin(struct stats_type *type)
+static int intel_ivb_qpi_begin(struct stats_type *type)
 {
   int nr = 0;
 
-  uint32_t events[] = {
-    TxL_FLITS_G1_SNP,  TxL_FLITS_G1_HOM, G1_DRS_DATA, G2_NCB_DATA,
+  uint32_t qpi_events[2][4] = {
+    TxL_FLITS_G1_SNP,  TxL_FLITS_G1_HOM, G1_DRS_DATA, G2_NCB_DATA,   
   };
 
   /* 2-4 buses and 4 devices per bus */
@@ -226,7 +226,7 @@ static int intel_hsw_qpi_begin(struct stats_type *type)
   num_buses = get_pci_busids(&bus);
 
   char *dev[2] = {"08.2", "09.2"};
-  int   ids[2] = {0x2f32, 0x2f33};
+  int   ids[2] = {0x3c41, 0x3c42};
   char bus_dev[80];
 
   int i, j;
@@ -234,9 +234,9 @@ static int intel_hsw_qpi_begin(struct stats_type *type)
     for (j = 0; j < 2; j++) {
       snprintf(bus_dev, sizeof(bus_dev), "%s/%s", bus[i], dev[j]);
       int nr_events;
-      if (signature(SANDYBRIDGE, cpu, &nr_events))      
+      if (signature(IVYBRIDGE, cpu, &nr_events))      
 	if (check_pci_id(bus_dev, ids[j]))
-	  if (intel_hsw_qpi_begin_dev(bus_dev, events, 4) == 0)
+	  if (intel_ivb_qpi_begin_dev(bus_dev, qpi_events, 4) == 0)
 	    nr++; /* HARD */    
     }
   }
@@ -247,7 +247,7 @@ static int intel_hsw_qpi_begin(struct stats_type *type)
   return nr > 0 ? 0 : -1;
 }
 
-static void intel_hsw_qpi_collect_dev(struct stats_type *type, char *bus_dev)
+static void intel_ivb_qpi_collect_dev(struct stats_type *type, char *bus_dev)
 {
   struct stats *stats = NULL;
   char pci_path[80];
@@ -295,7 +295,7 @@ static void intel_hsw_qpi_collect_dev(struct stats_type *type, char *bus_dev)
     close(pci_fd);
 }
 
-static void intel_hsw_qpi_collect(struct stats_type *type)
+static void intel_ivb_qpi_collect(struct stats_type *type)
 {
   /* 2-4 buses and 4 devices per bus */
   char **bus;
@@ -303,7 +303,7 @@ static void intel_hsw_qpi_collect(struct stats_type *type)
   num_buses = get_pci_busids(&bus);
 
   char *dev[2] = {"08.2", "09.2"};
-  int   ids[2] = {0x2f32, 0x2f33};
+  int   ids[2] = {0x3c41, 0x3c42};
   char bus_dev[80];                                        
 
   int i, j;
@@ -311,15 +311,15 @@ static void intel_hsw_qpi_collect(struct stats_type *type)
     for (j = 0; j < 2; j++) {
       snprintf(bus_dev, sizeof(bus_dev), "%s/%s", bus[i], dev[j]);
       if (check_pci_id(bus_dev, ids[j]))
-	intel_hsw_qpi_collect_dev(type, bus_dev);
+	intel_ivb_qpi_collect_dev(type, bus_dev);
     }
   }
 }
 
-struct stats_type intel_hsw_qpi_stats_type = {
-  .st_name = "intel_hsw_qpi",
-  .st_begin = &intel_hsw_qpi_begin,
-  .st_collect = &intel_hsw_qpi_collect,
+struct stats_type intel_ivb_qpi_stats_type = {
+  .st_name = "intel_ivb_qpi",
+  .st_begin = &intel_ivb_qpi_begin,
+  .st_collect = &intel_ivb_qpi_collect,
 #define X SCHEMA_DEF
   .st_schema_def = JOIN(KEYS),
 #undef X

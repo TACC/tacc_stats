@@ -226,9 +226,8 @@ static int intel_hsw_hau_begin(struct stats_type *type)
 {
   int nr = 0;
   
-  uint32_t hau_events[2][4] = {
-    { REQUESTS_READS, REQUESTS_WRITES, CLOCKTICKS, IMC_WRITES},
-    { REQUESTS_READS, REQUESTS_WRITES, CLOCKTICKS, IMC_WRITES},
+  uint32_t events[] = {
+    REQUESTS_READS, REQUESTS_WRITES, CLOCKTICKS, IMC_WRITES,
   };
 
   /* 2-4 buses and 2 devices per bus */
@@ -243,22 +242,26 @@ static int intel_hsw_hau_begin(struct stats_type *type)
   for (i = 0; i < num_buses; i++) {
     for (j = 0; j < 2; j++) {
       snprintf(bus_dev, sizeof(bus_dev), "%s/%s", bus[i], dev[j]);      
-      if (check_pci_id(bus_dev,ids[j]))
-	if (intel_hsw_hau_begin_dev(bus_dev, hau_events[j], 4) == 0)
-	  nr++; /* HARD */    
+      if (signature(HASWELL, cpu, &nr_events))
+	if (check_pci_id(bus_dev,ids[j]))
+	  if (intel_hsw_hau_begin_dev(bus_dev, events, 4) == 0)
+	    nr++; /* HARD */    
     }
   }
+
+  if (nr == 0)
+    type->st_enabled = 0;
 
   return nr > 0 ? 0 : -1;
 }
 
-static void intel_hsw_hau_collect_dev(struct stats_type *type, char *bus_dev, char *socket_dev)
+static void intel_hsw_hau_collect_dev(struct stats_type *type, char *bus_dev)
 {
   struct stats *stats = NULL;
   char pci_path[80];
   int pci_fd = -1;
 
-  stats = get_current_stats(type, socket_dev);
+  stats = get_current_stats(type, bus_dev);
   if (stats == NULL)
     goto out;
 
@@ -308,16 +311,13 @@ static void intel_hsw_hau_collect(struct stats_type *type)
   char *dev[2] = {"12.1", "12.5"};
   int   ids[2] = {0x2f30, 0x2f38};
   char bus_dev[80];       
-  char socket_dev[80];
 
   int i, j;
   for (i = 0; i < num_buses; i++) {
     for (j = 0; j < 2; j++) {
-
       snprintf(bus_dev, sizeof(bus_dev), "%s/%s", bus[i], dev[j]);
-      snprintf(socket_dev, sizeof(socket_dev), "%d/%s", i, dev[j]);
       if (check_pci_id(bus_dev,ids[j]))
-	intel_hsw_hau_collect_dev(type, bus_dev, socket_dev);
+	intel_hsw_hau_collect_dev(type, bus_dev);
     }
   }
 }

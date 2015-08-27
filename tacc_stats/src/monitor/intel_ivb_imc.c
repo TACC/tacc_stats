@@ -1,5 +1,5 @@
 /*! 
- \file intel_hsw_imc.c
+ \file intel_ivb_imc.c
  \author Todd Evans 
  \brief Performance Monitoring Counters for Intel Sandy Bridge Integrated Memory Controller (iMC)
 
@@ -149,7 +149,7 @@ reset and freeze the counters.
   
   To change events to count:
   -# Define event below
-  -# Modify events array in intel_hsw_imc_begin()
+  -# Modify events array in intel_ivb_imc_begin()
 */
 #define MBOX_PERF_EVENT(event, umask) \
   ( (event) \
@@ -171,24 +171,28 @@ reset and freeze the counters.
 #define CAS_WRITES          MBOX_PERF_EVENT(0x04, 0x0C)
 #define ACT_COUNT           MBOX_PERF_EVENT(0x01, 0x00)
 #define PRE_COUNT_ALL       MBOX_PERF_EVENT(0x02, 0x03)
-#define PRE_COUNT_MISS       MBOX_PERF_EVENT(0x02, 0x01)
+#define PRE_COUNT_MISS      MBOX_PERF_EVENT(0x02, 0x01)
 //@}
 
-static int intel_hsw_imc_begin_dev(char *bus_dev, uint32_t *events, size_t nr_events)
+#define PCI_DIR_PATH "/proc/bus/pci"
+
+static int intel_ivb_imc_begin_dev(char *bus_dev, uint32_t *events, 
+				   size_t nr_events)
 {
   int rc = -1;
   char pci_path[80];
   int pci_fd = -1;
   uint32_t ctl;
 
-  snprintf(pci_path, sizeof(pci_path), "/proc/bus/pci/%s", bus_dev);
+  snprintf(pci_path, sizeof(pci_path), "%s/%s", PCI_DIR_PATH, bus_dev);
+
   pci_fd = open(pci_path, O_RDWR);
   if (pci_fd < 0) {
     ERROR("cannot open `%s': %m\n", pci_path);
     goto out;
   }
 
-  ctl = 0x00103UL; // enable freeze (bit 16), freeze (bit 8)
+  ctl = 0x10100UL; // enable freeze (bit 16), freeze (bit 8)
   if (pwrite(pci_fd, &ctl, sizeof(ctl), MC_BOX_CTL) < 0) {
     ERROR("cannot enable freeze of MC counters: %m\n");
     goto out;
@@ -231,7 +235,7 @@ static int intel_hsw_imc_begin_dev(char *bus_dev, uint32_t *events, size_t nr_ev
     goto out;
   }
   
-  ctl = 0x00000UL; // unfreeze counters
+  ctl = 0x10000UL; // unfreeze counters
   if (pwrite(pci_fd, &ctl, sizeof(ctl), MC_BOX_CTL) < 0) {
     ERROR("cannot unfreeze MC counters: %m\n");
     goto out;
@@ -246,17 +250,16 @@ static int intel_hsw_imc_begin_dev(char *bus_dev, uint32_t *events, size_t nr_ev
   return rc;
 }
 
-static int intel_hsw_imc_begin(struct stats_type *type)
+static int intel_ivb_imc_begin(struct stats_type *type)
 {
   int nr = 0;
-
+  
   uint32_t events[] = {
     CAS_READS, CAS_WRITES, ACT_COUNT, PRE_COUNT_MISS,
   };
-
-  int dids[] = {0x2fb0, 0x2fb1, 0x2fb4, 0x2fb5, 
-		0x2fd0, 0x2fd1, 0x2fd4, 0x2fd5}; 
-
+  int dids[] = {0x0eb4, 0x0eb5, 0x0eb0, 0x0eb1,
+                0x0ef4, 0x0ef5, 0x0ef0, 0x0ef1};
+  
   char **dev_paths = NULL;
   int nr_devs;
 
@@ -265,7 +268,7 @@ static int intel_hsw_imc_begin(struct stats_type *type)
   
   int i;
   for (i = 0; i < nr_devs; i++)
-    if (intel_hsw_imc_begin_dev(dev_paths[i], events, 4) == 0)
+    if (intel_ivb_imc_begin_dev(dev_paths[i], events, 4) == 0)
       nr++; /* HARD */    
 
   if (nr == 0)
@@ -274,19 +277,18 @@ static int intel_hsw_imc_begin(struct stats_type *type)
   return nr > 0 ? 0 : -1;
 }
 
-static void intel_hsw_imc_collect_dev(struct stats_type *type, char *bus_dev)
+static void intel_ivb_imc_collect_dev(struct stats_type *type, char *bus_dev)
 {
   struct stats *stats = NULL;
   char pci_path[80];
   int pci_fd = -1;
 
+  TRACE("bus/dev %s\n", bus_dev);
   stats = get_current_stats(type, bus_dev);
   if (stats == NULL)
     goto out;
 
-  TRACE("bus/dev %s\n", bus_dev);
-
-  snprintf(pci_path, sizeof(pci_path), "/proc/bus/pci/%s", bus_dev);
+  snprintf(pci_path, sizeof(pci_path), "%s/%s", PCI_DIR_PATH, bus_dev);
   pci_fd = open(pci_path, O_RDONLY);
   if (pci_fd < 0) {
     ERROR("cannot open `%s': %m\n", pci_path);
@@ -320,28 +322,25 @@ static void intel_hsw_imc_collect_dev(struct stats_type *type, char *bus_dev)
     close(pci_fd);
 }
 
-static void intel_hsw_imc_collect(struct stats_type *type)
+static void intel_ivb_imc_collect(struct stats_type *type)
 {
-
-  int dids[] = {0x2fb0, 0x2fb1, 0x2fb4, 0x2fb5, 
-		0x2fd0, 0x2fd1, 0x2fd4, 0x2fd5}; 
+  int dids[] = {0x0eb4, 0x0eb5, 0x0eb0, 0x0eb1,
+                0x0ef4, 0x0ef5, 0x0ef0, 0x0ef1};
 
   char **dev_paths = NULL;
   int nr_devs;
-
   if (pci_map_create(&dev_paths, &nr_devs, dids, 8) < 0)
     TRACE("Failed to identify pci devices");
   
   int i;
   for (i = 0; i < nr_devs; i++)
-    intel_hsw_imc_collect_dev(type, dev_paths[i]);  
-
+    intel_ivb_imc_collect_dev(type, dev_paths[i]);  
 }
 
-struct stats_type intel_hsw_imc_stats_type = {
-  .st_name = "intel_hsw_imc",
-  .st_begin = &intel_hsw_imc_begin,
-  .st_collect = &intel_hsw_imc_collect,
+struct stats_type intel_ivb_imc_stats_type = {
+  .st_name = "intel_ivb_imc",
+  .st_begin = &intel_ivb_imc_begin,
+  .st_collect = &intel_ivb_imc_collect,
 #define X SCHEMA_DEF
   .st_schema_def = JOIN(KEYS),
 #undef X

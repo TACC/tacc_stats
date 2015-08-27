@@ -1,43 +1,3 @@
-/*! 
- \file intel_snb_r2pci.c
- \author Todd Evans 
- \brief Performance Monitoring Counters for Intel Sandy Bridge Ring to PCIe Interface (R2PCI)
-
-
-  \par Details such as Tables and Figures can be found in:
-  "Intel® Xeon® Processor E5-2600 Product Family Uncore 
-  Performance Monitoring Guide" 
-  Reference Number: 327043-001 March 2012 \n
-  R2PCI monitoring is described in Section 2.8.
-
-  \note
-  Sandy Bridge microarchitectures have signatures 06_2a and 06_2d. 
-  Stampede is 06_2d.
-
-
-  \par Location of monitoring register files
-
-  ex) Display PCI Config Space addresses:
-
-      $ lspci | grep "Ring to PCI"
-      7f:13.1 Performance counters: Intel Corporation Xeon E5/Core i7 Ring to PCI Express Performance Monitor (rev 07)
-      ff:13.1 Performance counters: Intel Corporation Xeon E5/Core i7 Ring to PCI Express Performance Monitor (rev 07)
-
-
-   \par PCI address layout of registers:
-
-   ~~~
-   PCI Config Space Dev ID:
-   Socket 1: 7f:13.1
-   Socket 0: ff:13.1
-   ~~~
-   
-   Layout shown in Table 2-104.
-   1 R2PCI w/ 4 counters each per socket
-   
-   There are 4 configure and 4 counter registers per R2PCI
-*/
-
 #include <stddef.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -55,32 +15,9 @@
 #include "check_pci_id.h"
 #include "pci_busid_map.h"
 
-/*! \name R2PCI Global Control Register
-
-  Layout in Table 2-105.  This register controls every R2PCI performance counter.  It can
-  reset and freeze the counters.
-*/
+/*! \name R2PCI Global Control Register */
 #define R2PCI_BOX_CTL        0xF4
 
-/*! \name R2PCI Configurable Performance Monitoring Registers
-
-  Control register layout in Table 2-106.  These are used to select events.  There are 4 per 
-  socket, 4 per R2PCI.
-
-  ~~~
-  threshhold        [31:24]
-  invert threshold  [23]
-  enable            [22]
-  edge detect       [18]
-  umask             [15:8]
-  event select      [7:0]
-  ~~~
-
-  \note
-  Counter registers are 64 bits with 44 used for counting.  They actually must be read from 
-  2 32 bit registers, with the first 32 (B) bits least and last 32 (A) bits most  significant.
-  @{
-*/
 #define R2PCI_CTL0           0xD8
 #define R2PCI_CTL1           0xDC
 #define R2PCI_CTL2           0xE0
@@ -94,15 +31,7 @@
 #define R2PCI_A_CTR2         0xB4
 #define R2PCI_B_CTR3         0xB8
 #define R2PCI_A_CTR3         0xBC
-//@}
 
-/*! \name KEYS will define the raw schema for this type. 
-  
-  The required order of registers is:
-  -# Control registers in order
-  -# Counter registers in order
-  @{
-*/
 #define CTL_KEYS \
     X(CTL0, "C", ""), \
     X(CTL1, "C", ""), \
@@ -116,18 +45,8 @@
     X(CTR3, "E,W=44", "")
 
 #define KEYS CTL_KEYS, CTR_KEYS
-//@}
 
-/*! \brief Event select
-  
-  Events are listed in Table 2-108.  They are defined in detail
-  in Section 2.8.7.
-  
-  To change events to count:
-  -# Define event below
-  -# Modify events array in intel_snb_r2pci_begin()
-*/
-#define R2PCI_PERF_EVENT(event, umask) \
+#define PERF_EVENT(event, umask) \
   ( (event) \
   | (umask << 8) \
   | (0UL << 17) /* reset counter */ \
@@ -137,19 +56,12 @@
   | (0x01UL << 24) /* Threshold */ \
   )
 
-/*! \name Events
+#define TxR_INSERTS      PERF_EVENT(0x24,0x04)  //!< CTR0 only
+#define CLOCKTICKS       PERF_EVENT(0x01,0x00)
+#define RING_AD_USED_ALL PERF_EVENT(0x07,0x0F)
+#define RING_AK_USED_ALL PERF_EVENT(0x08,0x0F) 
+#define RING_BL_USED_ALL PERF_EVENT(0x09,0x0F) 
 
-  Events are listed in Table 2-108.  They are defined in detail
-  in Section 2.8.7.
-
-@{
- */
-#define TxR_INSERTS      R2PCI_PERF_EVENT(0x24,0x04)  //!< CTR0 only
-#define CLOCKTICKS       R2PCI_PERF_EVENT(0x01,0x00)
-#define RING_AD_USED_ALL R2PCI_PERF_EVENT(0x07,0x0F)
-#define RING_AK_USED_ALL R2PCI_PERF_EVENT(0x08,0x0F) 
-#define RING_BL_USED_ALL R2PCI_PERF_EVENT(0x09,0x0F) 
-//@}
 
 static int intel_snb_r2pci_begin_dev(char *bus_dev, uint32_t *events, size_t nr_events)
 {
@@ -203,31 +115,25 @@ static int intel_snb_r2pci_begin(struct stats_type *type)
 {
   int nr = 0;
   
-  uint32_t r2pci_events[1][4] = {
-    { TxR_INSERTS, RING_BL_USED_ALL, RING_AD_USED_ALL, RING_AK_USED_ALL},
+  uint32_t events[] = {
+    TxR_INSERTS, RING_BL_USED_ALL, RING_AD_USED_ALL, RING_AK_USED_ALL,
   };
 
-  /* 2-4 buses and 1 device per bus */
-  char **bus;
-  int num_buses;
-  num_buses = get_pci_busids(&bus);
+  int dids[] = {0x3c43};
 
-  char *dev[1] = {"13.1"};
-  int   ids[1] = {0x3c43};
-  char bus_dev[80];
+  char **dev_paths = NULL;
+  int nr_devs;
 
-  int i, j;
-  for (i = 0; i < num_buses; i++) {
-    for (j = 0; j < 1; j++) {
+  if (pci_map_create(&dev_paths, &nr_devs, dids, 1) < 0)
+    TRACE("Failed to identify pci devices");
+  
+  int i;
+  for (i = 0; i < nr_devs; i++)
+    if (intel_snb_r2pci_begin_dev(dev_paths[i], events, 4) == 0)
+      nr++; /* HARD */    
 
-      snprintf(bus_dev, sizeof(bus_dev), "%s/%s", bus[i], dev[j]);
-      
-      if (check_pci_id(bus_dev, ids[j]))
-	if (intel_snb_r2pci_begin_dev(bus_dev, r2pci_events[j], 4) == 0)
-	  nr++; /* HARD */
-    
-    }
-  }
+  if (nr == 0)
+    type->st_enabled = 0;
 
   return nr > 0 ? 0 : -1;
 }
@@ -283,25 +189,16 @@ static void intel_snb_r2pci_collect_dev(struct stats_type *type, char *bus_dev, 
 
 static void intel_snb_r2pci_collect(struct stats_type *type)
 {
-  /* 2-4 buses and 1 device per bus */
-  char **bus;
-  int num_buses;
-  num_buses = get_pci_busids(&bus);
+  int ids[] = {0x3c43};
 
-  char *dev[1] = {"13.1"};
-  int   ids[1] = {0x3c43};
-  char bus_dev[80];                                        
-  char socket_dev[80];
+  char **dev_paths = NULL;
+  int nr_devs;
+  if (pci_map_create(&dev_paths, &nr_devs, dids, 1) < 0)
+    TRACE("Failed to identify pci devices");
   
-  int i, j;
-  for (i = 0; i < num_buses; i++) {
-    for (j = 0; j < 1; j++) {
-      snprintf(bus_dev, sizeof(bus_dev), "%s/%s", bus[i], dev[j]);      
-      snprintf(socket_dev, sizeof(socket_dev), "%d/%d", i, j);      
-      if (check_pci_id(bus_dev, ids[j]))
-	intel_snb_r2pci_collect_dev(type, bus_dev, socket_dev);
-    }
-  }
+  int i;
+  for (i = 0; i < nr_devs; i++)
+    intel_snb_r2pci_collect_dev(type, dev_paths[i]);  
 }
 
 struct stats_type intel_snb_r2pci_stats_type = {
