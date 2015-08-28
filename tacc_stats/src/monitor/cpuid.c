@@ -145,7 +145,7 @@ int signature(processor_t p, char *cpu, int *nr_ctrs) {
   return rc;
 }
 
-int topology(char *cpu, int *nr_procs, int *pkg_id, int *core_id, int *smt_id)
+int topology(char *cpu, int *pkg_id, int *core_id, int *smt_id)
 {
   int i;
   char cpuid_path[80];
@@ -216,7 +216,6 @@ int topology(char *cpu, int *nr_procs, int *pkg_id, int *core_id, int *smt_id)
 	      *core_id = (x2APIC_ID & CoreOnly_Select_Mask) >> SMT_Mask_Width;	      
 	      Pkg_Select_Mask = (-1) << CorePlus_Mask_Width;
 	      *pkg_id = (x2APIC_ID & Pkg_Select_Mask) >> CorePlus_Mask_Width;
-	      *nr_procs = buf[1];
 	      rc = 1;
 	      break;
 	    }

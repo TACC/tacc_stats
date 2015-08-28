@@ -30,6 +30,7 @@
 #define B_CTR3         0xB8
 #define A_CTR3         0xBC
 
+/* Fixed counters are available on IMC */
 #define FIXED_CTL      0xF0
 #define B_FIXED_CTR    0xD0
 #define A_FIXED_CTR    0xD4
@@ -46,7 +47,7 @@
     X(CTR2),	   \
     X(CTR3)
 
-static int intel_snb_uncore_begin_dev(struct stats_type *type, char *bus_dev, uint32_t *events, size_t nr_events)
+static int intel_snb_uncore_begin_dev(char *bus_dev, uint32_t *events, size_t nr_events)
 {
   int rc = -1;
   char pci_path[80];
@@ -89,20 +90,6 @@ static int intel_snb_uncore_begin_dev(struct stats_type *type, char *bus_dev, ui
       ERROR("cannot reset counter %08X,%08X through `%s': %m\n", 
 	    (unsigned) A_CTR0 + 8*i, (unsigned) B_CTR0 + 8*i,
             pci_path);
-      goto out;
-    }
-  }
-
-  if (strcmp(type->st_name, "intel_snb_imc") == 0) {
-    ctl = 0x80000UL; // Reset Fixed Counter
-    if (pwrite(pci_fd, &ctl, sizeof(ctl), FIXED_CTL) < 0) {
-      ERROR("cannot undo reset of MC Fixed counter: %m\n");
-      goto out;
-    }
-    
-    ctl = 0x400000UL; // Enable Fixed Counter
-    if (pwrite(pci_fd, &ctl, sizeof(ctl), FIXED_CTL) < 0) {
-      ERROR("cannot undo reset of MC Fixed counter: %m\n");
       goto out;
     }
   }
@@ -170,3 +157,4 @@ static void intel_snb_uncore_collect_dev(struct stats_type *type, char *bus_dev)
   if (pci_fd >= 0)
     close(pci_fd);
 }
+

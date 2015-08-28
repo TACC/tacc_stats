@@ -13,6 +13,6 @@ typedef enum {
   
 // Return 1 for true and 0 for false
 int signature(processor_t p, char *cpu, int *nr_events);
-int topology(char *cpu, int *nr_procs, int *pkg, int *core, int *smt);
+int topology(char *cpu, int *pkg, int *core, int *smt);
 
 #endif

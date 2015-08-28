@@ -63,7 +63,7 @@ static int intel_snb_imc_begin(struct stats_type *type)
   
   int i;
   for (i = 0; i < nr_devs; i++)
-    if (intel_snb_uncore_begin_dev(type, dev_paths[i], events, 4) == 0)
+    if (intel_snb_uncore_begin_dev(dev_paths[i], events, 4) == 0)
       nr++;
 
   if (nr == 0)

@@ -51,22 +51,21 @@
 static int intel_snb_qpi_begin(struct stats_type *type)
 {
   int nr = 0;
-
-  uint32_t events[] = {
-    TxL_FLITS_G1_SNP,  TxL_FLITS_G1_HOM, G1_DRS_DATA, G2_NCB_DATA,   
-  };
   int dids[] = {0x3c41, 0x3c42};
+  int nr_dids = 2;
+  uint32_t events[] = {TxL_FLITS_G1_SNP,  TxL_FLITS_G1_HOM, G1_DRS_DATA, G2_NCB_DATA};
+  int nr_events = 4;
 
   char **dev_paths = NULL;
   int nr_devs;
 
-  if (pci_map_create(&dev_paths, &nr_devs, dids, 2) < 0)
+  if (pci_map_create(&dev_paths, &nr_devs, dids, nr_dids) < 0)
     TRACE("Failed to identify pci devices");
   
   int i;
   for (i = 0; i < nr_devs; i++)
-    if (intel_snb_uncore_begin_dev(type, dev_paths[i], events, 4) == 0)
-      nr++; /* HARD */    
+    if (intel_snb_uncore_begin_dev(dev_paths[i], events, nr_events) == 0)
+      nr++;
   
   if (nr == 0)
     type->st_enabled = 0;
@@ -78,17 +77,17 @@ static int intel_snb_qpi_begin(struct stats_type *type)
 static void intel_snb_qpi_collect(struct stats_type *type)
 {
   int dids[] = {0x3c41, 0x3c42};
+  int nr_dids = 2;
 
   char **dev_paths = NULL;
   int nr_devs;
-  if (pci_map_create(&dev_paths, &nr_devs, dids, 2) < 0)
+  if (pci_map_create(&dev_paths, &nr_devs, dids, nr_dids) < 0)
     TRACE("Failed to identify pci devices");
   
   int i;
   for (i = 0; i < nr_devs; i++)
     intel_snb_uncore_collect_dev(type, dev_paths[i]);  
 }
-
 
 struct stats_type intel_snb_qpi_stats_type = {
   .st_name = "intel_snb_qpi",
