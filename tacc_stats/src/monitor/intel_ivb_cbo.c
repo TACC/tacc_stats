@@ -166,10 +166,10 @@ static int intel_ivb_cbo_begin(struct stats_type *type)
 {
   int nr = 0;
   uint64_t events[] = {
-    RxR_OCCUPANCY, 
     LLC_LOOKUP_DATA_READ, 
     LLC_LOOKUP_WRITE,
     LLC_LOOKUP_VICTIMS, 
+    COUNTER0_OCCUPANCY
   };
 
   int i;
