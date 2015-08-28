@@ -48,56 +48,6 @@
 #define G1_DRS_DATA       PERF_EVENT(0x02,0x08) //!< for data bandwidth, flits x 8B/time
 #define G2_NCB_DATA       PERF_EVENT(0x03,0x04) //!< for data bandwidth, flits x 8B/time
 
-static int intel_snb_qpi_begin_dev(char *bus_dev, uint32_t *events, 
-				   size_t nr_events)
-{
-  int rc = -1;
-  char pci_path[80];
-  int pci_fd = -1;
-  uint32_t ctl;
-
-  snprintf(pci_path, sizeof(pci_path), "/proc/bus/pci/%s", bus_dev);
-
-  pci_fd = open(pci_path, O_RDWR);
-  if (pci_fd < 0) {
-    ERROR("cannot open `%s': %m\n", pci_path);
-    goto out;
-  }
-
-  ctl = 0x10103UL; // enable freeze (bit 16), freeze (bit 8), reset counters
-  if (pwrite(pci_fd, &ctl, sizeof(ctl), BOX_CTL) < 0) {
-    ERROR("cannot enable freeze of QPI counters: %m\n");
-    goto out;
-  }
-  
-  /* Select Events for QPI counters, CTLx registers are 4 bits apart */
-  int i;
-  for (i = 0; i < nr_events; i++) {
-    TRACE("PCI Address %08X, event %016lX\n", CTL0 + 4*i, (unsigned long) events[i]);
-    if (pwrite(pci_fd, &events[i], sizeof(events[i]), CTL0 + 4*i) < 0) { 
-      ERROR("cannot write event %016lX to PCI Address %08X through `%s': %m\n", 
-            (unsigned long) events[i],
-            (unsigned) CTL0 + 4*i,
-            pci_path);
-      goto out;
-    }
-  }
-
-  ctl = 0x10000UL; // unfreeze counter
-  if (pwrite(pci_fd, &ctl, sizeof(ctl), BOX_CTL) < 0) {
-    ERROR("cannot unfreeze QPI counters: %m\n");
-    goto out;
-  }
-
-  rc = 0;
-
- out:
-  if (pci_fd >= 0)
-    close(pci_fd);
-
-  return rc;
-}
-
 static int intel_snb_qpi_begin(struct stats_type *type)
 {
   int nr = 0;
@@ -115,7 +65,7 @@ static int intel_snb_qpi_begin(struct stats_type *type)
   
   int i;
   for (i = 0; i < nr_devs; i++)
-    if (intel_snb_qpi_begin_dev(dev_paths[i], events, 4) == 0)
+    if (intel_snb_uncore_begin_dev(type, dev_paths[i], events, 4) == 0)
       nr++; /* HARD */    
   
   if (nr == 0)

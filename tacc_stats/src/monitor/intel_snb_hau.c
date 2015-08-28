@@ -43,68 +43,6 @@
 #define CLOCKTICKS      PERF_EVENT(0x00,0x00)
 #define IMC_WRITES      PERF_EVENT(0x1A,0x0F) 
 
-static int intel_snb_hau_begin_dev(char *bus_dev, uint32_t *events, size_t nr_events)
-{
-  int rc = -1;
-  char pci_path[80];
-  int pci_fd = -1;
-  uint32_t ctl;
-
-  snprintf(pci_path, sizeof(pci_path), "/proc/bus/pci/%s", bus_dev);
-  pci_fd = open(pci_path, O_RDWR);
-  if (pci_fd < 0) {
-    ERROR("cannot open `%s': %m\n", pci_path);
-    goto out;
-  }
-
-  ctl = 0x10100UL; // enable freeze (bit 16), freeze (bit 8)
-  if (pwrite(pci_fd, &ctl, sizeof(ctl), BOX_CTL) < 0) {
-    ERROR("cannot enable freeze of HAU counters: %m\n");
-    goto out;
-  }
-  
-  /* Select Events for HAU counters, CTLx registers are 4 bits apart */
-  int i;
-  for (i = 0; i < nr_events; i++) {
-    TRACE("PCI Address %08X, event %016lX\n", CTL0 + 4*i, (unsigned long) events[i]);
-    if (pwrite(pci_fd, &events[i], sizeof(events[i]), CTL0 + 4*i) < 0) { 
-      ERROR("cannot write event %016lX to PCI Address %08X through `%s': %m\n", 
-            (unsigned long) events[i],
-            (unsigned) CTL0 + 4*i,
-            pci_path);
-      goto out;
-    }
-  }
-
-  /* HAU Counters must be manually reset */
-
-  /* Manually reset programmable HAU counters. They are 4 apart, but each counter register is split into 2 32-bit registers, A and B */
-  int zero = 0x0UL;
-  for (i = 0; i < nr_events; i++) {
-    if (pwrite(pci_fd, &zero, sizeof(zero), A_CTR0 + 8*i) < 0 || 
-	pwrite(pci_fd, &zero, sizeof(zero), B_CTR0 + 8*i) < 0) { 
-      ERROR("cannot reset counter %08X,%08X through `%s': %m\n", 
-	    (unsigned) A_CTR0 + 8*i, (unsigned) B_CTR0 + 8*i,
-            pci_path);
-      goto out;
-    }
-  }
-  
-  ctl = 0x10000UL; // unfreeze counter
-  if (pwrite(pci_fd, &ctl, sizeof(ctl), BOX_CTL) < 0) {
-    ERROR("cannot unfreeze HAU counters: %m\n");
-    goto out;
-  }
-
-  rc = 0;
-
- out:
-  if (pci_fd >= 0)
-    close(pci_fd);
-
-  return rc;
-}
-
 static int intel_snb_hau_begin(struct stats_type *type)
 {
   int nr = 0;
@@ -122,7 +60,7 @@ static int intel_snb_hau_begin(struct stats_type *type)
   
   int i;
   for (i = 0; i < nr_devs; i++)
-    if (intel_snb_hau_begin_dev(dev_paths[i], events, 4) == 0)
+    if (intel_snb_uncore_begin_dev(type, dev_paths[i], events, 4) == 0)
       nr++;   
   
   if (nr == 0)

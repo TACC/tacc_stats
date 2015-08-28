@@ -46,6 +46,82 @@
     X(CTR2),	   \
     X(CTR3)
 
+static int intel_snb_uncore_begin_dev(struct stats_type *type, char *bus_dev, uint32_t *events, size_t nr_events)
+{
+  int rc = -1;
+  char pci_path[80];
+  int pci_fd = -1;
+  uint32_t ctl;
+
+  snprintf(pci_path, sizeof(pci_path), "/proc/bus/pci/%s", bus_dev);
+
+  pci_fd = open(pci_path, O_RDWR);
+  if (pci_fd < 0) {
+    ERROR("cannot open `%s': %m\n", pci_path);
+    goto out;
+  }
+
+  ctl = 0x10100UL; // enable freeze (bit 16), freeze (bit 8), reset counters
+  if (pwrite(pci_fd, &ctl, sizeof(ctl), BOX_CTL) < 0) {
+    ERROR("cannot enable freeze of QPI counters: %m\n");
+    goto out;
+  }
+  
+  /* Select Events for Uncore counters, CTLx registers are 4 bits apart */
+  int i;
+  for (i = 0; i < nr_events; i++) {
+    TRACE("PCI Address %08X, event %016lX\n", CTL0 + 4*i, (unsigned long) events[i]);
+    if (pwrite(pci_fd, &events[i], sizeof(events[i]), CTL0 + 4*i) < 0) { 
+      ERROR("cannot write event %016lX to PCI Address %08X through `%s': %m\n", 
+            (unsigned long) events[i],
+            (unsigned) CTL0 + 4*i,
+            pci_path);
+      goto out;
+    }
+  }
+
+  /* Manually reset programmable Uncore counters. They are 4 apart, 
+     but each counter register is split into 2 32-bit registers, A and B */
+  uint32_t zero = 0x0UL;
+  for (i = 0; i < nr_events; i++) {
+    if (pwrite(pci_fd, &zero, sizeof(zero), A_CTR0 + 8*i) < 0 || 
+	pwrite(pci_fd, &zero, sizeof(zero), B_CTR0 + 8*i) < 0) { 
+      ERROR("cannot reset counter %08X,%08X through `%s': %m\n", 
+	    (unsigned) A_CTR0 + 8*i, (unsigned) B_CTR0 + 8*i,
+            pci_path);
+      goto out;
+    }
+  }
+
+  if (strcmp(type->st_name, "intel_snb_imc") == 0) {
+    ctl = 0x80000UL; // Reset Fixed Counter
+    if (pwrite(pci_fd, &ctl, sizeof(ctl), FIXED_CTL) < 0) {
+      ERROR("cannot undo reset of MC Fixed counter: %m\n");
+      goto out;
+    }
+    
+    ctl = 0x400000UL; // Enable Fixed Counter
+    if (pwrite(pci_fd, &ctl, sizeof(ctl), FIXED_CTL) < 0) {
+      ERROR("cannot undo reset of MC Fixed counter: %m\n");
+      goto out;
+    }
+  }
+
+  ctl = 0x10000UL; // unfreeze counter
+  if (pwrite(pci_fd, &ctl, sizeof(ctl), BOX_CTL) < 0) {
+    ERROR("cannot unfreeze counters: %m\n");
+    goto out;
+  }
+
+  rc = 0;
+
+ out:
+  if (pci_fd >= 0)
+    close(pci_fd);
+
+  return rc;
+}
+
 static void intel_snb_uncore_collect_dev(struct stats_type *type, char *bus_dev)
 {
   struct stats *stats = NULL;
