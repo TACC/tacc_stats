@@ -30,9 +30,9 @@
 #define B_CTR3         0xB8
 #define A_CTR3         0xBC
 
-#define IMC_FIXED_CTL      0xF0
-#define B_IMC_FIXED_CTR    0xD0
-#define A_IMC_FIXED_CTR    0xD4
+#define FIXED_CTL      0xF0
+#define B_FIXED_CTR    0xD0
+#define A_FIXED_CTR    0xD4
 
 #define G_CTL_KEYS   \
   X(CTL0),	   \
