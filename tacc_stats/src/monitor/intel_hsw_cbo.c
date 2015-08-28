@@ -202,8 +202,8 @@
 #define RxR_OCCUPANCY        CBOX_PERF_EVENT(0x11, 0x01) //!< CTR0
 #define COUNTER0_OCCUPANCY   CBOX_PERF_EVENT(0x1F, 0x00) //!< CTR1-3
 #define LLC_LOOKUP_DATA_READ CBOX_PERF_EVENT(0x34, 0x03) //!< CTR0-3
-#define LLC_LOOKUP_ANY       CBOX_PERF_EVENT(0x34, 0x11) //!< CTR0-3
 #define LLC_LOOKUP_WRITE     CBOX_PERF_EVENT(0x34, 0x05) //!< CTR0-3
+#define LLC_LOOKUP_ANY       CBOX_PERF_EVENT(0x34, 0x11) //!< CTR0-3
 //@}
 
 //! Configure and start counters for CBo
