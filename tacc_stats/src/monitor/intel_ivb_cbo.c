@@ -58,7 +58,7 @@
   Can filter by opcode, MESIF state, node, core, thread
  */
 #define CBOX_FILTER(...)  \
-  ( (0x1ULL << 0)  \
+  ( (0x0ULL << 0)  \
   | (0x00ULL << 10) \
   | (0x1FULL << 18)  \
   | (0x000ULL << 23) \
@@ -78,7 +78,7 @@
   | (umask << 8) \
   | (0ULL << 17) \
   | (0ULL << 18) \
-  | (1ULL << 19) \
+  | (0ULL << 19) \
   | (1ULL << 22) \
   | (0ULL << 23) \
   | (0x01ULL << 24) \
@@ -181,7 +181,7 @@ static int intel_ivb_cbo_begin(struct stats_type *type)
     int nr_events;
 
     snprintf(cpu, sizeof(cpu), "%d", i);
-    if (signature(SANDYBRIDGE, cpu, &nr_events)) {
+    if (signature(IVYBRIDGE, cpu, &nr_events)) {
       topology(cpu, &pkg_id, &core_id, &smt_id);
       if (smt_id == 0)
 	if (intel_ivb_cbo_begin_box(cpu, core_id, events, 4) == 0)

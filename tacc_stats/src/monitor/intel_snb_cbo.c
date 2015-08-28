@@ -58,7 +58,7 @@
   Can filter by opcode, MESIF state, node, core, thread
  */
 #define CBOX_FILTER(...)  \
-  ( (0x1ULL << 0)  \
+  ( (0x0ULL << 0)  \
   | (0x00ULL << 10) \
   | (0x1FULL << 18)  \
   | (0x000ULL << 23) \
@@ -78,7 +78,7 @@
   | (umask << 8) \
   | (0ULL << 17) \
   | (0ULL << 18) \
-  | (1ULL << 19) \
+  | (0ULL << 19) \
   | (1ULL << 22) \
   | (0ULL << 23) \
   | (0x01ULL << 24) \
