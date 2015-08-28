@@ -54,7 +54,7 @@ static int intel_snb_imc_begin_dev(char *bus_dev, uint32_t *events,
   int pci_fd = -1;
   uint32_t ctl;
 
-  snprintf(pci_path, sizeof(pci_path), "%s/%s", "/proc/bus/pci/%s", bus_dev);
+  snprintf(pci_path, sizeof(pci_path), "%s/%s", "/proc/bus/pci", bus_dev);
 
   pci_fd = open(pci_path, O_RDWR);
   if (pci_fd < 0) {
