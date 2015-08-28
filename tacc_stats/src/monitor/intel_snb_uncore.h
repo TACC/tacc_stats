@@ -87,7 +87,7 @@ static void intel_snb_uncore_collect_dev(struct stats_type *type, char *bus_dev)
   })
   G_CTR_KEYS;
   if (strcmp(type->st_name, "intel_snb_imc") == 0)
-    X(IMC_FIXED_CTR);
+    X(FIXED_CTR);
 #undef X
 
  out:
