@@ -51,7 +51,7 @@
 #include "stats.h"
 #include "trace.h"
 #include "pscanf.h"
-#include "cpu_is_hsw.h"
+#include "cpuid.h"
 
 /*! \name PCU global control register
 
@@ -258,10 +258,12 @@ static int intel_hsw_pcu_begin(struct stats_type *type)
 {
   int nr = 0;
 
-  uint64_t pcu_events[4] = {FREQ_MAX_TEMP_CYCLES,
-			    FREQ_MAX_POWER_CYCLES,
-			    FREQ_MIN_IO_CYCLES,
-			    FREQ_MIN_SNOOP_CYCLES};
+  uint64_t pcu_events[4] = {
+    FREQ_MAX_TEMP_CYCLES,
+    FREQ_MAX_POWER_CYCLES,
+    FREQ_MIN_IO_CYCLES,
+    FREQ_MIN_SNOOP_CYCLES
+  };
 
   int i;
   for (i = 0; i < nr_cpus; i++) {
@@ -275,7 +277,7 @@ static int intel_hsw_pcu_begin(struct stats_type *type)
     if (signature(HASWELL, cpu, &nr_events)) {
       topology(cpu, &pkg_id, &core_id, &smt_id);
       if (core_id == 0 && smt_id == 0)
-	if (intel_snb_pcu_begin_socket(cpu, pcu_events,4) == 0)
+	if (intel_hsw_pcu_begin_socket(cpu, pcu_events,4) == 0)
 	  nr++;
     }
   }
@@ -287,18 +289,19 @@ static int intel_hsw_pcu_begin(struct stats_type *type)
 }
 
 //! Collect values of counters for PCU
-static void intel_hsw_pcu_collect_socket(struct stats_type *type, char *cpu, char* pcu)
+static void intel_hsw_pcu_collect_socket(struct stats_type *type, char *cpu, int pkg_id)
 {
   struct stats *stats = NULL;
   char msr_path[80];
   int msr_fd = -1;
+  char pkg[80];
+  snprintf(pkg, sizeof(pkg), "%d", pkg_id);
 
-  stats = get_current_stats(type, pcu);
+  TRACE("cpu %s pkg %s\n", cpu, pkg);
+
+  stats = get_current_stats(type, pkg);
   if (stats == NULL)
     goto out;
-
-  TRACE("cpu %s\n", cpu);
-  TRACE("cpu %s\n", pcu);
 
   snprintf(msr_path, sizeof(msr_path), "/dev/cpu/%s/msr", cpu);
   msr_fd = open(msr_path, O_RDONLY);
@@ -337,7 +340,7 @@ static void intel_hsw_pcu_collect(struct stats_type *type)
     topology(cpu, &pkg_id, &core_id, &smt_id);
   
     if (core_id == 0 && smt_id == 0)
-      intel_snb_pcu_collect_socket(type, cpu, pkg_id);
+      intel_hsw_pcu_collect_socket(type, cpu, pkg_id);
   }
 }
 

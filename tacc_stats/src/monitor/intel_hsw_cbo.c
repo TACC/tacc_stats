@@ -204,6 +204,7 @@
 #define LLC_LOOKUP_DATA_READ CBOX_PERF_EVENT(0x34, 0x03) //!< CTR0-3
 #define LLC_LOOKUP_WRITE     CBOX_PERF_EVENT(0x34, 0x05) //!< CTR0-3
 #define LLC_LOOKUP_ANY       CBOX_PERF_EVENT(0x34, 0x11) //!< CTR0-3
+#define RING_IV_USED         CBOX_PERF_EVENT(0x1E, 0x0F)
 //@}
 
 //! Configure and start counters for CBo
@@ -280,7 +281,7 @@ static int intel_hsw_cbo_begin(struct stats_type *type)
   uint64_t events[] = {
     RxR_OCCUPANCY, 
     LLC_LOOKUP_DATA_READ, 
-    LLC_LOOKUP_ANY, 
+    RING_IV_USED, 
     LLC_LOOKUP_WRITE,
   };
 
