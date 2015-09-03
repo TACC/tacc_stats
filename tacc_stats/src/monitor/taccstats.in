@@ -8,7 +8,7 @@
 
 PATH=/opt/tacc_statsd:/bin:/sbin:/usr/bin
 PID_FILE=stats_lock
-SERVER=server
+SERVER=rmq_server
 JOBID_FILE=jobid_file
 
 status() {

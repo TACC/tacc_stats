@@ -30,7 +30,7 @@ int consume(const char *hostname, const char* port, const char* archive_dir)
   amqp_bytes_t queuename;
 
   exchange = "amq.direct";
-  bindingkey = HOST_NAME_EXT;
+  bindingkey = HOST_NAME_QUEUE;
 
   conn = amqp_new_connection();
   socket = amqp_tcp_socket_new(conn);

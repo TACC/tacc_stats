@@ -7,11 +7,9 @@
 #include <sys/utsname.h>
 #include <syslog.h>
 
-#ifdef RMQ
 #include <amqp_tcp_socket.h>
 #include <amqp.h>
 #include <amqp_framing.h>
-#endif
 
 #include "stats.h"
 #include "stats_buffer.h"
@@ -33,7 +31,6 @@
     free(tmp_string);						\
   } while(0)
 
-#ifdef RMQ
 static int send(struct stats_buffer *sf)
 {
   int status;
@@ -42,7 +39,7 @@ static int send(struct stats_buffer *sf)
   amqp_socket_t *socket = NULL;
   amqp_connection_state_t conn;
   exchange = "amq.direct";
-  routingkey = HOST_NAME_EXT;
+  routingkey = HOST_NAME_QUEUE;
   conn = amqp_new_connection();
   socket = amqp_tcp_socket_new(conn);
   status = amqp_socket_open(socket, sf->sf_host, atoi(sf->sf_port));
@@ -71,12 +68,6 @@ static int send(struct stats_buffer *sf)
 
   return 0;
 }
-#else
-static int send(struct stats_buffer *sf) {
-  syslog(LOG_INFO, "%s\n", sf->sf_data);
-  return 0;
-}
-#endif
 
 int stats_wr_hdr(struct stats_buffer *sf)
 {

@@ -96,12 +96,8 @@ static void usage(void)
           "\n"
           "Mandatory arguments to long options are mandatory for short options too.\n"
           "  -h, --help         display this help and exit\n"
-#ifdef RMQ 
           "  -s [SERVER] or --server [SERVER]       Server to send data.\n"
           "  -p [PORT] or --port [PORT]         Port to use (5672 is the default).\n"
-#endif
-          /* "  -l, --list-types ...\n" */
-          /* describe */
           ,
           program_invocation_short_name);
 }
@@ -179,7 +175,6 @@ int main(int argc, char *argv[])
   }
   umask(022);
 
-#ifdef RMQ
   if (host == NULL) {
     fprintf(stderr, "Must specify a RMQ server with -s [--server] argument.\n");
     rc = -1;
@@ -188,7 +183,6 @@ int main(int argc, char *argv[])
   if (port == NULL) { 
     port = "5672";
   }
-#endif
 
   enum {
     cmd_begin,
@@ -263,11 +257,9 @@ int main(int argc, char *argv[])
     if (stats_buffer_open(&sf) < 0) {
       ERROR("Failed opening data buffer : %m\n");
     }
-    
-#ifdef RMQ
+
     sf.sf_host = host;
     sf.sf_port = port;
-#endif
 
     // Get current time
     gettimeofday(&tp,NULL);
