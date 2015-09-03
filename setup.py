@@ -221,7 +221,7 @@ root='tacc_stats/src/monitor/'
 sources=[
     pjoin(root,'schema.c'),pjoin(root,'dict.c'),
     pjoin(root,'cpuid.c'),pjoin(root,'pci.c'),pjoin(root,'collect.c'),
-    pjoin(root,"pci_busid_map.c"),pjoin(root,'stats_file.c'),
+    pjoin(root,'stats_file.c'),
     pjoin(root,'stats_buffer.c'),pjoin(root,'stats.c')
     ]
 

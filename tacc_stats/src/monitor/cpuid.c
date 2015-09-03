@@ -145,7 +145,7 @@ int signature(processor_t p, char *cpu, int *nr_ctrs) {
   return rc;
 }
 
-int topology(char *cpu, int *pkg_id, int *core_id, int *smt_id)
+int topology(char *cpu, int *pkg_id, int *core_id, int *smt_id, int *nr_core)
 {
   int i;
   char cpuid_path[80];
@@ -185,7 +185,7 @@ int topology(char *cpu, int *pkg_id, int *core_id, int *smt_id)
   int SMT_Mask_Width = -1, SMT_Select_Mask = -1;      
   int CorePlus_Mask_Width, CoreOnly_Select_Mask;
   int Pkg_Select_Mask;
-  
+  int nr_smt;
   if (buf[1] != 0)
     {
       for (i=0; i <= max_leaf; i++)
@@ -204,6 +204,7 @@ int topology(char *cpu, int *pkg_id, int *core_id, int *smt_id)
 	  /* SMT level type from EC[16:8] = 1 */
 	  if (((buf[2] >> 8) & 0xFF) == 1)
 	    {	      
+	      nr_smt = buf[1];
 	      SMT_Mask_Width = buf[0] & 0xF;
 	      SMT_Select_Mask = ~((-1) << SMT_Mask_Width);
 	      *smt_id = x2APIC_ID & SMT_Select_Mask;
@@ -211,6 +212,7 @@ int topology(char *cpu, int *pkg_id, int *core_id, int *smt_id)
 	  /* Core level type from EC[16:8] = 2 */
 	  else if (((buf[2] >> 8) & 0xFF) == 2)
 	    {	     
+	      *nr_core = buf[1]/nr_smt;
 	      CorePlus_Mask_Width = buf[0] & 0xF;
 	      CoreOnly_Select_Mask = ~((-1) << CorePlus_Mask_Width) ^ SMT_Select_Mask;
 	      *core_id = (x2APIC_ID & CoreOnly_Select_Mask) >> SMT_Mask_Width;	      
@@ -221,7 +223,7 @@ int topology(char *cpu, int *pkg_id, int *core_id, int *smt_id)
 	    }
 	}
     }
-
+  TRACE("Number of threads/physical cores %d/%d\n", nr_smt, *nr_core);
   TRACE("Pkg_ID Core_ID SMT_ID %d %d %d\n", *pkg_id, *core_id, *smt_id);
  out:
   if (cpuid_fd >= 0)

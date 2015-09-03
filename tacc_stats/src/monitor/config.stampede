@@ -1,7 +1,0 @@
-TYPES += numa
-TYPES += ps
-TYPES += sysv_shm
-TYPES += tmpfs
-TYPES += vfs
-TYPES += vm
-TYPES += llite

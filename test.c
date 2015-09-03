@@ -49,11 +49,23 @@ int topology(int core)
   unsigned int x2APIC_ID = regs[3] & 0xFFFFFFFF;
   printf("APIC ID %X\n",x2APIC_ID);
 
+
+  char msr_path[80];
+  int msr_fd = -1;
+  int apicid = 0;
+  snprintf(msr_path, sizeof(msr_path), "/dev/cpu/%d/msr", core);
+  msr_fd = open(msr_path, O_RDONLY);	  
+  apicid = 1 << 11 | 1 << 10;
+  pwrite(msr_fd, &apicid, sizeof(apicid), 0x1B);
+  apicid=0;
+  pread(msr_fd, &apicid, sizeof(apicid), 0x802);
+  printf("msr %d\n",apicid);
+
   char cpuid_path[80];
   int cpuid_fd = -1;
   snprintf(cpuid_path, sizeof(cpuid_path), "/dev/cpu/%d/cpuid", core);
   cpuid_fd = open(cpuid_path, O_RDONLY);	
-  
+
   if (regs[1] != 0)
     {
       int SMT_Mask_Width;
@@ -62,6 +74,7 @@ int topology(int core)
       int CoreOnly_Select_Mask;
       int Pkg_Select_Mask;
       int SMT_ID, Core_ID, Pkg_ID;
+      int logical_cores, physical_cores;
       for (i=0;i<=max_leaf;i++)
 	{
 	  unsigned int buf[4];       	  
@@ -75,19 +88,22 @@ int topology(int core)
 	  // SMT level type
 	  if (((regs[2] >> 8) & 0xFF) == 1)
 	    {	      
+	      logical_cores = regs[1];
 	      SMT_Mask_Width = regs[0] & 0xF;
 	      SMT_Select_Mask = ~((-1) << SMT_Mask_Width);
 	      SMT_ID = x2APIC_ID & SMT_Select_Mask;
 	    }
 	  // Core level type
 	  else if (((regs[2] >> 8) & 0xFF) == 2)
-	    {	     
+	    {	   
+	      printf("logical cores at smt level %d %d\n",logical_cores, regs[1]);
+	      physical_cores = regs[1]/logical_cores;
 	      CorePlus_Mask_Width = regs[0] & 0xF;
 	      CoreOnly_Select_Mask = ~((-1) << CorePlus_Mask_Width) ^ SMT_Select_Mask;
 	      Core_ID = (x2APIC_ID & CoreOnly_Select_Mask) >> SMT_Mask_Width;	      
 	      Pkg_Select_Mask = (-1) << CorePlus_Mask_Width;
 	      Pkg_ID = (x2APIC_ID & Pkg_Select_Mask) >> CorePlus_Mask_Width;
-	      printf("Pkg_ID Core_ID SMT_ID %d %d %d\n",Pkg_ID,Core_ID,SMT_ID);
+	      printf("Pkg_ID Core_ID SMT_ID %d %d %d %d\n",Pkg_ID,Core_ID,SMT_ID, physical_cores);
 	      //break;
 	    }
 	}

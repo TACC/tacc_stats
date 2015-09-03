@@ -71,9 +71,9 @@
  */
 #define CAS_READS           MBOX_PERF_EVENT(0x04, 0x03)
 #define CAS_WRITES          MBOX_PERF_EVENT(0x04, 0x0C)
-#define ACT_COUNT           MBOX_PERF_EVENT(0x01, 0x00)
+#define ACT_COUNT           MBOX_PERF_EVENT(0x01, 0x11)
 #define PRE_COUNT_ALL       MBOX_PERF_EVENT(0x02, 0x03)
-#define PRE_COUNT_MISS       MBOX_PERF_EVENT(0x02, 0x01)
+#define PRE_COUNT_MISS      MBOX_PERF_EVENT(0x02, 0x01)
 //@}
 
 static int intel_hsw_imc_begin(struct stats_type *type)

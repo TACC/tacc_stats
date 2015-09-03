@@ -272,10 +272,10 @@ static int intel_hsw_pcu_begin(struct stats_type *type)
     int core_id = -1;
     int smt_id = -1;
     int nr_events;
-
+    int nr_cores = 0;
     snprintf(cpu, sizeof(cpu), "%d", i);
     if (signature(HASWELL, cpu, &nr_events)) {
-      topology(cpu, &pkg_id, &core_id, &smt_id);
+      topology(cpu, &pkg_id, &core_id, &smt_id, &nr_cores);
       if (core_id == 0 && smt_id == 0)
 	if (intel_hsw_pcu_begin_socket(cpu, pcu_events,4) == 0)
 	  nr++;
@@ -335,9 +335,9 @@ static void intel_hsw_pcu_collect(struct stats_type *type)
     int pkg_id = -1;
     int core_id = -1;
     int smt_id = -1;
-
+    int nr_cores = 0;
     snprintf(cpu, sizeof(cpu), "%d", i);
-    topology(cpu, &pkg_id, &core_id, &smt_id);
+    topology(cpu, &pkg_id, &core_id, &smt_id, &nr_cores);
   
     if (core_id == 0 && smt_id == 0)
       intel_hsw_pcu_collect_socket(type, cpu, pkg_id);
