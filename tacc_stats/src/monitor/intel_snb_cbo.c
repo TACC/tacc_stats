@@ -173,7 +173,7 @@ static int intel_snb_cbo_begin(struct stats_type *type)
     COUNTER0_OCCUPANCY
   };
 
-  int i;
+  int i,j;
   for (i = 0; i < nr_cpus; i++) {
     char cpu[80];
     int pkg_id = -1;
@@ -186,8 +186,8 @@ static int intel_snb_cbo_begin(struct stats_type *type)
     if (signature(SANDYBRIDGE, cpu, &nr_events)) {
       topology(cpu, &pkg_id, &core_id, &smt_id, &nr_cores);
       if (smt_id == 0 && core_id == 0)
-	for (i = 0; i < nr_cores; i++)
-	  if (intel_snb_cbo_begin_box(cpu, i, events, 4) == 0)
+	for (j = 0; j < nr_cores; j++)
+	  if (intel_snb_cbo_begin_box(cpu, j, events, 4) == 0)
 	    nr++;
     }
   }
@@ -241,7 +241,7 @@ static void intel_snb_cbo_collect_box(struct stats_type *type, char *cpu, int pk
 //! Collect values in counters
 static void intel_snb_cbo_collect(struct stats_type *type)
 {
-  int i;
+  int i,j;
   for (i = 0; i < nr_cpus; i++) {
     char cpu[80];
     int pkg_id = -1;
@@ -251,8 +251,8 @@ static void intel_snb_cbo_collect(struct stats_type *type)
     snprintf(cpu, sizeof(cpu), "%d", i);
     topology(cpu, &pkg_id, &core_id, &smt_id, &nr_cores);
     if (smt_id == 0 && core_id == 0)
-      for (i = 0; i < nr_cores; i++)
-	intel_snb_cbo_collect_box(type, cpu, pkg_id, i);
+      for (j = 0; j < nr_cores; j++)
+	intel_snb_cbo_collect_box(type, cpu, pkg_id, j);
   }
 }
 
