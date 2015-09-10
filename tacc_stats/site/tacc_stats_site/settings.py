@@ -1,8 +1,9 @@
 # Django settings for tacc_stats_site project.
 import os
+import tacc_stats.cfg as cfg
 DIR = os.path.dirname(os.path.abspath(__file__))
 
-DEBUG = False
+DEBUG = True
 TEMPLATE_DEBUG = DEBUG
 
 ADMINS = (
@@ -15,12 +16,10 @@ MANAGERS = ADMINS
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql_psycopg2',
-        'NAME'  : 'tacc_stats_site_db',
-        #'ENGINE': 'django.db.backends.sqlite3',
-        #'NAME': os.path.join(DIR, 'maverick_db'),                     
+        'NAME'  : cfg.machine + '_db',
         'USER': 'rtevans',
         'PASSWORD': '',
-        'HOST': 'tacc-stats',         
+        'HOST': cfg.server,         
         'PORT': '5432',               
         },
     # Uncomment this portion if an xalt database exists
@@ -33,7 +32,7 @@ DATABASES = {
         }        
     }
 
-
+print '>>>>>>>>>>>>', DATABASES
 
 # Hosts/domain names that are valid for this site; required if DEBUG is False
 # See https://docs.djangoproject.com/en/1.5/ref/settings/#allowed-hosts

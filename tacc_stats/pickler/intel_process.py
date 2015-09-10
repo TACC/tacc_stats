@@ -29,6 +29,7 @@ cpu_event_map = {
     'FIXED1'                   : 'CLOCKS_UNHALTED_CORE,E',
     'FIXED2'                   : 'CLOCKS_UNHALTED_REF,E',
 }
+
 ## CBo events
 def CBOX_PERF_EVENT(event, umask):
     return (event) | (umask << 8) | (0L << 17) | (0L << 18) | (0L << 19) | (1L << 22) | (0L << 23) | (1L << 24)
@@ -41,6 +42,7 @@ cbo_event_map = {
     CBOX_PERF_EVENT(0x34, 0x11) : 'LLC_LOOKUP_ANY,E',
     CBOX_PERF_EVENT(0x34, 0x05) : 'LLC_LOOKUP_WRITE,E',
     }
+
 ## Home Agent Unit events
 def HAU_PERF_EVENT(event, umask):
     return (event) | (umask << 8) | (0L << 18) | (1L << 22) | (0L << 23) | (1L << 24)
@@ -51,6 +53,7 @@ hau_event_map = {
     HAU_PERF_EVENT(0x00, 0x00) : 'CLOCKTICKS,E',
     HAU_PERF_EVENT(0x1A, 0x0F) : 'IMC_WRITES,E',
     }
+
 ## Integrated Memory events
 def IMC_PERF_EVENT(event, umask):
     return (event) | (umask << 8) | (0L << 18) | (1L << 22) | (0L <<23) | (1L << 24)
@@ -63,6 +66,7 @@ imc_event_map = {
     IMC_PERF_EVENT(0x02, 0x01) : 'PRE_COUNT_MISS,E',              
     'FIXED0'                   : 'CYCLES,E',
     }
+
 ## Power Control Unit events
 def PCU_PERF_EVENT(event):
     return (event) | (0L << 14) | (0L << 17) | (0L << 18) | (1L << 22) | (0L <<23) | (1L << 24) | (0L << 31)
@@ -77,6 +81,7 @@ pcu_event_map = {
     'FIXED0'             : 'C3_CYCLES,E',
     'FIXED1'             : 'C6_CYCLES,E',
     }
+
 ## QPI Unit events
 def QPI_PERF_EVENT(event, umask):
     return (event) | (umask << 8) | (0L << 18) | (1L << 21) | (1L << 22) | (0L <<23)
@@ -87,6 +92,7 @@ qpi_event_map = {
     QPI_PERF_EVENT(0x02, 0x08) : 'G1_DRS_DATA,E',
     QPI_PERF_EVENT(0x03, 0x04) : 'G2_NCB_DATA,E',              
     }
+
 ## R2PCI Unit events
 def R2PCI_PERF_EVENT(event, umask):
     return (event) | (umask << 8) | (0L << 18) | (1L << 22) | (0L <<23) | (1L << 24)
@@ -98,6 +104,7 @@ r2pci_event_map = {
     R2PCI_PERF_EVENT(0x08, 0x0F) : 'ACKNOWLEDGED_USED,E',              
     R2PCI_PERF_EVENT(0x09, 0x0F) : 'DATA_USED,E',              
     }
+
 ## WESTMERE events
 def WTM_PERF_EVENT(event, umask):
     return (event) | (umask << 8) | (1L << 16) | (1L << 17) | (1L <<21) | (1L << 22)

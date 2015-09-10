@@ -12,7 +12,6 @@ from matplotlib.figure import Figure
 from matplotlib.backends.backend_agg import FigureCanvasAgg
 from matplotlib.backends.backend_pdf import FigureCanvasPdf
 
-from tacc_stats.cfg import lariat_path
 from tacc_stats.analysis.gen import tspl,tspl_utils,lariat_utils,my_utils
 
 ## Multiprocessing Unwrapper
