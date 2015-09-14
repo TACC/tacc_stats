@@ -284,6 +284,7 @@ class Host(object):
 
     def parse_stats(self, rec_time, line, file_schemas, file):
         type_name, dev_name, rest = line.split(None, 2)
+
         schema = file_schemas.get(type_name)
         if not schema:
             self.error("file `%s', unknown type `%s', discarding line `%s'\n",

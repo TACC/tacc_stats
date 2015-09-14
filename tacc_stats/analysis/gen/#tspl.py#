@@ -137,7 +137,6 @@ class TSPLBase:
 ###                 for i in range(len(self.k1))]
 
     g=self.j.hosts[self.j.hosts.keys()[0]]
-
     
     self.size=len(self.j.times)#g.stats[self.k1[0]].values()[0])
 

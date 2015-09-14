@@ -411,7 +411,7 @@ def get_data(pk):
 
 def master_plot(request, pk):
     data = get_data(pk)
-    mp = plots.MasterPlot(lariat_data="pass")
+    mp = plots.MasterPlot()
     mp.plot(pk,job_data=data)
     return figure_to_response(mp)
 
@@ -419,9 +419,12 @@ def heat_map(request, pk):
     data = get_data(pk)
     hm = plots.HeatMap(k1={'intel_snb' : ['intel_snb','intel_snb'],
                            'intel_hsw' : ['intel_hsw','intel_hsw'],
+                           'intel_ivb' : ['intel_ivb','intel_ivb'],
                            'intel_pmc3' : ['intel_pmc3','intel_pmc3']
                            },
                        k2={'intel_snb' : ['CLOCKS_UNHALTED_REF', 
+                                          'INSTRUCTIONS_RETIRED'],
+                           'intel_ivb' : ['CLOCKS_UNHALTED_REF', 
                                           'INSTRUCTIONS_RETIRED'],
                            'intel_hsw' : ['CLOCKS_UNHALTED_REF', 
                                           'INSTRUCTIONS_RETIRED'],
@@ -518,10 +521,12 @@ def type_plot(request, pk, type_name):
 
     k1 = {'intel_snb' : [type_name]*len(schema),
           'intel_hsw' : [type_name]*len(schema),
+          'intel_ivb' : [type_name]*len(schema),
           'intel_pmc3' : [type_name]*len(schema)
           }
     k2 = {'intel_snb': schema,
           'intel_hsw': schema,
+          'intel_ivb' : schema,
           'intel_pmc3': schema
           }
 
