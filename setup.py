@@ -264,7 +264,7 @@ if MODE == 'DAEMON':
     sources   += [pjoin(root,'amqp_listen.c'), 
                   pjoin(root,'stats_buffer.c'), pjoin(root,'monitor.c')]
     libraries += ['rabbitmq']
-
+    library_dirs += [cfg_data.get('RMQ_CFG', 'rmq_path')]
     SERVER = cfg_data.get('RMQ_CFG', 'RMQ_SERVER')
     define_macros += [('HOST_NAME_QUEUE',
                        '\"'+cfg_data.get('RMQ_CFG', 'HOST_NAME_QUEUE')+'\"')]
@@ -463,6 +463,7 @@ scripts=[
     'build/bin/monitor',             
     'tacc_stats/analysis/job_sweeper.py',
     'tacc_stats/analysis/job_plotter.py',
+    'tacc_stats/site/manage.py',
     'tacc_stats/site/machine/update_db.py',
     'tacc_stats/site/machine/update_thresholds.py',
     'tacc_stats/site/machine/thresholds.cfg',
