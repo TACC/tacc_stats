@@ -1,3 +1,4 @@
+import sys
 from plots import Plot
 from tacc_stats.analysis.gen import tspl_utils
 from matplotlib.figure import Figure
@@ -94,33 +95,36 @@ class MasterPlot(Plot):
     plot_ctr = 0
     try:
       if 'SSE_D_ALL' in k2_tmp and 'SIMD_D_256' in k2_tmp:
-        idx0 = schema['SSE_D_ALL'].index
+        idx0 = k2_tmp.index('SSE_D_ALL')
         idx1 = None
-        idx2 = schema['SIMD_D_256'].index
-      if 'SSE_DOUBLE_SCALAR' in k2_tmp and 'SSE_DOUBLE_PACKED' in k2_tmp and 'SIMD_DOUBLE_256' in k2_tmp:
-        idx0 = schema['SSE_DOUBLE_SCALAR'].index
-        idx1 = schema['SSE_DOUBLE_PACKED'].index
-        idx2 = schema['SIMD_DOUBLE_256'].index
-      if 'FP_COMP_OPS_EXE_SSE_PACKED' in k2_tmp and 'FP_COMP_OPS_EXE_SSE_SCALAR' in k2_tmp:
-        idx0 = schema['FP_COMP_OPS_EXE_SSE_SCALAR'].index
-        idx1 = schema['FP_COMP_OPS_EXE_SSE_PACKED'].index
+        idx2 = k2_tmp.index('SIMD_D_256')
+      elif 'SSE_DOUBLE_SCALAR' in k2_tmp and 'SSE_DOUBLE_PACKED' in k2_tmp and 'SIMD_DOUBLE_256' in k2_tmp:
+        idx0 = k2_tmp.index('SSE_DOUBLE_SCALAR')
+        idx1 = k2_tmp.index('SSE_DOUBLE_PACKED')
+        idx2 = k2_tmp.index('SIMD_DOUBLE_256')
+      elif 'FP_COMP_OPS_EXE_SSE_PACKED' in k2_tmp and 'FP_COMP_OPS_EXE_SSE_SCALAR' in k2_tmp:
+        idx0 = k2_tmp.index('FP_COMP_OPS_EXE_SSE_SCALAR')
+        idx1 = k2_tmp.index('FP_COMP_OPS_EXE_SSE_PACKED')
         idx2 = None
       else: print("FLOP stats not available for JOBID",self.ts.j.id)
 
-      for host_name in self.ts.j.host.keys():
-        stats =  self.ts.j.aggregrate_stats(self.ts.pmc_type, host_name = [host_name])[0]
-        flops =  stats[:,idx0]
-        if idx1: flops += 2*stats[:,idx1]
-        if idx2: flops += 4*stats[:,idx2]
+      plot_ctr += 1
+      ax = self.fig.add_subplot(6,cols,plot_ctr*shift)      
+      for host_name in self.ts.j.hosts.keys():
+        flops = self.ts.assemble([idx0],host_name,0)
+        if idx1: flops += 2*self.ts.assemble([idx1],host_name,0)
+        if idx2: flops += 4*self.ts.assemble([idx2],host_name,0)
+        
         flops = numpy.diff(flops)/numpy.diff(self.ts.t)/1.0e9
-        ax.step(self.ts.t/3600., numpy.append(flops,[flops[-1]]), where="post")
-      if flops:
-        plot_ctr += 1
-        ax = self.fig.add_subplot(6,cols,plot_ctr*shift)      
-        ax.set_ylabel('Dbl GFLOPS')
-        ax.set_xlim([0.,self.ts.t[-1]/3600.])
-        tspl_utils.adjust_yaxis_range(ax,0.1)
+        ax.step(self.ts.t/3600., numpy.append(flops, [flops[-1]]), 
+                where="post")
+        print flops,self.ts.t
+
+      ax.set_ylabel('Dbl GFLOPS')
+      ax.set_xlim([0.,self.ts.t[-1]/3600.])
+      tspl_utils.adjust_yaxis_range(ax,0.1)
     except: 
+      print sys.exc_info()[0]
       print("FLOP plot not available for JOBID",self.ts.j.id)
 
     # Plot key 2

@@ -463,6 +463,7 @@ scripts=[
     'build/bin/monitor',             
     'tacc_stats/analysis/job_sweeper.py',
     'tacc_stats/analysis/job_plotter.py',
+    'tacc_stats/analysis/job_printer.py',
     'tacc_stats/site/manage.py',
     'tacc_stats/site/machine/update_db.py',
     'tacc_stats/site/machine/update_thresholds.py',
