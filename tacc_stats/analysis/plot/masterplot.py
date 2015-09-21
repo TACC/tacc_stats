@@ -90,24 +90,25 @@ class MasterPlot(Plot):
 
     k1_tmp=self.k1[self.ts.pmc_type]
     k2_tmp=self.k2[self.ts.pmc_type]
-
+    processor_schema = self.ts.j.schemas[self.ts.pmc_type]
     # Plot key 1 for flops
     plot_ctr = 0
     try:
-      if 'SSE_D_ALL' in k2_tmp and 'SIMD_D_256' in k2_tmp:
+      if 'SSE_D_ALL' in processor_schema and 'SIMD_D_256' in processor_schema:
         idx0 = k2_tmp.index('SSE_D_ALL')
         idx1 = None
         idx2 = k2_tmp.index('SIMD_D_256')
-      elif 'SSE_DOUBLE_SCALAR' in k2_tmp and 'SSE_DOUBLE_PACKED' in k2_tmp and 'SIMD_DOUBLE_256' in k2_tmp:
+      elif 'SSE_DOUBLE_SCALAR' in processor_schema and 'SSE_DOUBLE_PACKED' in processor_schema and 'SIMD_DOUBLE_256' in processor_schema:
         idx0 = k2_tmp.index('SSE_DOUBLE_SCALAR')
         idx1 = k2_tmp.index('SSE_DOUBLE_PACKED')
         idx2 = k2_tmp.index('SIMD_DOUBLE_256')
-      elif 'FP_COMP_OPS_EXE_SSE_PACKED' in k2_tmp and 'FP_COMP_OPS_EXE_SSE_SCALAR' in k2_tmp:
+      elif 'FP_COMP_OPS_EXE_SSE_PACKED' in processor_schema and 'FP_COMP_OPS_EXE_SSE_SCALAR' in processor_schema:
         idx0 = k2_tmp.index('FP_COMP_OPS_EXE_SSE_SCALAR')
         idx1 = k2_tmp.index('FP_COMP_OPS_EXE_SSE_PACKED')
         idx2 = None
-      else: print("FLOP stats not available for JOBID",self.ts.j.id)
-
+      else: 
+        print("FLOP stats not available for JOBID",self.ts.j.id)
+        raise
       plot_ctr += 1
       ax = self.fig.add_subplot(6,cols,plot_ctr*shift)      
       for host_name in self.ts.j.hosts.keys():
@@ -127,20 +128,23 @@ class MasterPlot(Plot):
       print sys.exc_info()[0]
       print("FLOP plot not available for JOBID",self.ts.j.id)
 
+
     # Plot key 2
-    if 'CAS_READS' in k2_tmp and 'CAS_WRITES' in k2_tmp:
-      idx0=k2_tmp.index('CAS_READS')
-      idx1=k2_tmp.index('CAS_WRITES')
-    elif 'MEM_UNCORE_RETIRED_REMOTE_DRAM' in k2_tmp and 'MEM_UNCORE_RETIRED_LOCAL_DRAM' in k2_tmp:
-      idx0=k2_tmp.index('MEM_UNCORE_RETIRED_REMOTE_DRAM')
-      idx1=k2_tmp.index('MEM_UNCORE_RETIRED_LOCAL_DRAM')
-    else:
-      print(self.ts.pmc_type + ' missing Memory Bandwidth data' + ' for jobid ' + self.ts.j.id )
-    if idx0 and idx1:
+    try:
+      if 'CAS_READS' in k2_tmp and 'CAS_WRITES' in k2_tmp:
+        idx0=k2_tmp.index('CAS_READS')
+        idx1=k2_tmp.index('CAS_WRITES')
+      elif 'MEM_UNCORE_RETIRED_REMOTE_DRAM' in k2_tmp and 'MEM_UNCORE_RETIRED_LOCAL_DRAM' in k2_tmp:
+        idx0=k2_tmp.index('MEM_UNCORE_RETIRED_REMOTE_DRAM')
+        idx1=k2_tmp.index('MEM_UNCORE_RETIRED_LOCAL_DRAM')
+      else:
+        print(self.ts.pmc_type + ' missing Memory Bandwidth data' + ' for jobid ' + self.ts.j.id )
+        raise      
       plot_ctr += 1
       plot(self.fig.add_subplot(6,cols,plot_ctr*shift), [idx0,idx1], 3600., 
            1.0/64.0*1024.*1024.*1024., ylabel='Total Mem BW GB/s')
-
+    except:
+      print(self.ts.pmc_type + ' missing Memory Bandwidth plot' + ' for jobid ' + self.ts.j.id )
 
     #Plot key 3
     idx0=k2_tmp.index('MemUsed')
