@@ -241,7 +241,9 @@ intel_xeon = {'intel_snb' : cpu_event_map, 'intel_snb_cbo' : cbo_event_map, 'int
               'intel_ivb' : cpu_event_map, 'intel_ivb_cbo' : cbo_event_map, 'intel_ivb_hau' : hau_event_map, 
               'intel_ivb_imc' : imc_event_map,  'intel_ivb_qpi' : qpi_event_map, 'intel_ivb_pcu' : pcu_event_map, 'intel_ivb_r2pci' : r2pci_event_map,
               'intel_hsw' : cpu_event_map, 'intel_hsw_cbo' : cbo_event_map, 'intel_hsw_hau' : hau_event_map, 
-              'intel_hsw_imc' : imc_event_map,  'intel_hsw_qpi' : qpi_event_map, 'intel_hsw_pcu' : pcu_event_map, 'intel_hsw_r2pci' : r2pci_event_map}
+              'intel_hsw_imc' : imc_event_map,  'intel_hsw_qpi' : qpi_event_map, 'intel_hsw_pcu' : pcu_event_map, 'intel_hsw_r2pci' : r2pci_event_map,
+              'intel_hsw_ht' : cpu_event_map, 'intel_hsw_cbo_ht' : cbo_event_map,
+}
 
 
 def process_job(job):

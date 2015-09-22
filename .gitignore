@@ -28,3 +28,4 @@ tacc_stats/cfg.py
 *egg*
 #*
 tacc_stats/taccstats
+*.cfg
