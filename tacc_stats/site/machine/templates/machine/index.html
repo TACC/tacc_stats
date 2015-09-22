@@ -44,6 +44,20 @@
 <div class="table-responsive">
   <h4>Flagged Jobs:</h4>
   <table class="table table-condensed" style="max-width=100%;">
+    {% if md_job_list %}
+    <tr>
+      <th>Top metadata request rates (B)</th>
+    </tr>
+    {% for key,values in md_job_list.items %} 
+    <tr><td><a href="{% url 'machine:user_view' key %}"> {{ key }}</a> </td>
+      {% for v,d in values %} 
+      <td><a href="{% url 'machine:job' v %}">{{ v }}</a>({{ d|stringformat:"0.1f" }})</td>
+      {% endfor %}
+    </tr>
+    {% endfor %}
+    {% endif %}
+
+
     {% if gigebw_job_list %}
     <tr>
       <th>GigE BW > {{ gigebw_thresh|stringformat:"0.3e" }} B</th>

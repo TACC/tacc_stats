@@ -322,6 +322,10 @@ def index(request, **field):
     
     completed_list = job_list.exclude(status__in=['CANCELLED','FAILED']).order_by('-id')
     if len(completed_list) > 0:
+        try: 
+            field['md_job_list'] = job_list.order_by('-MetaDataRate')[0:10]
+        except:
+            field['md_job_list'] = job_list.order_by('-MetaDataRate')
         field['idle_job_list'] = completed_list.filter(idle__gte = 0.99)
         field['mem_job_list'] = completed_list.filter(mem__lte = 30, queue = 'largemem')
 
@@ -331,7 +335,10 @@ def index(request, **field):
 
         field['gigebw_thresh'] = 2**20
         field['gigebw_job_list']  = completed_list.exclude(GigEBW = float('nan')).filter(GigEBW__gte = field['gigebw_thresh'])
-
+        try:
+            field['md_job_list'] = list_to_dict(field['md_job_list'],'MetaDataRate')
+        except: 
+            field['md_job_list'] = None
         field['idle_job_list'] = list_to_dict(field['idle_job_list'],'idle')
         field['cat_job_list'] = list_to_dict(field['cat_job_list'],'cat')
         field['cpi_job_list'] = list_to_dict(field['cpi_job_list'],'cpi')
@@ -375,14 +382,15 @@ def hist_summary(job_list):
     ax.set_ylabel('# of jobs')
     ax.set_title('Queue Wait Time')
     ax.set_xlabel('hrs')
-    jobs =  np.array(job_list.filter(status = "FAILED").values_list('nodes',flat=True))
+    #jobs =  np.array(job_list.filter(status = "FAILED").values_list('nodes',flat=True))
+    jobs =  np.array(job_list.values_list('MetaDataRate',flat=True))
     ax = fig.add_subplot(224)
     try:
         bins = np.linspace(0, max(jobs), max(5, 5*np.log(len(jobs))))
         ax.hist(jobs, bins = bins, log=True)
     except: pass
-    ax.set_title('Failed Jobs')
-    ax.set_xlabel('nodes')
+    ax.set_title('Metadata Reqs')
+    ax.set_xlabel('<reqs>/s')
 
 
     fig.subplots_adjust(hspace=0.5)      
