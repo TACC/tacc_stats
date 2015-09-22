@@ -47,6 +47,7 @@ def update_comp_info(thresholds = None):
                   'CPU_Usage' : ['CPU_Usage','<',800],
                   'MIC_Usage' : ['MIC_Usage','>',0.0],
                   'Load_All' : ['Load_All','<',1e7],
+                  'MetaDataRate' : ['MetaDataRate','>',100],
                   }
     if thresholds:
         for key,val in thresholds.iteritems():
@@ -166,6 +167,7 @@ def update_metric_fields(date,rerun=False):
     aud.stage(exam.CPU_Usage, ignore_qs = [], min_time = 0)
     aud.stage(exam.MIC_Usage, ignore_qs = [], min_time = 0)
     aud.stage(exam.Load_All, ignore_qs = [], min_time = 0)
+    aud.stage(exam.MetaDataRate, ignore_qs = [], min_time = 0)
 
     print 'Run the following tests for:',date
     for name, test in aud.measures.iteritems():
