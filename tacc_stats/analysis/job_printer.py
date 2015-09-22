@@ -49,7 +49,7 @@ def main(**args):
                 print "Device:",device_name
                 print device
 
-
+    print 'test'
 if __name__ == '__main__':
     import argparse
     parser = argparse.ArgumentParser(description='Print job using Job ID or pickle file path')

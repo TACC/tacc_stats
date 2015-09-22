@@ -53,123 +53,8 @@
 #include <fcntl.h>
 #include "stats.h"
 #include "trace.h"
-#include "cpu_is_snb.h"
-
-//@{
-/*! \name Configurable Performance Monitoring Registers
-
-  Control register layout shown in Fig 18-6.  Described on Pg 18-3.
-  These are used to select events and ways to count events.
-  ~~~
-  [0, 7] Event Select       : Choose Event
-  [8, 15] Unit Mask (UMASK) : Choose Subevent
-  16 USR                    : Count when in user mode
-  17 OS                     : Count when in root mode
-  18 E Edge_detect          : Can measure time spent in state
-  19 PC Pin control         : Ovrflow control
-  20 INT APIC               : Ovrflow control
-  21 ANY                    : Counts events from any thread on core
-  22 EN                     : Enables counters
-  23 INV                    : Inverts Counter Mask
-  [24, 31] Counter Mask     : Counts in a cycle must exceed CMASK if set
-  [32, 63] Reserved
-  ~~~  
-
-  Counter registers are 64 bit but 48 bits wide.  These
-  are configured by the control registers and 
-  hold the counter values.
-*/
-
-#define IA32_CTL0 0x186
-#define IA32_CTL1 0x187
-#define IA32_CTL2 0x188
-#define IA32_CTL3 0x189
-#define IA32_CTL4 0x18A
-#define IA32_CTL5 0x18B
-#define IA32_CTL6 0x18C
-#define IA32_CTL7 0x18D
-
-#define IA32_CTR0 0xC1
-#define IA32_CTR1 0xC2
-#define IA32_CTR2 0xC3
-#define IA32_CTR3 0xC4
-#define IA32_CTR4 0xC5
-#define IA32_CTR5 0xC6
-#define IA32_CTR6 0xC7
-#define IA32_CTR7 0xC8
-//@}
-
-/*! \name Fixed Counter Registers
-
-  These counters always count the same events.  Fig 18-7 describes
-  how to enable these registers.  Events are described on page 18-10.
-  @{
-*/
-#define IA32_FIXED_CTR_CTRL 0x38D //!< Fixed Counter Control Register
-#define IA32_FIXED_CTR0     0x309 //!< Fixed Counter 0: Instructions Retired
-#define IA32_FIXED_CTR1     0x30A //!< Fixed Counter 1: Core Clock Cycles
-#define IA32_FIXED_CTR2     0x30B //!< Fixed Counter 2: Reference Clock Cycles
-//@}
-
-/*! \name Global Control Registers
-  
-  Layout in Fig 18-8 and 18-9.  Controls for all
-  registers.
-  @{
-*/
-#define IA32_PERF_GLOBAL_STATUS   0x38E //!< indicates overflow 
-#define IA32_PERF_GLOBAL_CTRL     0x38F //!< enables all fixed and configurable counters  
-#define IA32_PERF_GLOBAL_OVF_CTRL 0x390 //!< clears overflow indicators in GLOBAL_STATUS.
-//@}
-
-/*! \brief KEYS will define the raw schema for this type
-
-  The required order of registers is:
-  -# Control registers in order
-  -# Counter registers in order
-  -# Fixed registers in order
-
-  All counter registers are 48 bits wide.
- */
-#define KEYS \
-    X(CTL0, "C", ""), \
-    X(CTL1, "C", ""), \
-    X(CTL2, "C", ""), \
-    X(CTL3, "C", ""), \
-    X(CTL4, "C", ""), \
-    X(CTL5, "C", ""), \
-    X(CTL6, "C", ""), \
-    X(CTL7, "C", ""), \
-    X(CTR0, "E,W=48", ""), \
-    X(CTR1, "E,W=48", ""), \
-    X(CTR2, "E,W=48", ""), \
-    X(CTR3, "E,W=48", ""), \
-    X(CTR4, "E,W=48", ""), \
-    X(CTR5, "E,W=48", ""), \
-    X(CTR6, "E,W=48", ""), \
-    X(CTR7, "E,W=48", ""), \
-    X(FIXED_CTR0, "E,W=48", ""), \
-    X(FIXED_CTR1, "E,W=48", ""), \
-    X(FIXED_CTR2, "E,W=48", "")
-
-/*! \brief Event select 
-
-  Non-architectural events are listed and defined in 
-  Table 19-7, 19-8, and 19-9.  Table 19-8 is 06_2a specific, 
-  Table 19-9 is 06_2d specific.  
-
-  To change events to count:
-  -# Define event below
-  -# Modify events array in intel_snb_begin()
-*/
-#define PERF_EVENT(event, umask) \
-  ( (event) \
-  | (umask << 8) \
-  | (1ULL << 16) \
-  | (1ULL << 17) \
-  | (1ULL << 21) \
-  | (1ULL << 22) \
-  )
+#include "cpuid.h"
+#include "intel_pmc3.h"
 
 /*! \name Events 
 
@@ -193,86 +78,9 @@
 #define MEM_LOAD_UOPS_RETIRED_HIT_LFB  PERF_EVENT(0xD1, 0x40) // CTR0-3 Only
 //@}
 
-
-//! Configure and start counters for a cpu
-static int intel_snb_begin_cpu(char *cpu, uint64_t *events, size_t nr_events)
-{
-  int rc = -1;
-  char msr_path[80];
-  int msr_fd = -1;
-  uint64_t global_ctr_ctrl, fixed_ctr_ctrl;
-
-  snprintf(msr_path, sizeof(msr_path), "/dev/cpu/%s/msr", cpu);
-  msr_fd = open(msr_path, O_RDWR);
-  if (msr_fd < 0) {
-    ERROR("cannot open `%s': %m\n", msr_path);
-    goto out;
-  }
-
-  /* Disable counters globally. */
-  global_ctr_ctrl = 0x0ULL;
-  if (pwrite(msr_fd, &global_ctr_ctrl, sizeof(global_ctr_ctrl), IA32_PERF_GLOBAL_CTRL) < 0) {
-    ERROR("cannot disable performance counters: %m\n");
-    goto out;
-  }
-
-  int i;
-  for (i = 0; i < nr_events; i++) {
-    TRACE("MSR %08X, event %016llX\n", IA32_CTL0 + i, (unsigned long long) events[i]);
-    if (pwrite(msr_fd, &events[i], sizeof(events[i]), IA32_CTL0 + i) < 0) {
-      ERROR("cannot write event %016llX to MSR %08X through `%s': %m\n",
-            (unsigned long long) events[i],
-            (unsigned) IA32_CTL0 + i,
-            msr_path);
-      goto out;
-    }
-  }
-
-  /* Reset all the counters */
-  uint64_t zero = 0x0ULL;
-  for (i = 0; i < nr_events; i++) {
-    if (pwrite(msr_fd, &zero, sizeof(zero), IA32_CTR0 + i) < 0) {
-      ERROR("cannot reset counter %016llX to MSR %08X through `%s': %m\n",
-            (unsigned long long) zero,
-            (unsigned) IA32_CTR0 + i,
-            msr_path);
-      goto out;
-    }
-  }
-  if (pwrite(msr_fd, &zero, sizeof(zero), IA32_FIXED_CTR0) < 0 ||
-      pwrite(msr_fd, &zero, sizeof(zero), IA32_FIXED_CTR1) < 0 || 
-      pwrite(msr_fd, &zero, sizeof(zero), IA32_FIXED_CTR2) < 0) {
-    ERROR("cannot reset counter %016llX to MSRs (%08X,%08X,%08X) through `%s': %m\n",
-	  (unsigned long long) zero,
-	  (unsigned) IA32_FIXED_CTR0,
-	  (unsigned) IA32_FIXED_CTR1,
-	  (unsigned) IA32_FIXED_CTR2,
-	  msr_path);
-      goto out;
-  }
-  
-  rc = 0;
-
-  /* Enable fixed counters.  Three 4 bit blocks, enable OS, User, Any thread. */
-  fixed_ctr_ctrl = 0x777UL;
-  if (pwrite(msr_fd, &fixed_ctr_ctrl, sizeof(fixed_ctr_ctrl), IA32_FIXED_CTR_CTRL) < 0)
-    ERROR("cannot enable fixed counters: %m\n");
-
-  /* Enable counters globally, 8 PMC and 3 fixed. */
-  global_ctr_ctrl = 0xFF | (0x7ULL << 32);
-  if (pwrite(msr_fd, &global_ctr_ctrl, sizeof(global_ctr_ctrl), IA32_PERF_GLOBAL_CTRL) < 0)
-    ERROR("cannot enable performance counters: %m\n");
-
- out:
-  if (msr_fd >= 0)
-    close(msr_fd);
-
-  return rc;
-}
-
 //! Configure and start counters
 static int intel_snb_begin(struct stats_type *type)
-{
+{  
   int nr = 0;
 
   uint64_t events[] = {
@@ -289,62 +97,25 @@ static int intel_snb_begin(struct stats_type *type)
   int i;
   for (i = 0; i < nr_cpus; i++) {
     char cpu[80];
+    int nr_events = 0;
     snprintf(cpu, sizeof(cpu), "%d", i);
-
-    if (cpu_is_sandybridge(cpu))
-      if (intel_snb_begin_cpu(cpu, events, 8) == 0)
+    if (signature(SANDYBRIDGE, cpu, &nr_events))
+      if (intel_pmc3_begin_cpu(cpu, events, nr_events) == 0)
 	nr++;
   }
 
+  if (nr == 0) 
+    type->st_enabled = 0;
   return nr > 0 ? 0 : -1;
 }
 
-//! Collect values in counters for cpu
-static void intel_snb_collect_cpu(struct stats_type *type, char *cpu)
-{
-  struct stats *stats = NULL;
-  char msr_path[80];
-  int msr_fd = -1;
-
-  stats = get_current_stats(type, cpu);
-  if (stats == NULL)
-    goto out;
-
-  TRACE("cpu %s\n", cpu);
-
-  snprintf(msr_path, sizeof(msr_path), "/dev/cpu/%s/msr", cpu);
-  msr_fd = open(msr_path, O_RDONLY);
-  if (msr_fd < 0) {
-    ERROR("cannot open `%s': %m\n", msr_path);
-    goto out;
-  }
-
-#define X(k,r...) \
-  ({ \
-    uint64_t val = 0; \
-    if (pread(msr_fd, &val, sizeof(val), IA32_##k) < 0) \
-      ERROR("cannot read `%s' (%08X) through `%s': %m\n", #k, IA32_##k, msr_path); \
-    else \
-      stats_set(stats, #k, val); \
-  })
-  KEYS;
-#undef X
-
- out:
-  if (msr_fd >= 0)
-    close(msr_fd);
-}
-
-//! Collect values in counters
 static void intel_snb_collect(struct stats_type *type)
 {
   int i;
   for (i = 0; i < nr_cpus; i++) {
     char cpu[80];
     snprintf(cpu, sizeof(cpu), "%d", i);
-
-    if (cpu_is_sandybridge(cpu))
-      intel_snb_collect_cpu(type, cpu);
+    intel_pmc3_collect_cpu(type, cpu);
   }
 }
 

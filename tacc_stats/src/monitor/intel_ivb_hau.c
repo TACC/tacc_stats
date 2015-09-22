@@ -43,19 +43,19 @@
 #define CLOCKTICKS      PERF_EVENT(0x00,0x00)
 #define IMC_WRITES      PERF_EVENT(0x1A,0x0F) 
 
-static int intel_hsw_hau_begin(struct stats_type *type)
+static int intel_ivb_hau_begin(struct stats_type *type)
 {
   int nr = 0;
   
   uint32_t events[] = {
     REQUESTS_READS, REQUESTS_WRITES, CLOCKTICKS, IMC_WRITES,
   };
-  int dids[] = {0x2F30, 0x2F38};
+  int dids[] = {0x0e30, 0x0e38};
   
   char **dev_paths = NULL;
   int nr_devs;
   
-  if (pci_map_create(&dev_paths, &nr_devs, dids, 1) < 0)
+  if (pci_map_create(&dev_paths, &nr_devs, dids, 2) < 0)
     TRACE("Failed to identify pci devices");
   
   int i;
@@ -70,13 +70,13 @@ static int intel_hsw_hau_begin(struct stats_type *type)
 }
 
 
-static void intel_hsw_hau_collect(struct stats_type *type)
+static void intel_ivb_hau_collect(struct stats_type *type)
 {
-  int dids[] = {0x2F30, 0x2F38};
+  int dids[] = {0x0e30, 0x0e38};
 
   char **dev_paths = NULL;
   int nr_devs;
-  if (pci_map_create(&dev_paths, &nr_devs, dids, 1) < 0)
+  if (pci_map_create(&dev_paths, &nr_devs, dids, 2) < 0)
     TRACE("Failed to identify pci devices");
   
   int i;
@@ -84,10 +84,10 @@ static void intel_hsw_hau_collect(struct stats_type *type)
     intel_snb_uncore_collect_dev(type, dev_paths[i]);  
 }
 
-struct stats_type intel_hsw_hau_stats_type = {
-  .st_name = "intel_hsw_hau",
-  .st_begin = &intel_hsw_hau_begin,
-  .st_collect = &intel_hsw_hau_collect,
+struct stats_type intel_ivb_hau_stats_type = {
+  .st_name = "intel_ivb_hau",
+  .st_begin = &intel_ivb_hau_begin,
+  .st_collect = &intel_ivb_hau_collect,
 #define X SCHEMA_DEF
   .st_schema_def = JOIN(KEYS),
 #undef X

@@ -28,6 +28,8 @@
   X(write_bytes, "E,U=B", ""), \
   X(direct_read, "E,U=B", ""), \
   X(direct_write, "E,U=B", ""), \
+  X(osc_read, "E,U=B", ""), \
+  X(osc_write, "E,U=B", ""), \
   X(dirty_pages_hits, "E", ""), \
   X(dirty_pages_misses, "E", ""), \
   X(ioctl, "E", ""), \

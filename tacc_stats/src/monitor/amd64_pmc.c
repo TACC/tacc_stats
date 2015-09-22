@@ -11,6 +11,7 @@
 #include <fcntl.h>
 #include "stats.h"
 #include "trace.h"
+#include "cpuid.h"
 
 // The performance monitor counters are used by software to count
 // specific events that occur in the processor.  [The Performance
@@ -38,7 +39,7 @@
   X(CTR1, "E,W=48", ""), \
   X(CTR2, "E,W=48", ""), \
   X(CTR3, "E,W=48", "")
-
+/*
 static int cpu_is_amd64_10h(char *cpu)
 {
   char cpuid_path[80];
@@ -46,7 +47,6 @@ static int cpu_is_amd64_10h(char *cpu)
   uint32_t buf[8];
   int rc = 0;
 
-  /* Open /dev/cpuid/CPU/cpuid. */
   snprintf(cpuid_path, sizeof(cpuid_path), "/dev/cpu/%s/cpuid", cpu);
   cpuid_fd = open(cpuid_path, O_RDONLY);
   if (cpuid_fd < 0) {
@@ -54,7 +54,6 @@ static int cpu_is_amd64_10h(char *cpu)
     goto out;
   }
 
-  /* Do cpuid 0, 1 to get cpu vendor, family.  */
   if (pread(cpuid_fd, buf, sizeof(buf), 0x0) < 0) {
     ERROR("cannot read cpu vendor through `%s': %m\n", cpuid_path);
     goto out;
@@ -93,7 +92,7 @@ static int cpu_is_amd64_10h(char *cpu)
 
   return rc;
 }
-
+*/
 static int amd64_pmc_begin_cpu(char *cpu, uint64_t events[], size_t nr_events)
 {
   int rc = -1;
@@ -173,16 +172,17 @@ static int amd64_pmc_begin(struct stats_type *type)
   for (i = 0; i < nr_cpus; i++) {
     char cpu[80];
     snprintf(cpu, sizeof(cpu), "%d", i);
-
-    if (cpu_is_amd64_10h(cpu))
-      if (amd64_pmc_begin_cpu(cpu, events[i % 4], 4) == 0) /* HARD */
+    int nr_events = 0;
+    if (signature(AMD_10H, cpu, &nr_events))
+      if (amd64_pmc_begin_cpu(cpu, events[i % 4], nr_events) == 0)
         nr++;
   }
-
+  if (nr == 0)
+    type->st_enabled = 0;
   return nr > 0 ? 0 : -1;
 }
 
-static void amd64_pmc_collect_cpu(struct stats_type *type, char *cpu)
+static void amd64_pmc_collect_cpu(struct stats_type *type, char *cpu, int nr_events)
 {
   char msr_path[80];
   int msr_fd = -1;
@@ -199,14 +199,16 @@ static void amd64_pmc_collect_cpu(struct stats_type *type, char *cpu)
     ERROR("cannot open `%s': %m\n", msr_path);
     goto out;
   }
-
-#define X(k,r...) \
-  ({ \
-    uint64_t val = 0; \
-    if (pread(msr_fd, &val, sizeof(val), MSR_PERF_##k) < 0) \
+  int ctr = 0;
+#define X(k,r...)							\
+  ({									\
+    uint64_t val = 0;							\
+    if (pread(msr_fd, &val, sizeof(val), MSR_PERF_##k) < 0)		\
       ERROR("cannot read `%s' (%08X) through `%s': %m\n", #k, MSR_PERF_##k, msr_path); \
-    else \
-      stats_set(stats, #k, val); \
+    else								\
+      stats_set(stats, #k, val);					\
+    if (++ctr == nr_events)						\
+      goto out;								\
   })
   KEYS;
 #undef X
@@ -219,13 +221,12 @@ static void amd64_pmc_collect_cpu(struct stats_type *type, char *cpu)
 static void amd64_pmc_collect(struct stats_type *type)
 {
   int i;
-
   for (i = 0; i < nr_cpus; i++) {
     char cpu[80];
     snprintf(cpu, sizeof(cpu), "%d", i);
-
-    if (cpu_is_amd64_10h(cpu))
-      amd64_pmc_collect_cpu(type, cpu);
+    int nr_events = 0;
+    if (signature(AMD_10H, cpu, &nr_events))
+      amd64_pmc_collect_cpu(type, cpu, nr_events);
   }
 }
 

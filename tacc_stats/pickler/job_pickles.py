@@ -40,7 +40,7 @@ def job_pickle(reader_inst,
                         break
             except: 
                 validated = False
-                
+
     if not validated:
         print(reader_inst['id'] + " is not validated: process")
         with open(pickle_file,'w') as fd:

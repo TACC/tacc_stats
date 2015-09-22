@@ -1,5 +1,5 @@
 /*! 
- \file intel_hsw_pcu.c
+ \file intel_ivb_pcu.c
  \author Todd Evans 
  \brief Performance Monitoring Counters for Intel Sandy Bridge Power Control Unit (PCU)
 
@@ -7,12 +7,12 @@
   \par Details such as Tables and Figures can be found in:
   "Intel® Xeon® Processor E5-2600 Product Family Uncore 
   Performance Monitoring Guide" 
-  Reference Number: 331051 September 2014 \n
-  PCU monitoring is described in Section 2.8.
+  Reference Number: 327043-001 March 2012 \n
+  PCU monitoring is described in Section 2.6.
 
   \note
-  Haswell microarchitectures have signatures for EP 06_3f
-
+  Sandy Bridge microarchitectures have signatures 06_2a and 06_2d. 
+  Stampede is 06_2d.
 
 
   \par Location of cpu info and monitoring register files:
@@ -64,7 +64,7 @@
    works.
  */
 
-#define CTL 0x710
+#define CTL 0xC24
 
 /*! \name PCU filter register
 
@@ -79,7 +79,7 @@
   ~~~
 
  */
-#define FILTER 0x715
+#define FILTER 0xC34
 
 /*! \name PCU Performance Monitoring Registers
   
@@ -106,15 +106,15 @@
   are only 48 bits wide.
   @{
 */
-#define CTL0 0x711
-#define CTL1 0x712
-#define CTL2 0x713
-#define CTL3 0x714
+#define CTL0 0xC30
+#define CTL1 0xC31
+#define CTL2 0xC32
+#define CTL3 0xC33
 
-#define CTR0 0x717
-#define CTR1 0x718
-#define CTR2 0x719
-#define CTR3 0x71A
+#define CTR0 0xC36
+#define CTR1 0xC37
+#define CTR2 0xC38
+#define CTR3 0xC39
 //@}
 
 /*! \name Fixed registers
@@ -143,8 +143,8 @@
     X(CTR1,"E,W=48",""), \
     X(CTR2,"E,W=48",""), \
     X(CTR3,"E,W=48",""), \
-    X(FIXED_CTR0,"E,W=64",""), \
-    X(FIXED_CTR1,"E,W=64","")
+    X(FIXED_CTR0,"E,W=48",""), \
+    X(FIXED_CTR1,"E,W=48","")
 
 /*! \brief Filter 
   
@@ -164,7 +164,7 @@
   
   To change events to count:
   -# Define event below
-  -# Modify events array in intel_hsw_cbo_begin()
+  -# Modify events array in intel_ivb_cbo_begin()
 */
 #define PCU_PERF_EVENT(event)	\
   ( (event) \
@@ -193,7 +193,7 @@
 //@}
 
 //! Configure and start counters for PCU
-static int intel_hsw_pcu_begin_socket(char *cpu, uint64_t *events, size_t nr_events)
+static int intel_ivb_pcu_begin_socket(char *cpu, uint64_t *events, size_t nr_events)
 {
   int rc = -1;
   char msr_path[80];
@@ -209,7 +209,7 @@ static int intel_hsw_pcu_begin_socket(char *cpu, uint64_t *events, size_t nr_eve
     goto out;
   }
 
-  ctl = 0x00103ULL; // enable freeze (bit 16), freeze (bit 8)
+  ctl = 0x10102ULL; // enable freeze (bit 16), freeze (bit 8)
   if (pwrite(msr_fd, &ctl, sizeof(ctl), CTL) < 0) {
     ERROR("cannot enable freeze of PCU counters: %m\n");
     goto out;
@@ -238,7 +238,7 @@ static int intel_hsw_pcu_begin_socket(char *cpu, uint64_t *events, size_t nr_eve
     }
   }
   
-  ctl = 0x00000ULL; // unfreeze counter
+  ctl = 0x10000ULL; // unfreeze counter
   if (pwrite(msr_fd, &ctl, sizeof(ctl), CTL) < 0) {
     ERROR("cannot unfreeze PCU counters: %m\n");
     goto out;
@@ -254,16 +254,16 @@ static int intel_hsw_pcu_begin_socket(char *cpu, uint64_t *events, size_t nr_eve
 }
 
 //! Configure and start counters
-static int intel_hsw_pcu_begin(struct stats_type *type)
+static int intel_ivb_pcu_begin(struct stats_type *type)
 {
   int nr = 0;
-
   uint64_t pcu_events[4] = {
     FREQ_MAX_TEMP_CYCLES,
     FREQ_MAX_POWER_CYCLES,
     FREQ_MIN_IO_CYCLES,
     FREQ_MIN_SNOOP_CYCLES
   };
+
 
   int i;
   for (i = 0; i < nr_cpus; i++) {
@@ -272,12 +272,12 @@ static int intel_hsw_pcu_begin(struct stats_type *type)
     int core_id = -1;
     int smt_id = -1;
     int nr_events;
-    int nr_cores = 0;
+    int nr_cores;
     snprintf(cpu, sizeof(cpu), "%d", i);
-    if (signature(HASWELL, cpu, &nr_events)) {
+    if (signature(IVYBRIDGE, cpu, &nr_events)) {
       topology(cpu, &pkg_id, &core_id, &smt_id, &nr_cores);
       if (core_id == 0 && smt_id == 0)
-	if (intel_hsw_pcu_begin_socket(cpu, pcu_events,4) == 0)
+	if (intel_ivb_pcu_begin_socket(cpu, pcu_events,4) == 0)
 	  nr++;
     }
   }
@@ -289,11 +289,12 @@ static int intel_hsw_pcu_begin(struct stats_type *type)
 }
 
 //! Collect values of counters for PCU
-static void intel_hsw_pcu_collect_socket(struct stats_type *type, char *cpu, int pkg_id)
+static void intel_ivb_pcu_collect_socket(struct stats_type *type, char *cpu, int pkg_id)
 {
   struct stats *stats = NULL;
   char msr_path[80];
   int msr_fd = -1;
+
   char pkg[80];
   snprintf(pkg, sizeof(pkg), "%d", pkg_id);
 
@@ -327,7 +328,7 @@ static void intel_hsw_pcu_collect_socket(struct stats_type *type, char *cpu, int
 }
 
 //! Collect values of counters
-static void intel_hsw_pcu_collect(struct stats_type *type)
+static void intel_ivb_pcu_collect(struct stats_type *type)
 {
   int i;
   for (i = 0; i < nr_cpus; i++) {
@@ -340,15 +341,15 @@ static void intel_hsw_pcu_collect(struct stats_type *type)
     topology(cpu, &pkg_id, &core_id, &smt_id, &nr_cores);
   
     if (core_id == 0 && smt_id == 0)
-      intel_hsw_pcu_collect_socket(type, cpu, pkg_id);
+      intel_ivb_pcu_collect_socket(type, cpu, pkg_id);
   }
 }
 
 //! Definition of stats for this type
-struct stats_type intel_hsw_pcu_stats_type = {
-  .st_name = "intel_hsw_pcu",
-  .st_begin = &intel_hsw_pcu_begin,
-  .st_collect = &intel_hsw_pcu_collect,
+struct stats_type intel_ivb_pcu_stats_type = {
+  .st_name = "intel_ivb_pcu",
+  .st_begin = &intel_ivb_pcu_begin,
+  .st_collect = &intel_ivb_pcu_collect,
 #define X SCHEMA_DEF
   .st_schema_def = JOIN(KEYS),
 #undef X

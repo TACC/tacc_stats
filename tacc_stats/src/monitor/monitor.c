@@ -96,12 +96,8 @@ static void usage(void)
           "\n"
           "Mandatory arguments to long options are mandatory for short options too.\n"
           "  -h, --help         display this help and exit\n"
-#ifdef RMQ 
           "  -s [SERVER] or --server [SERVER]       Server to send data.\n"
           "  -p [PORT] or --port [PORT]         Port to use (5672 is the default).\n"
-#endif
-          /* "  -l, --list-types ...\n" */
-          /* describe */
           ,
           program_invocation_short_name);
 }
@@ -179,20 +175,14 @@ int main(int argc, char *argv[])
   }
   umask(022);
 
-#ifdef RMQ
   if (host == NULL) {
     fprintf(stderr, "Must specify a RMQ server with -s [--server] argument.\n");
-    rc = 1;
+    rc = -1;
     goto out;
   }
   if (port == NULL) { 
     port = "5672";
   }
-#endif
-
-  /* monitord [types] */
-  char **arg_list = argv + optind;
-  size_t arg_count = argc - optind;
 
   enum {
     cmd_begin,
@@ -208,7 +198,6 @@ int main(int argc, char *argv[])
   close(STDERR_FILENO);
 
   int enable_all = 1;
-  int select_all = (arg_count == 0);
   
   /* Collect is default and only
    changes when HUP signal is received. */
@@ -224,11 +213,13 @@ int main(int argc, char *argv[])
   // SIGALRM for auto rotation
   if (sigaction(SIGALRM, &alarm_action, NULL) < 0) {
     ERROR("cannot set alarm rotate handler: %m\n");
+    rc = -1;
     goto out;
   }
   // SIGTERM for manual rotation
   if (sigaction(SIGTERM, &alarm_action, NULL) < 0) {
     ERROR("cannot set manual rotation handler.");
+    rc = -1;
     goto out;
   }
   // Set timer to send SIGALRM  (every 24hrs)
@@ -241,6 +232,7 @@ int main(int argc, char *argv[])
   // SIGHUP for job loading/unloading
   if (sigaction(SIGHUP, &job_action, NULL) < 0) {
     ERROR("cannot set job loading/unloading signal");
+    rc = -1;
     goto out;
   }
 
@@ -263,14 +255,11 @@ int main(int argc, char *argv[])
     /* Open the data buffer */    
     struct stats_buffer sf;
     if (stats_buffer_open(&sf) < 0) {
-      rc = 1;
-      goto out;
+      ERROR("Failed opening data buffer : %m\n");
     }
-    
-#ifdef RMQ
+
     sf.sf_host = host;
     sf.sf_port = port;
-#endif
 
     // Get current time
     gettimeofday(&tp,NULL);
@@ -279,21 +268,9 @@ int main(int argc, char *argv[])
     size_t i;
     struct stats_type *type;
     
-    /* Only selected types will be collected 
-       If arg_count is zero then we select all below. */
-    for (i = 0; i < arg_count; i++) {
-      type = stats_type_get(arg_list[i]);
-      if (type == NULL) {
-	ERROR("unknown type `%s'\n", arg_list[i]);
-	continue;
-      }
-      type->st_selected = 1;
-    }
-
-    /* Program every enabled type but collect only selected types */
+    /* collect every enabled type */
     i = 0;
     while ((type = stats_type_for_each(&i)) != NULL) {
-
       if (enable_all)
 	type->st_enabled = 1;
       
@@ -304,17 +281,16 @@ int main(int argc, char *argv[])
 	type->st_enabled = 0;
 	continue;
       }
-      
-      if (select_all)
-	type->st_selected = 1;
 
-      if (cmd == cmd_begin && type->st_begin != NULL)
+      if ((g_new_flag || cmd == cmd_begin) && type->st_begin != NULL)
 	(*type->st_begin)(type);
-      
-      if (type->st_enabled && type->st_selected)
+
+      if (type->st_enabled > 0)
 	(*type->st_collect)(type);
     }
 
+    enable_all = 0;
+    
     /* On begin set mark to "begin JOBID", and similar for end. */
     if (cmd == cmd_begin) {
       if (pscanf(JOBID_FILE_PATH, "%79s", current_jobid) < 0)
@@ -335,7 +311,6 @@ int main(int argc, char *argv[])
     if (g_new_flag) {
       if (stats_wr_hdr(&sf) < 0) {
 	ERROR("Rotate signal failed : %m\n");
-	rc = 1;
       }
       g_new_flag = 0;
       // Set timer to wait until signal SIGALRM is sent (rotate every 24 hrs)
@@ -344,7 +319,7 @@ int main(int argc, char *argv[])
     
     /* Write data to buffer and ship off node */
     if (stats_buffer_write(&sf) < 0)
-      rc = 1;
+      ERROR("Buffer write and send failed failed : %m\n");
     
     /* Cleanup. */
     i = 0;
@@ -361,7 +336,5 @@ int main(int argc, char *argv[])
   }
 
  out:
-    return rc;
-    
-    exit(EXIT_FAILURE);
+    return rc;   
 }

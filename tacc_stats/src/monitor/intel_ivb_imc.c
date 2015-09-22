@@ -46,14 +46,14 @@
 #define PRE_COUNT_ALL       PERF_EVENT(0x02, 0x03)
 #define PRE_COUNT_MISS      PERF_EVENT(0x02, 0x01)
 
-static int intel_snb_imc_begin(struct stats_type *type)
+static int intel_ivb_imc_begin(struct stats_type *type)
 {
   int nr = 0;
   
   uint32_t events[] = {
     CAS_READS, CAS_WRITES, ACT_COUNT, PRE_COUNT_MISS,
   };
-  int dids[] = {0x3cb0, 0x3cb1, 0x3cb4, 0x3cb5}; 
+  int dids[] = {0x0eb4, 0x0eb5, 0x0eb0, 0x0eb1}; 
   
   char **dev_paths = NULL;
   int nr_devs;
@@ -72,10 +72,10 @@ static int intel_snb_imc_begin(struct stats_type *type)
   return nr > 0 ? 0 : -1;
 }
 
-static void intel_snb_imc_collect(struct stats_type *type)
+static void intel_ivb_imc_collect(struct stats_type *type)
 {
-  int dids[] = {0x3cb0, 0x3cb1, 0x3cb4, 0x3cb5}; 
 
+  int dids[] = {0x0eb4, 0x0eb5, 0x0eb0, 0x0eb1}; 
   char **dev_paths = NULL;
   int nr_devs;
   if (pci_map_create(&dev_paths, &nr_devs, dids, 4) < 0)
@@ -86,10 +86,10 @@ static void intel_snb_imc_collect(struct stats_type *type)
     intel_snb_uncore_collect_dev(type, dev_paths[i]);  
 }
 
-struct stats_type intel_snb_imc_stats_type = {
-  .st_name = "intel_snb_imc",
-  .st_begin = &intel_snb_imc_begin,
-  .st_collect = &intel_snb_imc_collect,
+struct stats_type intel_ivb_imc_stats_type = {
+  .st_name = "intel_ivb_imc",
+  .st_begin = &intel_ivb_imc_begin,
+  .st_collect = &intel_ivb_imc_collect,
 #define X SCHEMA_DEF
   .st_schema_def = JOIN(KEYS),
 #undef X

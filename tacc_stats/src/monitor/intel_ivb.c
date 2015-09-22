@@ -1,16 +1,16 @@
 /*! 
- \file intel_hsw.c
+ \file intel_ivb.c
  \author Todd Evans 
- \brief Performance Monitoring Counters for Intel Haswell Processors
+ \brief Performance Monitoring Counters for Intel Ivy Bridge Processors
 
 
   \par Details such as Tables and Figures can be found in:
   "Intel® 64 and IA-32 Architectures Software Developer’s Manual
   Volume 3B: System Programming Guide, Part 2" 
-  Order Number: 325384 January 2015 \n
+  Order Number: 253669-047US June 2013 \n
 
   \note
-  Haswell microarchitectures have signatures 06_3c, 06_45, 06_46, 06_47 and EP 06_3f. 
+  Ivy Bridge microarchitectures have signatures 06_3e. 
   Non-architectural events are listed in Table 19-7, 19-8, and 19-9.  
   Table 19-8 is 06_2a specific, Table 19-9 is 06_2d specific.  
 
@@ -27,7 +27,7 @@
 
   \par MSR address layout of registers:
 
-  There are 20 logical processors on a Haswell EP E52660v3 with Hyperthreading disabled.
+  There are 16 logical processors on Stampede with Hyperthreading disabled.
   There are 8 configurable and 3 fixed counter registers per processor.
 
   IA32_PMCx (CTRx) MSRs start at address 0C1H and occupy a contiguous block of MSR
@@ -55,26 +55,30 @@
 #include "cpuid.h"
 #include "intel_pmc3.h"
 
-#define DTLB_LOAD_MISSES_MISS_CAUSES_A_WALK PERF_EVENT(0x08, 0x01)
-#define DTLB_LOAD_MISSES_WALK_COMPLETED_2M_4M PERF_EVENT(0x08, 0x04)
+/*! \name Events 
+
+  Non-architectural events are listed in Table 19-7, 19-8, and 19-9. 
+  Table 19-8 is 06_2a specific, Table 19-9 is 06_2d specific.
+
+  @{
+*/
+#define DTLB_LOAD_MISSES_WALK_CYCLES   PERF_EVENT(0x08, 0x04)
+#define FP_COMP_OPS_EXE_SSE_FP_PACKED  PERF_EVENT(0x10, 0x10)
+#define FP_COMP_OPS_EXE_SSE_FP_SCALAR  PERF_EVENT(0x10, 0x80)
+#define SSE_DOUBLE_SCALAR_PACKED       PERF_EVENT(0x10, 0x90)
+#define SIMD_FP_256_PACKED_DOUBLE      PERF_EVENT(0x11, 0x02)
 #define L1D_REPLACEMENT                PERF_EVENT(0x51, 0x01) 
 #define RESOURCE_STALLS_ANY            PERF_EVENT(0xA2, 0x01) 
 #define MEM_UOPS_RETIRED_ALL_LOADS     PERF_EVENT(0xD0, 0x81) // CTR0-3 Only
-#define MEM_UOPS_RETIRED_ALL_STORES    PERF_EVENT(0xD0, 0x82) // CTR0-3 Only
 #define MEM_LOAD_UOPS_RETIRED_L1_HIT   PERF_EVENT(0xD1, 0x01) // CTR0-3 Only
 #define MEM_LOAD_UOPS_RETIRED_L2_HIT   PERF_EVENT(0xD1, 0x02) // CTR0-3 Only
 #define MEM_LOAD_UOPS_RETIRED_LLC_HIT  PERF_EVENT(0xD1, 0x04) // CTR0-3 Only
 #define MEM_LOAD_UOPS_RETIRED_LLC_MISS PERF_EVENT(0xD1, 0x20) // CTR0-3 Only
 #define MEM_LOAD_UOPS_RETIRED_HIT_LFB  PERF_EVENT(0xD1, 0x40) // CTR0-3 Only
-#define MEM_LOAD_UOPS_RETIRED_L1_MISS  PERF_EVENT(0xD1, 0x08)
-#define MEM_LOAD_UOPS_RETIRED_L2_MISS  PERF_EVENT(0xD1, 0x10)
-#define MEM_LOAD_UOPS_RETIRED_L3_MISS  PERF_EVENT(0xD1, 0x20)
-#define MEM_LOAD_UOPS_RETIRED_HIT_LFB  PERF_EVENT(0xD1, 0x40)
-#define L2_LINES_IN_ALL                PERF_EVENT(0xF1, 0x07)
 //@}
 
 //! Configure and start counters
-static int intel_hsw_begin(struct stats_type *type)
+static int intel_ivb_begin(struct stats_type *type)
 {
   int nr = 0;
 
@@ -84,9 +88,9 @@ static int intel_hsw_begin(struct stats_type *type)
     MEM_LOAD_UOPS_RETIRED_L2_HIT,
     MEM_LOAD_UOPS_RETIRED_LLC_HIT,
     L1D_REPLACEMENT,
-    DTLB_LOAD_MISSES_MISS_CAUSES_A_WALK,
-    RESOURCE_STALLS_ANY,
-    L2_LINES_IN_ALL,
+    FP_COMP_OPS_EXE_SSE_FP_SCALAR,
+    FP_COMP_OPS_EXE_SSE_FP_PACKED,
+    SIMD_FP_256_PACKED_DOUBLE,
   };
 
   int i;
@@ -94,32 +98,28 @@ static int intel_hsw_begin(struct stats_type *type)
     char cpu[80];
     int nr_events = 0;
     snprintf(cpu, sizeof(cpu), "%d", i);
-    if (signature(HASWELL, cpu, &nr_events))
+    if (signature(IVYBRIDGE, cpu, &nr_events))
       if (intel_pmc3_begin_cpu(cpu, events, nr_events) == 0)
 	nr++;
   }
-  
   if (nr == 0) 
     type->st_enabled = 0;
   return nr > 0 ? 0 : -1;
 }
-
-static void intel_hsw_collect(struct stats_type *type)
+static void intel_ivb_collect(struct stats_type *type)
 {
   int i;
-
   for (i = 0; i < nr_cpus; i++) {
     char cpu[80];
     snprintf(cpu, sizeof(cpu), "%d", i);
     intel_pmc3_collect_cpu(type, cpu);
   }
 }
-
 //! Definition of stats entry for this type
-struct stats_type intel_hsw_stats_type = {
-  .st_name = "intel_hsw",
-  .st_begin = &intel_hsw_begin,
-  .st_collect = &intel_hsw_collect,
+struct stats_type intel_ivb_stats_type = {
+  .st_name = "intel_ivb",
+  .st_begin = &intel_ivb_begin,
+  .st_collect = &intel_ivb_collect,
 #define X SCHEMA_DEF
   .st_schema_def = JOIN(KEYS),
 #undef X

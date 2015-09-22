@@ -51,7 +51,7 @@
 #include "stats.h"
 #include "trace.h"
 #include "pscanf.h"
-#include "cpu_is_snb.h"
+#include "cpuid.h"
 
 /*! \name PCU global control register
 
@@ -257,54 +257,52 @@ static int intel_snb_pcu_begin_socket(char *cpu, uint64_t *events, size_t nr_eve
 static int intel_snb_pcu_begin(struct stats_type *type)
 {
   int nr = 0;
-
-  uint64_t pcu_events[4] = {FREQ_MAX_TEMP_CYCLES,
-			    FREQ_MAX_POWER_CYCLES,
-			    FREQ_MIN_IO_CYCLES,
-			    FREQ_MIN_SNOOP_CYCLES};
+  uint64_t pcu_events[4] = {
+    FREQ_MAX_TEMP_CYCLES,
+    FREQ_MAX_POWER_CYCLES,
+    FREQ_MIN_IO_CYCLES,
+    FREQ_MIN_SNOOP_CYCLES
+  };
 
 
   int i;
   for (i = 0; i < nr_cpus; i++) {
     char cpu[80];
-    char core_id_path[80];
+    int pkg_id = -1;
     int core_id = -1;
-    /* Only program uncore counters on core 0 of a socket. */
-
-    snprintf(core_id_path, sizeof(core_id_path), "/sys/devices/system/cpu/cpu%d/topology/core_id", i);
-    if (pscanf(core_id_path, "%d", &core_id) != 1) {
-      ERROR("cannot read core id file `%s': %m\n", core_id_path); /* errno */
-      continue;
-    }
-
-    if (core_id != 0)
-      continue;
-
+    int smt_id = -1;
+    int nr_events;
+    int nr_cores = 0;
     snprintf(cpu, sizeof(cpu), "%d", i);
-    
-    if (cpu_is_sandybridge(cpu))      
-      {
+    if (signature(SANDYBRIDGE, cpu, &nr_events)) {      
+      topology(cpu, &pkg_id, &core_id, &smt_id, &nr_cores);
+      if (core_id == 0 && smt_id == 0)
 	if (intel_snb_pcu_begin_socket(cpu, pcu_events,4) == 0)
-	  nr++; /* HARD */
-      }
+	  nr++;
+    }
   }
+  
+  if (nr == 0)
+    type->st_enabled = 0;
 
   return nr > 0 ? 0 : -1;
 }
 
 //! Collect values of counters for PCU
-static void intel_snb_pcu_collect_socket(struct stats_type *type, char *cpu, char* pcu)
+static void intel_snb_pcu_collect_socket(struct stats_type *type, char *cpu, int pkg_id)
 {
   struct stats *stats = NULL;
   char msr_path[80];
   int msr_fd = -1;
 
-  stats = get_current_stats(type, pcu);
+  char pkg[80];
+  snprintf(pkg, sizeof(pkg), "%d", pkg_id);
+
+  TRACE("cpu %s pkg %s\n", cpu, pkg);
+
+  stats = get_current_stats(type, pkg);
   if (stats == NULL)
     goto out;
-
-  TRACE("cpu %s\n", cpu);
-  TRACE("cpu %s\n", pcu);
 
   snprintf(msr_path, sizeof(msr_path), "/dev/cpu/%s/msr", cpu);
   msr_fd = open(msr_path, O_RDONLY);
@@ -332,46 +330,18 @@ static void intel_snb_pcu_collect_socket(struct stats_type *type, char *cpu, cha
 //! Collect values of counters
 static void intel_snb_pcu_collect(struct stats_type *type)
 {
-  // CPUs 0 and 8 have core_id 0 on Stampede at least
-
   int i;
-
   for (i = 0; i < nr_cpus; i++) {
     char cpu[80];
-    char core_id_path[80];
+    int pkg_id = -1;
     int core_id = -1;
-
-    char socket[80];
-    char socket_id_path[80];
-    int socket_id = -1;
-
-    char pcu[80];
-
-    /* Only collect uncore counters on core 0 of a socket. */
-    snprintf(core_id_path, sizeof(core_id_path), 
-	     "/sys/devices/system/cpu/cpu%d/topology/core_id", i);
-    if (pscanf(core_id_path, "%d", &core_id) != 1) {
-      ERROR("cannot read core id file `%s': %m\n", core_id_path); /* errno */
-      continue;
-    }
-    if (core_id != 0)
-      continue;
-
-    /* Get socket number. */
-    snprintf(socket_id_path, sizeof(socket_id_path), 
-	     "/sys/devices/system/cpu/cpu%d/topology/physical_package_id", i);
-    if (pscanf(socket_id_path, "%d", &socket_id) != 1) {
-      ERROR("cannot read socket id file `%s': %m\n", socket_id_path);
-      continue;
-    }
-
+    int smt_id = -1;
+    int nr_cores = 0;
     snprintf(cpu, sizeof(cpu), "%d", i);
-    snprintf(socket, sizeof(socket), "%d", socket_id);
-    if (cpu_is_sandybridge(cpu))
-      {
-	snprintf(pcu, sizeof(pcu), "%d", socket_id);
-	intel_snb_pcu_collect_socket(type, cpu, pcu);
-      }
+    topology(cpu, &pkg_id, &core_id, &smt_id, &nr_cores);
+  
+    if (core_id == 0 && smt_id == 0)
+      intel_snb_pcu_collect_socket(type, cpu, pkg_id);
   }
 }
 

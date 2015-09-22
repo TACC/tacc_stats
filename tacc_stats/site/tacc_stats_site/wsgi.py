@@ -8,7 +8,7 @@ import sys
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 sys.path.append(os.path.join(os.path.dirname(os.path.abspath(__file__)),'../'))
 os.environ.setdefault("MPLCONFIGDIR","/tmp/")
-os.environ.setdefault("DJANGO_SETTINGS_MODULE","tacc_stats_site.settings")
+os.environ.setdefault("DJANGO_SETTINGS_MODULE","tacc_stats.site.tacc_stats_site.settings")
 
 # This application object is used by any WSGI server configured to use this
 # file. This includes Django's development server, if the WSGI_APPLICATION

@@ -71,7 +71,7 @@
   
   To change events to count:
   -# Define event below
-  -# Modify events array in intel_snb_cbo_begin()
+  -# Modify events array in intel_ivb_cbo_begin()
 */
 #define CBOX_PERF_EVENT(event, umask) \
   ( (event) \
@@ -95,7 +95,7 @@
 //@}
 
 //! Configure and start counters for CBo
-static int intel_snb_cbo_begin_box(char *cpu, int box, uint64_t *events, size_t nr_events)
+static int intel_ivb_cbo_begin_box(char *cpu, int box, uint64_t *events, size_t nr_events)
 {
   int rc = -1;
   char msr_path[80];
@@ -163,7 +163,7 @@ static int intel_snb_cbo_begin_box(char *cpu, int box, uint64_t *events, size_t 
 
 
 //! Configure and start counters
-static int intel_snb_cbo_begin(struct stats_type *type)
+static int intel_ivb_cbo_begin(struct stats_type *type)
 {
   int nr = 0;
   uint64_t events[] = {
@@ -179,19 +179,19 @@ static int intel_snb_cbo_begin(struct stats_type *type)
     int pkg_id = -1;
     int core_id = -1;
     int smt_id = -1;
-    int nr_cores = 0;
+    int nr_cores;
     int nr_events;
 
     snprintf(cpu, sizeof(cpu), "%d", i);
-    if (signature(SANDYBRIDGE, cpu, &nr_events)) {
+    if (signature(IVYBRIDGE, cpu, &nr_events)) {
       topology(cpu, &pkg_id, &core_id, &smt_id, &nr_cores);
       if (smt_id == 0 && core_id == 0)
-	for (j = 0; j < nr_cores; j++)
-	  if (intel_snb_cbo_begin_box(cpu, j, events, 4) == 0)
-	    nr++;
+        for (j = 0; j < nr_cores; j++)
+          if (intel_ivb_cbo_begin_box(cpu, j, events, 4) == 0)
+            nr++;
     }
   }
-
+  
   if (nr == 0)
     type->st_enabled = 0;
 
@@ -199,7 +199,7 @@ static int intel_snb_cbo_begin(struct stats_type *type)
 }
 
 //! Collect values in counters for a CBo
-static void intel_snb_cbo_collect_box(struct stats_type *type, char *cpu, int pkg_id, int box)
+static void intel_ivb_cbo_collect_box(struct stats_type *type, char *cpu, int pkg_id, int box)
 {
   struct stats *stats = NULL;
   char msr_path[80];
@@ -239,7 +239,7 @@ static void intel_snb_cbo_collect_box(struct stats_type *type, char *cpu, int pk
 }
 
 //! Collect values in counters
-static void intel_snb_cbo_collect(struct stats_type *type)
+static void intel_ivb_cbo_collect(struct stats_type *type)
 {
   int i,j;
   for (i = 0; i < nr_cpus; i++) {
@@ -252,15 +252,15 @@ static void intel_snb_cbo_collect(struct stats_type *type)
     topology(cpu, &pkg_id, &core_id, &smt_id, &nr_cores);
     if (smt_id == 0 && core_id == 0)
       for (j = 0; j < nr_cores; j++)
-	intel_snb_cbo_collect_box(type, cpu, pkg_id, j);
+        intel_ivb_cbo_collect_box(type, cpu, pkg_id, j);
   }
 }
 
 //! Definition of stats for this type
-struct stats_type intel_snb_cbo_stats_type = {
-  .st_name = "intel_snb_cbo",
-  .st_begin = &intel_snb_cbo_begin,
-  .st_collect = &intel_snb_cbo_collect,
+struct stats_type intel_ivb_cbo_stats_type = {
+  .st_name = "intel_ivb_cbo",
+  .st_begin = &intel_ivb_cbo_begin,
+  .st_collect = &intel_ivb_cbo_collect,
 #define X SCHEMA_DEF
   .st_schema_def = JOIN(KEYS),
 #undef X

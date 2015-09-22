@@ -48,11 +48,12 @@
 #define G1_DRS_DATA       PERF_EVENT(0x02,0x08) //!< for data bandwidth, flits x 8B/time
 #define G2_NCB_DATA       PERF_EVENT(0x03,0x04) //!< for data bandwidth, flits x 8B/time
 
-static int intel_hsw_qpi_begin(struct stats_type *type)
+static int intel_ivb_qpi_begin(struct stats_type *type)
 {
   int nr = 0;
-  int dids[] = {0x2F32, 0x2F33, 0x2F3A};
-  int nr_dids = 2;
+  int dids[] = {0x0e32, 0x0e33, 0x0e3a};
+  int nr_dids = 3;
+
   uint32_t events[] = {TxL_FLITS_G1_SNP,  TxL_FLITS_G1_HOM, G1_DRS_DATA, G2_NCB_DATA};
   int nr_events = 4;
 
@@ -74,10 +75,10 @@ static int intel_hsw_qpi_begin(struct stats_type *type)
 
 }
 
-static void intel_hsw_qpi_collect(struct stats_type *type)
+static void intel_ivb_qpi_collect(struct stats_type *type)
 {
-  int dids[] = {0x2F32, 0x2F33, 0x2F3A};
-  int nr_dids = 2;
+  int dids[] = {0x0e32, 0x0e33, 0x0e3a};
+  int nr_dids = 3;
 
   char **dev_paths = NULL;
   int nr_devs;
@@ -89,10 +90,10 @@ static void intel_hsw_qpi_collect(struct stats_type *type)
     intel_snb_uncore_collect_dev(type, dev_paths[i]);  
 }
 
-struct stats_type intel_hsw_qpi_stats_type = {
-  .st_name = "intel_hsw_qpi",
-  .st_begin = &intel_hsw_qpi_begin,
-  .st_collect = &intel_hsw_qpi_collect,
+struct stats_type intel_ivb_qpi_stats_type = {
+  .st_name = "intel_ivb_qpi",
+  .st_begin = &intel_ivb_qpi_begin,
+  .st_collect = &intel_ivb_qpi_collect,
 #define X SCHEMA_DEF
   .st_schema_def = JOIN(KEYS),
 #undef X

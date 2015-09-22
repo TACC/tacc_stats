@@ -16,7 +16,9 @@ class HeatMap(Plot):
                                  **kwargs)
 
   def plot(self,jobid,job_data=None):    
-    self.setup(jobid,job_data=job_data)
+    if not self.setup(jobid,job_data=job_data):
+      return
+    
     ts=self.ts
 
     host_cpi = {}

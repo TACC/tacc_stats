@@ -22,57 +22,59 @@
     X(CTL3, "C", "")
 
 #define CTR_KEYS \
-    X(CTR0, "E,W=48", ""), \
-    X(CTR1, "E,W=48", ""), \
-    X(CTR2, "E,W=48", ""), \
-    X(CTR3, "E,W=48", "")
+    X(CTR0, "E,W=44", ""), \
+    X(CTR1, "E,W=44", ""), \
+    X(CTR2, "E,W=44", ""), \
+    X(CTR3, "E,W=44", "")
 
 #define KEYS CTL_KEYS, CTR_KEYS
 
-#define PERF_EVENT(event, umask)		\
-  ( (event)					\
-    | (umask << 8)				\
-    | (0UL << 18)				\
-    | (1UL << 22)				\
-    | (0UL << 23)				\
-    | (0x01UL << 24)				\
-    )
+#define PERF_EVENT(event, umask) \
+  ( (event) \
+  | (umask << 8) \
+  | (0UL << 17) /* reset counter */ \
+  | (0UL << 18) /* Edge Detection. */ \
+  | (1UL << 22) /* Enable. */ \
+  | (0UL << 23) /* Invert */ \
+  | (0x01UL << 24) /* Threshold */ \
+  )
 
-#define REQUESTS_READS  PERF_EVENT(0x01,0x03)
-#define REQUESTS_WRITES PERF_EVENT(0x01,0x0C)
-#define CLOCKTICKS      PERF_EVENT(0x00,0x00)
-#define IMC_WRITES      PERF_EVENT(0x1A,0x0F) 
+#define TxR_INSERTS      PERF_EVENT(0x24,0x04)  //!< CTR0 only
+#define CLOCKTICKS       PERF_EVENT(0x01,0x00)
+#define RING_AD_USED_ALL PERF_EVENT(0x07,0x0F)
+#define RING_AK_USED_ALL PERF_EVENT(0x08,0x0F) 
+#define RING_BL_USED_ALL PERF_EVENT(0x09,0x0F) 
 
-static int intel_hsw_hau_begin(struct stats_type *type)
+static int intel_ivb_r2pci_begin(struct stats_type *type)
 {
   int nr = 0;
   
   uint32_t events[] = {
-    REQUESTS_READS, REQUESTS_WRITES, CLOCKTICKS, IMC_WRITES,
+    TxR_INSERTS, RING_BL_USED_ALL, RING_AD_USED_ALL, RING_AK_USED_ALL,
   };
-  int dids[] = {0x2F30, 0x2F38};
-  
+
+  int dids[] = {0x0e34};
+
   char **dev_paths = NULL;
   int nr_devs;
-  
+
   if (pci_map_create(&dev_paths, &nr_devs, dids, 1) < 0)
     TRACE("Failed to identify pci devices");
   
   int i;
   for (i = 0; i < nr_devs; i++)
     if (intel_snb_uncore_begin_dev(dev_paths[i], events, 4) == 0)
-      nr++;   
-  
+      nr++;
+
   if (nr == 0)
     type->st_enabled = 0;
 
   return nr > 0 ? 0 : -1;
 }
 
-
-static void intel_hsw_hau_collect(struct stats_type *type)
+static void intel_ivb_r2pci_collect(struct stats_type *type)
 {
-  int dids[] = {0x2F30, 0x2F38};
+  int dids[] = {0x0e34};
 
   char **dev_paths = NULL;
   int nr_devs;
@@ -84,10 +86,10 @@ static void intel_hsw_hau_collect(struct stats_type *type)
     intel_snb_uncore_collect_dev(type, dev_paths[i]);  
 }
 
-struct stats_type intel_hsw_hau_stats_type = {
-  .st_name = "intel_hsw_hau",
-  .st_begin = &intel_hsw_hau_begin,
-  .st_collect = &intel_hsw_hau_collect,
+struct stats_type intel_ivb_r2pci_stats_type = {
+  .st_name = "intel_ivb_r2pci",
+  .st_begin = &intel_ivb_r2pci_begin,
+  .st_collect = &intel_ivb_r2pci_collect,
 #define X SCHEMA_DEF
   .st_schema_def = JOIN(KEYS),
 #undef X

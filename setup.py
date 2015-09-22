@@ -92,16 +92,11 @@ if not ISRELEASED:
           rev = rev.decode('ascii')
 
       if not rev.startswith('v') and re.match("[a-zA-Z0-9]{7,9}",rev):
-          # partial clone, manually construct version string
-          # this is the format before we started using git-describe
-          # to get an ordering on dev version strings.
           rev ="v%s.dev-%s" % (VERSION, rev)
-
-      # Strip leading v from tags format "vx.y.z" to get th version string
       FULLVERSION = rev.lstrip('v')
-
 else:
     FULLVERSION += QUALIFIER
+
 
 
 def write_version_py(filename=None):
@@ -109,15 +104,11 @@ def write_version_py(filename=None):
 version = '%s'
 short_version = '%s'
 """
-    if not filename:
-        filename = os.path.join(
-            os.path.dirname(__file__), 'tacc_stats', 'version.py')
+    filename = os.path.join(
+        os.path.dirname(__file__), 'tacc_stats', 'version.py')
 
-    a = open(filename, 'w')
-    try:
-        a.write(cnt % (FULLVERSION, VERSION))
-    finally:
-        a.close()
+    with open(filename, 'w') as fd:
+        fd.write(cnt % (FULLVERSION, VERSION))
 
 if write_version:
     write_version_py()
@@ -126,42 +117,55 @@ def read_site_cfg():
     config = ConfigParser.ConfigParser()
     cfg_filename = os.path.abspath('setup.cfg')
     config.read(cfg_filename)
-    options = dict(config.items('OPTIONS'))
+    return config
 
-    config = ConfigParser.ConfigParser()
-    site_cfg = os.path.abspath(os.path.join('cfg',options['site_cfg']))
-    config.read(site_cfg)    
-    paths = dict(config.items('PATHS'))
-    types = dict(config.items('TYPES'))
+def write_stats_x(cfg_data):    
+    chip_types = [
+        'amd64_pmc', 'intel_nhm', 'intel_wtm',
+        'intel_hsw', 'intel_hsw_cbo', 'intel_hsw_pcu', 'intel_hsw_imc', 'intel_hsw_qpi', 'intel_hsw_hau', 'intel_hsw_r2pci',
+        'intel_ivb', 'intel_ivb_cbo', 'intel_ivb_pcu', 'intel_ivb_imc', 'intel_ivb_qpi', 'intel_ivb_hau', 'intel_ivb_r2pci',
+        'intel_snb', 'intel_snb_cbo', 'intel_snb_pcu', 'intel_snb_imc', 'intel_snb_qpi', 'intel_snb_hau', 'intel_snb_r2pci'
+        ]
+    ib_types   = [
+        'ib', 'ib_sw', 'ib_ext'
+        ]
+    lfs_types  = [
+        'llite', 'lnet', 'mdc', 'osc'
+        ]
+    phi_types = [
+        'mic'
+        ]
+    os_types  = [         
+        'block', 'cpu', 'mem', 'net', 'nfs', 'numa', 'proc', 'ps', 'sysv_shm', 'tmpfs', 'vfs', 'vm'
+        ]
 
-    return paths,types,options
+    types = chip_types + os_types
+    if cfg_data.getboolean('OPTIONS', 'IB'):
+        types += ib_types
+    if cfg_data.getboolean('OPTIONS', 'LFS'):
+        types += lfs_types
+    if cfg_data.getboolean('OPTIONS', 'PHI'):
+        types += phi_types
 
-def write_stats_x(types):
-
-    filename = os.path.join(
+    filename = pjoin(
         os.path.dirname(__file__), 'tacc_stats','src','monitor', 'stats.x')
-    a = open(filename, 'w')
-    import operator
-    try:
-        for t,val in sorted(types.iteritems(), key=operator.itemgetter(0)):            
-            if val == 'True':
-                print '>>>>>>>>>>>>>>>>>>>>>>',t,val
-                a.write('X('+t+') ')
-    finally:
-        a.write('\n')
-        a.close()
+    with open(filename, 'w') as fd:        
+        for val in sorted(types):            
+            print 'Adding monitoring support for device type',val
+            fd.write('X('+val+') ')
+        fd.write('\n')
 
-def write_cfg_file(paths):
-    
-    filename = pjoin(os.path.dirname(__file__), 'tacc_stats', 
-                     'cfg.py')
-    a = open(filename, 'w')    
-    try:
+def write_cfg_file(cfg_data):
+    paths = dict(cfg_data.items('PORTAL_OPTIONS'))
+
+    filename = pjoin(
+        os.path.dirname(__file__), 'tacc_stats', 'cfg.py')
+    print '\n--- Configure Web Portal Module ---\n'
+    with open(filename, 'w') as fd:
         for name,path in paths.iteritems():
-            a.write(name + " = " + "\"" + path + "\"" + "\n")
-        a.write("seek = 0\n")        
-    finally:
-        a.close()
+            print name,'=', path
+            fd.write(name + " = " + "\"" + path + "\"" + "\n")
+        fd.write("seek = 0\n")        
 
 def cfg_sh(filename_in,paths):
     f = open(filename_in, 'r').read()
@@ -213,79 +217,75 @@ class CleanCommand(Command):
             except Exception:
                 pass
 
-paths,types,options = read_site_cfg()
-write_stats_x(types)
-write_cfg_file(paths)
+root = pjoin('tacc_stats', 'src', 'monitor')
+cfg_data = read_site_cfg()
+write_stats_x(cfg_data)
+write_cfg_file(cfg_data)
 
-root='tacc_stats/src/monitor/'
+### Determine source files to use
 sources=[
-    pjoin(root,'schema.c'),pjoin(root,'dict.c'),pjoin(root,'collect.c'),
-    pjoin(root,"pci_busid_map.c"),
-    pjoin(root,'stats_file.c'),pjoin(root,'stats_buffer.c'),pjoin(root,'stats.c')
+    pjoin(root,'schema.c'), pjoin(root,'dict.c'),
+    pjoin(root,'cpuid.c'), pjoin(root,'pci.c'),
+    pjoin(root,'collect.c'),  pjoin(root,'stats.c')
     ]
+with open(pjoin(root, 'stats.x'), 'r') as fd:
+    for dev_type in fd.read().split():
+        sources += [pjoin(root, dev_type.lstrip('X(').rstrip(')') + '.c')]
 
-RMQ = False
-if options['rmq'] == 'True': 
-    RMQ = True
-if RMQ: sources.append(pjoin(root,'amqp_listen.c'))
-
-MODE = options['mode']
-if MODE == "DAEMON": 
-    print "Building a monitoring daemon."
-    sources.append(pjoin(root,'monitor.c'))
-elif MODE == "CRON": 
-    print "Building an executable to be called by cron."
-    sources.append(pjoin(root,'main.c'))
-else:
-    print "BUILD ERROR: Set mode to either DAEMON or CRON"
-SERVER = options['server']
-FREQUENCY = options['frequency']
-
-for root,dirs,files in os.walk('tacc_stats/src/monitor/'):
-    for f in files:
-        name,ext = os.path.splitext(f)        
-        if ext == '.c' and name in types.keys():
-            if types[name] == 'True':
-                sources.append(pjoin(root,f))
-
+FREQUENCY = cfg_data.get('OPTIONS', 'FREQUENCY')
 include_dirs = []
 library_dirs = []
-libraries = []
+libraries    = []
 
-if types['ib'] == 'True' or types['ib_sw'] == 'True' or types['ib_ext'] == 'True':    
-    include_dirs=['/opt/ofed/include']
-    library_dirs=['/opt/ofed/lib64']
-    libraries=['ibmad']
+if cfg_data.getboolean('OPTIONS', 'IB'):
+    ib_dir        = '/opt/ofed'
+    include_dirs += [pjoin(ib_dir,'/include')]
+    library_dirs += [pjoin(ib_dir,'/lib64')]
+    libraries    += ['ibmad']
 
-if types['mic'] == 'True':
+if cfg_data.getboolean('OPTIONS', 'PHI'):
     library_dirs += ['/usr/lib64']
-    libraries += ['scif', 'micmgmt']
-    
-if types['llite'] == 'True' or types ['lnet'] == 'True' or \
-        types['mdc'] == 'True' or types['osc'] == 'True':
-    sources.append('tacc_stats/src/monitor/lustre_obd_to_mnt.c')
+    libraries    += ['scif', 'micmgmt']
 
+if cfg_data.getboolean('OPTIONS', 'LFS'):
+    sources += ['tacc_stats/src/monitor/lustre_obd_to_mnt.c']
+
+paths = dict(cfg_data.items('MONITOR_PATHS'))
 define_macros=[('STATS_DIR_PATH','\"'+paths['stats_dir']+'\"'),
                ('STATS_VERSION','\"'+VERSION+'\"'),
                ('STATS_PROGRAM','\"tacc_stats\"'),
                ('STATS_LOCK_PATH','\"'+paths['stats_lock']+'\"'),
                ('JOBID_FILE_PATH','\"'+paths['jobid_file']+'\"'),
-               ('HOST_NAME_EXT','\"'+paths['host_name_ext']+'\"'),
                ('FREQUENCY',FREQUENCY)]
-if RMQ:
-    define_macros.append(('RMQ',True))
-    libraries.append("rabbitmq")
 
+MODE = cfg_data.get('OPTIONS', 'MODE') 
+if MODE == 'DAEMON': 
+    print "\n--- Building linux daemon for monitoring ---\n"
+    sources   += [pjoin(root,'amqp_listen.c'), 
+                  pjoin(root,'stats_buffer.c'), pjoin(root,'monitor.c')]
+    libraries += ['rabbitmq']
+    library_dirs += [cfg_data.get('RMQ_CFG', 'rmq_path')]
+    SERVER = cfg_data.get('RMQ_CFG', 'RMQ_SERVER')
+    define_macros += [('HOST_NAME_QUEUE',
+                       '\"'+cfg_data.get('RMQ_CFG', 'HOST_NAME_QUEUE')+'\"')]
+
+elif MODE == "CRON": 
+    print "Building executable for monitoring w/ cron"
+    sources += [pjoin(root,'stats_file.c'), pjoin(root,'main.c')]
+else:
+    print "BUILD ERROR: Set mode to either DAEMON or CRON"
+    
 flags = ['-D_GNU_SOURCE', '-Wp,-U_FORTIFY_SOURCE',
          '-O3', '-Wall', '-g', '-UDEBUG']
-ext_data=dict(sources=sources,
-              include_dirs=['tacc_stats/src/monitor/'] + include_dirs,
-              library_dirs=library_dirs,
-              runtime_library_dirs=library_dirs,
-              libraries=libraries,
-              extra_compile_args = flags,
-              define_macros=define_macros
-              )
+
+ext_data=dict(
+    sources            = sources,
+    include_dirs       = [root] + include_dirs,
+    library_dirs       = library_dirs,
+    libraries          = libraries,
+    extra_compile_args = flags,
+    define_macros      = define_macros
+    )
 
 extensions = []
 cmd = {}
@@ -309,28 +309,25 @@ class MyBDist_RPM(bdist_rpm):
         bdist_rpm.initialize_options(self)
         try: os.stat('build')
         except: os.mkdir('build')
-        
+   
+        ### Prep section
         self.prep_script = "build/bdist_rpm_prep"
-        prep = """
+        prep_cmds = """
 %define _bindir /opt/%{name}
-%define crontab_file /etc/cron.d/%{name}
+%setup -n %{name}-%{unmangled_version}
 """
-        if RMQ:
-            prep += "%define server " + "-s "+SERVER
-        else:
-            prep += "%define server \"\""
-        if MODE == "DAEMON":
-            prep += "\n%define pidfile " + paths['stats_lock']
+        prep_cmds += "%define lockfile " + paths['stats_lock'] + "\n"
         if MODE == "CRON":
-            prep += """
+            prep_cmds += """
+%define crontab_file /etc/cron.d/%{name}
 %define stats_dir /var/log/%{name}
 %define archive_dir /scratch/projects/%{name}/archive
 """
-        prep += """
-%setup -n %{name}-%{unmangled_version}
-"""        
-        open(self.prep_script,"w").write(prep)
+        #if MODE == "DAEMON":
+        #    prep_cmds += "%define server " + "-s "+SERVER
+        open(self.prep_script,"w").write(prep_cmds)
         
+        ### Build Section
         self.build_script = "build/bdist_rpm_build"        
         build_cmds = """
 rm -rf %{buildroot}
@@ -338,6 +335,7 @@ python setup.py build_ext
 """
         open(self.build_script,"w").write(build_cmds)
 
+        ### Install Section
         self.install_script = "build/bdist_rpm_install"
         install_cmds = """
 install -m 0755 -d %{buildroot}/%{_bindir}
@@ -356,9 +354,8 @@ echo %{_bindir}/taccstats >> %{_builddir}/%{name}-%{unmangled_version}/INSTALLED
 """
         open(self.install_script,"w").write(install_cmds)
 
-        self.clean_script = None
-        self.verify_script = None
 
+        ### Post Install Section
         self.post_install = "build/bdist_rpm_postinstall"
 
         if MODE == "CRON":
@@ -369,18 +366,7 @@ echo %{_bindir}/taccstats >> %{_builddir}/%{name}-%{unmangled_version}/INSTALLED
  echo \"MAILTO=\\"\\"\"
  echo \"*/10 * * * * root %{_bindir}/%{name} collect %{server}\"
  echo \"55 23 * * * root %{_bindir}/%{name} rotate %{server}\"
-"""
-            self.pre_uninstall = "build/bdist_rpm_preuninstall"
-            open(self.pre_uninstall,"w").write("""
-if [ $1 == 0 ]; then
-rm %{crontab_file} || :
-fi
-""")
-            if not RMQ:
-                post_install_cmds += """
-echo \"${archive_min} ${archive_hour} * * * root %{_bindir}/archive %{stats_dir} %{archive_dir}\"
-"""
-            post_install_cmds += """
+ echo \"${archive_min} ${archive_hour} * * * root %{_bindir}/archive %{stats_dir} %{archive_dir}\"
 ) > %{crontab_file}
 /sbin/service crond restart || :
 %{_bindir}/%{name} rotate %{server}
@@ -392,19 +378,28 @@ chkconfig --add taccstats
 /sbin/service taccstats restart
 """
         open(self.post_install,"w").write(post_install_cmds)
-        self.pre_install = None
-        
-        self.post_uninstall = "build/bdist_rpm_post_uninstall"
+
+        ### Pre Uninstall
+        self.pre_uninstall = "build/bdist_rpm_preuninstall"
+        if MODE == "CRON":
+            pre_uninstall_cmds = """
+if [ $1 == 0 ]; then
+rm %{crontab_file} || :
+fi
+"""        
         if MODE == "DAEMON":
-            post_uninstall_cmds = """
+            pre_uninstall_cmds = """
 /sbin/service taccstats stop
 chkconfig --del taccstats
-rm /etc/init.d/taccstats
+rm -f /etc/init.d/taccstats
 """
-        post_uninstall_cmds = """ """
-#rm -rf %{_bindir}
+
+#        pre_uninstall_cmds += """
+#if [ -e %{lockfile} ]
+#rm %{lockfile}
+#fi
 #"""
-        open(self.post_uninstall,"w").write(post_uninstall_cmds)
+        open(self.pre_uninstall,"w").write(pre_uninstall_cmds)
 
 # Make executable
 # C extensions
@@ -413,6 +408,7 @@ class MyBuildExt(build_ext):
         
         sources = ext.sources
         sources = list(sources)
+        print ext.sources
         ext_path = self.get_ext_fullpath(ext.name)
         depends = sources + ext.depends
         extra_args = ext.extra_compile_args or []
@@ -434,14 +430,13 @@ class MyBuildExt(build_ext):
 
         language = ext.language or self.compiler.detect_language(sources)
 
-        if RMQ:
+        if MODE == "DAEMON":
             self.compiler.link_executable([pjoin(self.build_temp,
                                                  'tacc_stats','src','monitor',
                                                  'amqp_listen.o')],
-                                          'build/bin/amqp_listend',
+                                          'build/bin/listend',
                                           libraries=ext.libraries,
                                           library_dirs=ext.library_dirs,
-                                          runtime_library_dirs=ext.runtime_library_dirs,
                                           extra_postargs=extra_args,
                                           target_lang=language)
             objects.remove(pjoin(self.build_temp,'tacc_stats','src',
@@ -451,14 +446,12 @@ class MyBuildExt(build_ext):
                                       'build/bin/monitor',
                                       libraries=ext.libraries,
                                       library_dirs=ext.library_dirs,
-                                      runtime_library_dirs=ext.runtime_library_dirs,
                                       extra_postargs=extra_args,
                                       target_lang=language)
         self.compiler.link_shared_object(objects, 
                                          ext_path,
                                          libraries=ext.libraries,
                                          library_dirs=ext.library_dirs,
-                                         runtime_library_dirs=ext.runtime_library_dirs,
                                          extra_postargs=extra_args,
                                          debug=self.debug,
                                          build_temp=self.build_temp,
@@ -466,55 +459,54 @@ class MyBuildExt(build_ext):
 
 extensions.append(Extension('tacc_stats.monitor', **ext_data))
 
-if not RMQ:
-    cfg_sh(pjoin(os.path.dirname(__file__), 'tacc_stats',
-                 'src','monitor','archive.sh.in'),paths)
-if MODE == "DAEMON":
-    cfg_sh(pjoin(os.path.dirname(__file__), 'tacc_stats',
-                 'src','monitor','taccstats.in'),dict(paths.items()+options.items()))
+scripts=[
+    'build/bin/monitor',             
+    'tacc_stats/analysis/job_sweeper.py',
+    'tacc_stats/analysis/job_plotter.py',
+    'tacc_stats/analysis/job_printer.py',
+    'tacc_stats/site/manage.py',
+    'tacc_stats/site/machine/update_db.py',
+    'tacc_stats/site/machine/update_thresholds.py',
+    'tacc_stats/site/machine/thresholds.cfg',
+    'tacc_stats/pickler/job_pickles.py'
+    ]
 
+if MODE == "DAEMON": 
+    cfg_sh(pjoin(root, 'taccstats.in'), 
+           dict(paths.items() + cfg_data.items('RMQ_CFG')))
 
-scripts=['build/bin/monitor',             
-         'tacc_stats/analysis/job_sweeper.py',
-         'tacc_stats/analysis/job_plotter.py',
-         'tacc_stats/site/machine/update_db.py',
-         'tacc_stats/site/machine/update_thresholds.py',
-         'tacc_stats/site/machine/thresholds.cfg',
-         'tacc_stats/pickler/job_pickles.py']
+    scripts  += ['build/bin/listend', 
+                 'tacc_stats/taccstats']
+    DISTNAME += "d"
 
-if RMQ: scripts += ['build/bin/amqp_listend']
 if MODE == "CRON":
+    cfg_sh(pjoin(root, 'archive.sh.in'), paths)
     scripts += ['tacc_stats/archive.sh']
     package_data = {'' : ['*.sh.in'] },
-else:
-    DISTNAME += "d"
-    scripts += ['tacc_stats/taccstats']
-
-setup(name=DISTNAME,
-      version=FULLVERSION,
-      maintainer=AUTHOR,
-      package_dir={'':'.'},
-      packages=find_packages(),
-      package_data = {'' : ['*.in','*.cfg','*.html','*.png','*.jpg','*.h'] },
-      scripts=scripts,
-      ext_modules=extensions,
-      setup_requires=['nose'],
-      install_requires=['argparse','numpy','matplotlib','scipy'],
-      test_suite = 'nose.collector',
-      maintainer_email=EMAIL,
-      description=DESCRIPTION,
-      zip_safe=False,
-      license=LICENSE,
-      cmdclass={'build_ext' : MyBuildExt, 
+    
+setup(
+    name = DISTNAME,
+    version = FULLVERSION,
+    maintainer = AUTHOR,
+    package_dir = {'':'.'},
+    packages = find_packages(),
+    package_data = {'' : ['*.in','*.cfg','*.html','*.png','*.jpg','*.h'] },
+    scripts = scripts,
+    ext_modules = extensions,
+    setup_requires = ['nose'],
+    install_requires = ['argparse','numpy','matplotlib','scipy'],
+    test_suite = 'nose.collector',
+    maintainer_email = EMAIL,
+    description = DESCRIPTION,
+    zip_safe = False,
+    license = LICENSE,
+    cmdclass = {'build_ext' : MyBuildExt, 
                 'clean' : CleanCommand,
                 'bdist_rpm' : MyBDist_RPM},
-      url=URL,
-      download_url=DOWNLOAD_URL,
-      long_description=LONG_DESCRIPTION,
-      classifiers=CLASSIFIERS,
-      platforms='any',
-      **setuptools_kwargs)
-
-for name,path in paths.iteritems():
-    if os.path.exists(path): print ">>>", path, 'exists'
-    else: print ">>>", path, 'does not exist'
+    url = URL,
+    download_url = DOWNLOAD_URL,
+    long_description = LONG_DESCRIPTION,
+    classifiers = CLASSIFIERS,
+    platforms = 'any',
+    **setuptools_kwargs
+    )

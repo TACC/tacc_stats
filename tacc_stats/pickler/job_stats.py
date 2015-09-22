@@ -263,6 +263,8 @@ class Host(object):
                 c = line[0]
                 if c == SF_SCHEMA_CHAR:
                     type_name, schema_desc = line[1:].split(None, 1)
+                    if type_name == "intel_hsw_ht": type_name = "intel_hsw"
+                    if type_name == "intel_hsw_cbo_ht": type_name = "intel_hsw_cbo"
 
                     schema = self.job.get_schema(type_name, schema_desc)
                     if schema:
@@ -284,6 +286,8 @@ class Host(object):
 
     def parse_stats(self, rec_time, line, file_schemas, file):
         type_name, dev_name, rest = line.split(None, 2)
+        if type_name == "intel_hsw_ht": type_name = "intel_hsw"
+        if type_name == "intel_hsw_cbo_ht": type_name = "intel_hsw_cbo"
         schema = file_schemas.get(type_name)
         if not schema:
             self.error("file `%s', unknown type `%s', discarding line `%s'\n",
@@ -465,6 +469,9 @@ class Job(object):
         error('%s: ' + fmt, self.id, *args)
 
     def get_schema(self, type_name, desc=None):
+        if type_name == "intel_hsw_ht": type_name = "intel_hsw"
+        if type_name == "intel_hsw_cbo_ht": type_name = "intel_hsw_cbo"
+
         schema = self.schemas.get(type_name)
         if schema:
             if desc and schema.desc != schema_fixup(type_name,desc):

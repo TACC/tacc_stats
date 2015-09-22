@@ -12,8 +12,7 @@ from matplotlib.figure import Figure
 from matplotlib.backends.backend_agg import FigureCanvasAgg
 from matplotlib.backends.backend_pdf import FigureCanvasPdf
 
-from tacc_stats.cfg import lariat_path
-from tacc_stats.analysis.gen import tspl,tspl_utils,lariat_utils,my_utils
+from tacc_stats.analysis.gen import tspl,tspl_utils,my_utils
 
 ## Multiprocessing Unwrapper
 #
@@ -46,9 +45,6 @@ class Plot(object):
     self.header=kwargs.get('header',None)
     self.wide=kwargs.get('wide',False)
     self.save=kwargs.get('save',False)
-    self.lariat_data=kwargs.get('lariat_data',
-                                lariat_utils.LariatData(directory=lariat_path,
-                                                        daysback=2))
     self.aggregate=kwargs.get('aggregate',True)
 
   def setup(self,jobid,job_data=None):
@@ -62,10 +58,6 @@ class Plot(object):
     except EOFError as e:
       print('End of file found reading: ' + jobid)
       return False
-
-    if self.lariat_data != 'pass':
-      self.lariat_data.set_job(self.ts)
-
     return True
 
   ## Plot the list of files using multiprocessing
@@ -179,9 +171,7 @@ class Plot(object):
 
   def output(self,file_suffix):    
     if self.wide:
-      if self.lariat_data != 'pass':
-        left_text=self.header+'\n'+my_utils.summary_text(self.lariat_data,self.ts)
-      else: left_text=self.header + '\n' + self.ts.title
+      left_text=self.header + '\n' + self.ts.title
       text_len=len(left_text.split('\n'))
       fontsize=self.ax.yaxis.label.get_size()
       linespacing=1.2
@@ -194,7 +184,6 @@ class Plot(object):
       title=self.header+'\n'+self.ts.title
       if self.threshold:
         title+=', V: %(v)-6.1f' % {'v': self.threshold}
-      if self.lariat_data != 'pass': title += '\n' + self.lariat_data.title()
       self.fig.suptitle(title)
       self.fname='_'.join([self.prefix,self.ts.j.id,self.ts.owner,file_suffix])
     else:
