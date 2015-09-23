@@ -238,9 +238,9 @@ library_dirs = []
 libraries    = []
 
 if cfg_data.getboolean('OPTIONS', 'IB'):
-    ib_dir        = '/opt/ofed'
-    include_dirs += [pjoin(ib_dir,'/include')]
-    library_dirs += [pjoin(ib_dir,'/lib64')]
+    ib_dir        = "/opt/ofed"
+    include_dirs += [pjoin(ib_dir,'include')]
+    library_dirs += [pjoin(ib_dir,'lib64')]
     libraries    += ['ibmad']
 
 if cfg_data.getboolean('OPTIONS', 'PHI'):
@@ -248,7 +248,7 @@ if cfg_data.getboolean('OPTIONS', 'PHI'):
     libraries    += ['scif', 'micmgmt']
 
 if cfg_data.getboolean('OPTIONS', 'LFS'):
-    sources += ['tacc_stats/src/monitor/lustre_obd_to_mnt.c']
+    sources += [pjoin(root,'lustre_obd_to_mnt.c')]
 
 paths = dict(cfg_data.items('MONITOR_PATHS'))
 define_macros=[('STATS_DIR_PATH','\"'+paths['stats_dir']+'\"'),
@@ -264,11 +264,10 @@ if MODE == 'DAEMON':
     sources   += [pjoin(root,'amqp_listen.c'), 
                   pjoin(root,'stats_buffer.c'), pjoin(root,'monitor.c')]
     libraries += ['rabbitmq']
-    library_dirs += [cfg_data.get('RMQ_CFG', 'rmq_path')]
+
     SERVER = cfg_data.get('RMQ_CFG', 'RMQ_SERVER')
     define_macros += [('HOST_NAME_QUEUE',
                        '\"'+cfg_data.get('RMQ_CFG', 'HOST_NAME_QUEUE')+'\"')]
-
 elif MODE == "CRON": 
     print "Building executable for monitoring w/ cron"
     sources += [pjoin(root,'stats_file.c'), pjoin(root,'main.c')]
@@ -364,12 +363,12 @@ echo %{_bindir}/taccstats >> %{_builddir}/%{name}-%{unmangled_version}/INSTALLED
  archive_min=$(( ((RANDOM * 60) / 32768) %% 60 ))
  archive_hour=$(( (RANDOM %% 2) + 2 ))
  echo \"MAILTO=\\"\\"\"
- echo \"*/10 * * * * root %{_bindir}/%{name} collect %{server}\"
- echo \"55 23 * * * root %{_bindir}/%{name} rotate %{server}\"
+ echo \"*/10 * * * * root %{_bindir}/%{name} collect\"
+ echo \"55 23 * * * root %{_bindir}/%{name} rotate\"
  echo \"${archive_min} ${archive_hour} * * * root %{_bindir}/archive %{stats_dir} %{archive_dir}\"
 ) > %{crontab_file}
 /sbin/service crond restart || :
-%{_bindir}/%{name} rotate %{server}
+%{_bindir}/%{name} rotate
 """
         if MODE == "DAEMON":
             post_install_cmds = """
@@ -389,16 +388,12 @@ fi
 """        
         if MODE == "DAEMON":
             pre_uninstall_cmds = """
-/sbin/service taccstats stop
-chkconfig --del taccstats
-rm -f /etc/init.d/taccstats
+if [ $1 == 0 ]; then
+/sbin/service taccstats stop || :
+chkconfig --del taccstats || :
+rm /etc/init.d/taccstats || :
+fi
 """
-
-#        pre_uninstall_cmds += """
-#if [ -e %{lockfile} ]
-#rm %{lockfile}
-#fi
-#"""
         open(self.pre_uninstall,"w").write(pre_uninstall_cmds)
 
 # Make executable
@@ -408,7 +403,6 @@ class MyBuildExt(build_ext):
         
         sources = ext.sources
         sources = list(sources)
-        print ext.sources
         ext_path = self.get_ext_fullpath(ext.name)
         depends = sources + ext.depends
         extra_args = ext.extra_compile_args or []
@@ -432,15 +426,14 @@ class MyBuildExt(build_ext):
 
         if MODE == "DAEMON":
             self.compiler.link_executable([pjoin(self.build_temp,
-                                                 'tacc_stats','src','monitor',
+                                                 root,
                                                  'amqp_listen.o')],
                                           'build/bin/listend',
                                           libraries=ext.libraries,
                                           library_dirs=ext.library_dirs,
                                           extra_postargs=extra_args,
                                           target_lang=language)
-            objects.remove(pjoin(self.build_temp,'tacc_stats','src',
-                                 'monitor','amqp_listen.o'))
+            objects.remove(pjoin(self.build_temp, root, 'amqp_listen.o'))
 
         self.compiler.link_executable(objects, 
                                       'build/bin/monitor',
@@ -483,7 +476,7 @@ if MODE == "CRON":
     cfg_sh(pjoin(root, 'archive.sh.in'), paths)
     scripts += ['tacc_stats/archive.sh']
     package_data = {'' : ['*.sh.in'] },
-    
+
 setup(
     name = DISTNAME,
     version = FULLVERSION,
