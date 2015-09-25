@@ -1,0 +1,10 @@
+machine = "stampede"
+host_list_dir = "/hpc/tacc_stats_site/%s/hostfile_logs" % machine
+host_name_ext = "%s.tacc.utexas.edu" % machine
+batch_system = "SLURM"
+tacc_stats_home = "/hpc/tacc_stats_site/%s" % machine
+pickles_dir = "/hpc/tacc_stats_site/%s/pickles" % machine
+server = "tacc-stats"
+acct_path = "/hpc/tacc_stats_site/%s/accounting/tacc_jobs_completed" % machine
+base_dir = "/hpc/tacc_stats_site/%s" % machine
+seek = 0

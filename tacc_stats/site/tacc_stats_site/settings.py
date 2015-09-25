@@ -1,6 +1,6 @@
 # Django settings for tacc_stats_site project.
 import os
-import tacc_stats.cfg as cfg
+import tacc_stats.cfg.stampede as cfg
 import tacc_stats.site.tacc_stats_site as tacc_stats_site
 DIR = os.path.dirname(os.path.abspath(__file__))
 
@@ -18,7 +18,7 @@ DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql_psycopg2',
         'NAME'  : cfg.machine + '_db',
-        'USER': 'postgres',
+        'USER': 'rtevans',
         'PASSWORD': '',
         'HOST': cfg.server,         
         'PORT': '5432',               

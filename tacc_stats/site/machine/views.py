@@ -250,8 +250,7 @@ def dates(request, error = False):
         month_dict[key].append((y+'-'+m+'-'+d, d))
         
     field = {}
-    field["machine_name"] = cfg.host_name_ext
-
+    field["machine_name"] = 'Stampede'
     field['date_list'] = sorted(month_dict.iteritems())[::-1]
     field['error'] = error
     return render_to_response("machine/search.html", field)
