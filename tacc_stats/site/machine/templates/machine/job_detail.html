@@ -26,7 +26,7 @@
     <nav class="navbar navbar-default" role="navigation">
       <div class="navbar-header"><a href="https://www.tacc.utexas.edu"> <img src="/media/TACC_logo.png" style="max-width:50%;"/></a></div>
       <center><a href="/machine/">TACC Stats Home</a></center>
-      <a><form class="navbar-form navbar-right" action="{% url 'machine:search' %}" method="get" role="search"> 
+      <a><form class="navbar-form navbar-right" action="/{{resource_name}}/search" method="get" role="search"> 
 	  <div class="form-group">
 	    <input type="text" class="form-control" name ="jobid" placeholder="Job ID">
 	  </div>
@@ -46,11 +46,11 @@
       <th>run time (s)</th><th>requested time (s)</th><th>queue</th><th>name</th><th>status</th><th>wayness</th><th>cores</th><th>nodes</th><th>threads</th>
   </thead>
   <tbody>
-    <tr bgcolor="{{job.color}}"><td><a href="{% url 'machine:job'  job.id %}">{{ job.id }}</a></td>
-      <td><a href="{% url 'machine:uid_view' job.uid %}" >{{ job.uid }}</td>           
-      <td><a href="{% url 'machine:uid_view' job.uid %}" >{{ job.user }}</td>
-      <td><a href="{% url 'machine:project_view' job.project %}">{{ job.project }}</td>
-      <td><a href="{% url 'machine:exe_view' job.exe %}" >{{ job.exe }}</td>
+    <tr bgcolor="{{job.color}}"><td><a href="{% url 'machine:job' resource_name job.id %}">{{ job.id }}</a></td>
+      <td><a href="{% url 'machine:uid_view' resource_name job.uid %}" >{{ job.uid }}</td>           
+      <td><a href="{% url 'machine:uid_view' resource_name job.uid %}" >{{ job.user }}</td>
+      <td><a href="{% url 'machine:project_view' resource_name job.project %}">{{ job.project }}</td>
+      <td><a href="{% url 'machine:exe_view' resource_name job.exe %}" >{{ job.exe }}</td>
       <td align=right>{{ job.start_time }}</td>
       <td align=right>{{ job.end_time }}</td>
       <td align=right>{{ job.run_time }}</td>
@@ -113,10 +113,10 @@
 <table>
   <tr>
     <td><div id="dv01">
-      <img src="{% url 'machine:master_plot' job.id %}" alt="job less than time resolution" style="max-width:100%;"/></div>
+      <img src="{% url 'machine:master_plot' resource_name job.id %}" alt="job less than time resolution" style="max-width:100%;"/></div>
     </td>
     <td><div id="dv02">
-    <img src="{% url 'machine:heat_map' job.id %}" alt="heat map failed" style="max-width:100%"/>
+    <img src="{% url 'machine:heat_map' resource_name job.id %}" alt="heat map failed" style="max-width:100%"/>
     </td></div>
   <tr>
 </table>
@@ -138,7 +138,7 @@
 
 <center><h3>System View</h3></center>
 <p>
-<img src="{% url 'machine:sys_plot' job.id %}" alt="sys plot failed" align="left" style="max-width:100%;"/> 
+<img src="{% url 'machine:sys_plot' resource_name job.id %}" alt="sys plot failed" align="left" style="max-width:100%;"/> 
 </p>
 
 </body>

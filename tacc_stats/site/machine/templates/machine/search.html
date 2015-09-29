@@ -25,7 +25,7 @@
     <nav class="navbar navbar-default" role="navigation">
 	<div class="navbar-header"><a href="https://www.tacc.utexas.edu"> <img src="/media/TACC_logo.png" style="max-width:50%;"/></a></div>
 	<center>{{ machine_name }}</center>
-	<a><form class="navbar-form navbar-right" action="{% url 'machine:search' %}" method="get" role="search"> 	    
+	<a><form class="navbar-form navbar-right" action="/{{machine_name}}/search" method="get" role="search"> 	    
 	    <div class="form-group">
 	    <input type="text" class="form-control" name ="jobid" placeholder="Job ID">
 	  </div>
@@ -55,7 +55,7 @@
 {% endif %}
 <hr/>
 
-<form action="{% url 'machine:search' %}" method="get">
+<form action="/{{machine_name}}/search" method="get">
 
 <h4>Search for jobs on multiple fields </h4>
 </br>
@@ -119,9 +119,9 @@
 
 {% for month, dates in date_list %}
 <ul class="pagination">
-   <li><a href="/machine/date/{{month}}">{{month}}</a></li>
+   <li><a href="/{{machine_name}}/date/{{month}}">{{month}}</a></li>
    {% for date in dates %}
-     <li><a href="/machine/date/{{date.0}}">{{date.1}}</a></li>
+     <li><a href="/{{machine_name}}/date/{{date.0}}">{{date.1}}</a></li>
    {% endfor %}
 </ul>
 {% endfor %}

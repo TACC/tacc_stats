@@ -1,6 +1,6 @@
 # Django settings for tacc_stats_site project.
 import os
-import tacc_stats.cfg.stampede as cfg
+import tacc_stats.cfg as cfg
 import tacc_stats.site.tacc_stats_site as tacc_stats_site
 DIR = os.path.dirname(os.path.abspath(__file__))
 
@@ -16,8 +16,36 @@ MANAGERS = ADMINS
 # Give a name that is unique for the computing platform
 DATABASES = {
     'default': {
+        'ENGINE': 'django.db.backends.sqlite3',
+        'NAME': 'tacc_stats_db'
+    },
+    'stampede': {
         'ENGINE': 'django.db.backends.postgresql_psycopg2',
-        'NAME'  : cfg.machine + '_db',
+        'NAME'  : 'stampede_db',
+        'USER': 'rtevans',
+        'PASSWORD': '',
+        'HOST': cfg.server,         
+        'PORT': '5432',               
+        },
+    'lonestar': {
+        'ENGINE': 'django.db.backends.postgresql_psycopg2',
+        'NAME'  : 'lonestar4_db',
+        'USER': 'rtevans',
+        'PASSWORD': '',
+        'HOST': cfg.server,         
+        'PORT': '5432',               
+        },
+    'maverick': {
+        'ENGINE': 'django.db.backends.postgresql_psycopg2',
+        'NAME'  : 'maverick_db',
+        'USER': 'rtevans',
+        'PASSWORD': '',
+        'HOST': cfg.server,         
+        'PORT': '5432',               
+        },
+    'wrangler': {
+        'ENGINE': 'django.db.backends.postgresql_psycopg2',
+        'NAME'  : 'wrangler_db',
         'USER': 'rtevans',
         'PASSWORD': '',
         'HOST': cfg.server,         
@@ -33,7 +61,7 @@ DATABASES = {
         }        
     }
 
-print '>>>>>>>>>>>>', DATABASES
+DATABASE_ROUTERS = ['tacc_stats.site.machine.multidb.MultiDbRouter']
 
 # Hosts/domain names that are valid for this site; required if DEBUG is False
 # See https://docs.djangoproject.com/en/1.5/ref/settings/#allowed-hosts
@@ -117,6 +145,7 @@ MIDDLEWARE_CLASSES = (
     #'tacc_stats_site.middleware.ProfileMiddleware',
     # Uncomment the next line for simple clickjacking protection:
     # 'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    'tacc_stats.site.machine.multidb.MultiDbRouterMiddleware'
 )
 
 ROOT_URLCONF = 'tacc_stats_site.urls'
@@ -167,12 +196,37 @@ SESSION_ENGINE = 'django.contrib.sessions.backends.file'
 LOGGING = {
     'version': 1,
     'disable_existing_loggers': False,
+    'formatters': {
+        'verbose': {
+            'format': '%(levelname)s %(asctime)s %(module)s %(process)d %(thread)d %(message)s'
+        },
+        'simple': {
+            'format': '%(levelname)s %(asctime)s %(message)s'
+        },
+    },
     'filters': {
         'require_debug_false': {
             '()': 'django.utils.log.RequireDebugFalse'
         }
     },
     'handlers': {
+        'console': {
+            'level': 'DEBUG',
+            'class': 'logging.StreamHandler',
+            'formatter': 'verbose',
+        },
+        'file': {
+            'level': 'DEBUG',
+            'class': 'logging.FileHandler',
+            'filename': '/var/log/django/statsapi.log',
+            'formatter': 'verbose',
+        },
+        'auth': {
+            'level': 'DEBUG',
+            'class': 'logging.FileHandler',
+            'filename': '/var/log/django/statsapi_auth.log',
+            'formatter': 'simple',
+        },
         'mail_admins': {
             'level': 'ERROR',
             'filters': ['require_debug_false'],
@@ -180,6 +234,18 @@ LOGGING = {
         }
     },
     'loggers': {
+        'console': {
+            'handlers': ['console'],
+            'level': 'DEBUG',
+        },
+        'default': {
+            'handlers': ['file', 'console'],
+            'level': 'DEBUG',
+        },
+        'auth': {
+            'handlers': ['file', 'auth', 'console'],
+            'level': 'DEBUG',
+        },
         'django.request': {
             'handlers': ['mail_admins'],
             'level': 'ERROR',

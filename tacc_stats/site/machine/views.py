@@ -27,6 +27,9 @@ from matplotlib.figure import Figure
 from matplotlib.backends.backend_agg import FigureCanvasAgg as FigureCanvas
 from django.core.cache import cache,get_cache 
 import traceback
+import logging
+
+logger = logging.getLogger('default')
 
 def update_comp_info(thresholds = None):
     
@@ -63,10 +66,10 @@ def update_comp_info(thresholds = None):
                        threshold = schema_map[name][2])
         obj.save()
 
-def update(date,rerun=False):
+def update(date, resource_name, rerun=False):
 
     tz = pytz.timezone('US/Central')
-    pickle_dir = os.path.join(cfg.pickles_dir,date)
+    pickle_dir = os.path.join(cfg.get_pickles_dir(resource_name), date)
 
     ctr = 0
     for root, directory, pickle_files in os.walk(pickle_dir):
@@ -146,7 +149,7 @@ def update(date,rerun=False):
                 print date
             print "Percentage Completed =",100*float(ctr)/num_files
 
-def update_metric_fields(date,rerun=False):
+def update_metric_fields(date, resource_name, rerun=False):
     update_comp_info()
     aud = exam.Auditor(processes=4)
     
@@ -183,7 +186,7 @@ def update_metric_fields(date,rerun=False):
     
     paths = []
     for job in jobs_list:
-        paths.append(os.path.join(cfg.pickles_dir,
+        paths.append(os.path.join(cfg.get_pickles_dir(resource_name),
                                   job.date.strftime('%Y-%m-%d'),
                                   str(job.id)))
         
@@ -238,9 +241,8 @@ def sys_plot(request, pk):
     fig.savefig(response, format='png')
 
     return response
-
-
-def dates(request, error = False):
+    
+def dates(request, resource_name, error = False):
     month_dict ={}
     dates = Job.objects.dates('date','day')
     for date in dates:
@@ -250,7 +252,7 @@ def dates(request, error = False):
         month_dict[key].append((y+'-'+m+'-'+d, d))
         
     field = {}
-    field["machine_name"] = 'Stampede'
+    field["machine_name"] = resource_name
     field['date_list'] = sorted(month_dict.iteritems())[::-1]
     field['error'] = error
     return render_to_response("machine/search.html", field)
@@ -286,8 +288,8 @@ def search(request):
 
 def index(request, **field):
 
-
-    print 'index',field
+    resource_name = field['resource_name']
+    del field['resource_name']
     name = ''
     for key, val in field.iteritems():
         name += '['+key+'='+val+']-'
@@ -343,6 +345,8 @@ def index(request, **field):
         field['cpi_job_list'] = list_to_dict(field['cpi_job_list'],'cpi')
         field['mem_job_list'] = list_to_dict(field['mem_job_list'],'mem')
         field['gigebw_job_list'] = list_to_dict(field['gigebw_job_list'],'GigEBW')
+
+        field['resource_name'] = resource_name
 
     return render_to_response("machine/index.html", field)
 
@@ -409,24 +413,24 @@ def figure_to_response(p):
     p.fig.savefig(response, format='png')
     return response
 
-def get_data(pk):
+def get_data(resource_name, pk):
     if cache.has_key(pk):
         data = cache.get(pk)
     else:
         job = Job.objects.get(pk = pk)
-        with open(os.path.join(cfg.pickles_dir,job.date.strftime('%Y-%m-%d'),str(job.id)),'rb') as f:
+        with open(os.path.join(cfg.get_pickles_dir(resource_name), job.date.strftime('%Y-%m-%d'), str(job.id)),'rb') as f:
             data = pickle.load(f)
             cache.set(job.id, data)
     return data
 
-def master_plot(request, pk):
-    data = get_data(pk)
+def master_plot(request, resource_name, pk):
+    data = get_data(resource_name, pk)
     mp = plots.MasterPlot()
     mp.plot(pk,job_data=data)
     return figure_to_response(mp)
 
-def heat_map(request, pk):    
-    data = get_data(pk)
+def heat_map(request, resource_name, pk):    
+    data = get_data(resource_name, pk)
     hm = plots.HeatMap(k1={'intel_snb' : ['intel_snb','intel_snb'],
                            'intel_hsw' : ['intel_hsw','intel_hsw'],
                            'intel_ivb' : ['intel_ivb','intel_ivb'],
@@ -460,16 +464,14 @@ class JobDetailView(DetailView):
     def get_context_data(self, **kwargs):
         context = super(JobDetailView, self).get_context_data(**kwargs)
         job = context['job']
-
-        data = get_data(job.id)
+        context['resource_name'] = self.kwargs['resource_name']
+        data = get_data(self.kwargs['resource_name'], job.id)
 
         import operator
         comp = {'>': operator.gt, '>=': operator.ge,
                 '<': operator.le, '<=': operator.le,
                 '==': operator.eq}
         
-        
-        print ">>>>>>>>>>>>>>>>>>>>>>>>"
         testinfo_dict = {}
         for obj in TestInfo.objects.all():
             obj.test_name,
@@ -523,8 +525,8 @@ class JobDetailView(DetailView):
 
         return context
 
-def type_plot(request, pk, type_name):
-    data = get_data(pk)
+def type_plot(request, resource_name, pk, type_name):
+    data = get_data(resource_name, pk)
 
     schema = build_schema(data,type_name)
     schema = [x.split(',')[0] for x in schema]
@@ -551,14 +553,14 @@ def proc_detail(data):
             print proc_name, proc[-1]
             
 
-def type_detail(request, pk, type_name):
-    data = get_data(pk)
+def type_detail(request, resource_name, pk, type_name):
+    data = get_data(resource_name, pk)
 
     if type_name == 'proc':
         proc_detail(data)
     else: pass
 
-    schema = build_schema(data,type_name)
+    schema = build_schema(data, type_name)
     raw_stats = data.aggregate_stats(type_name)[0]  
 
     stats = []
