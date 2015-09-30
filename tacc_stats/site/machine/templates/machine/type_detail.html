@@ -2,7 +2,7 @@
 <head>
     <title>TACC Stats </title>
     <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.1/css/bootstrap.min.css">
-<!---    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.1/css/bootstrap-theme.min.css">--->
+<!--<link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.1/css/bootstrap-theme.min.css">-->
     <link rel="stylesheet" href="https://bootswatch.com/spacelab/bootstrap.min.css">
 
     <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.1/js/bootstrap.min.js"></script>
@@ -23,7 +23,7 @@
 <div class="container-fluid">
     <h2>Job {{ jobid }} / Type {{ type_name }}</h2>
     <h4>Rates Aggregated over devices</h4>
-<img src="{% url 'machine:type_plot' jobid type_name %}" style="max-width:100%;"/>
+<img src="{% url 'machine:type_plot' resource_name jobid type_name %}" style="max-width:100%;"/>
 {% if stats_data %}
 <h4>Counts Aggregated over devices and hosts</h4>
 <div class="table-responsive">

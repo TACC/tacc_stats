@@ -7,7 +7,7 @@ import os,sys,pwd
 from tacc_stats.analysis import exam
 from tacc_stats.site.machine.models import Job, Host, Libraries, TestInfo
 from tacc_stats.site.xalt.models import run, join_run_object, lib
-import tacc_stats.cfg as cfg
+import tacc_stats.site_cfg as cfg
 
 import tacc_stats.analysis.plot as plots
 from tacc_stats.analysis.gen import lariat_utils
@@ -257,12 +257,12 @@ def dates(request, resource_name, error = False):
     field['error'] = error
     return render_to_response("machine/search.html", field)
 
-def search(request):
+def search(request, resource_name):
 
     if 'jobid' in request.GET:
         try:
             job = Job.objects.get(id = request.GET['jobid'])
-            return HttpResponseRedirect("/machine/job/"+str(job.id)+"/")
+            return HttpResponseRedirect("/" + resource_name + "/job/"+str(job.id)+"/")
         except: pass
     try:
         fields = request.GET.dict()
@@ -280,10 +280,11 @@ def search(request):
             del fields['opt_field2'], fields['value2']
 
         print 'search', fields
+        fields['resource_name'] = resource_name
         return index(request, **fields)
     except: pass
 
-    return dates(request, error = True)
+    return dates(request, resource_name, error = True)
     
 
 def index(request, **field):
@@ -572,5 +573,5 @@ def type_detail(request, resource_name, pk, type_name):
             temp.append(raw_stats[t,event]*scale)
         stats.append((times[t],temp))
 
-    return render_to_response("machine/type_detail.html",{"type_name" : type_name, "jobid" : pk, "stats_data" : stats, "schema" : schema})
+    return render_to_response("machine/type_detail.html", {"type_name" : type_name, "jobid" : pk, "stats_data" : stats, "schema" : schema, "resource_name" : resource_name})
 

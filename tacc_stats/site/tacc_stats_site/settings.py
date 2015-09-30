@@ -1,14 +1,22 @@
 # Django settings for tacc_stats_site project.
 import os
-import tacc_stats.cfg as cfg
 import tacc_stats.site.tacc_stats_site as tacc_stats_site
-DIR = os.path.dirname(os.path.abspath(__file__))
+BASE_DIR = os.path.dirname(os.path.dirname(__file__))
 
-DEBUG = True
+# Quick-start development - unsuitable for production
+# See https://docs.djangoproject.com/en/1.7/howto/deployment/checklist/
+
+# SECURITY WARNING: keep the secret key used in production secret!
+SECRET_KEY = os.environ.get('DJANGO_SECRET_KEY', 'NOT_A_SECRET')
+
+# SECURITY WARNING: don't run with debug turned on in production!
+DEBUG = os.environ.get('DJANGO_ENV', 'DEBUG') == 'DEBUG'
+
 TEMPLATE_DEBUG = DEBUG
 
 ADMINS = (
     ('Richard Todd Evans', 'rtevans@tacc.utexas.edu'),
+    ('Ajit Gauli', 'agauli@tacc.utexas.edu'),
 )
 
 MANAGERS = ADMINS
@@ -22,42 +30,43 @@ DATABASES = {
     'stampede': {
         'ENGINE': 'django.db.backends.postgresql_psycopg2',
         'NAME'  : 'stampede_db',
-        'USER': 'rtevans',
-        'PASSWORD': '',
-        'HOST': cfg.server,         
-        'PORT': '5432',               
+        'USER': os.environ.get('PG_DB_USER'),    
+        'PASSWORD': os.environ.get('PG_DB_PASSWORD'),
+        'HOST': os.environ.get('PG_DB_HOST'),        
+        'PORT': os.environ.get('PG_DB_PORT'),               
         },
     'lonestar': {
         'ENGINE': 'django.db.backends.postgresql_psycopg2',
         'NAME'  : 'lonestar4_db',
-        'USER': 'rtevans',
-        'PASSWORD': '',
-        'HOST': cfg.server,         
-        'PORT': '5432',               
+        'USER': os.environ.get('PG_DB_USER'),    
+        'PASSWORD': os.environ.get('PG_DB_PASSWORD'),
+        'HOST': os.environ.get('PG_DB_HOST'),        
+        'PORT': os.environ.get('PG_DB_PORT'),               
         },
     'maverick': {
         'ENGINE': 'django.db.backends.postgresql_psycopg2',
         'NAME'  : 'maverick_db',
-        'USER': 'rtevans',
-        'PASSWORD': '',
-        'HOST': cfg.server,         
-        'PORT': '5432',               
+        'USER': os.environ.get('PG_DB_USER'),    
+        'PASSWORD': os.environ.get('PG_DB_PASSWORD'),
+        'HOST': os.environ.get('PG_DB_HOST'),        
+        'PORT': os.environ.get('PG_DB_PORT'),               
         },
     'wrangler': {
         'ENGINE': 'django.db.backends.postgresql_psycopg2',
         'NAME'  : 'wrangler_db',
-        'USER': 'rtevans',
-        'PASSWORD': '',
-        'HOST': cfg.server,         
-        'PORT': '5432',               
+        'USER': os.environ.get('PG_DB_USER'),    
+        'PASSWORD': os.environ.get('PG_DB_PASSWORD'),
+        'HOST': os.environ.get('PG_DB_HOST'),        
+        'PORT': os.environ.get('PG_DB_PORT'),               
         },
     # Uncomment this portion if an xalt database exists
     'xalt' : {
         'ENGINE' : 'django.db.backends.mysql',
-        'NAME' : 'xalt',
-        'USER' : 'xaltUser',
-        'PASSWORD' : 'kutwgbh',
-        'HOST' : 'tacc-stats'
+        'NAME' : os.environ.get('XALT_DB_NAME'),
+        'USER': os.environ.get('XALT_DB_USER'),    
+        'PASSWORD': os.environ.get('XALT_DB_PASSWORD'),
+        'HOST': os.environ.get('XALT_DB_HOST'),        
+        'PORT': os.environ.get('XALT_DB_PORT'),
         }        
     }
 
@@ -92,29 +101,27 @@ USE_TZ = True
 
 # Absolute filesystem path to the directory that will hold user-uploaded files.
 # Example: "/var/www/example.com/media/"
-MEDIA_ROOT = os.path.join(DIR,'media/')
+MEDIA_ROOT = '/var/www/media/'
 
 # URL that handles the media served from MEDIA_ROOT. Make sure to use a
 # trailing slash.
 # Examples: "http://example.com/media/", "http://media.example.com/"
-MEDIA_URL = 'media/'
+MEDIA_URL = '/media/'
 
 # Absolute path to the directory static files should be collected to.
 # Don't put anything in this directory yourself; store your static files
 # in apps' "static/" subdirectories and in STATICFILES_DIRS.
 # Example: "/var/www/example.com/static/"
-STATIC_ROOT = ''
+STATIC_ROOT = '/var/www/statsapi/static/'
 
 # URL prefix for static files.
 # Example: "http://example.com/static/", "http://static.example.com/"
-STATIC_URL = 'static/'
+STATIC_URL = '/static/'
 
 # Additional locations of static files
 STATICFILES_DIRS = (
-    os.path.join(DIR,'static/')
-    # Put strings here, like "/home/html/static" or "C:/www/django/static".
-    # Always use forward slashes, even on Windows.
-    # Don't forget to use absolute paths, not relative paths.
+    os.path.join(BASE_DIR, 'static'),
+    '/var/www/static/',
 )
 
 # List of finder classes that know how to find static files in
@@ -124,9 +131,6 @@ STATICFILES_FINDERS = (
     'django.contrib.staticfiles.finders.AppDirectoriesFinder',
 #    'django.contrib.staticfiles.finders.DefaultStorageFinder',
 )
-
-# Make this unique, and don't share it with anybody.
-SECRET_KEY = 'dcute6k4o*0%=76t6!2q=wqv4lt20v32(m!c_ueed^)x8q2u#8'
 
 # List of callables that know how to import templates from various sources.
 TEMPLATE_LOADERS = (
@@ -154,11 +158,9 @@ ROOT_URLCONF = 'tacc_stats_site.urls'
 WSGI_APPLICATION = 'tacc_stats.site.tacc_stats_site.wsgi.application'
 
 TEMPLATE_DIRS = (
-    os.path.join(DIR,'templates'),
-    # Put strings here, like "/home/html/django_templates" or "C:/www/django/templates".
-    # Always use forward slashes, even on Windows.
-    # Don't forget to use absolute paths, not relative paths.
+    os.path.join(BASE_DIR,'tacc_stats_site','templates'),
 )
+
 
 INSTALLED_APPS = (
     'django.contrib.auth',
@@ -167,7 +169,6 @@ INSTALLED_APPS = (
     'django.contrib.sites',
     'django.contrib.messages',
     'django.contrib.staticfiles',
-    #'django_extensions',
     # Uncomment the next line to enable the admin:
     'django.contrib.admin',
     #'django_pdf',
@@ -175,6 +176,10 @@ INSTALLED_APPS = (
     # 'django.contrib.admindocs',
     'tacc_stats.site.machine',
     'tacc_stats.site.xalt',
+    'tacc_stats_api',
+    'django_extensions',
+    'rest_framework',
+    'rest_framework_swagger',
 )
 """
 TEMPLATE_CONTEXT_PROCESSORS=(
@@ -188,6 +193,36 @@ TEMPLATE_CONTEXT_PROCESSORS=(
 """
 SESSION_SERIALIZER = 'django.contrib.sessions.serializers.JSONSerializer'
 SESSION_ENGINE = 'django.contrib.sessions.backends.file'
+
+REST_FRAMEWORK = {
+    # Use Django's standard `django.contrib.auth` permissions,
+    # or allow read-only access for unauthenticated users.
+    'DEFAULT_PERMISSION_CLASSES': [
+        'rest_framework.permissions.DjangoModelPermissionsOrAnonReadOnly'
+    ],
+    'PAGINATE_BY': 10,                 # Default to 10
+}
+
+ANONYMOUS_USER_ID = -1
+
+SWAGGER_SETTINGS = {
+    "exclude_namespaces": [], # List URL namespaces to ignore
+    "api_version": '0.1',  # Specify your API's version
+    "api_path": "/",  # Specify the path to your API not a root level
+    "enabled_methods": [  # Specify which methods to enable in Swagger UI
+        'get',
+    ],
+    "api_key": '', #An API key
+    "is_authenticated": False,  # Set to True to enforce user authentication,
+    "is_superuser": False,  # Set to True to enforce admin only access
+    "permission_denied_handler": None,
+    "info": {
+        'contact': '',
+        'description': '',
+    },
+    "permission_denied_handler": "apiviews.permission_denied_handler"
+}
+
 # A sample logging configuration. The only tangible logging
 # performed by this configuration is to send an email to
 # the site admins on every HTTP 500 error when DEBUG=False.
