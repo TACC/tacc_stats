@@ -10,19 +10,6 @@ from tacc_stats.site.tacc_stats_api.urls import api_router
 
 admin.autodiscover()
 
-# Serializers define the API representation.
-class UserSerializer(serializers.HyperlinkedModelSerializer):
-    class Meta:
-        model = User
-        fields = ('url', 'username', 'email', 'is_staff')
-
-# ViewSets define the view behavior.
-class UserViewSet(viewsets.ModelViewSet):
-    queryset = User.objects.using('stampede').all()
-    serializer_class = UserSerializer
-
-api_router.register(r'users', UserViewSet)
-
 urlpatterns = patterns('',
     url(r'^$', home, name='home'),
     url(r'^admin/', include(admin.site.urls)),
