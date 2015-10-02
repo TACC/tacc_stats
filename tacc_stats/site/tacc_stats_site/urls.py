@@ -17,7 +17,8 @@ urlpatterns = patterns('',
         {'document_root': settings.MEDIA_ROOT}), 
     #url(r'^docs/', include('rest_framework_swagger.urls')),
      #Django Rest API
-    url(r'^api/', include(api_router.urls)),
+    url(r'^api/jobs/', include(api_router.urls)),
+    url(r'^api/', include('tacc_stats_api.urls', namespace='tacc_stats_api')),
     url(r'^api-auth/', include('rest_framework.urls', namespace='rest_framework')),
-    url(r'^(?P<resource_name>(stampede|lonestar|maverick|wrangler))/', include('machine.urls', namespace="machine"), name='machine'),
+    url(r'^(?P<resource_name>(stampede|lonestar|maverick|wrangler))/', include('machine.urls', namespace="machine")),
 )

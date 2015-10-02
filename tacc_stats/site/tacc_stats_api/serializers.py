@@ -1,45 +1,59 @@
-from django.contrib.auth.models import User, Group
 from rest_framework import serializers
-from tacc_stats.site.machine.models import Job
-from tacc_stats.site.machine import apiviews
+from tacc_stats.site.machine.models import Job, TestInfo
+from tacc_stats.site.machine import views as machineViews
 
-class UserSerializer(serializers.HyperlinkedModelSerializer):
-    class Meta:
-        model = User
-        fields = ('url', 'username', 'email', 'groups')
-
-
-class GroupSerializer(serializers.HyperlinkedModelSerializer):
-    class Meta:
-        model = Group
-        fields = ('url', 'name')
 
 class JobSerializer(serializers.HyperlinkedModelSerializer):
-    gig_ebw = serializers.CharField(source='GigEBW')
-    vec_percent = serializers.CharField(source='VecPercent')
+    gig_ebw = serializers.FloatField(source='GigEBW')
+    vec_percent = serializers.FloatField(source='VecPercent')
+    load_all = serializers.IntegerField(source='Load_All')
+    load_l1hits = serializers.IntegerField(source='Load_L1Hits')
+    load_l2hits = serializers.IntegerField(source='Load_L2Hits')
+    load_llchits = serializers.IntegerField(source='Load_LLCHits')
+    cpu_usage = serializers.FloatField(source='CPU_Usage')
+    mic_usage = serializers.FloatField(source='MIC_Usage')
     class Meta:
         model = Job
-        fields = ('id', 'project', 'start_time','end_time','run_time','queue','status','date','user','cpi','mbw','idle','cat','mem','packetrate','packetsize','gig_ebw','flops','vec_percent',)
+        fields = ('id', 'uid', 'project', 'start_time','end_time','run_time', 'requested_time',
+            'queue', 'queue_time', 'status', 'nodes', 'cores', 'wayness', 'date', 'user', 'cpi',
+            'cpld', 'mbw', 'cat', 'idle', 'mem', 'packetrate', 'packetsize', 'gig_ebw', 'flops', 
+            'vec_percent', 'load_all', 'load_l1hits', 'load_l2hits', 'load_llchits', 'cpu_usage', 
+            'mic_usage')
 
 class JobDetailSerializer(serializers.HyperlinkedModelSerializer):
-    master_plot = serializers.SerializerMethodField("get_master_plot")
-    heat_map = serializers.SerializerMethodField("get_heat_map")
-    sys_plot = serializers.SerializerMethodField("get_sys_plot")
-    type_list = serializers.SerializerMethodField("get_type_list")
-    gig_ebw = serializers.CharField(source='GigEBW')
-    vec_percent = serializers.CharField(source='VecPercent')
-    def get_master_plot(self,obj):
-        return apiviews.master_plot(None, obj.id)
+    gig_ebw = serializers.FloatField(source='GigEBW')
+    vec_percent = serializers.FloatField(source='VecPercent')
+    load_all = serializers.IntegerField(source='Load_All')
+    load_l1hits = serializers.IntegerField(source='Load_L1Hits')
+    load_l2hits = serializers.IntegerField(source='Load_L2Hits')
+    load_llchits = serializers.IntegerField(source='Load_LLCHits')
+    cpu_usage = serializers.FloatField(source='CPU_Usage')
+    mic_usage = serializers.FloatField(source='MIC_Usage')
+    master_plot = serializers.SerializerMethodField()
+    sys_plot = serializers.SerializerMethodField()
+    heat_map = serializers.SerializerMethodField()
+    type_list = serializers.SerializerMethodField()
 
-    def get_heat_map(self,obj):
-        return apiviews.heat_map(None, obj.id)
+    def get_master_plot(self, obj):
+        return machineViews.master_plot(None, 'wrangler', obj.id, view_type='api')
 
-    def get_sys_plot(self,obj):
-        return apiviews.sys_plot(None, obj.id)
+    def get_sys_plot(self, obj):
+        return machineViews.sys_plot(None, obj.id, view_type='api')
+
+    def get_heat_map(self, obj):
+        return machineViews.heat_map(None, 'wrangler', obj.id, view_type='api')
 
     def get_type_list(self, obj):
-        return apiviews.type_list(obj.id)
+        return machineViews.type_list('wrangler', obj.id)
 
     class Meta:
         model = Job
-        fields = ('id','uid', 'project', 'start_time','end_time','run_time','queue_time','queue','name','status','nodes','cores','wayness','path','date','user','exe','threads','cpi','mbw','idle','cat','mem','packetrate','packetsize','gig_ebw','flops','vec_percent','master_plot','heat_map','sys_plot','type_list')
+        fields = ('id', 'uid', 'project', 'start_time','end_time','run_time', 'requested_time',
+         'queue', 'queue_time', 'status', 'nodes', 'cores', 'wayness', 'date', 'user', 'cpi', 
+         'cpld', 'mbw', 'cat', 'idle', 'mem', 'packetrate', 'packetsize', 'load_all', 'gig_ebw', 
+         'flops', 'vec_percent', 'load_l1hits', 'load_l2hits', 'load_llchits', 'cpu_usage', 
+         'mic_usage', 'master_plot', 'sys_plot', 'heat_map', 'type_list')
+
+class TestInfoSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = TestInfo

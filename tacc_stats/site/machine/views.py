@@ -25,8 +25,12 @@ from datetime import datetime
 import numpy as np
 from matplotlib.figure import Figure
 from matplotlib.backends.backend_agg import FigureCanvasAgg as FigureCanvas
-from django.core.cache import cache,get_cache 
+from django.core.cache import cache, get_cache 
 import traceback
+import base64
+import json
+from cStringIO import StringIO
+from rest_framework.response import Response
 import logging
 
 logger = logging.getLogger('default')
@@ -205,7 +209,7 @@ def update_metric_fields(date, resource_name, rerun=False):
             except:
                 pass
 
-def sys_plot(request, pk):
+def sys_plot(request, pk, view_type='site'):
 
     racks = []
     nodes = []
@@ -235,10 +239,16 @@ def sys_plot(request, pk):
 
     pcm = ax.pcolor(np.array(range(len(racks)+1)),np.array(range(len(nodes)+1)),x)
 
-    canvas = FigureCanvas(fig)    
-    response = HttpResponse(content_type='image/png')
-    response['Content-Disposition'] = "attachment; filename="+pk+"-sys.png"
-    fig.savefig(response, format='png')
+    canvas = FigureCanvas(fig) 
+    response = ''
+    if(view_type == 'site'):
+        response = HttpResponse(content_type='image/png')
+        response['Content-Disposition'] = "attachment; filename="+pk+"-sys.png"
+        fig.savefig(response, format='png')
+    else:
+        sio = StringIO()
+        fig.savefig(sio, format='png')
+        response = base64.standard_b64encode(sio.getvalue())
 
     return response
     
@@ -357,7 +367,7 @@ def list_to_dict(job_list,metric):
         job_dict.setdefault(job.user,[]).append((job.id,round(job.__dict__[metric],3)))
     return job_dict
     
-def hist_summary(job_list):
+def hist_summary(job_list, view_type='site'):
 
     fig = Figure(figsize=(16,6))
 
@@ -404,7 +414,11 @@ def hist_summary(job_list):
     imgdata = StringIO.StringIO()
     fig.savefig(imgdata, format='png')
     imgdata.seek(0)
-    response = "data:image/png;base64,%s" % base64.b64encode(imgdata.buf)
+    response = ''
+    if(view_type == 'site'):
+        response = "data:image/png;base64,%s" % base64.b64encode(imgdata.buf)
+    else:
+        response = Response(base64.b64encode(imgdata.buf))
 
     return response
 
@@ -413,6 +427,11 @@ def figure_to_response(p):
     response['Content-Disposition'] = "attachment; filename="+p.fname+".png"
     p.fig.savefig(response, format='png')
     return response
+
+def figure_to_base64(p):
+    sio = StringIO()
+    p.fig.savefig(sio, format='png')
+    return base64.standard_b64encode(sio.getvalue())
 
 def get_data(resource_name, pk):
     if cache.has_key(pk):
@@ -424,13 +443,16 @@ def get_data(resource_name, pk):
             cache.set(job.id, data)
     return data
 
-def master_plot(request, resource_name, pk):
+def master_plot(request, resource_name, pk, view_type='site'):
     data = get_data(resource_name, pk)
     mp = plots.MasterPlot()
-    mp.plot(pk,job_data=data)
-    return figure_to_response(mp)
+    mp.plot(pk, job_data=data)
+    if(view_type == 'site'):
+        return figure_to_response(mp)
+    else:
+        return figure_to_base64(mp)
 
-def heat_map(request, resource_name, pk):    
+def heat_map(request, resource_name, pk, view_type='site'):    
     data = get_data(resource_name, pk)
     hm = plots.HeatMap(k1={'intel_snb' : ['intel_snb','intel_snb'],
                            'intel_hsw' : ['intel_hsw','intel_hsw'],
@@ -448,15 +470,60 @@ def heat_map(request, resource_name, pk):
                            },
                        lariat_data="pass")
     hm.plot(pk,job_data=data)
-    return figure_to_response(hm)
+    if(view_type == 'site'):
+        return figure_to_response(hm)
+    else:
+        return figure_to_base64(hm)
 
-def build_schema(data,name):
+def build_schema(data, name):
     schema = []
     for key,value in data.get_schema(name).iteritems():
         if value.unit:
             schema.append(value.key + ','+value.unit)
         else: schema.append(value.key)
     return schema
+
+def type_list(resource_name, job_id):
+    data = get_data(resource_name, job_id)
+    type_list = []
+    host0=data.hosts.values()[0]
+    for type_name, type in host0.stats.iteritems():
+        schema = ' '.join(build_schema(data, type_name))
+        type_list.append({'type_name':type_name, 'schema':schema})
+    return type_list
+
+def type_info(pk, type_name):
+    data = get_data(pk)
+    if data is None:
+        return None
+    schema = build_schema(data,type_name)
+    schema0 = [x.split(',')[0] for x in schema]
+
+    k1 = {'intel_snb' : [type_name]*len(schema0)}
+    k2 = {'intel_snb': schema0}
+
+    raw_stats = data.aggregate_stats(type_name)[0]
+    stats = []
+    scale = 1.0
+    for t in range(len(raw_stats)):
+        temp = []
+        times = data.times-data.times[0]
+        for event in range(len(raw_stats[t])):
+            temp.append(raw_stats[t,event]*scale)
+        stats.append((times[t],temp))
+
+    tp = plots.DevPlot(k1=k1,k2=k2,lariat_data='pass')
+    tp.plot(pk,job_data=data)
+    plot_base64 = figure_to_base64(tp)
+    print stats
+    print schema
+    return {
+                    'type_name':type_name,
+                    'job_id': pk,
+                    'type_plot':plot_base64,
+                    'schema':schema,
+                    'stats':stats
+                    }
 
 class JobDetailView(DetailView):
 
@@ -526,7 +593,7 @@ class JobDetailView(DetailView):
 
         return context
 
-def type_plot(request, resource_name, pk, type_name):
+def type_plot(request, resource_name, pk, type_name, view_type='site'):
     data = get_data(resource_name, pk)
 
     schema = build_schema(data,type_name)
@@ -545,7 +612,10 @@ def type_plot(request, resource_name, pk, type_name):
 
     tp = plots.DevPlot(k1=k1,k2=k2,lariat_data='pass')
     tp.plot(pk,job_data=data)
-    return figure_to_response(tp)
+    if(view_type == 'site'):
+        return figure_to_response(tp)
+    else:
+        return figure_to_base64(tp)
 
 def proc_detail(data):
     print data.get_schema('proc').keys()

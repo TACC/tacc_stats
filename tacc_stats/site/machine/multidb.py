@@ -17,7 +17,7 @@ class MultiDbRouterMiddleware (object):
     def process_view( self, request, view_func, args, kwargs ):
         if 'resource_name' in kwargs:
             request_cfg.resource_name = kwargs['resource_name']
-            logger.debug( 'Resouce Name requested: %s. Saving it as a thread local variable.', request_cfg.resource_name )
+            logger.debug( 'Resouce requested: %s. Saving it as a thread local variable.', request_cfg.resource_name )
             request.SELECTED_DATABASE = request_cfg.resource_name
             logger.debug( 'Setting config machine name as: %s', request_cfg.resource_name )
     def process_response( self, request, response ):
@@ -35,7 +35,7 @@ class MultiDbRouter(object):
     def _multi_db(self):
         from django.conf import settings
         if hasattr(request_cfg, 'resource_name'):
-            logger.debug( 'Resouce Name requested: %s', request_cfg.resource_name )
+            logger.debug( 'Resouce requested: %s', request_cfg.resource_name )
             if request_cfg.resource_name in settings.DATABASES:
                 logger.debug( 'Requested resource is valid.' )
                 return request_cfg.resource_name

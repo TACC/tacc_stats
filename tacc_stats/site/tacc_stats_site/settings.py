@@ -101,7 +101,7 @@ USE_TZ = True
 
 # Absolute filesystem path to the directory that will hold user-uploaded files.
 # Example: "/var/www/example.com/media/"
-MEDIA_ROOT = '/var/www/media/'
+MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 
 # URL that handles the media served from MEDIA_ROOT. Make sure to use a
 # trailing slash.
@@ -121,7 +121,6 @@ STATIC_URL = '/static/'
 # Additional locations of static files
 STATICFILES_DIRS = (
     os.path.join(BASE_DIR, 'static'),
-    '/var/www/static/',
 )
 
 # List of finder classes that know how to find static files in
@@ -197,9 +196,15 @@ SESSION_ENGINE = 'django.contrib.sessions.backends.file'
 REST_FRAMEWORK = {
     # Use Django's standard `django.contrib.auth` permissions,
     # or allow read-only access for unauthenticated users.
-    'DEFAULT_PERMISSION_CLASSES': [
-        'rest_framework.permissions.DjangoModelPermissionsOrAnonReadOnly'
-    ],
+    # 'DEFAULT_PERMISSION_CLASSES': (
+    #     'rest_framework.permissions.DjangoModelPermissionsOrAnonReadOnly',
+    # ),
+    'DEFAULT_RENDERER_CLASSES': (
+        'rest_framework.renderers.JSONRenderer',
+    ),
+    'DEFAULT_PARSER_CLASSES': (
+        'rest_framework.parsers.JSONParser',
+    ),
     'PAGINATE_BY': 10,                 # Default to 10
 }
 
@@ -290,16 +295,16 @@ LOGGING = {
 }
 
 
-CACHES = {
-    'normal': {
-        'BACKEND': 'django.core.cache.backends.memcached.MemcachedCache',
-        'LOCATION': '127.0.0.1:11211',
-        },
+# CACHES = {
+#     'normal': {
+#         'BACKEND': 'django.core.cache.backends.memcached.MemcachedCache',
+#         'LOCATION': '127.0.0.1:11211',
+#         },
 
-    'default': { 
-        'BACKEND':'tacc_stats.site.tacc_stats_site.cache.LargeMemcachedCache',
-        'LOCATION': '127.0.0.1:11211',
-        'TIMEOUT': None,
-        }
-    }
+#     'default': { 
+#         'BACKEND':'tacc_stats.site.tacc_stats_site.cache.LargeMemcachedCache',
+#         'LOCATION': '127.0.0.1:11211',
+#         'TIMEOUT': None,
+#         }
+#     }
 
