@@ -23,7 +23,6 @@ class MetaDataRate(Test):
  
     for k in ts.j.hosts.keys():
       meta_rate+=numpy.diff(ts.assemble(range(0,len(ts.k1)),k,0))/numpy.diff(ts.t)
-    #meta_rate  /= float(ts.numhosts)
     
     self.metric = numpy.max(meta_rate)
     return  

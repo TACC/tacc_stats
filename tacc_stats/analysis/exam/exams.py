@@ -54,6 +54,7 @@ class Auditor():
         raise tspl.TSPLException('End of file found for: ' + jobpath)
 
     for name, measure in self.measures.iteritems():
+      print( name)
       self.metrics[name][job_data.id] = measure.test(jobpath,job_data)
 
   # Compare metric to threshold

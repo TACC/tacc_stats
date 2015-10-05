@@ -47,7 +47,11 @@ def update_comp_info(thresholds = None):
                   'CPU_Usage' : ['CPU_Usage','<',800],
                   'MIC_Usage' : ['MIC_Usage','>',0.0],
                   'Load_All' : ['Load_All','<',1e7],
-                  'MetaDataRate' : ['MetaDataRate','>',100],
+                  'MetaDataRate' : ['MetaDataRate','>',10000],
+                  'InternodeIBAveBW' : ['InternodeIBAveBW', '>', 10000],
+                  'InternodeIBMaxBW' : ['InternodeIBMaxBW', '>', 10000],
+                  'LnetAveBW'  : ['LnetAveBW', '>', 10000],
+                  'LnetMaxBW'  : ['LnetMaxBW', '>', 10000],
                   }
     if thresholds:
         for key,val in thresholds.iteritems():
@@ -473,7 +477,7 @@ class JobDetailView(DetailView):
         print ">>>>>>>>>>>>>>>>>>>>>>>>"
         testinfo_dict = {}
         for obj in TestInfo.objects.all():
-            obj.test_name,
+            print obj.test_name,
             test_type = getattr(sys.modules[exam.__name__],obj.test_name)
             test = test_type(min_time=0,ignore_qs=[])
             try: 
