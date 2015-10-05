@@ -47,6 +47,10 @@ class Job(models.Model):
     CPU_Usage = models.FloatField(null=True)
     MIC_Usage = models.FloatField(null=True)
     MetaDataRate = models.FloatField(null=True)
+    LnetAveBW = models.FloatField(null=True)
+    LnetMaxBW = models.FloatField(null=True)
+    InternodeIBAveBW = models.FloatField(null=True)
+    InternodeIBMaxBW = models.FloatField(null=True)
 
     def __unicode__(self):
         return str(self.id)

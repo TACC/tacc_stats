@@ -238,7 +238,7 @@ library_dirs = []
 libraries    = []
 
 if cfg_data.getboolean('OPTIONS', 'IB'):
-    ib_dir        = "/opt/ofed"
+    ib_dir        = "/usr"
     include_dirs += [pjoin(ib_dir,'include')]
     library_dirs += [pjoin(ib_dir,'lib64')]
     libraries    += ['ibmad']
