@@ -1,10 +1,10 @@
 <html>
 <head>
     <title>TACC: Job details</title>
-    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.1/css/bootstrap.min.css">
-<!----    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.1/css/bootstrap-theme.min.css">---->
-    <link rel="stylesheet" href="https://bootswatch.com/spacelab/bootstrap.min.css">
-    <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.1/js/bootstrap.min.js"></script>
+    <link rel="stylesheet" href="https://bootswatch.com/spacelab/bootstrap.css">
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.11.3/jquery.min.js"></script>
+    <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.5/js/bootstrap.min.js"></script>
+
     <meta charset="utf-8">
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -71,39 +71,53 @@
   <div class="col-sm-2">Links to Splunk Logs</div><div class="col-sm-10"><a href={{ client_url }}>Client Logs</a> <a href={{ server_url }}>Server Logs</a></div>
 </div>
 
-<p> <h3> Processes Alive During Job </h3>
-{% for proc in proc_list %} {{ proc }} {% endfor %}
-</p>
-<hr>
 </br>
+
 <div class="row">
-  <div class="col-sm-5">
-    <table class="table table-condensed table-bordered" style="max-width:30%;">
-      <thead><th>Test</th><th>Measured</th><th>Threshold</th><th>Result</th></thead>
-      <tbody>
-	{% for key,val in testinfo_dict.items %}
-	<tr align=center><th>{{ key }}</th><td>{{ val.0|stringformat:"0.1e" }}</td><td>{{ val.1|stringformat:"0.1e" }}</td><td>{{ val.2 }}</td></tr>
-	{% endfor %}	
-      </tbody>
-    </table>
-  </div>
+
   <div class="col-sm-3">
-    <table style="max-width:30%;">
-      <tr><th>Modules Loaded</th></tr>
-      {% for obj in job.libraries_set.all %}
-      <tr><td align=left>{{ obj.module_name }}</td></tr>
-      {% endfor %}
-    </table>
+    <button type="button" class="btn btn-primary" data-toggle="collapse" data-target="#procs">Processes Alive During Job</button>
+    <div id="procs" class="collapse">
+    {% for proc in proc_list %} <a href="{% url 'machine:proc_detail' job.id proc %}">{{proc}}</a>{% endfor %}
+    </div>
   </div>
-  <div class="col-sm-4">
+
+  <div class="col-md-3">
+  <button type="button" class="btn btn-primary" data-toggle="collapse" data-target="#tests">Click for For Tests Summary</button>
+    <div id="tests" class="collapse">
+      <table class="table table-condensed table-bordered" style="max-width:30%;">
+	<thead><th>Test</th><th>Measured</th><th>Threshold</th><th>Result</th></thead>
+	<tbody>
+	  {% for key,val in testinfo_dict.items %}
+	  <tr align=center><th>{{ key }}</th><td>{{ val.0|stringformat:"0.1e" }}</td><td>{{ val.1|stringformat:"0.1e" }}</td><td>{{ val.2 }}</td></tr>
+	  {% endfor %}	
+	</tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="col-md-6">
+  <button type="button" class="btn btn-primary" data-toggle="collapse" data-target="#libs">Click for Modules and Libraries</button>
+    <div id="libs" class="collapse">
+      <table style="max-width:30%;">
+	<tr><th>Modules Loaded</th></tr>
+	{% for obj in job.libraries_set.all %}
+	{% if obj.module_name != "none" %}
+	<tr><td align=left>{{ obj.module_name }}</td></tr>
+	{% endif %}
+	{% endfor %}
+      </table>
+      </br>
     <table style="max-width:30%;">
       <tr><th>Objects linked</th></tr>
       {% for lib in job.libraries_set.all %}
       <tr><td align=left>{{ lib }}</td></tr>
       {% endfor %}
     </table>
+    </div>
   </div>
-</div>
+
+</div>  
 
 </br>
 
@@ -123,14 +137,17 @@
 </center></p>
 
 <center>
-<h3>Choose Type Name below to access plots and counts of Performance Events</h3>
-</center>
+
+<button type="button" class="btn btn-primary btn-lg" data-toggle="collapse" data-target="#dev">Click for Raw Device Data and Plots</button>
+<div id="dev" class="collapse">
     <table class="table table-condensed table-bordered" style="margin-right:30px;width:100%;">
       <tr><th>Type Name</th><th>Recorded Performance Events</th></tr>
          {% for type_name, schema in type_list %}
             <tr><td><a href="{{ type_name }}/">{{ type_name }}</a></td><td style="text-align:left">{{ schema }}</td></tr>
          {% endfor %}
     </table>
+</div>
+</center>
 
 {% else %}
     <h1>Job not found</h1>
