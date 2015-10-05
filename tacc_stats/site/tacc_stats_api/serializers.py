@@ -57,3 +57,4 @@ class JobDetailSerializer(serializers.HyperlinkedModelSerializer):
 class TestInfoSerializer(serializers.ModelSerializer):
     class Meta:
         model = TestInfo
+        exclude = ('id')

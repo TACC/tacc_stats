@@ -17,9 +17,83 @@ import logging
 
 logger = logging.getLogger('default')
 
-@api_view(['GET', 'POST', 'PUT'])
+def permission_denied_handler(request):
+    from django.http import HttpResponse
+    return HttpResponse('You don\'t have required permission!')
+
+@api_view(['GET'])
 @renderer_classes((TACCJSONRenderer,))
 def thresholds(request, resource_name):
+    """
+    Returns job flag thresholds set on each resource database.
+    ---
+    # YAML (must be separated by `---`)
+    omit_serializer: true
+    parameters_strategy:
+      form: replace
+      query: merge
+    omit_parameters:
+      - form
+    parameters:
+    - name: resource_name
+      description: resource name
+      required: true
+      type: string
+      enum:
+        - stampede
+        - lonestar
+        - maverick
+        - wrangler
+      paramType: path
+    responseMessages:
+        - code: 401
+          message: Not authenticated
+        - code: 500
+          message: Internal Server Error
+        - code: 405
+          message: Method Not Allowed Error
+    """
+
+    queryset = TestInfo.objects.all()
+    context = dict(request=request)
+    serializer = TestInfoSerializer(queryset, many=True, context=context)
+    return Response(serializer.data)
+
+@api_view(['PUT'])
+@renderer_classes((TACCJSONRenderer,))
+def thresholds(request, resource_name):
+    """
+    Updates job flag thresholds set on each resource database.
+    ---
+    # YAML (must be separated by `---`)
+    omit_serializer: true
+    parameters_strategy:
+      form: replace
+      query: merge
+    omit_parameters:
+      - form
+    parameters:
+    - name: resource_name
+      description: resource name
+      required: true
+      type: string
+      enum:
+        - stampede
+        - lonestar
+        - maverick
+        - wrangler
+      paramType: path
+    responseMessages:
+        - code: 401
+          message: Not authenticated
+        - code: 403
+          message: Insufficient rights to call this procedure
+        - code: 500
+          message: Internal Server Error
+        - code: 405
+          message: Method Not Allowed Error
+    """
+
     queryset = TestInfo.objects.all()
     context = dict(request=request)
     serializer = TestInfoSerializer(queryset, many=True, context=context)
@@ -28,6 +102,75 @@ def thresholds(request, resource_name):
 @api_view(['GET'])
 @renderer_classes((TACCJSONRenderer,))
 def flagged_jobs(request, resource_name):
+    """
+    Returns flagged jobs run on a resource filtered by the params below.
+    ---
+    # YAML (must be separated by `---`)
+    omit_serializer: true
+    parameters_strategy:
+      form: replace
+      query: merge
+    omit_parameters:
+      - form
+    parameters:
+    - name: resource_name
+      description: resource name
+      required: true
+      type: string
+      enum:
+        - stampede
+        - lonestar
+        - maverick
+        - wrangler
+      paramType: path
+    - name: user
+      description: Owner of the job
+      required: false
+      type: string
+      paramType: query
+    - name: project
+      description: ID of the corresponding project
+      type: string
+      required: false
+      paramType: query
+    - name: id
+      description: ID of the job
+      required: false
+      type: string
+      paramType: query
+    - name: uid
+      description: uid of the job
+      required: false
+      type: string
+      paramType: query
+    - name: start_time
+      description: Datetime when the job started e.g. 2015-10-01T13:46:59Z
+      required: false
+      type: string
+      paramType: query
+    - name: end_time
+      description: Datetime when the job ended e.g. 2015-10-01T13:46:59Z
+      required: false
+      type: string
+      paramType: query
+    - name: queue
+      description: Queue name this job is in.
+      required: false
+      type: string
+      paramType: query
+    - name: status
+      description: Status of this job ('queued','running','completed')
+      required: false
+      type: string
+      paramType: query
+    responseMessages:
+        - code: 401
+          message: Not authenticated
+        - code: 500
+          message: Internal Server Error
+        - code: 405
+          message: Method Not Allowed Error
+    """
     field = {}
     for param in request.query_params:
         val = request.query_params.get(param)
@@ -71,6 +214,75 @@ def flagged_jobs(request, resource_name):
 @api_view(['GET'])
 @renderer_classes((TACCJSONRenderer,))
 def characteristics_plot(request, resource_name):
+    """
+    Returns job characteristics plot for job list filtered by the params below.
+    ---
+    # YAML (must be separated by `---`)
+    omit_serializer: true
+    parameters_strategy:
+      form: replace
+      query: merge
+    omit_parameters:
+      - form
+    parameters:
+    - name: resource_name
+      description: resource name
+      required: true
+      type: string
+      enum:
+        - stampede
+        - lonestar
+        - maverick
+        - wrangler
+      paramType: path
+    - name: user
+      description: Owner of the job
+      required: false
+      type: string
+      paramType: query
+    - name: project
+      description: ID of the corresponding project
+      type: string
+      required: false
+      paramType: query
+    - name: id
+      description: ID of the job
+      required: false
+      type: string
+      paramType: query
+    - name: uid
+      description: uid of the job
+      required: false
+      type: string
+      paramType: query
+    - name: start_time
+      description: Datetime when the job started e.g. 2015-10-01T13:46:59Z
+      required: false
+      type: string
+      paramType: query
+    - name: end_time
+      description: Datetime when the job ended e.g. 2015-10-01T13:46:59Z
+      required: false
+      type: string
+      paramType: query
+    - name: queue
+      description: Queue name this job is in.
+      required: false
+      type: string
+      paramType: query
+    - name: status
+      description: Status of this job ('queued','running','completed')
+      required: false
+      type: string
+      paramType: query
+    responseMessages:
+        - code: 401
+          message: Not authenticated
+        - code: 500
+          message: Internal Server Error
+        - code: 405
+          message: Method Not Allowed Error
+    """
     field = {}
     for param in request.query_params:
         val = request.query_params.get(param)
@@ -85,41 +297,60 @@ def characteristics_plot(request, resource_name):
     return machineViews.hist_summary(queryset, view_type='api')
 
 class JobViewSet(viewsets.ReadOnlyModelViewSet):
-    #serializer_class = JobSerializer
+    # this serializer below is overridden by method level serializers, it is here to shut up an assertion error
+    serializer_class = JobSerializer
     permission_classes = (IsAuthenticatedOrReadOnly,)
     renderer_classes = (TACCJSONRenderer,)
     def list(self, request, resource_name):
         """
-        Returns jobs run on a resource.
+        Returns job list on a resource filtered by the params below. Recommended to use as many filters as possible 
+        to narrow the search.
         ---
         # YAML (must be separated by `---`)
-
-        serializer: JobSerializer
-        omit_serializer: false
-        parameters_strategy: replace
+        omit_serializer: true
+        parameters_strategy:
+          form: replace
+          query: merge
+        omit_parameters:
+          - form
         parameters:
+        - name: resource_name
+          description: resource name
+          required: true
+          type: string
+          enum:
+            - stampede
+            - lonestar
+            - maverick
+            - wrangler
+          paramType: path
         - name: user
           description: Owner of the job
           required: false
           type: string
           paramType: query
-        - name: project_id
+        - name: project
           description: ID of the corresponding project
           type: string
           required: false
           paramType: query
-        - name: job_id
+        - name: id
           description: ID of the job
           required: false
           type: string
           paramType: query
+        - name: uid
+          description: uid of the job
+          required: false
+          type: string
+          paramType: query
         - name: start_time
-          description: Datetime when the job started
+          description: Datetime when the job started e.g. 2015-10-01T13:46:59Z
           required: false
           type: string
           paramType: query
         - name: end_time
-          description: Datetime when the job ended
+          description: Datetime when the job ended e.g. 2015-10-01T13:46:59Z
           required: false
           type: string
           paramType: query
@@ -134,6 +365,8 @@ class JobViewSet(viewsets.ReadOnlyModelViewSet):
           type: string
           paramType: query
         responseMessages:
+            - code: 401
+              message: Not authenticated
             - code: 500
               message: Internal Server Error
             - code: 405
@@ -159,10 +392,23 @@ class JobViewSet(viewsets.ReadOnlyModelViewSet):
         Returns a job run on a resource by job id.
         ---
         # YAML (must be separated by `---`)
-
-        serializer: JobDetailSerializer
-        omit_serializer: false
-        parameters_strategy: replace
+        omit_serializer: true
+        parameters_strategy:
+          form: replace
+          query: merge
+        omit_parameters:
+          - form
+        parameters:
+        - name: resource_name
+          description: resource name
+          required: true
+          type: string
+          enum:
+            - stampede
+            - lonestar
+            - maverick
+            - wrangler
+          paramType: path
         responseMessages:
             - code: 500
               message: Internal Server Error
@@ -176,7 +422,7 @@ class JobViewSet(viewsets.ReadOnlyModelViewSet):
     @detail_route(methods=['get'])
     def type_info(self, request, pk=None):
         """
-        Returns type info for a job run on Stampede.
+        Returns type info for a job run on a resource.
         ---
         # YAML (must be separated by `---`)
         type:
@@ -198,6 +444,16 @@ class JobViewSet(viewsets.ReadOnlyModelViewSet):
         omit_serializer: true
         parameters_strategy: merge
         parameters:
+        - name: resource_name
+          description: resource name
+          required: true
+          type: string
+          enum:
+            - stampede
+            - lonestar
+            - maverick
+            - wrangler
+          paramType: path
         - name: type
           description: type name
           required: true

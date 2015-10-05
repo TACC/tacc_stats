@@ -216,16 +216,19 @@ SWAGGER_SETTINGS = {
     "api_path": "/",  # Specify the path to your API not a root level
     "enabled_methods": [  # Specify which methods to enable in Swagger UI
         'get',
+        'post',
+        'put'
     ],
     "api_key": '', #An API key
     "is_authenticated": False,  # Set to True to enforce user authentication,
     "is_superuser": False,  # Set to True to enforce admin only access
     "permission_denied_handler": None,
     "info": {
-        'contact': '',
+        'contact': 'agauli@tacc.utexas.edu',
         'description': '',
     },
-    "permission_denied_handler": "apiviews.permission_denied_handler"
+    "permission_denied_handler": "tacc_stats_api.views.permission_denied_handler",
+    'title': 'TACC Stats API',
 }
 
 # A sample logging configuration. The only tangible logging
