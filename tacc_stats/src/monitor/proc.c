@@ -35,6 +35,7 @@ static void proc_collect_pid(struct stats_type *type, const char *pid)
 {
   struct stats *stats = NULL;
   char path[32];
+  char process[128];
   FILE *file = NULL;
   char file_buf[4096];
   char *line = NULL;
@@ -60,12 +61,13 @@ static void proc_collect_pid(struct stats_type *type, const char *pid)
     if (strcmp(key,"Name:") == 0) 
       {
 	rest[strlen(rest) - 1] = '\0';
-	stats = get_current_stats(type, rest);
+	snprintf(process, sizeof(process), "%s/%s", rest, pid);
+	stats = get_current_stats(type, process);
 	continue;
       }
     if (stats == NULL)
       goto out;
-
+ 
     errno = 0;
     key[strlen(key) - 1] = '\0';
     

@@ -465,6 +465,7 @@ scripts=[
     ]
 
 if MODE == "DAEMON": 
+    print 'data will go to',SERVER
     cfg_sh(pjoin(root, 'taccstats.in'), 
            dict(paths.items() + cfg_data.items('RMQ_CFG')))
 
