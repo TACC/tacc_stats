@@ -1,7 +1,9 @@
 from rest_framework import serializers
 from tacc_stats.site.machine.models import Job, TestInfo
 from tacc_stats.site.machine import views as machineViews
+import logging
 
+logger = logging.getLogger('default')
 
 class JobSerializer(serializers.HyperlinkedModelSerializer):
     gig_ebw = serializers.FloatField(source='GigEBW')
@@ -35,16 +37,16 @@ class JobDetailSerializer(serializers.HyperlinkedModelSerializer):
     type_list = serializers.SerializerMethodField()
 
     def get_master_plot(self, obj):
-        return machineViews.master_plot(None, 'wrangler', obj.id, view_type='api')
+        return machineViews.master_plot(None, self.context.get('resource_name'), obj.id, view_type='api')
 
     def get_sys_plot(self, obj):
-        return machineViews.sys_plot(None, obj.id, view_type='api')
+        return machineViews.sys_plot(None, self.context.get('resource_name'),  obj.id, view_type='api')
 
     def get_heat_map(self, obj):
-        return machineViews.heat_map(None, 'wrangler', obj.id, view_type='api')
+        return machineViews.heat_map(None, self.context.get('resource_name'), obj.id, view_type='api')
 
     def get_type_list(self, obj):
-        return machineViews.type_list('wrangler', obj.id)
+        return machineViews.type_list(self.context.get('resource_name'), obj.id)
 
     class Meta:
         model = Job
@@ -57,4 +59,4 @@ class JobDetailSerializer(serializers.HyperlinkedModelSerializer):
 class TestInfoSerializer(serializers.ModelSerializer):
     class Meta:
         model = TestInfo
-        exclude = ('id')
+        exclude = ('id',)

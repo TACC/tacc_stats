@@ -209,7 +209,7 @@ def update_metric_fields(date, resource_name, rerun=False):
             except:
                 pass
 
-def sys_plot(request, pk, view_type='site'):
+def sys_plot(request, resource_name, pk, view_type='site'):
 
     racks = []
     nodes = []
