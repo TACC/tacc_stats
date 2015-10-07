@@ -92,9 +92,7 @@ class JobForm(ModelForm):
 class TestInfo(models.Model):
     test_name = models.CharField(max_length=128)
     field_name = models.CharField(max_length=128)
-    threshold = models.FloatField(null=True)
-
-    # Computed Metric .op. Threshold
+    threshold = models.FloatField(blank=False)
     comparator = models.CharField(max_length=2)
 
     def __unicode__(self):

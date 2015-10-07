@@ -1,5 +1,7 @@
 from django.contrib.auth.models import User, Group
 from django.db.models import Q
+from django.forms import ModelForm
+from django.shortcuts import get_object_or_404
 from rest_framework import viewsets
 from rest_framework_extensions.mixins import PaginateByMaxMixin
 from rest_framework.renderers import JSONRenderer
@@ -57,7 +59,7 @@ class ThresholdList(APIView):
         queryset = TestInfo.objects.all()
         context = dict(request=request)
         serializer = TestInfoSerializer(queryset, many=True, context=context)
-        return Response(serializer.data)
+        return Response({'status': 'success', 'message': '', 'result': serializer.data})
 
     def post(self, request, resource_name, format=None):
         """
@@ -91,16 +93,52 @@ class ThresholdList(APIView):
             - code: 405
               message: Method Not Allowed Error
         """
-
-        queryset = TestInfo.objects.all()
-        context = dict(request=request)
-        serializer = TestInfoSerializer(queryset, many=True, context=context)
-        return Response(serializer.data)
+        logger.debug(request.data)
+        serializer = TestInfoSerializer(data=request.data)
+        if serializer.is_valid():
+          new_instance = serializer.save()
+          return Response({'status': 'success', 'message': '', 'result': serializer.data}, status=status.HTTP_201_CREATED)
+        else:
+          return Response({'status': 'error', 'message': 'Error creating this threshold', 'result': serializer.errors.as_json()}, status=status.HTTP_400_BAD_REQUEST)
 
 class ThresholdDetail(APIView):
 
     @renderer_classes((TACCJSONRenderer,))
-    def put(self, request, pk, resource_name, format=None):
+    def get(self, request, pk, resource_name, format=None):
+        """
+        Retrieves a job flag threshold set on a resource.
+        ---
+        serializer: TestInfoSerializer
+        omit_serializer: false
+        parameters_strategy: merge
+        parameters:
+        - name: resource_name
+          required: true
+          type: string
+          enum:
+            - stampede
+            - lonestar
+            - maverick
+            - wrangler
+          paramType: path
+        responseMessages:
+            - code: 401
+              message: Not authenticated
+            - code: 403
+              message: Insufficient rights to call this procedure
+            - code: 500
+              message: Internal Server Error
+            - code: 405
+              message: Method Not Allowed Error
+        """
+
+        instance = get_object_or_404(TestInfo, pk=pk)
+        serializer = TestInfoSerializer(instance)
+        return Response({'status': 'success', 'message': '', 'result': serializer.data})
+    
+    # was unable to use PUT for update because of empty request.data object received
+    @renderer_classes((TACCJSONRenderer,))
+    def post(self, request, pk, resource_name, format=None):
         """
         Updates job flag threshold set on a resource.
         ---
@@ -132,11 +170,13 @@ class ThresholdDetail(APIView):
             - code: 405
               message: Method Not Allowed Error
         """
-
-        queryset = TestInfo.objects.all()
-        context = dict(request=request)
-        serializer = TestInfoSerializer(queryset, many=True, context=context)
-        return Response(serializer.data)
+        instance = get_object_or_404(TestInfo, pk=pk)
+        serializer = TestInfoSerializer(instance, data=request.data)
+        if serializer.is_valid():
+          instance = serializer.save()
+          return Response({'status': 'success', 'message': '', 'result': serializer.data})
+        else:
+          return Response({'status': 'error', 'message': 'Error creating this threshold', 'result': serializer.errors}, status=status.HTTP_400_BAD_REQUEST)
 
     @renderer_classes((TACCJSONRenderer,))
     def delete(self, request, pk, resource_name, format=None):
@@ -167,10 +207,9 @@ class ThresholdDetail(APIView):
               message: Method Not Allowed Error
         """
 
-        queryset = TestInfo.objects.all()
-        context = dict(request=request)
-        serializer = TestInfoSerializer(queryset, many=True, context=context)
-        return Response(serializer.data)
+        instance = get_object_or_404(TestInfo, pk=pk)
+        instance.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
 
 class JobViewSet(viewsets.ReadOnlyModelViewSet):
@@ -268,7 +307,7 @@ class JobViewSet(viewsets.ReadOnlyModelViewSet):
         logger.debug('Query: %s', queryset.query)
         context = dict(resource_name=resource_name)
         serializer = JobSerializer(queryset, many=True, context=context)
-        return Response(serializer.data)
+        return Response({'status': 'success', 'message': '', 'result': serializer.data})
 
     def retrieve(self, request, resource_name, pk=None):
         """
@@ -296,57 +335,11 @@ class JobViewSet(viewsets.ReadOnlyModelViewSet):
         """
         job = Job.objects.using(resource_name).get(pk=pk)
         context = dict(resource_name=resource_name)
-        serializer = JobDetailSerializer(job, context=context)
-        return Response(serializer.data)
-
-    @detail_route(methods=['get'])
-    def type_info(self, request, pk=None):
-        """
-        Returns type info for a job run on a resource.
-        ---
-        type:
-          schema:
-            required: true
-            type: array
-          type_name:
-            required: true
-            type: string
-          stats:
-            required: true
-            type: array
-          job_id:
-            required: true
-            type: integer
-          type_plot:
-            required: true
-            type: string
-        omit_serializer: true
-        parameters_strategy: merge
-        parameters:
-        - name: resource_name
-          description: resource name
-          required: true
-          type: string
-          enum:
-            - stampede
-            - lonestar
-            - maverick
-            - wrangler
-          paramType: path
-        - name: type
-          description: type name
-          required: true
-          type: string
-          paramType: query
-        responseMessages:
-            - code: 500
-              message: Internal Server Error
-            - code: 405
-              message: Method Not Allowed Error
-        """
-        type_name = request.query_params.get('type', None)
-        type_info = apiviews.type_info(pk, type_name)
-        return Response(type_info)
+        if job is not None:
+          serializer = JobDetailSerializer(job, context=context)
+          return Response({'status': 'success', 'message': '', 'result': serializer.data})
+        else:
+          return Response({'status': 'error', 'message': 'No found', 'result': None})
 
 def _getFlags():
   thresholds = {}
@@ -554,7 +547,7 @@ def flagged_jobs(request, resource_name):
         data['packet_size'] = completed_list.filter(**{packetSizeFilter: flags.get('packetsize').get('value')}).values_list('id', flat=True)
         mbwFilter = _getFilter('mbw', flags.get('mbw').get('comparator'))
         data['mem_bw'] = completed_list.filter(**{mbwFilter: flags.get('mbw').get('value')}).values_list('id', flat=True)
-    return Response(data)
+    return Response({'status': 'success', 'message': '', 'result': data})
 
 @api_view(['GET'])
 @renderer_classes((TACCJSONRenderer,))
@@ -643,4 +636,54 @@ def characteristics_plot(request, resource_name):
     logger.debug('Request params: %s', field)
     queryset = Job.objects.filter(**field).order_by(order_key)
     logger.debug('Query: %s', queryset.query)
-    return machineViews.hist_summary(queryset, view_type='api')
+    return Response({'status': 'success', 'message': '', 'result': machineViews.hist_summary(queryset, view_type='api')})
+
+@api_view(['GET'])
+@renderer_classes((TACCJSONRenderer,))
+def device_data(request, pk, resource_name, device_name):
+    """
+    Returns device data for a job run on a resource.
+    ---
+    type:
+      schema:
+        required: true
+        type: array
+      device_name:
+        required: true
+        type: string
+      stats:
+        required: true
+        type: array
+      job_id:
+        required: true
+        type: integer
+      type_plot:
+        required: true
+        type: string
+    omit_serializer: true
+    parameters_strategy: merge
+    parameters:
+    - name: pk
+      description: job id
+      required: true
+      type: integer
+      format: int64
+      paramType: path 
+    - name: resource_name
+      description: resource name
+      required: true
+      type: string
+      enum:
+        - stampede
+        - lonestar
+        - maverick
+        - wrangler
+      paramType: path
+    responseMessages:
+        - code: 500
+          message: Internal Server Error
+        - code: 405
+          message: Method Not Allowed Error
+    """
+    type_info = machineViews.type_info(resource_name, pk, device_name)
+    return Response(type_info)

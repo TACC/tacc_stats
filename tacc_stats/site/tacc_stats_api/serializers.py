@@ -34,7 +34,7 @@ class JobDetailSerializer(serializers.HyperlinkedModelSerializer):
     master_plot = serializers.SerializerMethodField()
     sys_plot = serializers.SerializerMethodField()
     heat_map = serializers.SerializerMethodField()
-    type_list = serializers.SerializerMethodField()
+    device_data = serializers.SerializerMethodField()
 
     def get_master_plot(self, obj):
         return machineViews.master_plot(None, self.context.get('resource_name'), obj.id, view_type='api')
@@ -45,7 +45,7 @@ class JobDetailSerializer(serializers.HyperlinkedModelSerializer):
     def get_heat_map(self, obj):
         return machineViews.heat_map(None, self.context.get('resource_name'), obj.id, view_type='api')
 
-    def get_type_list(self, obj):
+    def get_device_data(self, obj):
         return machineViews.type_list(self.context.get('resource_name'), obj.id)
 
     class Meta:
@@ -54,9 +54,8 @@ class JobDetailSerializer(serializers.HyperlinkedModelSerializer):
          'queue', 'queue_time', 'status', 'nodes', 'cores', 'wayness', 'date', 'user', 'cpi', 
          'cpld', 'mbw', 'cat', 'idle', 'mem', 'packetrate', 'packetsize', 'load_all', 'gig_ebw', 
          'flops', 'vec_percent', 'load_l1hits', 'load_l2hits', 'load_llchits', 'cpu_usage', 
-         'mic_usage', 'master_plot', 'sys_plot', 'heat_map', 'type_list')
+         'mic_usage', 'master_plot', 'sys_plot', 'heat_map', 'device_data')
 
 class TestInfoSerializer(serializers.ModelSerializer):
     class Meta:
         model = TestInfo
-        exclude = ('id',)

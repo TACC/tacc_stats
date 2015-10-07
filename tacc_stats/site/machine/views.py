@@ -492,17 +492,17 @@ def type_list(resource_name, job_id):
         type_list.append({'type_name':type_name, 'schema':schema})
     return type_list
 
-def type_info(pk, type_name):
-    data = get_data(pk)
+def type_info(resource_name, pk, device_name):
+    data = get_data(resource_name, pk)
     if data is None:
         return None
-    schema = build_schema(data,type_name)
+    schema = build_schema(data,device_name)
     schema0 = [x.split(',')[0] for x in schema]
 
-    k1 = {'intel_snb' : [type_name]*len(schema0)}
+    k1 = {'intel_snb' : [device_name]*len(schema0)}
     k2 = {'intel_snb': schema0}
 
-    raw_stats = data.aggregate_stats(type_name)[0]
+    raw_stats = data.aggregate_stats(device_name)[0]
     stats = []
     scale = 1.0
     for t in range(len(raw_stats)):
@@ -518,7 +518,7 @@ def type_info(pk, type_name):
     print stats
     print schema
     return {
-                    'type_name':type_name,
+                    'device_name':device_name,
                     'job_id': pk,
                     'type_plot':plot_base64,
                     'schema':schema,

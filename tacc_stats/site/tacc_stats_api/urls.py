@@ -12,4 +12,5 @@ urlpatterns = patterns('',
                        url(r'^thresholds/(?P<pk>\d+)/(?P<resource_name>stampede|lonestar|maverick|wrangler)$', ThresholdDetail.as_view()),
                        url(r'^flagged-jobs/(?P<resource_name>stampede|lonestar|maverick|wrangler)$', flagged_jobs, name='flagged_jobs'),
                        url(r'^characteristics-plot/(?P<resource_name>stampede|lonestar|maverick|wrangler)$', characteristics_plot, name='characteristics_plot'),
+                       url(r'^jobs/(?P<resource_name>stampede|lonestar|maverick|wrangler)/(?P<pk>\d+)/device-data/(?P<device_name>\w+)$', device_data, name='device_data'),
                        )
