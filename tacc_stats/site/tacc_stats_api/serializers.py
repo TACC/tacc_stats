@@ -1,5 +1,6 @@
 from rest_framework import serializers
 from tacc_stats.site.machine.models import Job, TestInfo
+from tacc_stats_api.models import Token
 from tacc_stats.site.machine import views as machineViews
 import logging
 
@@ -59,3 +60,7 @@ class JobDetailSerializer(serializers.HyperlinkedModelSerializer):
 class TestInfoSerializer(serializers.ModelSerializer):
     class Meta:
         model = TestInfo
+
+class TokenSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Token

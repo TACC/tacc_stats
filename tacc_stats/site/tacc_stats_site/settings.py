@@ -1,6 +1,6 @@
-# Django settings for tacc_stats_site project.
+# Django settings for site.
 import os
-import tacc_stats.site.tacc_stats_site as tacc_stats_site
+import middleware
 BASE_DIR = os.path.dirname(os.path.dirname(__file__))
 
 # Quick-start development - unsuitable for production
@@ -143,12 +143,12 @@ MIDDLEWARE_CLASSES = (
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
+    'django.contrib.auth.middleware.SessionAuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
-    #'django_pdf.middleware.PdfMiddleware',
-    #'tacc_stats_site.middleware.ProfileMiddleware',
-    # Uncomment the next line for simple clickjacking protection:
-    # 'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    'tacc_stats_site.middleware.ProfileMiddleware',
     'tacc_stats.site.machine.multidb.MultiDbRouterMiddleware'
+
 )
 
 ROOT_URLCONF = 'tacc_stats_site.urls'
@@ -176,7 +176,6 @@ INSTALLED_APPS = (
     'tacc_stats.site.machine',
     'tacc_stats.site.xalt',
     'tacc_stats_api',
-    'django_extensions',
     'rest_framework',
     'rest_framework_swagger',
 )
@@ -193,12 +192,15 @@ TEMPLATE_CONTEXT_PROCESSORS=(
 SESSION_SERIALIZER = 'django.contrib.sessions.serializers.JSONSerializer'
 SESSION_ENGINE = 'django.contrib.sessions.backends.file'
 
+AUTHENTICATION_BACKENDS = (
+    'tacc_stats_api.auth.TASBackend',
+)
+
 REST_FRAMEWORK = {
-    # Use Django's standard `django.contrib.auth` permissions,
-    # or allow read-only access for unauthenticated users.
-    # 'DEFAULT_PERMISSION_CLASSES': (
-    #     'rest_framework.permissions.DjangoModelPermissionsOrAnonReadOnly',
-    # ),
+    'DEFAULT_AUTHENTICATION_CLASSES': (
+        'rest_framework.authentication.BasicAuthentication',
+        #'rest_framework.authentication.SessionAuthentication',
+    ),
     'DEFAULT_RENDERER_CLASSES': (
         'rest_framework.renderers.JSONRenderer',
     ),
@@ -217,7 +219,9 @@ SWAGGER_SETTINGS = {
     "enabled_methods": [  # Specify which methods to enable in Swagger UI
         'get',
         'post',
-        'put'
+        'put',
+        'patch',
+        'delete'
     ],
     "api_key": '', #An API key
     "is_authenticated": False,  # Set to True to enforce user authentication,

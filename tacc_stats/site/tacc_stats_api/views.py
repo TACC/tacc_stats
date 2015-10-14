@@ -1,18 +1,21 @@
 from django.contrib.auth.models import User, Group
+from django.contrib.auth.decorators import login_required
 from django.db.models import Q
 from django.forms import ModelForm
 from django.shortcuts import get_object_or_404
 from rest_framework import viewsets
 from rest_framework_extensions.mixins import PaginateByMaxMixin
 from rest_framework.renderers import JSONRenderer
-from rest_framework.permissions import IsAuthenticatedOrReadOnly
-from serializers import JobSerializer, JobDetailSerializer, TestInfoSerializer
+from rest_framework.authentication import SessionAuthentication, BasicAuthentication
+from tacc_stats_api.authentication import CustomTokenAuthentication
+from rest_framework.permissions import IsAuthenticated, IsAuthenticatedOrReadOnly
+from serializers import JobSerializer, JobDetailSerializer, TestInfoSerializer, TokenSerializer
 from tacc_stats.site.machine.models import Job, TestInfo
+from tacc_stats_api.models import Token
 from tacc_stats.site.machine import views as machineViews
 from django.http import HttpResponse, Http404
-from django.shortcuts import get_object_or_404
 from rest_framework.response import Response
-from rest_framework.decorators import api_view, detail_route, renderer_classes
+from rest_framework.decorators import api_view, list_route, detail_route, renderer_classes, authentication_classes, permission_classes
 from rest_framework import status
 from rest_framework.views import APIView
 from renderers import TACCJSONRenderer
@@ -25,6 +28,8 @@ def permission_denied_handler(request):
     return HttpResponse('You don\'t have required permission!')
 
 class ThresholdList(APIView):
+    authentication_classes = (CustomTokenAuthentication,)
+    permission_classes = (IsAuthenticated,)
     renderer_classes = (TACCJSONRenderer,)
 
     def get(self, request, resource_name, format=None):
@@ -52,8 +57,6 @@ class ThresholdList(APIView):
               message: Insufficient rights to call this procedure
             - code: 500
               message: Internal Server Error
-            - code: 405
-              message: Method Not Allowed Error
         """
 
         queryset = TestInfo.objects.all()
@@ -90,8 +93,6 @@ class ThresholdList(APIView):
               message: Insufficient rights to call this procedure
             - code: 500
               message: Internal Server Error
-            - code: 405
-              message: Method Not Allowed Error
         """
         logger.debug(request.data)
         serializer = TestInfoSerializer(data=request.data)
@@ -103,7 +104,10 @@ class ThresholdList(APIView):
 
 class ThresholdDetail(APIView):
 
-    @renderer_classes((TACCJSONRenderer,))
+    authentication_classes = (CustomTokenAuthentication,)
+    permission_classes = (IsAuthenticated,)
+    renderer_classes = (TACCJSONRenderer,)
+    
     def get(self, request, pk, resource_name, format=None):
         """
         Retrieves a job flag threshold set on a resource.
@@ -128,8 +132,6 @@ class ThresholdDetail(APIView):
               message: Insufficient rights to call this procedure
             - code: 500
               message: Internal Server Error
-            - code: 405
-              message: Method Not Allowed Error
         """
 
         instance = get_object_or_404(TestInfo, pk=pk)
@@ -137,7 +139,6 @@ class ThresholdDetail(APIView):
         return Response({'status': 'success', 'message': '', 'result': serializer.data})
     
     # was unable to use PUT for update because of empty request.data object received
-    @renderer_classes((TACCJSONRenderer,))
     def post(self, request, pk, resource_name, format=None):
         """
         Updates job flag threshold set on a resource.
@@ -167,8 +168,6 @@ class ThresholdDetail(APIView):
               message: Insufficient rights to call this procedure
             - code: 500
               message: Internal Server Error
-            - code: 405
-              message: Method Not Allowed Error
         """
         instance = get_object_or_404(TestInfo, pk=pk)
         serializer = TestInfoSerializer(instance, data=request.data)
@@ -178,7 +177,6 @@ class ThresholdDetail(APIView):
         else:
           return Response({'status': 'error', 'message': 'Error creating this threshold', 'result': serializer.errors}, status=status.HTTP_400_BAD_REQUEST)
 
-    @renderer_classes((TACCJSONRenderer,))
     def delete(self, request, pk, resource_name, format=None):
         """
         Deletes a job flag threshold set on a resource.
@@ -203,20 +201,121 @@ class ThresholdDetail(APIView):
               message: Insufficient rights to call this procedure
             - code: 500
               message: Internal Server Error
-            - code: 405
-              message: Method Not Allowed Error
         """
 
         instance = get_object_or_404(TestInfo, pk=pk)
         instance.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
 
+class TokenViewSet(viewsets.ViewSet):
+    renderer_classes = (TACCJSONRenderer,)
+    authentication_classes = (BasicAuthentication,)
+    permission_classes = (IsAuthenticated,)
+    serializer_class = TokenSerializer
+    
+    def list(self, request):
+        """
+        Retrieves/creates token for the user after authenticating via TAS.
+        ---
+        serializer: TokenSerializer
+        omit_serializer: false
+        responseMessages:
+            - code: 401
+              message: Not authenticated
+            - code: 403
+              message: Insufficient rights to call this procedure
+            - code: 500
+              message: Internal Server Error
+        """
+        username = request.user.username
+        logger.debug('Token requested for username: %s', username)
+        try:
+            token = Token.objects.using('stampede').get(user=request.user)
+
+        except Token.DoesNotExist:
+            logger.debug('Token does not exist. Creating one...')
+            token = Token(
+              user = request.user
+              )
+            token.save(using='stampede')
+            logger.debug('Token successfully saved in stampede_db.')
+        serializer = self.serializer_class(token)
+        return Response(serializer.data)
+    
+    @list_route()
+    def refresh(self, request):
+        """
+        Refreshes/creates token for the user after authenticating via TAS.
+        ---
+        serializer: TokenSerializer
+        omit_serializer: false
+        responseMessages:
+            - code: 401
+              message: Not authenticated
+            - code: 403
+              message: Insufficient rights to call this procedure
+            - code: 500
+              message: Internal Server Error
+        """
+        username = request.user.username
+        logger.debug('Token refresh requested for username: %s', username)
+        try:
+            token = Token.objects.using('stampede').get(user=request.user)
+            token.delete(using='stampede')
+            logger.debug('Current token deleted. Creating new one...')
+            token = Token(
+              user = request.user
+              )
+            token.save(using='stampede')
+            logger.debug('New token created in stampede_db.')
+        except Token.DoesNotExist:
+            logger.debug('Token does not exist. Creating one...')
+            token = Token(
+              user = request.user
+              )
+            token.save(using='stampede')
+            logger.debug('Token successfully saved in stampede_db.')
+        serializer = self.serializer_class(token)
+        return Response(serializer.data)
+    
+    def destroy(self, request, pk=None):
+        """
+        Deletes token for the user after authenticating via TAS.
+        ---
+        serializer: TokenSerializer
+        omit_serializer: false
+        parameters_strategy: merge
+        parameters:
+        - name: pk
+          description: key
+          required: true
+          type: string
+          paramType: path
+        responseMessages:
+            - code: 401
+              message: Not authenticated
+            - code: 403
+              message: Insufficient rights to call this procedure
+            - code: 500
+              message: Internal Server Error
+        """
+        username = request.user.username
+        logger.debug('Token delete requested for username: %s', username)
+        try:
+            token = Token.objects.using('stampede').get(user=request.user)
+            token.delete(using='stampede')
+            logger.debug('Token successfully deleted from stampede_db.')
+            return Response('Successfully deleted.', status=status.HTTP_204_NO_CONTENT)
+        except Token.DoesNotExist:
+            logger.debug('Token not found.')
+            return Response('Error. Token not found.', status=status.HTTP_404_NOT_FOUND)
 
 class JobViewSet(viewsets.ReadOnlyModelViewSet):
     # this serializer below is overridden by method level serializers, it is here to shut up an assertion error
     serializer_class = JobSerializer
     permission_classes = (IsAuthenticatedOrReadOnly,)
     renderer_classes = (TACCJSONRenderer,)
+    
     def list(self, request, resource_name):
         """
         Returns job list on a resource filtered by the params below. Recommended to use 
@@ -288,10 +387,10 @@ class JobViewSet(viewsets.ReadOnlyModelViewSet):
         responseMessages:
             - code: 401
               message: Not authenticated
+            - code: 403
+              message: Insufficient rights to call this procedure
             - code: 500
               message: Internal Server Error
-            - code: 405
-              message: Method Not Allowed Error
         """
         field = {}
         for param in request.query_params:
@@ -328,10 +427,13 @@ class JobViewSet(viewsets.ReadOnlyModelViewSet):
             - wrangler
           paramType: path
         responseMessages:
+            - code: 401
+              message: Not authenticated
+            - code: 403
+              message: Insufficient rights to call this procedure
             - code: 500
               message: Internal Server Error
-            - code: 405
-              message: Method Not Allowed Error
+
         """
         job = Job.objects.using(resource_name).get(pk=pk)
         context = dict(resource_name=resource_name)
@@ -485,10 +587,10 @@ def flagged_jobs(request, resource_name):
     responseMessages:
         - code: 401
           message: Not authenticated
+        - code: 403
+          message: Insufficient rights to call this procedure
         - code: 500
           message: Internal Server Error
-        - code: 405
-          message: Method Not Allowed Error
     """
     field = {}
     for param in request.query_params:
@@ -620,10 +722,10 @@ def characteristics_plot(request, resource_name):
     responseMessages:
         - code: 401
           message: Not authenticated
+        - code: 403
+          message: Insufficient rights to call this procedure
         - code: 500
           message: Internal Server Error
-        - code: 405
-          message: Method Not Allowed Error
     """
     field = {}
     for param in request.query_params:
@@ -680,10 +782,12 @@ def device_data(request, pk, resource_name, device_name):
         - wrangler
       paramType: path
     responseMessages:
+        - code: 401
+          message: Not authenticated
+        - code: 403
+          message: Insufficient rights to call this procedure
         - code: 500
           message: Internal Server Error
-        - code: 405
-          message: Method Not Allowed Error
     """
     type_info = machineViews.type_info(resource_name, pk, device_name)
     return Response(type_info)

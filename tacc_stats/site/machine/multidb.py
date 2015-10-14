@@ -3,7 +3,7 @@ import logging
 from django.http import Http404
 from tacc_stats import cfg
 logger = logging.getLogger('default')
-request_cfg = threading.local()
+threadlocal = threading.local()
 
 class MultiDbRouterMiddleware (object):
     """
@@ -16,13 +16,13 @@ class MultiDbRouterMiddleware (object):
     """
     def process_view( self, request, view_func, args, kwargs ):
         if 'resource_name' in kwargs:
-            request_cfg.resource_name = kwargs['resource_name']
-            logger.debug( 'Resouce requested: %s. Saving it as a thread local variable.', request_cfg.resource_name )
-            request.SELECTED_DATABASE = request_cfg.resource_name
-            logger.debug( 'Setting config machine name as: %s', request_cfg.resource_name )
+            threadlocal.resource_name = kwargs['resource_name']
+            logger.debug( 'Resouce requested: %s. Saving it as a thread local variable.', threadlocal.resource_name )
+            request.SELECTED_DATABASE = threadlocal.resource_name
+            logger.debug( 'Setting config machine name as: %s', threadlocal.resource_name )
     def process_response( self, request, response ):
-        if hasattr( request_cfg, 'resource_name' ):
-            del request_cfg.resource_name
+        if hasattr( threadlocal, 'resource_name' ):
+            del threadlocal.resource_name
             logger.debug( 'Thread local variable resource_name deleted.' )
         return response
 
@@ -34,17 +34,17 @@ class MultiDbRouter(object):
     """
     def _multi_db(self):
         from django.conf import settings
-        if hasattr(request_cfg, 'resource_name'):
-            logger.debug( 'Resouce requested: %s', request_cfg.resource_name )
-            if request_cfg.resource_name in settings.DATABASES:
+        if hasattr(threadlocal, 'resource_name'):
+            logger.debug( 'Resouce requested: %s', threadlocal.resource_name )
+            if threadlocal.resource_name in settings.DATABASES:
                 logger.debug( 'Requested resource is valid.' )
-                return request_cfg.resource_name
+                return threadlocal.resource_name
             else:
                 logger.debug( 'Invalid resource requested.' )
                 raise Http404
         else:
-            logger.debug( 'Resource name is required.' )
-            raise Http404
+            logger.debug( 'Resource name not provided. Using stampede_db.' )
+            return 'stampede'
 
     def db_for_read(self, model, **hints):
         return self._multi_db()

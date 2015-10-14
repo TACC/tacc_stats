@@ -4,4 +4,4 @@ import settings
 
 def home(request):
 
-    return render_to_response("tacc_stats_site/home.html",{"MEDIA_URL" : settings.MEDIA_URL})
+    return render_to_response("site/home.html",{"MEDIA_URL" : settings.MEDIA_URL})
