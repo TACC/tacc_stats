@@ -361,7 +361,7 @@ def index(request, **field):
 
     return render_to_response("machine/index.html", field)
 
-def list_to_dict(job_list,metric):
+def list_to_dict(job_list, metric):
     job_dict={}
     for job in job_list:
         job_dict.setdefault(job.user,[]).append((job.id,round(job.__dict__[metric],3)))
@@ -418,7 +418,7 @@ def hist_summary(job_list, view_type='site'):
     if(view_type == 'site'):
         response = "data:image/png;base64,%s" % base64.b64encode(imgdata.buf)
     else:
-        response = Response(base64.b64encode(imgdata.buf))
+        response = base64.b64encode(imgdata.buf)
 
     return response
 

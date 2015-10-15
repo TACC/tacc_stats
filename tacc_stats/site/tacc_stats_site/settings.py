@@ -168,16 +168,13 @@ INSTALLED_APPS = (
     'django.contrib.sites',
     'django.contrib.messages',
     'django.contrib.staticfiles',
-    # Uncomment the next line to enable the admin:
     'django.contrib.admin',
-    #'django_pdf',
-    # Uncomment the next line to enable admin documentation:
-    # 'django.contrib.admindocs',
     'tacc_stats.site.machine',
     'tacc_stats.site.xalt',
     'tacc_stats_api',
     'rest_framework',
     'rest_framework_swagger',
+    'django_filters'
 )
 """
 TEMPLATE_CONTEXT_PROCESSORS=(
@@ -199,7 +196,6 @@ AUTHENTICATION_BACKENDS = (
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': (
         'rest_framework.authentication.BasicAuthentication',
-        #'rest_framework.authentication.SessionAuthentication',
     ),
     'DEFAULT_RENDERER_CLASSES': (
         'rest_framework.renderers.JSONRenderer',
@@ -207,7 +203,8 @@ REST_FRAMEWORK = {
     'DEFAULT_PARSER_CLASSES': (
         'rest_framework.parsers.JSONParser',
     ),
-    'PAGINATE_BY': 10,                 # Default to 10
+    'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
+    'PAGE_SIZE': 100
 }
 
 ANONYMOUS_USER_ID = -1

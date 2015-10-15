@@ -17,7 +17,7 @@ urlpatterns = patterns('',
         {'document_root': settings.MEDIA_ROOT}),
     url(r'^api/', include(api_router.urls)),
     url(r'^api/', include('tacc_stats_api.urls', namespace='tacc_stats_api')),
-    url(r'^api-auth/', include('rest_framework.urls', namespace='rest_framework')),
+    #url(r'^api-auth/', include('rest_framework.urls', namespace='rest_framework')),
     #url(r'^api-token-auth/', 'rest_framework.authtoken.views.obtain_auth_token'),
     url(r'^(?P<resource_name>(stampede|lonestar|maverick|wrangler))/', include('machine.urls', namespace="machine")),
 )

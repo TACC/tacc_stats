@@ -3,22 +3,23 @@ from django.contrib.auth.decorators import login_required
 from django.db.models import Q
 from django.forms import ModelForm
 from django.shortcuts import get_object_or_404
-from rest_framework import viewsets
-from rest_framework_extensions.mixins import PaginateByMaxMixin
+from rest_framework import viewsets, status, filters, generics
 from rest_framework.renderers import JSONRenderer
 from rest_framework.authentication import SessionAuthentication, BasicAuthentication
+from rest_framework.pagination import PageNumberPagination
+from rest_framework.response import Response
+from rest_framework.decorators import api_view, list_route, detail_route, renderer_classes, authentication_classes, permission_classes
+from rest_framework.views import APIView
 from tacc_stats_api.authentication import CustomTokenAuthentication
 from rest_framework.permissions import IsAuthenticated, IsAuthenticatedOrReadOnly
 from serializers import JobSerializer, JobDetailSerializer, TestInfoSerializer, TokenSerializer
 from tacc_stats.site.machine.models import Job, TestInfo
 from tacc_stats_api.models import Token
+from tacc_stats_api.filters import JobFilter
 from tacc_stats.site.machine import views as machineViews
 from django.http import HttpResponse, Http404
-from rest_framework.response import Response
-from rest_framework.decorators import api_view, list_route, detail_route, renderer_classes, authentication_classes, permission_classes
-from rest_framework import status
-from rest_framework.views import APIView
 from renderers import TACCJSONRenderer
+import django_filters
 import logging
 
 logger = logging.getLogger('default')
@@ -30,7 +31,6 @@ def permission_denied_handler(request):
 class ThresholdList(APIView):
     authentication_classes = (CustomTokenAuthentication,)
     permission_classes = (IsAuthenticated,)
-    renderer_classes = (TACCJSONRenderer,)
 
     def get(self, request, resource_name, format=None):
         """
@@ -103,10 +103,8 @@ class ThresholdList(APIView):
           return Response({'status': 'error', 'message': 'Error creating this threshold', 'result': serializer.errors.as_json()}, status=status.HTTP_400_BAD_REQUEST)
 
 class ThresholdDetail(APIView):
-
     authentication_classes = (CustomTokenAuthentication,)
     permission_classes = (IsAuthenticated,)
-    renderer_classes = (TACCJSONRenderer,)
     
     def get(self, request, pk, resource_name, format=None):
         """
@@ -242,13 +240,15 @@ class TokenViewSet(viewsets.ViewSet):
         serializer = self.serializer_class(token)
         return Response(serializer.data)
     
-    @list_route()
+    @list_route(methods=['post'])
     def refresh(self, request):
         """
         Refreshes/creates token for the user after authenticating via TAS.
         ---
         serializer: TokenSerializer
         omit_serializer: false
+        omit_parameters:
+        - form
         responseMessages:
             - code: 401
               message: Not authenticated
@@ -310,17 +310,12 @@ class TokenViewSet(viewsets.ViewSet):
             logger.debug('Token not found.')
             return Response('Error. Token not found.', status=status.HTTP_404_NOT_FOUND)
 
-class JobViewSet(viewsets.ReadOnlyModelViewSet):
-    # this serializer below is overridden by method level serializers, it is here to shut up an assertion error
-    serializer_class = JobSerializer
-    permission_classes = (IsAuthenticatedOrReadOnly,)
-    renderer_classes = (TACCJSONRenderer,)
-    
-    def list(self, request, resource_name):
-        """
-        Returns job list on a resource filtered by the params below. Recommended to use 
-        as many filters as possible to narrow the search.
-        ---
+class JobListView(generics.ListAPIView):
+    """
+    Returns job list on a resource filtered by the params below. Recommended to use 
+    as many filters as possible to narrow the search.
+    ---
+    GET:
         serializer: JobSerializer
         omit_serializer: false
         parameters_strategy: merge
@@ -336,47 +331,65 @@ class JobViewSet(viewsets.ReadOnlyModelViewSet):
             - wrangler
           paramType: path
         - name: user
-          description: Owner of the job
+          description: owner username
           required: false
           type: string
           paramType: query
         - name: project
-          description: ID of the corresponding project
+          description: project id
           type: integer
           format: int64
           required: false
           paramType: query
         - name: id
-          description: ID of the job
+          description: job id
           required: false
           type: integer
           format: int64
           paramType: query
         - name: uid
-          description: uid of the job
+          description: job uid
           required: false
           type: integer
           format: int64
           paramType: query
-        - name: start_time
-          description: Datetime when the job started e.g. 2015-10-01T13:46:59Z
+        - name: date
+          description: job date e.g. 2015-10-01
+          required: false
+          type: string
+          format: date
+          paramType: query
+        - name: start_time_from
+          description: earliest start time e.g. 2015-10-01T13:46:59Z
           required: false
           type: string
           format: date-time
           paramType: query
-        - name: end_time
-          description: Datetime when the job ended e.g. 2015-10-01T13:46:59Z
+        - name: start_time_to
+          description: latest start time
+          required: false
+          type: string
+          format: date-time
+          paramType: query
+        - name: end_time_from
+          description: earliest end time
+          required: false
+          type: string
+          format: date-time
+          paramType: query
+        - name: end_time_to
+          description: latest end time
           required: false
           type: string
           format: date-time
           paramType: query
         - name: queue
-          description: Queue name this job is in.
+          description: queue name.
           required: false
           type: string
           paramType: query
         - name: status
-          description: Status of this job
+          description: job status
           required: false
           type: string
           enum:
@@ -384,6 +397,72 @@ class JobViewSet(viewsets.ReadOnlyModelViewSet):
             - running
             - completed
           paramType: query
+        - name: max_run_time
+          description: maximum run time
+          required: false
+          type: integer
+          format: int64
+          paramType: query
+        - name: min_run_time
+          description: minimum run time
+          required: false
+          type: integer
+          format: int64
+          paramType: query
+        - name: max_queue_time
+          description: maximum queue time
+          required: false
+          type: integer
+          format: int64
+          paramType: query
+        - name: min_queue_time
+          description: minimum queue time
+          required: false
+          type: integer
+          format: int64
+          paramType: query
+        - name: max_requested_time
+          description: maximum requested time
+          required: false
+          type: integer
+          format: int64
+          paramType: query
+        - name: min_requested_time
+          description: minimum requested time
+          required: false
+          type: integer
+          format: int64
+          paramType: query
+        - name: max_nodes
+          description: maximum nodes
+          required: false
+          type: integer
+          format: int64
+          paramType: query
+        - name: min_nodes
+          description: minimum nodes
+          required: false
+          type: integer
+          format: int64
+          paramType: query
+        - name: max_cores
+          description: maximum cores
+          required: false
+          type: integer
+          format: int64
+          paramType: query
+        - name: min_cores
+          description: minimum cores
+          required: false
+          type: integer
+          format: int64
+          paramType: query
+        - name: page
+          description: page number
+          required: false
+          type: integer
+          format: int64
+          paramType: query
         responseMessages:
             - code: 401
               message: Not authenticated
@@ -391,57 +470,76 @@ class JobViewSet(viewsets.ReadOnlyModelViewSet):
               message: Insufficient rights to call this procedure
             - code: 500
               message: Internal Server Error
-        """
-        field = {}
-        for param in request.query_params:
-            val = request.query_params.get(param)
-            field[param] = val
+    """
+    serializer_class = JobSerializer
+    authentication_classes = (CustomTokenAuthentication,)
+    permission_classes = (IsAuthenticated,)
+    filter_backends = (filters.DjangoFilterBackend, filters.OrderingFilter,)
+    filter_class = JobFilter
+    ordering_fields = '__all__'
+    ordering = ('id',)
+    pagination_class = PageNumberPagination
+    queryset = Job.objects.all()
+    #     field = {}
+    #     for param in request.query_params:
+    #         val = request.query_params.get(param)
+    #         field[param] = val
 
-        order_key = '-id'
-        if 'order_key' in field: 
-            order_key = field['order_key']
-            del field['order_key']
-        logger.debug('Request params: %s', field)
-        queryset = Job.objects.using(resource_name).filter(**field).order_by(order_key)
-        logger.debug('Query: %s', queryset.query)
-        context = dict(resource_name=resource_name)
-        serializer = JobSerializer(queryset, many=True, context=context)
-        return Response({'status': 'success', 'message': '', 'result': serializer.data})
+    #     order_key = '-id'
+    #     if 'order_key' in field: 
+    #         order_key = field['order_key']
+    #         del field['order_key']
+    #     logger.debug('Request params: %s', field)
+    #     queryset = Job.objects.using(resource_name).filter(**field).order_by(order_key)
+    #     logger.debug('Query: %s', queryset.query)
+    #     context = dict(resource_name=resource_name)
+    #     serializer = JobSerializer(queryset, many=True, context=context)
+    #     return Response({'status': 'success', 'message': '', 'result': serializer.data})
 
-    def retrieve(self, request, resource_name, pk=None):
-        """
-        Returns a job run on a resource by job id.
-        ---
-        serializer: JobDetailSerializer
-        omit_serializer: false
-        parameters_strategy: merge
-        parameters:
-        - name: resource_name
-          description: resource name
-          required: true
-          type: string
-          enum:
-            - stampede
-            - lonestar
-            - maverick
-            - wrangler
-          paramType: path
-        responseMessages:
-            - code: 401
-              message: Not authenticated
-            - code: 403
-              message: Insufficient rights to call this procedure
-            - code: 500
-              message: Internal Server Error
+@api_view(['GET'])
+@authentication_classes((CustomTokenAuthentication,))
+@permission_classes((IsAuthenticated,))    
+def job_detail(request, pk, resource_name):
+    """
+    Returns a job run on a resource by job id.
+    ---
+    serializer: JobDetailSerializer
+    omit_serializer: false
+    parameters_strategy: merge
+    parameters:
+    - name: pk
+      description: job id
+      required: true
+      type: integer
+      format: int64
+      paramType: path
+    - name: resource_name
+      description: resource name
+      required: true
+      type: string
+      enum:
+        - stampede
+        - lonestar
+        - maverick
+        - wrangler
+      paramType: path
+    responseMessages:
+        - code: 401
+          message: Not authenticated
+        - code: 403
+          message: Insufficient rights to call this procedure
+        - code: 500
+          message: Internal Server Error
 
-        """
-        job = Job.objects.using(resource_name).get(pk=pk)
-        context = dict(resource_name=resource_name)
-        if job is not None:
-          serializer = JobDetailSerializer(job, context=context)
-          return Response({'status': 'success', 'message': '', 'result': serializer.data})
-        else:
-          return Response({'status': 'error', 'message': 'No found', 'result': None})
+    """
+
+    job = Job.objects.using(resource_name).get(pk=pk)
+    context = dict(resource_name=resource_name)
+    if job is not None:
+      serializer = JobDetailSerializer(job, context=context)
+      return Response({'status': 'success', 'message': '', 'result': serializer.data})
+    else:
+      return Response({'status': 'error', 'message': 'Not found', 'result': None})
 
 def _getFlags():
   thresholds = {}
@@ -462,7 +560,8 @@ def _getFilter(key, comparator):
 
 
 @api_view(['GET'])
-@renderer_classes((TACCJSONRenderer,))
+@authentication_classes((CustomTokenAuthentication,))
+@permission_classes((IsAuthenticated,))
 def flagged_jobs(request, resource_name):
     """
     Returns flagged jobs run on a resource filtered by the params below.
@@ -536,47 +635,47 @@ def flagged_jobs(request, resource_name):
         - wrangler
       paramType: path
     - name: user
-      description: Owner of the job
+      description: owner username
       required: false
       type: string
       paramType: query
     - name: project
-      description: ID of the corresponding project
+      description: project id
       type: integer
       format: int64
       required: false
       paramType: query
     - name: id
-      description: ID of the job
+      description: job id
       required: false
       type: integer
       format: int64
       paramType: query
     - name: uid
-      description: uid of the job
+      description: job uid
       required: false
       type: integer
       format: int64
       paramType: query
     - name: start_time
-      description: Datetime when the job started e.g. 2015-10-01T13:46:59Z
+      description: job start time e.g. 2015-10-01T13:46:59Z
       required: false
       type: string
       format: date-time
       paramType: query
     - name: end_time
-      description: Datetime when the job ended e.g. 2015-10-01T13:46:59Z
+      description: job end time e.g. 2015-10-01T13:46:59Z
       required: false
       type: string
       format: date-time
       paramType: query
     - name: queue
-      description: Queue name this job is in.
+      description: queue name
       required: false
       type: string
       paramType: query
     - name: status
-      description: Status of this job
+      description: job status
       required: false
       type: string
       enum:
@@ -652,7 +751,8 @@ def flagged_jobs(request, resource_name):
     return Response({'status': 'success', 'message': '', 'result': data})
 
 @api_view(['GET'])
-@renderer_classes((TACCJSONRenderer,))
+@authentication_classes((CustomTokenAuthentication,))
+@permission_classes((IsAuthenticated,))
 def characteristics_plot(request, resource_name):
     """
     Returns job characteristics base64 encoded plot for job list filtered by the params below.
@@ -671,47 +771,47 @@ def characteristics_plot(request, resource_name):
         - wrangler
       paramType: path
     - name: user
-      description: Owner of the job
+      description: job owner
       required: false
       type: string
       paramType: query
     - name: project
-      description: ID of the corresponding project
+      description: project id
       type: integer
       format: int64
       required: false
       paramType: query
     - name: id
-      description: ID of the job
+      description: job id
       required: false
       type: integer
       format: int64
       paramType: query
     - name: uid
-      description: uid of the job
+      description: job uid
       required: false
       type: integer
       format: int64
       paramType: query
     - name: start_time
-      description: Datetime when the job started e.g. 2015-10-01T13:46:59Z
+      description: job start time e.g. 2015-10-01T13:46:59Z
       required: false
       type: string
       format: date-time
       paramType: query
     - name: end_time
-      description: Datetime when the job ended e.g. 2015-10-01T13:46:59Z
+      description: job end time e.g. 2015-10-01T13:46:59Z
       required: false
       type: string
       format: date-time
       paramType: query
     - name: queue
-      description: Queue name this job is in.
+      description: queue name
       required: false
       type: string
       paramType: query
     - name: status
-      description: Status of this job
+      description: job status
       required: false
       type: string
       enum:
@@ -738,10 +838,12 @@ def characteristics_plot(request, resource_name):
     logger.debug('Request params: %s', field)
     queryset = Job.objects.filter(**field).order_by(order_key)
     logger.debug('Query: %s', queryset.query)
-    return Response({'status': 'success', 'message': '', 'result': machineViews.hist_summary(queryset, view_type='api')})
+    char_plot = machineViews.hist_summary(queryset, view_type='api')
+    return Response({'status': 'success', 'message': '', 'result': char_plot})
 
 @api_view(['GET'])
-@renderer_classes((TACCJSONRenderer,))
+@authentication_classes((CustomTokenAuthentication,))
+@permission_classes((IsAuthenticated,))
 def device_data(request, pk, resource_name, device_name):
     """
     Returns device data for a job run on a resource.
@@ -790,4 +892,4 @@ def device_data(request, pk, resource_name, device_name):
           message: Internal Server Error
     """
     type_info = machineViews.type_info(resource_name, pk, device_name)
-    return Response(type_info)
+    return Response({'status': 'success', 'message': '', 'result': type_info})
