@@ -11,7 +11,8 @@ from rest_framework.response import Response
 from rest_framework.decorators import api_view, list_route, detail_route, renderer_classes, authentication_classes, permission_classes
 from rest_framework.views import APIView
 from tacc_stats_api.authentication import CustomTokenAuthentication
-from rest_framework.permissions import IsAuthenticated, IsAuthenticatedOrReadOnly
+from tacc_stats_api.permissions import IsAuthenticatedOrAdmin
+from rest_framework.permissions import IsAuthenticated
 from serializers import JobSerializer, JobDetailSerializer, TestInfoSerializer, TokenSerializer
 from tacc_stats.site.machine.models import Job, TestInfo
 from tacc_stats_api.models import Token
@@ -30,7 +31,7 @@ def permission_denied_handler(request):
 
 class ThresholdList(APIView):
     authentication_classes = (CustomTokenAuthentication,)
-    permission_classes = (IsAuthenticated,)
+    permission_classes = (IsAuthenticatedOrAdmin,)
 
     def get(self, request, resource_name, format=None):
         """
@@ -63,7 +64,7 @@ class ThresholdList(APIView):
         context = dict(request=request)
         serializer = TestInfoSerializer(queryset, many=True, context=context)
         return Response({'status': 'success', 'message': '', 'result': serializer.data})
-
+    
     def post(self, request, resource_name, format=None):
         """
         Creates new job flag threshold on a resource.
@@ -104,7 +105,7 @@ class ThresholdList(APIView):
 
 class ThresholdDetail(APIView):
     authentication_classes = (CustomTokenAuthentication,)
-    permission_classes = (IsAuthenticated,)
+    permission_classes = (IsAuthenticatedOrAdmin,)
     
     def get(self, request, pk, resource_name, format=None):
         """
