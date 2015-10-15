@@ -6,48 +6,11 @@ from django.contrib.auth import authenticate, get_user_model
 from django.middleware.csrf import CsrfViewMiddleware
 from django.utils.translation import ugettext_lazy as _
 
-from rest_framework import HTTP_HEADER_ENCODING, exceptions
+from rest_framework import HTTP_HEADER_ENCODING, exceptions, authentication
 from tacc_stats_api.models import Token
 
-def get_authorization_header(request):
-    """
-    Return request's 'Authorization:' header, as a bytestring.
 
-    Hide some test client ickyness where the header can be unicode.
-    """
-    auth = request.META.get('HTTP_AUTHORIZATION', b'')
-    if isinstance(auth, type('')):
-        # Work around django test client oddness
-        auth = auth.encode(HTTP_HEADER_ENCODING)
-    return auth
-
-
-class CSRFCheck(CsrfViewMiddleware):
-    def _reject(self, request, reason):
-        # Return the failure reason instead of an HttpResponse
-        return reason
-
-
-class BaseAuthentication(object):
-    """
-    All authentication classes should extend BaseAuthentication.
-    """
-
-    def authenticate(self, request):
-        """
-        Authenticate the request and return a two-tuple of (user, token).
-        """
-        raise NotImplementedError(".authenticate() must be overridden.")
-
-    def authenticate_header(self, request):
-        """
-        Return a string to be used as the value of the `WWW-Authenticate`
-        header in a `401 Unauthenticated` response, or `None` if the
-        authentication scheme should return `403 Permission Denied` responses.
-        """
-        pass
-
-class CustomTokenAuthentication(BaseAuthentication):
+class CustomTokenAuthentication(authentication.BaseAuthentication):
     """
     Simple token based authentication.
 
@@ -58,15 +21,9 @@ class CustomTokenAuthentication(BaseAuthentication):
     """
 
     model = Token
-    """
-    A custom token model may be used, but must have the following properties.
-
-    * key -- The string identifying the token
-    * user -- The user to which the token belongs
-    """
 
     def authenticate(self, request):
-        auth = get_authorization_header(request).split()
+        auth = authentication.get_authorization_header(request).split()
 
         if not auth or auth[0].lower() != b'token':
             return None

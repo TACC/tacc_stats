@@ -20,6 +20,7 @@ from tacc_stats_api.filters import JobFilter
 from tacc_stats.site.machine import views as machineViews
 from django.http import HttpResponse, Http404
 from renderers import TACCJSONRenderer
+from django.views.decorators.cache import cache_page
 import django_filters
 import logging
 
@@ -63,6 +64,7 @@ class ThresholdList(APIView):
         queryset = TestInfo.objects.all()
         context = dict(request=request)
         serializer = TestInfoSerializer(queryset, many=True, context=context)
+        logger.debug('List of threshold successfully fetched from database: %s', resource_name)
         return Response({'status': 'success', 'message': '', 'result': serializer.data})
     
     def post(self, request, resource_name, format=None):
@@ -95,12 +97,14 @@ class ThresholdList(APIView):
             - code: 500
               message: Internal Server Error
         """
-        logger.debug(request.data)
+        logger.debug('Creating new threshold by user: %s, with data: %s, on database: %s', request.user.username, request.data, resource_name)
         serializer = TestInfoSerializer(data=request.data)
         if serializer.is_valid():
           new_instance = serializer.save()
+          logger.debug('Threshold successfully created.')
           return Response({'status': 'success', 'message': '', 'result': serializer.data}, status=status.HTTP_201_CREATED)
         else:
+          logger.debug('Error creating threshold. %s', serializer.errors)
           return Response({'status': 'error', 'message': 'Error creating this threshold', 'result': serializer.errors.as_json()}, status=status.HTTP_400_BAD_REQUEST)
 
 class ThresholdDetail(APIView):
@@ -132,9 +136,10 @@ class ThresholdDetail(APIView):
             - code: 500
               message: Internal Server Error
         """
-
+        
         instance = get_object_or_404(TestInfo, pk=pk)
         serializer = TestInfoSerializer(instance)
+        logger.debug('Threshold successfully fetched from database: %s', resource_name)
         return Response({'status': 'success', 'message': '', 'result': serializer.data})
     
     # was unable to use PUT for update because of empty request.data object received
@@ -169,12 +174,16 @@ class ThresholdDetail(APIView):
               message: Internal Server Error
         """
         instance = get_object_or_404(TestInfo, pk=pk)
+        logger.debug('Requested threshold found in database: %s', resource_name)
+        logger.debug('Updating threshold by user: %s, with data: %s', request.user.username, request.data)
         serializer = TestInfoSerializer(instance, data=request.data)
         if serializer.is_valid():
           instance = serializer.save()
+          logger.debug('Threshold successfully updated.')
           return Response({'status': 'success', 'message': '', 'result': serializer.data})
         else:
-          return Response({'status': 'error', 'message': 'Error creating this threshold', 'result': serializer.errors}, status=status.HTTP_400_BAD_REQUEST)
+          logger.debug('Error updating threshold. %s', serializer.errors)
+          return Response({'status': 'error', 'message': 'Error creating this threshold', 'result': serializer.errors.as_json()}, status=status.HTTP_400_BAD_REQUEST)
 
     def delete(self, request, pk, resource_name, format=None):
         """
@@ -203,7 +212,10 @@ class ThresholdDetail(APIView):
         """
 
         instance = get_object_or_404(TestInfo, pk=pk)
+        logger.debug('Requested threshold found in database: %s', resource_name)
+        logger.debug('Deleting threshold %s by user: %s', instance.test_name, request.user.username)
         instance.delete()
+        logger.debug('Threshold successfully deleted.')
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 class TokenViewSet(viewsets.ViewSet):
@@ -230,6 +242,7 @@ class TokenViewSet(viewsets.ViewSet):
         logger.debug('Token requested for username: %s', username)
         try:
             token = Token.objects.using('stampede').get(user=request.user)
+            logger.debug('Token found.')
 
         except Token.DoesNotExist:
             logger.debug('Token does not exist. Creating one...')
@@ -237,7 +250,7 @@ class TokenViewSet(viewsets.ViewSet):
               user = request.user
               )
             token.save(using='stampede')
-            logger.debug('Token successfully saved in stampede_db.')
+            logger.debug('Token successfully created in stampede_db.')
         serializer = self.serializer_class(token)
         return Response(serializer.data)
     
@@ -262,6 +275,7 @@ class TokenViewSet(viewsets.ViewSet):
         logger.debug('Token refresh requested for username: %s', username)
         try:
             token = Token.objects.using('stampede').get(user=request.user)
+            logger.debug('Existing token found. Deleting...')
             token.delete(using='stampede')
             logger.debug('Current token deleted. Creating new one...')
             token = Token(
@@ -275,7 +289,7 @@ class TokenViewSet(viewsets.ViewSet):
               user = request.user
               )
             token.save(using='stampede')
-            logger.debug('Token successfully saved in stampede_db.')
+            logger.debug('Token successfully created in stampede_db.')
         serializer = self.serializer_class(token)
         return Response(serializer.data)
     
@@ -304,6 +318,7 @@ class TokenViewSet(viewsets.ViewSet):
         logger.debug('Token delete requested for username: %s', username)
         try:
             token = Token.objects.using('stampede').get(user=request.user)
+            logger.debug('Token found.')
             token.delete(using='stampede')
             logger.debug('Token successfully deleted from stampede_db.')
             return Response('Successfully deleted.', status=status.HTTP_204_NO_CONTENT)
@@ -481,21 +496,6 @@ class JobListView(generics.ListAPIView):
     ordering = ('id',)
     pagination_class = PageNumberPagination
     queryset = Job.objects.all()
-    #     field = {}
-    #     for param in request.query_params:
-    #         val = request.query_params.get(param)
-    #         field[param] = val
-
-    #     order_key = '-id'
-    #     if 'order_key' in field: 
-    #         order_key = field['order_key']
-    #         del field['order_key']
-    #     logger.debug('Request params: %s', field)
-    #     queryset = Job.objects.using(resource_name).filter(**field).order_by(order_key)
-    #     logger.debug('Query: %s', queryset.query)
-    #     context = dict(resource_name=resource_name)
-    #     serializer = JobSerializer(queryset, many=True, context=context)
-    #     return Response({'status': 'success', 'message': '', 'result': serializer.data})
 
 @api_view(['GET'])
 @authentication_classes((CustomTokenAuthentication,))
@@ -533,13 +533,16 @@ def job_detail(request, pk, resource_name):
           message: Internal Server Error
 
     """
-
+    logger.debug('Job detail requested for pk %s on resource %s.', pk, resource_name)
     job = Job.objects.using(resource_name).get(pk=pk)
     context = dict(resource_name=resource_name)
     if job is not None:
+      logger.debug('Job found.')
       serializer = JobDetailSerializer(job, context=context)
+      logger.debug('Job metadata added.')
       return Response({'status': 'success', 'message': '', 'result': serializer.data})
     else:
+      logger.debug('Job not found.')
       return Response({'status': 'error', 'message': 'Not found', 'result': None})
 
 def _getFlags():
@@ -636,7 +639,7 @@ def flagged_jobs(request, resource_name):
         - wrangler
       paramType: path
     - name: user
-      description: owner username
+      description: job owner
       required: false
       type: string
       paramType: query
@@ -646,26 +649,26 @@ def flagged_jobs(request, resource_name):
       format: int64
       required: false
       paramType: query
-    - name: id
-      description: job id
-      required: false
-      type: integer
-      format: int64
-      paramType: query
-    - name: uid
-      description: job uid
-      required: false
-      type: integer
-      format: int64
-      paramType: query
-    - name: start_time
-      description: job start time e.g. 2015-10-01T13:46:59Z
+    - name: start_time_from
+      description: earliest start time e.g. 2015-10-01T13:46:59Z
       required: false
       type: string
       format: date-time
       paramType: query
-    - name: end_time
-      description: job end time e.g. 2015-10-01T13:46:59Z
+    - name: start_time_to
+      description: latest start time
+      required: false
+      type: string
+      format: date-time
+      paramType: query
+    - name: end_time_from
+      description: earliest end time
+      required: false
+      type: string
+      format: date-time
+      paramType: query
+    - name: end_time_to
+      description: latest end time
       required: false
       type: string
       format: date-time
@@ -684,6 +687,66 @@ def flagged_jobs(request, resource_name):
         - running
         - completed
       paramType: query
+    - name: max_run_time
+      description: maximum run time
+      required: false
+      type: integer
+      format: int64
+      paramType: query
+    - name: min_run_time
+      description: minimum run time
+      required: false
+      type: integer
+      format: int64
+      paramType: query
+    - name: max_queue_time
+      description: maximum queue time
+      required: false
+      type: integer
+      format: int64
+      paramType: query
+    - name: min_queue_time
+      description: minimum queue time
+      required: false
+      type: integer
+      format: int64
+      paramType: query
+    - name: max_requested_time
+      description: maximum requested time
+      required: false
+      type: integer
+      format: int64
+      paramType: query
+    - name: min_requested_time
+      description: minimum requested time
+      required: false
+      type: integer
+      format: int64
+      paramType: query
+    - name: max_nodes
+      description: maximum nodes
+      required: false
+      type: integer
+      format: int64
+      paramType: query
+    - name: min_nodes
+      description: minimum nodes
+      required: false
+      type: integer
+      format: int64
+      paramType: query
+    - name: max_cores
+      description: maximum cores
+      required: false
+      type: integer
+      format: int64
+      paramType: query
+    - name: min_cores
+      description: minimum cores
+      required: false
+      type: integer
+      format: int64
+      paramType: query
     responseMessages:
         - code: 401
           message: Not authenticated
@@ -692,6 +755,7 @@ def flagged_jobs(request, resource_name):
         - code: 500
           message: Internal Server Error
     """
+    logger.debug('Flagged jobs requested by user: %s on %s.', request.user.username, resource_name)
     field = {}
     for param in request.query_params:
         val = request.query_params.get(param)
@@ -708,7 +772,7 @@ def flagged_jobs(request, resource_name):
             field['date__month'] = date[1]
             del field['date']
     logger.debug('Request params: %s', field)
-    job_list = Job.objects.filter(**field).order_by(order_key)
+    job_list = JobFilter(request.GET, queryset=Job.objects.all()).qs
     flags = _getFlags()
     data={}
     catfilter = _getFilter('cat', flags.get('cat').get('comparator'))
@@ -749,11 +813,15 @@ def flagged_jobs(request, resource_name):
         data['packet_size'] = completed_list.filter(**{packetSizeFilter: flags.get('packetsize').get('value')}).values_list('id', flat=True)
         mbwFilter = _getFilter('mbw', flags.get('mbw').get('comparator'))
         data['mem_bw'] = completed_list.filter(**{mbwFilter: flags.get('mbw').get('value')}).values_list('id', flat=True)
+        logger.debug('All thresholds applied.')
+    else:
+        logger.debug('Empty completed jobs list.')
     return Response({'status': 'success', 'message': '', 'result': data})
 
 @api_view(['GET'])
 @authentication_classes((CustomTokenAuthentication,))
 @permission_classes((IsAuthenticated,))
+@cache_page(60 * 15, cache="default")
 def characteristics_plot(request, resource_name):
     """
     Returns job characteristics base64 encoded plot for job list filtered by the params below.
@@ -794,14 +862,26 @@ def characteristics_plot(request, resource_name):
       type: integer
       format: int64
       paramType: query
-    - name: start_time
-      description: job start time e.g. 2015-10-01T13:46:59Z
+    - name: start_time_from
+      description: earliest start time e.g. 2015-10-01T13:46:59Z
       required: false
       type: string
       format: date-time
       paramType: query
-    - name: end_time
-      description: job end time e.g. 2015-10-01T13:46:59Z
+    - name: start_time_to
+      description: latest start time
+      required: false
+      type: string
+      format: date-time
+      paramType: query
+    - name: end_time_from
+      description: earliest end time
+      required: false
+      type: string
+      format: date-time
+      paramType: query
+    - name: end_time_to
+      description: latest end time
       required: false
       type: string
       format: date-time
@@ -820,6 +900,66 @@ def characteristics_plot(request, resource_name):
         - running
         - completed
       paramType: query
+    - name: max_run_time
+      description: maximum run time
+      required: false
+      type: integer
+      format: int64
+      paramType: query
+    - name: min_run_time
+      description: minimum run time
+      required: false
+      type: integer
+      format: int64
+      paramType: query
+    - name: max_queue_time
+      description: maximum queue time
+      required: false
+      type: integer
+      format: int64
+      paramType: query
+    - name: min_queue_time
+      description: minimum queue time
+      required: false
+      type: integer
+      format: int64
+      paramType: query
+    - name: max_requested_time
+      description: maximum requested time
+      required: false
+      type: integer
+      format: int64
+      paramType: query
+    - name: min_requested_time
+      description: minimum requested time
+      required: false
+      type: integer
+      format: int64
+      paramType: query
+    - name: max_nodes
+      description: maximum nodes
+      required: false
+      type: integer
+      format: int64
+      paramType: query
+    - name: min_nodes
+      description: minimum nodes
+      required: false
+      type: integer
+      format: int64
+      paramType: query
+    - name: max_cores
+      description: maximum cores
+      required: false
+      type: integer
+      format: int64
+      paramType: query
+    - name: min_cores
+      description: minimum cores
+      required: false
+      type: integer
+      format: int64
+      paramType: query
     responseMessages:
         - code: 401
           message: Not authenticated
@@ -828,6 +968,7 @@ def characteristics_plot(request, resource_name):
         - code: 500
           message: Internal Server Error
     """
+    logger.debug('Characteristics plot requested by user: %s on %s.', request.user.username, resource_name)
     field = {}
     for param in request.query_params:
         val = request.query_params.get(param)
@@ -837,9 +978,9 @@ def characteristics_plot(request, resource_name):
         order_key = field['order_key']
         del field['order_key']
     logger.debug('Request params: %s', field)
-    queryset = Job.objects.filter(**field).order_by(order_key)
-    logger.debug('Query: %s', queryset.query)
-    char_plot = machineViews.hist_summary(queryset, view_type='api')
+    job_filter = JobFilter(request.GET, queryset=Job.objects.all())
+    char_plot = machineViews.hist_summary(job_filter.qs, view_type='api')
+    logger.debug('Plot generated for given queryset.')
     return Response({'status': 'success', 'message': '', 'result': char_plot})
 
 @api_view(['GET'])
@@ -892,5 +1033,7 @@ def device_data(request, pk, resource_name, device_name):
         - code: 500
           message: Internal Server Error
     """
+    logger.debug('Device data requested by user: %s, job id: %s, device name: %s, resource: %s', request.user.username, pk, device_name, resource_name)
     type_info = machineViews.type_info(resource_name, pk, device_name)
+    logger.debug('Device data generated.')
     return Response({'status': 'success', 'message': '', 'result': type_info})

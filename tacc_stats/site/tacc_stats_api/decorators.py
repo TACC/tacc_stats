@@ -1,6 +1,8 @@
+#
+# NOT IN USE
+#
 from django.http import HttpResponseForbidden, HttpResponseBadRequest
 from tacc_stats_api.models import Token
-
 
 def token_required(func):
     def inner(request, *args, **kwargs):

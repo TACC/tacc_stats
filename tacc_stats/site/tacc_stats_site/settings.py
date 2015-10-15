@@ -302,16 +302,16 @@ LOGGING = {
 }
 
 
-# CACHES = {
-#     'normal': {
-#         'BACKEND': 'django.core.cache.backends.memcached.MemcachedCache',
-#         'LOCATION': '127.0.0.1:11211',
-#         },
+CACHES = {
+    'normal': {
+        'BACKEND': 'django.core.cache.backends.memcached.MemcachedCache',
+        'LOCATION': '127.0.0.1:11211',
+        },
 
-#     'default': { 
-#         'BACKEND':'tacc_stats.site.tacc_stats_site.cache.LargeMemcachedCache',
-#         'LOCATION': '127.0.0.1:11211',
-#         'TIMEOUT': None,
-#         }
-#     }
+    'default': { 
+        'BACKEND':'tacc_stats.site.tacc_stats_site.cache.LargeMemcachedCache',
+        'LOCATION': '127.0.0.1:11211',
+        'TIMEOUT': None,
+        }
+    }
 

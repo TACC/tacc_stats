@@ -7,7 +7,8 @@ from rest_framework import routers, serializers, viewsets
 from django.views.generic import DetailView, ListView
 from tacc_stats.site.tacc_stats_api.urls import api_router
 
-admin.autodiscover()
+#not needed in django 1.7
+#admin.autodiscover()
 
 urlpatterns = patterns('',
     url(r'^$', siteViews.home, name='home'),
