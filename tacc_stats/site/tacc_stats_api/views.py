@@ -216,7 +216,7 @@ class ThresholdDetail(APIView):
         logger.debug('Deleting threshold %s by user: %s', instance.test_name, request.user.username)
         instance.delete()
         logger.debug('Threshold successfully deleted.')
-        return Response(status=status.HTTP_204_NO_CONTENT)
+        return Response({'status': 'success', 'message': 'Successfully deleted', 'result': None}, status=status.HTTP_204_NO_CONTENT)
 
 class TokenViewSet(viewsets.ViewSet):
     renderer_classes = (TACCJSONRenderer,)
@@ -252,7 +252,7 @@ class TokenViewSet(viewsets.ViewSet):
             token.save(using='stampede')
             logger.debug('Token successfully created in stampede_db.')
         serializer = self.serializer_class(token)
-        return Response(serializer.data)
+        return Response({'status': 'success', 'message': '', 'result': serializer.data})
     
     @list_route(methods=['post'])
     def refresh(self, request):
@@ -291,7 +291,7 @@ class TokenViewSet(viewsets.ViewSet):
             token.save(using='stampede')
             logger.debug('Token successfully created in stampede_db.')
         serializer = self.serializer_class(token)
-        return Response(serializer.data)
+        return Response({'status': 'success', 'message': '', 'result': serializer.data})
     
     def destroy(self, request, pk=None):
         """
@@ -321,10 +321,10 @@ class TokenViewSet(viewsets.ViewSet):
             logger.debug('Token found.')
             token.delete(using='stampede')
             logger.debug('Token successfully deleted from stampede_db.')
-            return Response('Successfully deleted.', status=status.HTTP_204_NO_CONTENT)
+            return Response({'status': 'success', 'message': 'Successfully deleted.', 'result': None}, status=status.HTTP_204_NO_CONTENT)
         except Token.DoesNotExist:
             logger.debug('Token not found.')
-            return Response('Error. Token not found.', status=status.HTTP_404_NOT_FOUND)
+            return Response({'status': 'error', 'message': 'Token not found.', 'result': None}, status=status.HTTP_404_NOT_FOUND)
 
 class JobListView(generics.ListAPIView):
     """
@@ -499,7 +499,8 @@ class JobListView(generics.ListAPIView):
 
 @api_view(['GET'])
 @authentication_classes((CustomTokenAuthentication,))
-@permission_classes((IsAuthenticated,))    
+@permission_classes((IsAuthenticated,))
+@cache_page(43200, cache="default")   
 def job_detail(request, pk, resource_name):
     """
     Returns a job run on a resource by job id.
@@ -543,7 +544,7 @@ def job_detail(request, pk, resource_name):
       return Response({'status': 'success', 'message': '', 'result': serializer.data})
     else:
       logger.debug('Job not found.')
-      return Response({'status': 'error', 'message': 'Not found', 'result': None})
+      return Response({'status': 'error', 'message': 'Not found', 'result': None}, status=status.HTTP_404_NOT_FOUND)
 
 def _getFlags():
   thresholds = {}
@@ -566,6 +567,7 @@ def _getFilter(key, comparator):
 @api_view(['GET'])
 @authentication_classes((CustomTokenAuthentication,))
 @permission_classes((IsAuthenticated,))
+@cache_page(43200, cache="default")
 def flagged_jobs(request, resource_name):
     """
     Returns flagged jobs run on a resource filtered by the params below.
@@ -821,7 +823,7 @@ def flagged_jobs(request, resource_name):
 @api_view(['GET'])
 @authentication_classes((CustomTokenAuthentication,))
 @permission_classes((IsAuthenticated,))
-@cache_page(60 * 15, cache="default")
+@cache_page(43200, cache="default")
 def characteristics_plot(request, resource_name):
     """
     Returns job characteristics base64 encoded plot for job list filtered by the params below.
@@ -986,6 +988,7 @@ def characteristics_plot(request, resource_name):
 @api_view(['GET'])
 @authentication_classes((CustomTokenAuthentication,))
 @permission_classes((IsAuthenticated,))
+@cache_page(43200, cache="default")
 def device_data(request, pk, resource_name, device_name):
     """
     Returns device data for a job run on a resource.
@@ -1035,5 +1038,10 @@ def device_data(request, pk, resource_name, device_name):
     """
     logger.debug('Device data requested by user: %s, job id: %s, device name: %s, resource: %s', request.user.username, pk, device_name, resource_name)
     type_info = machineViews.type_info(resource_name, pk, device_name)
-    logger.debug('Device data generated.')
-    return Response({'status': 'success', 'message': '', 'result': type_info})
+    if type_info is not None:
+        logger.debug('Device data generated.')
+        return Response({'status': 'success', 'message': '', 'result': type_info})
+    else:
+        logger.debug('Job not found.')
+        return Response({'status': 'error', 'message': 'Not found', 'result': None}, status=status.HTTP_404_NOT_FOUND)
+

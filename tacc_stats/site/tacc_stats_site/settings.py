@@ -301,17 +301,17 @@ LOGGING = {
     }
 }
 
-
+#default cache is 43200 seconds = 12 hrs
 CACHES = {
     'normal': {
         'BACKEND': 'django.core.cache.backends.memcached.MemcachedCache',
-        'LOCATION': '127.0.0.1:11211',
+        'LOCATION': 'memcached:11211',
         },
 
     'default': { 
         'BACKEND':'tacc_stats.site.tacc_stats_site.cache.LargeMemcachedCache',
-        'LOCATION': '127.0.0.1:11211',
-        'TIMEOUT': None,
+        'LOCATION': 'memcached:11211',
+        'TIMEOUT': 43200,
         }
     }
 
