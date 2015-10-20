@@ -251,52 +251,30 @@ LOGGING = {
             'format': '%(levelname)s %(asctime)s %(message)s'
         },
     },
-    'filters': {
-        'require_debug_false': {
-            '()': 'django.utils.log.RequireDebugFalse'
-        }
-    },
     'handlers': {
         'console': {
             'level': 'DEBUG',
             'class': 'logging.StreamHandler',
             'formatter': 'verbose',
         },
-        'file': {
-            'level': 'DEBUG',
-            'class': 'logging.FileHandler',
-            'filename': '/var/log/django/statsapi.log',
-            'formatter': 'verbose',
-        },
-        'auth': {
-            'level': 'DEBUG',
-            'class': 'logging.FileHandler',
-            'filename': '/var/log/django/statsapi_auth.log',
-            'formatter': 'simple',
-        },
-        'mail_admins': {
-            'level': 'ERROR',
-            'filters': ['require_debug_false'],
-            'class': 'django.utils.log.AdminEmailHandler'
-        }
     },
     'loggers': {
         'console': {
             'handlers': ['console'],
             'level': 'DEBUG',
         },
+        'django': {
+            'handlers': ['console'],
+            'level': 'INFO',
+            'propagate': True
+        },
         'default': {
-            'handlers': ['file', 'console'],
+            'handlers': ['console'],
             'level': 'DEBUG',
         },
         'auth': {
-            'handlers': ['file', 'auth', 'console'],
+            'handlers': ['console'],
             'level': 'DEBUG',
-        },
-        'django.request': {
-            'handlers': ['mail_admins'],
-            'level': 'ERROR',
-            'propagate': True,
         },
     }
 }
