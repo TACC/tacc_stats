@@ -15,21 +15,21 @@
 #include "string1.h"
 
 #define KEYS                                                            \
-  X(Uid, "C", "user id"),						\
-    X(VmPeak, "E,U=kB", "Peak vm size"),				\
-    X(VmSize, "E,U=kB", "Current vm size"),				\
-    X(VmLck, "E,U=kB", "Locked mem size"),				\
-    X(VmHWM, "E,U=kB", "Peak resident set size"),			\
-    X(VmRSS, "E,U=kB", "Current resident set size"),			\
-    X(VmData, "E,U=kB", "size of data"),				\
-    X(VmStk, "E,U=kB", "size of stack"),				\
-    X(VmExe, "E,U=kB", "size of text"),					\
-    X(VmLib, "E,U=kB", "shared lib code size"),				\
-    X(VmPTE, "E,U=kB", "page table entry size"),			\
-    X(VmSwap, "E,U=kB", "swapped vm size"),				\
-    X(Threads, "C", "number of threads"),				\
-    X(Cpus_allowed_list, "C", "cores process can use"),			\
-    X(Mems_allowed_list, "C", "memory nodes process can use"),		\
+  X(Uid, "", "user id"),						\
+    X(VmPeak, "U=kB", "Peak vm size"),					\
+    X(VmSize, "U=kB", "Current vm size"),				\
+    X(VmLck, "U=kB", "Locked mem size"),				\
+    X(VmHWM, "U=kB", "Peak resident set size"),				\
+    X(VmRSS, "U=kB", "Current resident set size"),			\
+    X(VmData, "U=kB", "size of data"),					\
+    X(VmStk, "U=kB", "size of stack"),					\
+    X(VmExe, "U=kB", "size of text"),					\
+    X(VmLib, "U=kB", "shared lib code size"),				\
+    X(VmPTE, "U=kB", "page table entry size"),				\
+    X(VmSwap, "U=kB", "swapped vm size"),				\
+    X(Threads, "", "number of threads"),				\
+    X(Cpus_allowed_list, "", "cores process can use"),			\
+    X(Mems_allowed_list, "", "memory nodes process can use"),		\
     
 static void proc_collect_pid(struct stats_type *type, const char *pid)
 {
