@@ -108,7 +108,9 @@ static void proc_collect_pid(struct stats_type *type, const char *pid)
 
 int filter(const struct dirent *dir)
 {
-  struct passwd *pwd;
+  if (fnmatch("[1-9]*", dir->d_name, 0))
+    return 0;
+
   struct stat dirinfo;
 
   int len = strlen(dir->d_name) + 7; 
@@ -117,12 +119,19 @@ int filter(const struct dirent *dir)
   strcpy(path, "/proc/");
   strcat(path, dir->d_name);
 
-  if (stat(path, &dirinfo) < 0) {
-    ERROR("processdir() ==> stat()");
-    return -1;
+  if (stat(path, &dirinfo) < 0 || dirinfo.st_uid == 0) {
+    TRACE("Do not include this proc entry %s", path);
+    return 0;
   }
+
+  struct passwd *pwd;
   pwd = getpwuid(dirinfo.st_uid);
-  return !fnmatch("[1-9]*", dir->d_name, 0) && ( 0 != dirinfo.st_uid && 68 != dirinfo.st_uid && strcmp("postfix", pwd->pw_name) && strcmp("rpc", pwd->pw_name) && strcmp("rpcuser", pwd->pw_name) && strcmp("dbus", pwd->pw_name) && strcmp("daemon", pwd->pw_name) && strcmp("ntp", pwd->pw_name)); 
+  if ( !strcmp("postfix", pwd->pw_name) || !strcmp("rpc", pwd->pw_name) || 
+       !strcmp("rpcuser", pwd->pw_name) || !strcmp("dbus", pwd->pw_name) || 
+       !strcmp("daemon", pwd->pw_name) || !strcmp("ntp", pwd->pw_name) )
+    return 0;
+
+  return 1;
 }
 
 static void proc_collect(struct stats_type *type) 
