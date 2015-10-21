@@ -1,10 +1,10 @@
 <html>
 <head>
     <title>TACC Stats</title>
-    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.1/css/bootstrap.min.css">
-    <!----<link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.1/css/bootstrap-theme.min.css">---->
-    <link rel="stylesheet" href="https://bootswatch.com/spacelab/bootstrap.min.css">
-    <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.1/js/bootstrap.min.js"></script>
+    <link rel="stylesheet" href="https://bootswatch.com/spacelab/bootstrap.css">
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.11.3/jquery.min.js"></script>
+    <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.5/js/bootstrap.min.js"></script>
+
     <meta charset="utf-8">
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -41,10 +41,14 @@
 
 <hr>
 
+
+<h4>Flagged Jobs:</h4>
+<button type="button" class="btn btn-primary" data-toggle="collapse" data-target="#flagged">Click for Flagged Jobs</button>
+<div id="flagged" class="collapse">
 <div class="table-responsive">
-  <h4>Flagged Jobs:</h4>
   <table class="table table-condensed" style="max-width=100%;">
     {% if md_job_list %}
+
     <tr>
       <th>Top metadata request rates (B)</th>
     </tr>
@@ -56,7 +60,6 @@
     </tr>
     {% endfor %}
     {% endif %}
-
 
     {% if gigebw_job_list %}
     <tr>
@@ -125,6 +128,7 @@
     {% endfor %}
     {% endif %}
   </table>
+</div>
 </div>
 
 <h3># Jobs over 1 mn in run time = {{nj}}</h3>
