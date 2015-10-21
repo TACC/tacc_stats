@@ -218,6 +218,8 @@ class ThresholdDetail(APIView):
         logger.debug('Threshold successfully deleted.')
         return Response({'status': 'success', 'message': 'Successfully deleted', 'result': None}, status=status.HTTP_204_NO_CONTENT)
 
+# Users and tokens are saved in stampede db only, 
+# multidb router routes to stampede if no resource name found in the url
 class TokenViewSet(viewsets.ViewSet):
     renderer_classes = (TACCJSONRenderer,)
     authentication_classes = (BasicAuthentication,)
@@ -241,7 +243,7 @@ class TokenViewSet(viewsets.ViewSet):
         username = request.user.username
         logger.debug('Token requested for username: %s', username)
         try:
-            token = Token.objects.using('stampede').get(user=request.user)
+            token = Token.objects.get(user=request.user)
             logger.debug('Token found.')
 
         except Token.DoesNotExist:
@@ -249,8 +251,8 @@ class TokenViewSet(viewsets.ViewSet):
             token = Token(
               user = request.user
               )
-            token.save(using='stampede')
-            logger.debug('Token successfully created in stampede_db.')
+            token.save()
+            logger.debug('Token successfully created.')
         serializer = self.serializer_class(token)
         return Response({'status': 'success', 'message': '', 'result': serializer.data})
     
@@ -274,24 +276,24 @@ class TokenViewSet(viewsets.ViewSet):
         username = request.user.username
         logger.debug('Token refresh requested for username: %s', username)
         try:
-            token = Token.objects.using('stampede').get(user=request.user)
+            token = Token.objects.get(user=request.user)
             logger.debug('Existing token found. Deleting...')
-            token.delete(using='stampede')
+            token.delete()
             logger.debug('Current token deleted. Creating new one...')
             token = Token(
               user = request.user
               )
-            token.save(using='stampede')
-            logger.debug('New token created in stampede_db.')
+            token.save()
+            logger.debug('New token created.')
         except Token.DoesNotExist:
             logger.debug('Token does not exist. Creating one...')
             token = Token(
               user = request.user
               )
-            token.save(using='stampede')
-            logger.debug('Token successfully created in stampede_db.')
+            token.save()
+            logger.debug('Token successfully created.')
         serializer = self.serializer_class(token)
-        return Response({'status': 'success', 'message': '', 'result': serializer.data})
+        return Response({'status': 'success', 'message': '', 'result': serializer.data}, status=status.HTTP_201_CREATED)
     
     def destroy(self, request, pk=None):
         """
@@ -317,10 +319,10 @@ class TokenViewSet(viewsets.ViewSet):
         username = request.user.username
         logger.debug('Token delete requested for username: %s', username)
         try:
-            token = Token.objects.using('stampede').get(user=request.user)
+            token = Token.objects.get(user=request.user)
             logger.debug('Token found.')
-            token.delete(using='stampede')
-            logger.debug('Token successfully deleted from stampede_db.')
+            token.delete()
+            logger.debug('Token successfully deleted.')
             return Response({'status': 'success', 'message': 'Successfully deleted.', 'result': None}, status=status.HTTP_204_NO_CONTENT)
         except Token.DoesNotExist:
             logger.debug('Token not found.')
@@ -500,7 +502,7 @@ class JobListView(generics.ListAPIView):
 @api_view(['GET'])
 @authentication_classes((CustomTokenAuthentication,))
 @permission_classes((IsAuthenticated,))
-@cache_page(43200, cache="default")   
+@cache_page(3600, cache="default")   
 def job_detail(request, pk, resource_name):
     """
     Returns a job run on a resource by job id.
@@ -535,7 +537,7 @@ def job_detail(request, pk, resource_name):
 
     """
     logger.debug('Job detail requested for pk %s on resource %s.', pk, resource_name)
-    job = Job.objects.using(resource_name).get(pk=pk)
+    job = Job.objects.get(pk=pk)
     context = dict(resource_name=resource_name)
     if job is not None:
       logger.debug('Job found.')
@@ -567,7 +569,7 @@ def _getFilter(key, comparator):
 @api_view(['GET'])
 @authentication_classes((CustomTokenAuthentication,))
 @permission_classes((IsAuthenticated,))
-@cache_page(43200, cache="default")
+@cache_page(3600, cache="default")
 def flagged_jobs(request, resource_name):
     """
     Returns flagged jobs run on a resource filtered by the params below.
@@ -823,7 +825,7 @@ def flagged_jobs(request, resource_name):
 @api_view(['GET'])
 @authentication_classes((CustomTokenAuthentication,))
 @permission_classes((IsAuthenticated,))
-@cache_page(43200, cache="default")
+@cache_page(3600, cache="default")
 def characteristics_plot(request, resource_name):
     """
     Returns job characteristics base64 encoded plot for job list filtered by the params below.
@@ -988,7 +990,7 @@ def characteristics_plot(request, resource_name):
 @api_view(['GET'])
 @authentication_classes((CustomTokenAuthentication,))
 @permission_classes((IsAuthenticated,))
-@cache_page(43200, cache="default")
+@cache_page(3600, cache="default")
 def device_data(request, pk, resource_name, device_name):
     """
     Returns device data for a job run on a resource.

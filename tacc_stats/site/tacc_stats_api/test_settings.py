@@ -1,6 +1,5 @@
 # Django settings for site.
 import os
-import middleware
 BASE_DIR = os.path.dirname(os.path.dirname(__file__))
 
 # Quick-start development - unsuitable for production
@@ -10,9 +9,9 @@ BASE_DIR = os.path.dirname(os.path.dirname(__file__))
 SECRET_KEY = os.environ.get('DJANGO_SECRET_KEY', 'NOT_A_SECRET')
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = os.environ.get('DJANGO_ENV', 'DEBUG') == 'DEBUG'
+DEBUG = False
 
-TEMPLATE_DEBUG = DEBUG
+TEMPLATE_DEBUG = False
 
 ADMINS = (
     ('Richard Todd Evans', 'rtevans@tacc.utexas.edu'),
@@ -21,56 +20,15 @@ ADMINS = (
 
 MANAGERS = ADMINS
 
+SOUTH_TESTS_MIGRATE = False
+
 # Give a name that is unique for the computing platform
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.sqlite3',
         'NAME': 'tacc_stats_db'
-    },
-    'stampede': {
-        'ENGINE': 'django.db.backends.postgresql_psycopg2',
-        'NAME'  : 'stampede_db',
-        'USER': os.environ.get('PG_DB_USER'),    
-        'PASSWORD': os.environ.get('PG_DB_PASSWORD'),
-        'HOST': os.environ.get('PG_DB_HOST'),        
-        'PORT': os.environ.get('PG_DB_PORT'),               
-        },
-    'lonestar': {
-        'ENGINE': 'django.db.backends.postgresql_psycopg2',
-        'NAME'  : 'lonestar4_db',
-        'USER': os.environ.get('PG_DB_USER'),    
-        'PASSWORD': os.environ.get('PG_DB_PASSWORD'),
-        'HOST': os.environ.get('PG_DB_HOST'),        
-        'PORT': os.environ.get('PG_DB_PORT'),               
-        },
-    'maverick': {
-        'ENGINE': 'django.db.backends.postgresql_psycopg2',
-        'NAME'  : 'maverick_db',
-        'USER': os.environ.get('PG_DB_USER'),    
-        'PASSWORD': os.environ.get('PG_DB_PASSWORD'),
-        'HOST': os.environ.get('PG_DB_HOST'),        
-        'PORT': os.environ.get('PG_DB_PORT'),               
-        },
-    'wrangler': {
-        'ENGINE': 'django.db.backends.postgresql_psycopg2',
-        'NAME'  : 'wrangler_db',
-        'USER': os.environ.get('PG_DB_USER'),    
-        'PASSWORD': os.environ.get('PG_DB_PASSWORD'),
-        'HOST': os.environ.get('PG_DB_HOST'),        
-        'PORT': os.environ.get('PG_DB_PORT'),               
-        },
-    # Uncomment this portion if an xalt database exists
-    'xalt' : {
-        'ENGINE' : 'django.db.backends.mysql',
-        'NAME' : os.environ.get('XALT_DB_NAME'),
-        'USER': os.environ.get('XALT_DB_USER'),    
-        'PASSWORD': os.environ.get('XALT_DB_PASSWORD'),
-        'HOST': os.environ.get('XALT_DB_HOST'),        
-        'PORT': os.environ.get('XALT_DB_PORT'),
-        }        
+    }     
     }
-
-DATABASE_ROUTERS = ['tacc_stats.site.machine.multidb.MultiDbRouter']
 
 # Hosts/domain names that are valid for this site; required if DEBUG is False
 # See https://docs.djangoproject.com/en/1.5/ref/settings/#allowed-hosts
@@ -147,7 +105,6 @@ MIDDLEWARE_CLASSES = (
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
     'tacc_stats_site.middleware.ProfileMiddleware',
-    'tacc_stats.site.machine.multidb.MultiDbRouterMiddleware'
 
 )
 
