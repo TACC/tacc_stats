@@ -1,7 +1,7 @@
 import threading
 import logging
 from django.http import Http404
-from tacc_stats import cfg
+from tacc_stats import site_cfg as cfg
 logger = logging.getLogger('default')
 threadlocal = threading.local()
 
