@@ -182,8 +182,8 @@ def update_metric_fields(date,rerun=False):
     jobs_list = Job.objects.filter(date = date).exclude(run_time__lt = 0)
 
     # Use mem to see if job was tested.  It will always exist
-    #if not rerun:
-        #jobs_list = jobs_list.filter(Load_L1Hits = None)
+    if not rerun:
+        jobs_list = jobs_list.filter(Load_L1Hits = None)
     
     paths = []
     for job in jobs_list:
@@ -200,9 +200,10 @@ def update_metric_fields(date,rerun=False):
 
     for name, results in aud.metrics.iteritems():
         obj = TestInfo.objects.get(test_name = name)
-        for jobid in results.keys():
+        print name,len(results.keys())
+        for jobid, result in results.iteritems():            
             try:
-                jobs_list.filter(id = jobid).update(**{ obj.field_name : results[jobid]})
+                jobs_list.filter(id = jobid).update(**{ obj.field_name : result })
             except:
                 pass
 

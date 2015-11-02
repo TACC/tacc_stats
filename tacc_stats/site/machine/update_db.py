@@ -23,7 +23,7 @@ for root,dirnames,filenames in os.walk(cfg.pickles_dir):
             print 'Run update for',date.date()
         except: continue
 
-        views.update(directory,rerun=False)        
+        views.update(directory,rerun=False)         
         views.update_metric_fields(directory,rerun=True)
         
     break
