@@ -15,26 +15,27 @@
 #include "string1.h"
 
 #define KEYS                                                            \
-  X(Uid, "C", "user id"),						\
-    X(VmPeak, "E,U=kB", "Peak vm size"),				\
-    X(VmSize, "E,U=kB", "Current vm size"),				\
-    X(VmLck, "E,U=kB", "Locked mem size"),				\
-    X(VmHWM, "E,U=kB", "Peak resident set size"),			\
-    X(VmRSS, "E,U=kB", "Current resident set size"),			\
-    X(VmData, "E,U=kB", "size of data"),				\
-    X(VmStk, "E,U=kB", "size of stack"),				\
-    X(VmExe, "E,U=kB", "size of text"),					\
-    X(VmLib, "E,U=kB", "shared lib code size"),				\
-    X(VmPTE, "E,U=kB", "page table entry size"),			\
-    X(VmSwap, "E,U=kB", "swapped vm size"),				\
-    X(Threads, "C", "number of threads"),				\
-    X(Cpus_allowed_list, "C", "cores process can use"),			\
-    X(Mems_allowed_list, "C", "memory nodes process can use"),		\
+  X(Uid, "", "user id"),						\
+    X(VmPeak, "U=kB", "Peak vm size"),					\
+    X(VmSize, "U=kB", "Current vm size"),				\
+    X(VmLck, "U=kB", "Locked mem size"),				\
+    X(VmHWM, "U=kB", "Peak resident set size"),				\
+    X(VmRSS, "U=kB", "Current resident set size"),			\
+    X(VmData, "U=kB", "size of data"),					\
+    X(VmStk, "U=kB", "size of stack"),					\
+    X(VmExe, "U=kB", "size of text"),					\
+    X(VmLib, "U=kB", "shared lib code size"),				\
+    X(VmPTE, "U=kB", "page table entry size"),				\
+    X(VmSwap, "U=kB", "swapped vm size"),				\
+    X(Threads, "", "number of threads"),				\
+    X(Cpus_allowed_list, "", "cores process can use"),			\
+    X(Mems_allowed_list, "", "memory nodes process can use"),		\
     
 static void proc_collect_pid(struct stats_type *type, const char *pid)
 {
   struct stats *stats = NULL;
   char path[32];
+  char process[128];
   FILE *file = NULL;
   char file_buf[4096];
   char *line = NULL;
@@ -60,12 +61,13 @@ static void proc_collect_pid(struct stats_type *type, const char *pid)
     if (strcmp(key,"Name:") == 0) 
       {
 	rest[strlen(rest) - 1] = '\0';
-	stats = get_current_stats(type, rest);
+	snprintf(process, sizeof(process), "%s/%s", rest, pid);
+	stats = get_current_stats(type, process);
 	continue;
       }
     if (stats == NULL)
       goto out;
-
+ 
     errno = 0;
     key[strlen(key) - 1] = '\0';
     
@@ -106,7 +108,9 @@ static void proc_collect_pid(struct stats_type *type, const char *pid)
 
 int filter(const struct dirent *dir)
 {
-  struct passwd *pwd;
+  if (fnmatch("[1-9]*", dir->d_name, 0))
+    return 0;
+
   struct stat dirinfo;
 
   int len = strlen(dir->d_name) + 7; 
@@ -115,12 +119,19 @@ int filter(const struct dirent *dir)
   strcpy(path, "/proc/");
   strcat(path, dir->d_name);
 
-  if (stat(path, &dirinfo) < 0) {
-    ERROR("processdir() ==> stat()");
-    return -1;
+  if (stat(path, &dirinfo) < 0 || dirinfo.st_uid == 0) {
+    TRACE("Do not include this proc entry %s", path);
+    return 0;
   }
+
+  struct passwd *pwd;
   pwd = getpwuid(dirinfo.st_uid);
-  return !fnmatch("[1-9]*", dir->d_name, 0) && ( 0 != dirinfo.st_uid && 68 != dirinfo.st_uid && strcmp("postfix", pwd->pw_name) && strcmp("rpc", pwd->pw_name) && strcmp("rpcuser", pwd->pw_name) && strcmp("dbus", pwd->pw_name) && strcmp("daemon", pwd->pw_name) && strcmp("ntp", pwd->pw_name)); 
+  if ( !strcmp("postfix", pwd->pw_name) || !strcmp("rpc", pwd->pw_name) || 
+       !strcmp("rpcuser", pwd->pw_name) || !strcmp("dbus", pwd->pw_name) || 
+       !strcmp("daemon", pwd->pw_name) || !strcmp("ntp", pwd->pw_name) )
+    return 0;
+
+  return 1;
 }
 
 static void proc_collect(struct stats_type *type) 

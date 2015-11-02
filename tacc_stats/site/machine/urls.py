@@ -11,6 +11,9 @@ urlpatterns = patterns('',
                        url(r'^job/(?P<pk>\d+)/(?P<type_name>\w+)/$',
                            type_detail, name = 'type_detail'),
 
+                       url(r'^proc/(?P<pk>\d+)/(?P<proc_name>.*)/$',
+                           proc_detail, name = 'proc_detail'),
+
                        url(r'^type_plot/(?P<pk>\d+)/(?P<type_name>\w+)/$', 
                            type_plot, name = 'type_plot'),
                        url(r'^sys_plot/(?P<pk>\d+)/$', 

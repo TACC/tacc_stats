@@ -299,8 +299,8 @@ def index(request, **field):
         name += '['+key+'='+val+']-'
 
 
-    if 'run_time__gte' in field: pass
-    else: field['run_time__gte'] = 60
+    #if 'run_time__gte' in field: pass
+    #else: field['run_time__gte'] = 60
 
     order_key = '-id'
     if 'order_key' in field: 
@@ -366,7 +366,7 @@ def hist_summary(job_list):
     jobs = np.array(job_list.values_list('run_time',flat=True))/3600.
     ax = fig.add_subplot(221)
     bins = np.linspace(0, max(jobs), max(5, 5*np.log(len(jobs))))
-    ax.hist(jobs, bins = bins, log=True)
+    ax.hist(jobs, bins = bins, log=True, color='#bf0a30')
     ax.set_ylabel('# of jobs')
     ax.set_xlabel('hrs')
     ax.set_title('Runtime')
@@ -375,7 +375,7 @@ def hist_summary(job_list):
     jobs =  np.array(job_list.values_list('nodes',flat=True))
     ax = fig.add_subplot(222)
     bins = np.linspace(0, max(jobs), max(5, 5*np.log(len(jobs))))
-    ax.hist(jobs, bins = bins, log=True)
+    ax.hist(jobs, bins = bins, log=True, color='#bf0a30')
     ax.set_title('Size')
     ax.set_xlabel('nodes')
 
@@ -383,7 +383,7 @@ def hist_summary(job_list):
     jobs =  (np.array(job_list.values_list('start_epoch',flat=True))-np.array(job_list.values_list('queue_time',flat=True)))/3600.
     ax = fig.add_subplot(223)
     bins = np.linspace(0, max(jobs), max(5, 5*np.log(len(jobs))))
-    ax.hist(jobs, bins = bins, log=True)
+    ax.hist(jobs, bins = bins, log=True, color='#bf0a30')
     ax.set_ylabel('# of jobs')
     ax.set_title('Queue Wait Time')
     ax.set_xlabel('hrs')
@@ -392,7 +392,7 @@ def hist_summary(job_list):
     ax = fig.add_subplot(224)
     try:
         bins = np.linspace(0, max(jobs), max(5, 5*np.log(len(jobs))))
-        ax.hist(jobs, bins = bins, log=True)
+        ax.hist(jobs, bins = bins, log=True, color='#bf0a30')
     except: pass
     ax.set_title('Metadata Reqs')
     ax.set_xlabel('<reqs>/s')
@@ -499,7 +499,10 @@ class JobDetailView(DetailView):
 
         for host_name, host in data.hosts.iteritems():
             if host.stats.has_key('proc'):
-                proc_list += host.stats['proc'] 
+                for proc_pid,val in host.stats['proc'].iteritems():
+                    if job.uid == val[0][0]:
+                        proc = proc_pid.split('/')[0]
+                        proc_list += [proc]
                 proc_list = list(set(proc_list))
             host_list.append(host_name)
 
@@ -550,19 +553,8 @@ def type_plot(request, pk, type_name):
     tp.plot(pk,job_data=data)
     return figure_to_response(tp)
 
-def proc_detail(data):
-    print data.get_schema('proc').keys()
-    for host_name, host in data.hosts.iteritems():        
-        for proc_name, proc in host.stats['proc'].iteritems():
-            print proc_name, proc[-1]
-            
-
 def type_detail(request, pk, type_name):
     data = get_data(pk)
-
-    if type_name == 'proc':
-        proc_detail(data)
-    else: pass
 
     schema = build_schema(data,type_name)
     raw_stats = data.aggregate_stats(type_name)[0]  
@@ -578,3 +570,18 @@ def type_detail(request, pk, type_name):
 
     return render_to_response("machine/type_detail.html",{"type_name" : type_name, "jobid" : pk, "stats_data" : stats, "schema" : schema})
 
+def proc_detail(request, pk, proc_name):
+
+    data = get_data(pk)
+    
+    host_map = {}
+    schema = data.get_schema('proc')
+    hwm = schema['VmHWM'].index
+    hwm_unit = "gB"#schema['VmHWM'].unit
+    affinity = schema['Cpus_allowed_list'].index
+
+    for host_name, host in data.hosts.iteritems():
+        if proc_name not in host.stats['proc']: continue
+        host_map[host_name] = [ host.stats['proc'][proc_name][-1][hwm]/2**20., hex(host.stats['proc'][proc_name][-1][affinity]) ]
+
+    return render_to_response("machine/proc_detail.html",{"proc_name" : proc_name, "jobid" : pk, "host_map" : host_map, "hwm_unit" : hwm_unit})

@@ -163,5 +163,5 @@ void stats_inc(struct stats *stats, const char *key, unsigned long long val)
         stats->s_type->st_name, stats->s_dev, key, val, i);
 
   if (i >= 0)
-    stats->s_val[i] = val;
+    stats->s_val[i] += val;
 }

@@ -119,7 +119,6 @@ class MasterPlot(Plot):
         flops = numpy.diff(flops)/numpy.diff(self.ts.t)/1.0e9
         ax.step(self.ts.t/3600., numpy.append(flops, [flops[-1]]), 
                 where="post")
-        print flops,self.ts.t
 
       ax.set_ylabel('Dbl GFLOPS')
       ax.set_xlim([0.,self.ts.t[-1]/3600.])

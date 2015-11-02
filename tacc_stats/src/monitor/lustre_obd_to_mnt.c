@@ -127,8 +127,9 @@ char *lustre_obd_to_mnt(const char *name)
 
   sb_mnt = dict_ref(&sb_dict, name + strlen(name) - 16);
   if (sb_mnt == NULL) {
-    ERROR("no super block found for obd `%s'\n", name);
-    return NULL;
+    ERROR("no super block found for obd `%s'. build a new super block dict\n", name);
+    sb_dict_init();
+    sb_mnt = dict_ref(&sb_dict, name + strlen(name) - 16);
   }
 
   return sb_mnt + 16 + 1;
