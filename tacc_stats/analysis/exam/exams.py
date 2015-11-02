@@ -6,11 +6,12 @@ import cPickle as pickle
 import multiprocessing
 from tacc_stats.analysis.gen import tspl,tspl_utils
 
-def unwrap(args):
+def _unwrap(args):
   try:
-    return args[0].get_measurements(args[1],**args[2])
-  except:
+    return args[0].get_measurements(args[1])
+  except Exception as e:
     print(traceback.format_exc())
+    raise e
     pass
 
 class Auditor():
@@ -19,43 +20,40 @@ class Auditor():
           '<': operator.le, '<=': operator.le,
           '==': operator.eq}
 
-  def __init__(self, processes=1, **kwargs):
+  def __init__(self, processes = 4, **kwargs):
     self.processes = processes
     self.metrics = {}
     self.results = {}
-    self.measures = {}
-    manager = multiprocessing.Manager()
-    self.accts = manager.dict()
-    self.paths = manager.dict()
+    self.measures = {}    
 
   def stage(self, Measure, **kwargs):
     self.measures[Measure.__name__] = Measure(**kwargs)
-    manager = multiprocessing.Manager()
-    self.metrics[Measure.__name__] = manager.dict()
 
   # Compute metrics in parallel (Shared memory only)
-  def run(self, filelist, **kwargs):
+  def run(self, filelist):
     if not filelist: 
       print("Please specify a job file list.")
       sys.exit()
     pool = multiprocessing.Pool(processes=self.processes) 
-    pool.map(unwrap,zip([self]*len(filelist),filelist,[kwargs]*len(filelist)))
-    pool.close()
-    pool.join()
-
+    metrics = pool.map(_unwrap, zip([self]*len(filelist), filelist))
+    
+    for d in metrics:
+      for metric_name, job in d.iteritems():
+        self.metrics.setdefault(metric_name, {}) 
+        self.metrics[metric_name][job[0]] = job[1]
+    
   # Compute metric
   def get_measurements(self,jobpath):
     with open(jobpath) as fd:
       try:
         job_data = pickle.load(fd)
-        self.accts[job_data.id] = job_data.acct
-        self.paths[job_data.id] = jobpath
       except EOFError as e:
         raise tspl.TSPLException('End of file found for: ' + jobpath)
 
+    metrics = {}
     for name, measure in self.measures.iteritems():
-      print( name)
-      self.metrics[name][job_data.id] = measure.test(jobpath,job_data)
+      metrics[name] = (job_data.id, measure.test(jobpath,job_data))
+    return metrics
 
   # Compare metric to threshold
   def test(self, Measure, threshold = 1.0):
@@ -121,7 +119,7 @@ class Test(object):
 
   # Compute Average Rate of Change
   def arc(self,data):
-    avg = 0
+    avg = 0.0
     self.val = {}
     idt = (self.ts.t[-1]-self.ts.t[0])**-1
     for h in self.ts.j.hosts.keys():
@@ -130,13 +128,13 @@ class Test(object):
     return avg/self.ts.numhosts
 
   def test(self,jobpath,job_data):
-    try:
-      # Setup job data and filter out unwanted jobs
-      if not self.setup(jobpath,job_data=job_data): return
+    #try:
+    # Setup job data and filter out unwanted jobs
+    if not self.setup(jobpath,job_data=job_data): return
       # Compute metric of interest
-      self.compute_metric()
-    except: 
-      print("Test failed",sys.exc_info()[0])
+    self.compute_metric()
+    #except Exception as e: 
+    #  print("Test failed",sys.exc_info()[0])
 
     return self.metric
 
