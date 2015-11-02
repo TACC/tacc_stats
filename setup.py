@@ -241,7 +241,9 @@ libraries    = []
 if cfg_data.getboolean('OPTIONS', 'IB'):
     ib_dir        = "/usr"
     include_dirs += [pjoin(ib_dir,'include')]
+    include_dirs += ['/opt/ofed/include']
     library_dirs += [pjoin(ib_dir,'lib64')]
+    library_dirs += ['/opt/ofed/lib64']
     libraries    += ['ibmad']
 
 if cfg_data.getboolean('OPTIONS', 'PHI'):
@@ -321,8 +323,8 @@ class MyBDist_RPM(bdist_rpm):
             prep_cmds += """
 %define crontab_file /etc/cron.d/%{name}
 %define stats_dir /var/log/%{name}
-%define archive_dir /scratch/projects/%{name}/archive
-"""
+%define archive_dir """ + paths["archive_dir"]
+
         #if MODE == "DAEMON":
         #    prep_cmds += "%define server " + "-s "+SERVER
         open(self.prep_script,"w").write(prep_cmds)
