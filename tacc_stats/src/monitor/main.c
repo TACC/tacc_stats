@@ -171,7 +171,7 @@ int main(int argc, char *argv[])
         ERROR("cannot unlink `%s': %m\n", current_path);
         rc = 1;
     }
-    goto out;
+    cmd = cmd_begin;
   }
 
   gettimeofday(&tp,NULL);
