@@ -24,6 +24,9 @@ class MIC_Usage(Test):
 
     # Compute user fraction over run
     # Assume threads*cores is constant in time
-    self.metric = Nhosts * (stats[-1, us_index] - stats[0, us_index])*float( (stats[-1, jc_index]-stats[0, jc_index]) * stats[0, th_index] * stats[0, nc_index] )**-1
+    try:
+      self.metric = Nhosts * (stats[-1, us_index] - stats[0, us_index])*float( (stats[-1, jc_index]-stats[0, jc_index]) * stats[0, th_index] * stats[0, nc_index] )**-1
+    except: 
+      self.metric = 0.0
     return
 

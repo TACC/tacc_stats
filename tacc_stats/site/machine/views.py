@@ -182,8 +182,8 @@ def update_metric_fields(date,rerun=False):
     jobs_list = Job.objects.filter(date = date).exclude(run_time__lt = 0)
 
     # Use mem to see if job was tested.  It will always exist
-    #if not rerun:
-        #jobs_list = jobs_list.filter(Load_L1Hits = None)
+    if not rerun:
+        jobs_list = jobs_list.filter(Load_L1Hits = None)
     
     paths = []
     for job in jobs_list:
@@ -200,9 +200,10 @@ def update_metric_fields(date,rerun=False):
 
     for name, results in aud.metrics.iteritems():
         obj = TestInfo.objects.get(test_name = name)
-        for jobid in results.keys():
+        print name,len(results.keys())
+        for jobid, result in results.iteritems():            
             try:
-                jobs_list.filter(id = jobid).update(**{ obj.field_name : results[jobid]})
+                jobs_list.filter(id = jobid).update(**{ obj.field_name : result })
             except:
                 pass
 
@@ -500,10 +501,12 @@ class JobDetailView(DetailView):
             if host.stats.has_key('proc'):
                 for proc_pid,val in host.stats['proc'].iteritems():
                     if job.uid == val[0][0]:
+
                         try: 
                             proc = proc_pid.split('/')[0]
                         except:
                             proc = proc_pid
+
                         proc_list += [proc]
                 proc_list = list(set(proc_list))
             host_list.append(host_name)
@@ -584,6 +587,7 @@ def proc_detail(request, pk, proc_name):
     thr_idx = schema['Threads'].index
 
     for host_name, host in data.hosts.iteritems():
+
         for proc_pid, val in host.stats['proc'].iteritems():
             host_map.setdefault(host_name, {})
             try:
@@ -592,6 +596,5 @@ def proc_detail(request, pk, proc_name):
                 proc_ = proc_pid
             if  proc_ == proc_name:
                 host_map[host_name][proc_pid] = [ val[-1][hwm_idx]/2**20, format(int(val[-1][aff_idx]),'#018b')[2:], val[-1][thr_idx] ]
-
 
     return render_to_response("machine/proc_detail.html",{"proc_name" : proc_name, "jobid" : pk, "host_map" : host_map, "hwm_unit" : hwm_unit})

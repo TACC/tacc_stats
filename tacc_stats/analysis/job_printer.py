@@ -10,13 +10,13 @@ def main(**args):
     acct = batch_acct.factory(cfg.batch_system,
                               cfg.acct_path,
                               cfg.host_name_ext)
-
-    reader = acct.find_jobids(args['jobid']).next()
-    
-    date_dir = os.path.join(cfg.pickles_dir,
-                            datetime.fromtimestamp(reader['end_time']).strftime('%Y-%m-%d'))
-    pickle_file = os.path.join(date_dir, reader['id'])
-
+    if args['jobid']:
+        reader = acct.find_jobids(args['jobid']).next()    
+        date_dir = os.path.join(cfg.pickles_dir,
+                                datetime.fromtimestamp(reader['end_time']).strftime('%Y-%m-%d'))
+        pickle_file = os.path.join(date_dir, reader['id'])
+    else:
+        pickle_file = args['file']
 
     with open(pickle_file) as fd:
         data = pickle.load(fd)

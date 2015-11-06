@@ -8,7 +8,7 @@ class MetaDataRatePlot(Plot):
       'llite', 'llite', 'llite', 'llite', 'llite',
       'llite', 'llite', 'llite', 'llite', 'llite',
       'llite', 'llite', 'llite', 'llite', 'llite',
-      'llite', 'llite', 'llite', ]
+      'llite', 'llite', 'llite',]
   k2=['open','close','mmap','fsync','setattr',
       'truncate','flock','getattr','statfs','alloc_inode',
       'setxattr',' listxattr',

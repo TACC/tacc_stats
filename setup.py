@@ -54,7 +54,7 @@ CLASSIFIERS = [
 ]
 
 MAJOR = 2
-MINOR = 1
+MINOR = 2
 MICRO = 1
 ISRELEASED = True
 VERSION = '%d.%d.%d' % (MAJOR, MINOR, MICRO)
@@ -136,7 +136,8 @@ def write_stats_x(cfg_data):
         'mic'
         ]
     os_types  = [         
-        'block', 'cpu', 'mem', 'net', 'nfs', 'numa', 'proc', 'ps', 'sysv_shm', 'tmpfs', 'vfs', 'vm'
+        'block', 'cpu', 'mem', 'net', 'nfs', 'numa', 'proc',
+        'ps', 'sysv_shm', 'tmpfs', 'vfs', 'vm'
         ]
 
     types = chip_types + os_types
@@ -229,7 +230,7 @@ sources=[
     pjoin(root,'collect.c'),  pjoin(root,'stats.c')
     ]
 with open(pjoin(root, 'stats.x'), 'r') as fd:
-    for dev_type in fd.read().split():
+    for dev_type in fd.read().split():        
         sources += [pjoin(root, dev_type.lstrip('X(').rstrip(')') + '.c')]
 
 FREQUENCY = cfg_data.get('OPTIONS', 'FREQUENCY')
@@ -240,7 +241,13 @@ libraries    = []
 if cfg_data.getboolean('OPTIONS', 'IB'):
     ib_dir        = "/usr"
     include_dirs += [pjoin(ib_dir,'include')]
+    include_dirs += ['/opt/ofed/include']
     library_dirs += [pjoin(ib_dir,'lib64')]
+
+    ib_dir        = "/opt/ofed"
+    include_dirs += [pjoin(ib_dir,'include')]
+    library_dirs += [pjoin(ib_dir,'lib64')]
+
     libraries    += ['ibmad']
 
 if cfg_data.getboolean('OPTIONS', 'PHI'):
@@ -273,7 +280,7 @@ elif MODE == "CRON":
     sources += [pjoin(root,'stats_file.c'), pjoin(root,'main.c')]
 else:
     print "BUILD ERROR: Set mode to either DAEMON or CRON"
-    
+    sys.exit(1)
 flags = ['-D_GNU_SOURCE', '-Wp,-U_FORTIFY_SOURCE',
          '-O3', '-Wall', '-g', '-UDEBUG']
 
@@ -320,8 +327,8 @@ class MyBDist_RPM(bdist_rpm):
             prep_cmds += """
 %define crontab_file /etc/cron.d/%{name}
 %define stats_dir /var/log/%{name}
-%define archive_dir /scratch/projects/%{name}/archive
-"""
+%define archive_dir """ + paths["archive_dir"]
+
         #if MODE == "DAEMON":
         #    prep_cmds += "%define server " + "-s "+SERVER
         open(self.prep_script,"w").write(prep_cmds)
@@ -401,26 +408,20 @@ fi
 class MyBuildExt(build_ext):
     def build_extension(self,ext):
         
-        sources = ext.sources
-        sources = list(sources)
+        sources = list(ext.sources)
         ext_path = self.get_ext_fullpath(ext.name)
-        depends = sources + ext.depends
         extra_args = ext.extra_compile_args or []
         macros = ext.define_macros[:]
         for undef in ext.undef_macros:
             macros.append((undef,))
-
+        
         objects = self.compiler.compile(sources,
                                         output_dir=self.build_temp,
                                         macros=macros,
                                         include_dirs=ext.include_dirs,
-                                        extra_postargs=extra_args,
+                                        extra_preargs=extra_args,
                                         depends=ext.depends)
         self._built_objects = objects[:]
-
-        if ext.extra_objects:
-            objects.extend(ext.extra_objects)
-        extra_args = ext.extra_link_args or []
 
         language = ext.language or self.compiler.detect_language(sources)
 
@@ -439,18 +440,19 @@ class MyBuildExt(build_ext):
                                       'build/bin/monitor',
                                       libraries=ext.libraries,
                                       library_dirs=ext.library_dirs,
-                                      extra_postargs=extra_args,
+                                      extra_preargs=extra_args,
                                       target_lang=language)
+
         self.compiler.link_shared_object(objects, 
                                          ext_path,
                                          libraries=ext.libraries,
                                          library_dirs=ext.library_dirs,
-                                         extra_postargs=extra_args,
+                                         extra_preargs=extra_args,
                                          debug=self.debug,
                                          build_temp=self.build_temp,
                                          target_lang=language)
 
-extensions.append(Extension('tacc_stats.monitor', **ext_data))
+extensions.append(Extension('monitor', **ext_data))
 
 scripts=[
     'build/bin/monitor',             

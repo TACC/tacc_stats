@@ -702,13 +702,3 @@ def from_acct(acct, stats_home, host_list_dir, batch_acct):
         return False
     
 
-
-def from_id(id, **kwargs):
-    """from_id(id, acct_file=None, acct_path=sge_acct_path, use_awk=True)
-    Return Job object for the job with SGE id ID, or None if no such job was found.
-    """
-    acct = sge_acct.from_id(id, **kwargs)
-    if acct:
-        return from_acct(acct)
-    else:
-        return None

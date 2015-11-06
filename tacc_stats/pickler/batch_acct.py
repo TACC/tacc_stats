@@ -31,6 +31,8 @@ class BatchAcct(object):
       ## Clean up when colons exist in job name
       d = self.clean_up(d)
 
+      if d['start_time'] == d['end_time']: continue
+
       # Accounting records with pe_taskid != NONE are generated for
       # sub_tasks of a tightly integrated job and should be ignored.
       if max(start_time, d['end_time']) <= min(d['end_time'], end_time):
