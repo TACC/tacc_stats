@@ -242,6 +242,10 @@ if cfg_data.getboolean('OPTIONS', 'IB'):
     ib_dir        = "/usr"
     include_dirs += [pjoin(ib_dir,'include')]
     library_dirs += [pjoin(ib_dir,'lib64')]
+    ib_dir        = "/opt/ofed"
+    include_dirs += [pjoin(ib_dir,'include')]
+    library_dirs += [pjoin(ib_dir,'lib64')]
+
     libraries    += ['ibmad']
 
 if cfg_data.getboolean('OPTIONS', 'PHI'):
@@ -436,7 +440,7 @@ class MyBuildExt(build_ext):
                                       library_dirs=ext.library_dirs,
                                       extra_preargs=extra_args,
                                       target_lang=language)
-        """
+
         self.compiler.link_shared_object(objects, 
                                          ext_path,
                                          libraries=ext.libraries,
@@ -445,7 +449,7 @@ class MyBuildExt(build_ext):
                                          debug=self.debug,
                                          build_temp=self.build_temp,
                                          target_lang=language)
-                                         """
+
 extensions.append(Extension('monitor', **ext_data))
 
 scripts=[
