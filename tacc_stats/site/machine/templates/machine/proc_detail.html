@@ -39,14 +39,17 @@
 <h2>{{ proc_name }}</h2>
 
 <table class="table table-condensed table-bordered">
-  <thead><th>host</th><th>Memory HWM ({{ hwm_unit }})</th><th>Affinity</th></thead>
+  <thead><th>host</th><th>proc/pid</th><th>Memory HWM ({{ hwm_unit }})</th><th>Affinity</th><th>Threads</th></thead>
   <tbody>
-    {% for host, vals in host_map.iteritems %}
-    <tr> 
-      <td>{{ host }}</td>
+    {% for host, procs in host_map.iteritems %}
+    {% for proc, vals in procs.iteritems %} 
+    <tr>
+      <td>{{ host }}</td><td>{{ proc }}</td>
       {% for val in vals %} 
       <td>{{ val }}</td>
       {% endfor %}
+      {% endfor %}
+      </tr>
     </tr>
     {% endfor %}
   </tbody>

@@ -498,8 +498,12 @@ class JobDetailView(DetailView):
 
         for host_name, host in data.hosts.iteritems():
             if host.stats.has_key('proc'):
-                for proc,val in host.stats['proc'].iteritems():
+                for proc_pid,val in host.stats['proc'].iteritems():
                     if job.uid == val[0][0]:
+                        try: 
+                            proc = proc_pid.split('/')[0]
+                        except:
+                            proc = proc_pid
                         proc_list += [proc]
                 proc_list = list(set(proc_list))
             host_list.append(host_name)
@@ -550,21 +554,10 @@ def type_plot(request, pk, type_name):
     tp = plots.DevPlot(k1=k1,k2=k2,lariat_data='pass')
     tp.plot(pk,job_data=data)
     return figure_to_response(tp)
-"""
-def proc_detail(data):
-    print data.get_schema('proc').keys()
-    for host_name, host in data.hosts.iteritems():        
-        for proc_name, proc in host.stats['proc'].iteritems():
-            print proc_name, proc[-1]
- """           
 
 def type_detail(request, pk, type_name):
     data = get_data(pk)
-    """
-    if type_name == 'proc':
-        proc_detail(data)
-    else: pass
-    """
+
     schema = build_schema(data,type_name)
     raw_stats = data.aggregate_stats(type_name)[0]  
 
@@ -580,18 +573,25 @@ def type_detail(request, pk, type_name):
     return render_to_response("machine/type_detail.html",{"type_name" : type_name, "jobid" : pk, "stats_data" : stats, "schema" : schema})
 
 def proc_detail(request, pk, proc_name):
-    print "><>>>>>>>",proc_name
+
     data = get_data(pk)
     
     host_map = {}
     schema = data.get_schema('proc')
-    hwm = schema['VmHWM'].index
+    hwm_idx = schema['VmHWM'].index
     hwm_unit = "gB"#schema['VmHWM'].unit
-    affinity = schema['Cpus_allowed_list'].index
+    aff_idx = schema['Cpus_allowed_list'].index
+    thr_idx = schema['Threads'].index
 
     for host_name, host in data.hosts.iteritems():
-        print host_name
-        if proc_name not in host.stats['proc']: continue
-        host_map[host_name] = [ host.stats['proc'][proc_name][-1][hwm]/2**20., hex(host.stats['proc'][proc_name][-1][affinity]) ]
-    print host_map
+        for proc_pid, val in host.stats['proc'].iteritems():
+            host_map.setdefault(host_name, {})
+            try:
+                proc_ = proc_pid.split('/')[0] 
+            except: 
+                proc_ = proc_pid
+            if  proc_ == proc_name:
+                host_map[host_name][proc_pid] = [ val[-1][hwm_idx]/2**20, format(int(val[-1][aff_idx]),'#018b')[2:], val[-1][thr_idx] ]
+
+
     return render_to_response("machine/proc_detail.html",{"proc_name" : proc_name, "jobid" : pk, "host_map" : host_map, "hwm_unit" : hwm_unit})
