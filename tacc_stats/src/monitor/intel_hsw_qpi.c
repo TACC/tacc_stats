@@ -52,7 +52,7 @@ static int intel_hsw_qpi_begin(struct stats_type *type)
 {
   int nr = 0;
   int dids[] = {0x2F32, 0x2F33, 0x2F3A};
-  int nr_dids = 2;
+  int nr_dids = 3;
   uint32_t events[] = {TxL_FLITS_G1_SNP,  TxL_FLITS_G1_HOM, G1_DRS_DATA, G2_NCB_DATA};
   int nr_events = 4;
 
@@ -69,7 +69,7 @@ static int intel_hsw_qpi_begin(struct stats_type *type)
   
   if (nr == 0)
     type->st_enabled = 0;
-
+  pci_map_destroy(&dev_paths, 3);
   return nr > 0 ? 0 : -1;
 
 }
@@ -77,7 +77,7 @@ static int intel_hsw_qpi_begin(struct stats_type *type)
 static void intel_hsw_qpi_collect(struct stats_type *type)
 {
   int dids[] = {0x2F32, 0x2F33, 0x2F3A};
-  int nr_dids = 2;
+  int nr_dids = 3;
 
   char **dev_paths = NULL;
   int nr_devs;
@@ -87,6 +87,7 @@ static void intel_hsw_qpi_collect(struct stats_type *type)
   int i;
   for (i = 0; i < nr_devs; i++)
     intel_snb_uncore_collect_dev(type, dev_paths[i]);  
+  pci_map_destroy(&dev_paths, 3);
 }
 
 struct stats_type intel_hsw_qpi_stats_type = {

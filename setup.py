@@ -121,7 +121,7 @@ def read_site_cfg():
 
 def write_stats_x(cfg_data):    
     chip_types = [
-        'amd64_pmc', 'intel_nhm', 'intel_wtm',
+        'amd64_pmc', 'intel_nhm', 'intel_wtm', 'intel_rapl',
         'intel_hsw', 'intel_hsw_cbo', 'intel_hsw_pcu', 'intel_hsw_imc', 'intel_hsw_qpi', 'intel_hsw_hau', 'intel_hsw_r2pci',
         'intel_ivb', 'intel_ivb_cbo', 'intel_ivb_pcu', 'intel_ivb_imc', 'intel_ivb_qpi', 'intel_ivb_hau', 'intel_ivb_r2pci',
         'intel_snb', 'intel_snb_cbo', 'intel_snb_pcu', 'intel_snb_imc', 'intel_snb_qpi', 'intel_snb_hau', 'intel_snb_r2pci'

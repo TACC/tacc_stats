@@ -16,7 +16,6 @@ int pci_map_create(char ***dev_paths, int *nr, int *ids, int nr_ids) {
   const char *pci_dir_path = PCI_DIR_PATH;
   DIR *pci_dir = NULL;
   
-
   pci_dir = opendir(pci_dir_path);
   if (pci_dir == NULL) {
     ERROR("cannot open `%s': %m\n", pci_dir_path);
@@ -66,13 +65,14 @@ int pci_map_create(char ***dev_paths, int *nr, int *ids, int nr_ids) {
       int i;
       for (i = 0; i < nr_ids; i++)
 	if (ids[i] == reg[1]) { 
-	  *dev_paths = realloc(*dev_paths, (*nr + 1)*sizeof(char*));
+	  *dev_paths = realloc(*dev_paths, (*nr+1)*sizeof(char*));
 	  if (*dev_paths != NULL)
 	    (*dev_paths)[*nr] = malloc(strlen(dev_fun_path)*sizeof(char)+1);
 	  else {
-	    free((*dev_paths)[*nr]);
+	    TRACE("dev path not allocated\n");
 	    continue;
 	  }
+
 	  snprintf((*dev_paths)[*nr], strlen(dev_fun_path)*sizeof(char)+1,"%s/%s", 
 		   bus_no->d_name, dev_fun_no->d_name);
 	  TRACE("%x %x %s\n", reg[0], reg[1], (*dev_paths)[*nr]);
@@ -98,10 +98,15 @@ int pci_map_create(char ***dev_paths, int *nr, int *ids, int nr_ids) {
   return rc;
 }
 
-void pci_map_destroy(char ***dev_paths, int nr) {
-  int i;
-  for (i=0; i < nr; i++) {
-    free((*dev_paths)[i]);
+void pci_map_destroy(char ***dev_paths, int nr_ids) {
+
+  if (*dev_paths != NULL) {
+    int i;
+    for (i=0; i < nr_ids; i++) {
+      if ((*dev_paths)[i] != NULL)
+	free((*dev_paths)[i]);
+    }
+    free(*dev_paths); 
   }
-  free(*dev_paths); 
+
 }

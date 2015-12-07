@@ -70,6 +70,7 @@ static int intel_snb_qpi_begin(struct stats_type *type)
   if (nr == 0)
     type->st_enabled = 0;
 
+  pci_map_destroy(&dev_paths, 2);
   return nr > 0 ? 0 : -1;
 
 }
@@ -87,6 +88,7 @@ static void intel_snb_qpi_collect(struct stats_type *type)
   int i;
   for (i = 0; i < nr_devs; i++)
     intel_snb_uncore_collect_dev(type, dev_paths[i]);  
+  pci_map_destroy(&dev_paths, 2);
 }
 
 struct stats_type intel_snb_qpi_stats_type = {
