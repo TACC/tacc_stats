@@ -237,7 +237,7 @@ FREQUENCY = cfg_data.get('OPTIONS', 'FREQUENCY')
 include_dirs = []
 library_dirs = []
 libraries    = []
-
+extra_objects = []
 if cfg_data.getboolean('OPTIONS', 'IB'):
     ib_dir        = "/usr"
     include_dirs += [pjoin(ib_dir,'include')]
@@ -264,14 +264,14 @@ define_macros=[('STATS_DIR_PATH','\"'+paths['stats_dir']+'\"'),
                ('STATS_LOCK_PATH','\"'+paths['stats_lock']+'\"'),
                ('JOBID_FILE_PATH','\"'+paths['jobid_file']+'\"'),
                ('FREQUENCY',FREQUENCY)]
-
+flags=[]
 MODE = cfg_data.get('OPTIONS', 'MODE') 
 if MODE == 'DAEMON': 
     print "\n--- Building linux daemon for monitoring ---\n"
     sources   += [pjoin(root,'amqp_listen.c'), 
                   pjoin(root,'stats_buffer.c'), pjoin(root,'monitor.c')]
-    libraries += ['rabbitmq']
-
+    include_dirs += [cfg_data.get('RMQ_CFG', 'RMQ_PATH')+"/include"]
+    extra_objects += [cfg_data.get('RMQ_CFG', 'RMQ_PATH')+"/lib64/librabbitmq.a"]
     SERVER = cfg_data.get('RMQ_CFG', 'RMQ_SERVER')
     define_macros += [('HOST_NAME_QUEUE',
                        '\"'+cfg_data.get('RMQ_CFG', 'HOST_NAME_QUEUE')+'\"')]
@@ -281,15 +281,17 @@ elif MODE == "CRON":
 else:
     print "BUILD ERROR: Set mode to either DAEMON or CRON"
     sys.exit(1)
-flags = ['-D_GNU_SOURCE', '-Wp,-U_FORTIFY_SOURCE',
+flags += ['-D_GNU_SOURCE', '-Wp,-U_FORTIFY_SOURCE',
          '-O3', '-Wall', '-g', '-UDEBUG']
 
 ext_data=dict(
     sources            = sources,
+    extra_compile_args = flags,
+    extra_objects      = extra_objects,
+    extra_link_args    = [],
     include_dirs       = [root] + include_dirs,
     library_dirs       = library_dirs,
-    libraries          = libraries,
-    extra_compile_args = flags,
+    libraries          = libraries + ['m', 'rt'],
     define_macros      = define_macros
     )
 
@@ -319,7 +321,7 @@ class MyBDist_RPM(bdist_rpm):
         ### Prep section
         self.prep_script = "build/bdist_rpm_prep"
         prep_cmds = """
-%define _bindir /opt/%{name}
+%define _bindir /opt/apps/%{name}
 %setup -n %{name}-%{unmangled_version}
 """
         prep_cmds += "%define lockfile " + paths['stats_lock'] + "\n"
@@ -329,8 +331,6 @@ class MyBDist_RPM(bdist_rpm):
 %define stats_dir /var/log/%{name}
 %define archive_dir """ + paths["archive_dir"]
 
-        #if MODE == "DAEMON":
-        #    prep_cmds += "%define server " + "-s "+SERVER
         open(self.prep_script,"w").write(prep_cmds)
         
         ### Build Section
@@ -424,11 +424,12 @@ class MyBuildExt(build_ext):
         self._built_objects = objects[:]
 
         language = ext.language or self.compiler.detect_language(sources)
-
+        
         if MODE == "DAEMON":
+            print ext.extra_objects
             self.compiler.link_executable([pjoin(self.build_temp,
                                                  root,
-                                                 'amqp_listen.o')],
+                                                 'amqp_listen.o')] + ext.extra_objects,
                                           'build/bin/listend',
                                           libraries=ext.libraries,
                                           library_dirs=ext.library_dirs,
@@ -436,14 +437,14 @@ class MyBuildExt(build_ext):
                                           target_lang=language)
             objects.remove(pjoin(self.build_temp, root, 'amqp_listen.o'))
 
-        self.compiler.link_executable(objects, 
+        self.compiler.link_executable(objects + ext.extra_objects,
                                       'build/bin/monitor',
                                       libraries=ext.libraries,
                                       library_dirs=ext.library_dirs,
                                       extra_preargs=extra_args,
                                       target_lang=language)
 
-        self.compiler.link_shared_object(objects, 
+        self.compiler.link_shared_object(objects + ext.extra_objects, 
                                          ext_path,
                                          libraries=ext.libraries,
                                          library_dirs=ext.library_dirs,
