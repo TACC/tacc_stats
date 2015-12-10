@@ -52,6 +52,11 @@ def update_comp_info(thresholds = None):
                   'InternodeIBMaxBW' : ['InternodeIBMaxBW', '>', 10000],
                   'LnetAveBW'  : ['LnetAveBW', '>', 10000],
                   'LnetMaxBW'  : ['LnetMaxBW', '>', 10000],
+                  'MDCReqs'  : ['MDCReqs', '>', 10000],
+                  'OSCReqs'  : ['OSCReqs', '>', 10000],
+                  'OSCWait'  : ['OSCWait', '>', 10000],
+                  'MDCWait'  : ['MDCWait', '>', 10000],
+                  'LLiteOpenClose'  : ['LLiteOpenClose', '>', 10000],
                   }
     if thresholds:
         for key,val in thresholds.iteritems():
@@ -172,6 +177,15 @@ def update_metric_fields(date,rerun=False):
     aud.stage(exam.MIC_Usage, ignore_qs = [], min_time = 0)
     aud.stage(exam.Load_All, ignore_qs = [], min_time = 0)
     aud.stage(exam.MetaDataRate, ignore_qs = [], min_time = 0)
+    aud.stage(exam.LnetAveBW, ignore_qs=[], min_time = 0)
+    aud.stage(exam.LnetMaxBW, ignore_qs=[], min_time = 0)
+    aud.stage(exam.InternodeIBAveBW, ignore_qs=[], min_time = 0)
+    aud.stage(exam.InternodeIBMaxBW, ignore_qs=[], min_time = 0)
+    aud.stage(exam.MDCReqs, ignore_qs=[], min_time = 0)
+    aud.stage(exam.MDCWait, ignore_qs=[], min_time = 0)
+    aud.stage(exam.OSCReqs, ignore_qs=[], min_time = 0)
+    aud.stage(exam.OSCWait, ignore_qs=[], min_time = 0)
+    aud.stage(exam.LLiteOpenClose, ignore_qs=[], min_time = 0)
 
     print 'Run the following tests for:',date
     for name, test in aud.measures.iteritems():
