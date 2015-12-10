@@ -63,7 +63,6 @@ static int intel_rapl_begin(struct stats_type *type)
   int cpuid_fd = -1;
   uint32_t buf[4];
   int rc = -1;
-  char signature[5];
 
   char vendor[12];
   /* Open /dev/cpuid/CPU/cpuid. */
@@ -82,8 +81,8 @@ static int intel_rapl_begin(struct stats_type *type)
   buf[0] = buf[2], buf[2] = buf[3], buf[3] = buf[0];
   snprintf(vendor, sizeof(vendor) + 1, (char*) buf + 4);
   TRACE("cpu %s, vendor `%.12s'\n", cpu, vendor);
-  if (strncmp(vendor, "GenuineIntel", 12) == 0)
-    type->st_enabled = 1;  
+  if (strncmp(vendor, "GenuineIntel", 12) != 0)
+    type->st_enabled = 0;  
   rc = 0;
   
  out:
@@ -161,6 +160,7 @@ static void intel_rapl_collect(struct stats_type *type)
 //! Definition of stats entry for this type
 struct stats_type intel_rapl_stats_type = {
   .st_name = "intel_rapl",
+  .st_begin = &intel_rapl_begin,
   .st_collect = &intel_rapl_collect,
 #define X SCHEMA_DEF
   .st_schema_def = JOIN(KEYS),

@@ -61,6 +61,11 @@ static void proc_collect_pid(struct stats_type *type, const char *pid)
     if (strcmp(key,"Name:") == 0) 
       {
 	rest[strlen(rest) - 1] = '\0';
+
+	if (!strcmp("bash", rest) || !strcmp("ssh", rest) || 
+	    !strcmp("sshd", rest) || !strcmp("metacity", rest))
+	  goto out;
+  
 	snprintf(process, sizeof(process), "%s/%s", rest, pid);
 	stats = get_current_stats(type, process);
 	continue;
@@ -126,11 +131,11 @@ int filter(const struct dirent *dir)
 
   struct passwd *pwd;
   pwd = getpwuid(dirinfo.st_uid);
-  if ( !strcmp("postfix", pwd->pw_name) || !strcmp("rpc", pwd->pw_name) || 
-       !strcmp("rpcuser", pwd->pw_name) || !strcmp("dbus", pwd->pw_name) || 
-       !strcmp("daemon", pwd->pw_name) || !strcmp("ntp", pwd->pw_name) )
+  if (pwd == NULL || !strcmp("postfix", pwd->pw_name) || !strcmp("rpc", pwd->pw_name) || 
+      !strcmp("rpcuser", pwd->pw_name) || !strcmp("dbus", pwd->pw_name) || 
+      !strcmp("daemon", pwd->pw_name) || !strcmp("ntp", pwd->pw_name))
     return 0;
-
+  
   return 1;
 }
 

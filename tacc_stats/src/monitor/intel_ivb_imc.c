@@ -68,7 +68,7 @@ static int intel_ivb_imc_begin(struct stats_type *type)
 
   if (nr == 0)
     type->st_enabled = 0;
-  pci_map_destroy(&dev_paths, 4);
+  pci_map_destroy(&dev_paths, nr_devs);
   return nr > 0 ? 0 : -1;
 }
 
@@ -84,7 +84,7 @@ static void intel_ivb_imc_collect(struct stats_type *type)
   int i;
   for (i = 0; i < nr_devs; i++)
     intel_snb_uncore_collect_dev(type, dev_paths[i]);  
-  pci_map_destroy(&dev_paths, 4);
+  pci_map_destroy(&dev_paths, nr_devs);
 }
 
 struct stats_type intel_ivb_imc_stats_type = {
