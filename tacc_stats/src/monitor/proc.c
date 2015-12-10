@@ -131,8 +131,7 @@ int filter(const struct dirent *dir)
 
   struct passwd *pwd;
   pwd = getpwuid(dirinfo.st_uid);
-  if (pwd == NULL || !strcmp("postfix", pwd->pw_name) || !strcmp("rpc", pwd->pw_name) || 
-      !strcmp("rpcuser", pwd->pw_name) || !strcmp("dbus", pwd->pw_name) || 
+  if (pwd == NULL || !strcmp("postfix", pwd->pw_name) || !strcmp("rpc", pwd->pw_name) || !strcmp("rpcuser", pwd->pw_name) || !strcmp("dbus", pwd->pw_name) || 
       !strcmp("daemon", pwd->pw_name) || !strcmp("ntp", pwd->pw_name))
     return 0;
   

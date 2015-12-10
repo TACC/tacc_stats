@@ -236,8 +236,9 @@ with open(pjoin(root, 'stats.x'), 'r') as fd:
 FREQUENCY = cfg_data.get('OPTIONS', 'FREQUENCY')
 include_dirs = []
 library_dirs = []
-libraries    = []
 extra_objects = []
+libraries    = ['m','rt']
+
 if cfg_data.getboolean('OPTIONS', 'IB'):
     ib_dir        = "/usr"
     include_dirs += [pjoin(ib_dir,'include')]

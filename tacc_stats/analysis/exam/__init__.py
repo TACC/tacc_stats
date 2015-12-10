@@ -23,5 +23,13 @@ from tacc_stats.analysis.exam.lnet_avebw import LnetAveBW
 from tacc_stats.analysis.exam.lnet_maxbw import LnetMaxBW
 from tacc_stats.analysis.exam.internodeib_avebw import InternodeIBAveBW
 from tacc_stats.analysis.exam.internodeib_maxbw import InternodeIBMaxBW
+
+from tacc_stats.analysis.exam.mdcreqs import MDCReqs
+from tacc_stats.analysis.exam.mdcwait import MDCWait
+from tacc_stats.analysis.exam.oscreqs import OSCReqs
+from tacc_stats.analysis.exam.oscwait import OSCWait
+
+from tacc_stats.analysis.exam.lliteopenclose import LLiteOpenClose
+
 from tacc_stats.analysis.exam.exams import Auditor
 

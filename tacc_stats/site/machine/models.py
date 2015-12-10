@@ -52,6 +52,13 @@ class Job(models.Model):
     InternodeIBAveBW = models.FloatField(null=True)
     InternodeIBMaxBW = models.FloatField(null=True)
 
+    MDCReqs          =  models.FloatField(null=True)
+    OSCReqs          =  models.FloatField(null=True)
+    MDCWait          =  models.FloatField(null=True)
+    OSCWait          =  models.FloatField(null=True)
+
+    LLiteOpenClose   =  models.FloatField(null=True)
+    
     def __unicode__(self):
         return str(self.id)
 
