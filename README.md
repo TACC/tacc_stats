@@ -188,7 +188,7 @@ To install TACC Stats on the machine where data will be processed, analyzed, and
     $ virtualenv machinename
     $ cd machinename; source bin/activate
     $ git clone https://github.com/TACC/tacc_stats
-    $ pip install tacc_stats
+    $ pip install tacc_stats/
 ~~~
 
 Scripts and executables will be installed in
