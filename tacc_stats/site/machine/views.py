@@ -25,7 +25,7 @@ from datetime import datetime
 import numpy as np
 from matplotlib.figure import Figure
 from matplotlib.backends.backend_agg import FigureCanvasAgg as FigureCanvas
-from django.core.cache import cache,get_cache 
+from django.core.cache import cache 
 import traceback
 
 def update_comp_info(thresholds = None):
