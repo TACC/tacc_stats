@@ -27,6 +27,7 @@ from matplotlib.figure import Figure
 from matplotlib.backends.backend_agg import FigureCanvasAgg as FigureCanvas
 from django.core.cache import cache 
 import traceback
+import operator
 
 def update_comp_info(thresholds = None):
     
@@ -98,7 +99,7 @@ def update(date,rerun=False):
                     data = np.load(f)
                     json = data.acct
                     hosts = data.hosts.keys()
-                del json['yesno']
+                if 'yesno' in json: del json['yesno']
                 utc_start = datetime.utcfromtimestamp(
                     json['start_time']).replace(tzinfo=pytz.utc)
                 utc_end = datetime.utcfromtimestamp(
@@ -108,8 +109,10 @@ def update(date,rerun=False):
                 if json.has_key('unknown'):
                     json['requested_time'] = json['unknown']*60
                     del json['unknown']
-                else: json['requested_time'] = json['requested_time']*60
-
+                elif json.has_key('requested_time'): 
+                    json['requested_time'] = json['requested_time']*60
+                else:
+                    json['requested_time'] = 0
                 json['start_epoch'] = json['start_time']
                 json['end_epoch'] = json['end_time']
                 json['start_time'] = utc_start.astimezone(tz)
@@ -117,9 +120,16 @@ def update(date,rerun=False):
                 json['date'] = json['end_time'].date()
                 json['name'] = json['name'][0:128]
                 json['wayness'] = json['cores']/json['nodes']
-
-                try: json['user']=pwd.getpwuid(int(json['uid']))[0]
-                except: json['user']='unknown'
+                if json.has_key('state'): 
+                    json['status'] = json['state']
+                    del json['state']
+                json['status'] = json['status'].split()[0]
+                if json.has_key('user'):
+                    json['uid'] = int(pwd.getpwnam(json['user']).pw_uid)
+                elif json.has_key('uid'):
+                    json['user'] = pwd.getpwuid(int(json['uid']))[0]
+                else: 
+                    json['user']='unknown'
                 
                 ### If xalt is available add data to the DB 
                 xd = None
@@ -131,7 +141,11 @@ def update(date,rerun=False):
                     json['cwd']     = xd.cwd[0:128]
                     json['threads'] = xd.num_threads
                 except: xd = False 
-                    
+                
+                if json.has_key('host_list'):
+                    del json['host_list']
+                print json
+                Job.objects.filter(id=json['id']).delete()
                 obj, created = Job.objects.update_or_create(**json)
                 for host_name in hosts:
                     h = Host(name=host_name)
@@ -401,7 +415,7 @@ def hist_summary(job_list):
     ax.set_ylabel('# of jobs')
     ax.set_title('Queue Wait Time')
     ax.set_xlabel('hrs')
-    #jobs =  np.array(job_list.filter(status = "FAILED").values_list('nodes',flat=True))
+
     jobs =  np.array(job_list.values_list('MetaDataRate',flat=True))
     ax = fig.add_subplot(224)
     try:
@@ -483,21 +497,17 @@ class JobDetailView(DetailView):
 
         data = get_data(job.id)
 
-        import operator
+        
         comp = {'>': operator.gt, '>=': operator.ge,
                 '<': operator.le, '<=': operator.le,
                 '==': operator.eq}
         
-        
-        print ">>>>>>>>>>>>>>>>>>>>>>>>"
         testinfo_dict = {}
         for obj in TestInfo.objects.all():
-            print obj.test_name,
             test_type = getattr(sys.modules[exam.__name__],obj.test_name)
             test = test_type(min_time=0,ignore_qs=[])
             try: 
                 metric = test.test(job.path,data)
-                print metric
                 if not metric: continue            
                 setattr(job,obj.field_name,metric)
                 result = comp[obj.comparator](metric, obj.threshold)
@@ -510,6 +520,8 @@ class JobDetailView(DetailView):
         proc_list = []
         type_list = []
         host_list = []
+
+        fsio_dict = {}
 
         for host_name, host in data.hosts.iteritems():
             if host.stats.has_key('proc'):
@@ -524,6 +536,20 @@ class JobDetailView(DetailView):
                         proc_list += [proc]
                 proc_list = list(set(proc_list))
             host_list.append(host_name)
+
+            if host.stats.has_key('llite'):
+                schema = data.get_schema('llite')
+                rd_idx = schema['osc_read'].index
+                wr_idx = schema['osc_write'].index
+
+                for device, value in host.stats['llite'].iteritems():
+                    fsio_dict.setdefault(device, [0.0, 0.0])
+                    fsio_dict[device][0] += value[-1, rd_idx] 
+                    fsio_dict[device][1] += value[-1, wr_idx]
+        for key, val in fsio_dict.iteritems():
+            val[0] = val[0] * 2.0**(-20)
+            val[1] = val[1] * 2.0**(-20)
+        context['fsio'] = fsio_dict
 
         if len(host_list) != job.nodes:
             job.status = str(job.nodes-len(host_list))+"_NODES_MISSING"

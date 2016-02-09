@@ -2,15 +2,8 @@ from exams import Test
 import numpy, math
 
 class Idle(Test):
-  k1={'amd64' : ['cpu'],
-      'intel_snb' : ['cpu'],
-      'intel_hsw' : ['cpu']
-      }
-  k2={'amd64' : ['user'],
-      'intel_snb' : ['user'],
-      'intel_hsw' : ['user']
-      }
-
+  k1 = ['cpu']
+  k2 = ['user']
   comp_operator = '>'
 
   def compute_metric(self):

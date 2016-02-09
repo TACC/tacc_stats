@@ -69,7 +69,6 @@ class MasterPlot(Plot):
 
   def plot(self,jobid,job_data=None):
     if not self.setup(jobid,job_data=job_data): return
-    wayness=self.ts.wayness
 
     if self.wide:
       self.fig = Figure(figsize=(15.5,12),dpi=110)
@@ -159,24 +158,27 @@ class MasterPlot(Plot):
     plot(self.fig.add_subplot(6,cols,plot_ctr*shift), [idx0,idx1], 3600., 1024.**2, ylabel='Total lnet MB/s')
 
     # Plot remaining IB sum rate
-    try:
-      idx2=k1_tmp.index('ib_sw')
-      idx3=idx2 + k1_tmp[idx2+1:].index('ib_sw') + 1
-    except:
-      idx2=k1_tmp.index('ib_ext')
-      idx3=idx2 + k1_tmp[idx2+1:].index('ib_ext') + 1
-    try:
-      plot_ctr += 1
-      plot(self.fig.add_subplot(6,cols,plot_ctr*shift),[idx2,idx3,-idx0,-idx1],3600.,2.**20,
-           ylabel='Total (ib-lnet) MB/s') 
-    except: pass
+    if 'ib_ext' in self.ts.j.hosts.values()[0].stats:
+      try:
+        idx2=k1_tmp.index('ib_sw')
+        idx3=idx2 + k1_tmp[idx2+1:].index('ib_sw') + 1
+      except:
+        idx2=k1_tmp.index('ib_ext')
+        idx3=idx2 + k1_tmp[idx2+1:].index('ib_ext') + 1
+      try:
+        plot_ctr += 1
+        plot(self.fig.add_subplot(6,cols,plot_ctr*shift),[idx2,idx3,-idx0,-idx1],3600.,2.**20,
+             ylabel='Total (ib-lnet) MB/s') 
+      except: pass
 
     #Plot CPU user time
-    idx0=k2_tmp.index('user')
+    idx0 = [k2_tmp.index('user')]
     plot_ctr += 1
-    plot(self.fig.add_subplot(6,cols,plot_ctr*shift),[idx0],3600.,wayness*100.,
+
+    wayness = len(self.ts.j.hosts.values()[0].stats['cpu'].keys())
+    plot(self.fig.add_subplot(6,cols,plot_ctr*shift),idx0,3600.,wayness,
          xlabel='Time (hr)',
-         ylabel='Total cpu user\nfraction')
+         ylabel='cpu usage %')
     
     self.fig.subplots_adjust(hspace=0.35)
     self.output('master')

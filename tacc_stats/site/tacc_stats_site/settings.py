@@ -4,7 +4,7 @@ import tacc_stats.cfg as cfg
 import tacc_stats.site.tacc_stats_site as tacc_stats_site
 DIR = os.path.dirname(os.path.abspath(__file__))
 
-DEBUG = False
+DEBUG = True
 TEMPLATE_DEBUG = DEBUG
 
 ADMINS = (
@@ -18,9 +18,9 @@ DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql_psycopg2',
         'NAME'  : cfg.machine + '_db',
-        'USER': 'postgres',
-        'PASSWORD': '',
-        'HOST': cfg.server,         
+        'USER': 'taccstats',
+        'PASSWORD': 'taccstats',
+        'HOST': 'localhost',         
         'PORT': '5432',               
         },
     # Uncomment this portion if an xalt database exists
@@ -188,7 +188,7 @@ LOGGING = {
     }
 }
 
-
+"""
 CACHES = {
     'normal': {
         'BACKEND': 'django.core.cache.backends.memcached.MemcachedCache',
@@ -202,3 +202,4 @@ CACHES = {
         }
     }
 
+"""

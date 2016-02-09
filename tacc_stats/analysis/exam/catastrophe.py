@@ -5,14 +5,20 @@ from tacc_stats.analysis.gen import tspl_utils
 class Catastrophe(Test):
 
   # Hash value must be a list
+  """
   k1={'amd64' : ['amd64_sock'],
       'intel_snb' : ['intel_snb'],
+      'intel_ivb' : ['intel_ivb'],
       'intel_hsw' : ['intel_hsw']
       }
   k2={'amd64' : ['DRAM'],
       'intel_snb' : ['LOAD_L1D_ALL'],
+      'intel_ivb' : ['LOAD_L1D_ALL'],
       'intel_hsw' : ['LOAD_L1D_ALL']
       }
+  """
+  k1 = ['cpu']
+  k2 = ['user']
   comp_operator = '<'
 
   def compute_fit_params(self,ind):
@@ -38,7 +44,7 @@ class Catastrophe(Test):
 
     self.tmid=(self.ts.t[:-1]+self.ts.t[1:])/2.0
     self.dt = numpy.diff(self.ts.t)
-
+    
     #skip first and last two time slices
     vals=[]
     for i in [x + 2 for x in range(self.ts.size-4)]:

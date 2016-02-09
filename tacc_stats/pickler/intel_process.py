@@ -87,6 +87,7 @@ imc_event_map = {
     IMC_PERF_EVENT(0x04, 0x03) : 'CAS_READS,E',
     IMC_PERF_EVENT(0x04, 0x0C) : 'CAS_WRITES,E',
     IMC_PERF_EVENT(0x01, 0x00) : 'ACT_COUNT,E',
+    IMC_PERF_EVENT(0x01, 0x11) : 'ACT_COUNT,E',
     IMC_PERF_EVENT(0x02, 0x03) : 'PRE_COUNT_ALL,E',              
     IMC_PERF_EVENT(0x02, 0x01) : 'PRE_COUNT_MISS,E',              
     'FIXED0'                   : 'CYCLES,E',

@@ -47,7 +47,10 @@ class TSPLBase:
       pass
 
     try:
-      self.owner=pwd.getpwuid(int(self.j.acct['uid']))[0]
+      if self.j.acct.has_key('user'):
+        self.owner = self.j.acct['user']
+      else:
+        self.owner=pwd.getpwuid(int(self.j.acct['uid']))[0]
     except KeyError:
       try:
         self.owner=self.j.acct['owner']
@@ -132,9 +135,6 @@ class TSPLBase:
         self.index +=  [self.j.get_schema(self.k1[i])[self.k2[i]].index]
       else:
         self.index += [-1]
-
-###    self.index=[ self.j.get_schema(self.k1[i])[self.k2[i]].index
-###                 for i in range(len(self.k1))]
 
     g=self.j.hosts[self.j.hosts.keys()[0]]
 

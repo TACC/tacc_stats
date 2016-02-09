@@ -64,7 +64,14 @@
       <td align=right>{{ job.threads }}</td></tr>
   </tbody>
  </table>
- 
+
+<table class="table table-condensed table-bordered" style="max-width:30%;">
+  <thead><th>File System</th><th>MB Read</th><th>MB Written</th><thead>
+    {% for key,val in fsio.items %}
+    <tr align=left><td>{{ key }}</td><td>{{ val.0|stringformat:"0.1e" }}</td><td>{{ val.1|stringformat:"0.1e" }}</td></tr>
+    {% endfor %}	
+</table>
+
 <div class="row">
   <div class="col-sm-2">Executable Path</div><div class="col-sm-10">{{job.exec_path}}</div>      
   <div class="col-sm-2">Working Directory</div><div class="col-sm-10">{{job.cwd}}</div>

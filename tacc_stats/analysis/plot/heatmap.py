@@ -64,9 +64,10 @@ class HeatMap(Plot):
     pcm = self.ax.pcolor(time, ycore, cpi,vmin=0.0,vmax=5.0)
     pcm.cmap = cm.get_cmap('jet_r')
 
-    try: self.ax.set_title(self.k2[ts.pmc_type][0] +'/'+self.k2[ts.pmc_type][1] + '\n'+ r'$\bar{Mean}=$'+'{0:.2f}'.format(mean_cpi)+r'$\pm$'+'{0:.2f}'.format(sqrt(var_cpi)))
-    except: self.ax.set_title(self.k2[0] +'/'+self.k2[1] + '\n'+ r'$\bar{Mean}$='+'{0:.2f}'.format(mean_cpi)+r'$\pm$'+'{0:.2f}'.format(sqrt(var_cpi)))
-
+    try: self.ax.set_title(self.k2[ts.pmc_type][0] +'/'+self.k2[ts.pmc_type][1] + '\n' + 
+                           r'Mean(Std)='+'{0:.2f}'.format(mean_cpi)+r'({0:.2f})'.format(sqrt(var_cpi)))
+    except: self.ax.set_title(self.k2[0] +'/'+self.k2[1] + '\n'+ 
+                              r'$\bar{Mean}$='+'{0:.2f}'.format(mean_cpi)+r'$\pm$'+'{0:.2f}'.format(sqrt(var_cpi)))
     self.fig.colorbar(pcm)
     self.ax.set_xlabel('Time (hrs)')
     self.output('heatmap')

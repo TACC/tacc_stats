@@ -170,6 +170,7 @@ class Plot(object):
     tspl_utils.adjust_yaxis_range(ax,0.1)
 
   def output(self,file_suffix):    
+
     if self.wide:
       left_text=self.header + '\n' + self.ts.title
       text_len=len(left_text.split('\n'))

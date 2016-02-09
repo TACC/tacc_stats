@@ -3,9 +3,11 @@ from exams import Test
 class HighCPLD(Test):
 
   k1 = {'intel_snb' : ['intel_snb', 'intel_snb'],
+        'intel_ivb' : ['intel_ivb', 'intel_ivb'],
         'intel_hsw' : ['intel_hsw', 'intel_hsw']
         }      
   k2 = {'intel_snb' : ['CLOCKS_UNHALTED_REF','LOAD_1D_ALL'],
+        'intel_ivb' : ['CLOCKS_UNHALTED_REF','LOAD_1D_ALL'],
         'intel_hsw' : ['CLOCKS_UNHALTED_REF','LOAD_1D_ALL']
         }
   comp_operator = '>'

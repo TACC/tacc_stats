@@ -10,20 +10,19 @@ import tacc_stats.cfg as cfg
 
 try:
     start = datetime.strptime(sys.argv[1],"%Y-%m-%d")
-    end   = datetime.strptime(sys.argv[2],"%Y-%m-%d")
+    try:
+        end   = datetime.strptime(sys.argv[2],"%Y-%m-%d")
+    except:
+        end = start
 except:
-    start = datetime.now() - timedelta(days=1)
-    end   = datetime.now() + timedelta(days=1)
+    start = datetime.now()
+    end   = datetime.now()
 
-for root,dirnames,filenames in os.walk(cfg.pickles_dir):
-    for directory in dirnames:
-        try:
-            date = datetime.strptime(directory,'%Y-%m-%d')
-            if max(date.date(),start.date()) > min(date.date(),end.date()): continue
-            print 'Run update for',date.date()
-        except: continue
+def daterange(start_date, end_date):
+    for n in range(int((end_date - start_date).days) + 1):
+        yield start_date + timedelta(n)
 
-        views.update(directory,rerun=False)         
-        views.update_metric_fields(directory,rerun=True)
-        
-    break
+for date in daterange(start, end):
+    directory = date.strftime("%Y-%m-%d")
+    views.update(directory, rerun = False)         
+    views.update_metric_fields(directory, rerun = True)

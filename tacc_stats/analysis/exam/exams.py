@@ -36,6 +36,7 @@ class Auditor():
       sys.exit()
     pool = multiprocessing.Pool(processes=self.processes) 
     metrics = pool.map(_unwrap, zip([self]*len(filelist), filelist))
+    #metrics = map(_unwrap, zip([self]*len(filelist), filelist))
     
     for d in metrics:
       for metric_name, job in d.iteritems():
@@ -51,7 +52,9 @@ class Auditor():
         raise tspl.TSPLException('End of file found for: ' + jobpath)
 
     metrics = {}
+    print(">>>", job_data.id)
     for name, measure in self.measures.iteritems():
+      print(name)
       metrics[name] = (job_data.id, measure.test(jobpath,job_data))
     return metrics
 
@@ -128,13 +131,13 @@ class Test(object):
     return avg/self.ts.numhosts
 
   def test(self,jobpath,job_data):
-    #try:
     # Setup job data and filter out unwanted jobs
     if not self.setup(jobpath,job_data=job_data): return
-      # Compute metric of interest
-    self.compute_metric()
-    #except Exception as e: 
-    #  print("Test failed",sys.exc_info()[0])
+    
+    # Compute metric of interest
+    try:
+      self.compute_metric()
+    except: pass
 
     return self.metric
 

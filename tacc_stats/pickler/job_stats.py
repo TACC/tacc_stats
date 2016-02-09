@@ -219,7 +219,6 @@ class Host(object):
         self.marks = {}
         self.raw_stats = {}
         self.raw_stats_dir=raw_stats_dir
-        #self.procdump = procdump.ProcDump()
 
     def trace(self, fmt, *args):
         self.job.trace('%s: ' + fmt, self.name, *args)
@@ -507,8 +506,10 @@ class Job(object):
             # TODO Keep bad_hosts.
             try: host_name = host_name.split('.')[0]
             except: pass
-
-            host = Host(self, host_name, self.stats_home + '/archive',self.batch_acct.name_ext )
+            try:
+                host = Host(self, host_name, self.stats_home + '/archive',self.batch_acct.name_ext )
+            except:
+                host = Host(self, host_name, self.stats_home)
             if host.gather_stats():
                 self.hosts[host_name] = host
             else: break
@@ -696,6 +697,7 @@ def from_acct(acct, stats_home, host_list_dir, batch_acct):
     stats_home as the base directory, running all required processing.
     """
     job = Job(acct, stats_home, host_list_dir, batch_acct)
+    print job.acct
     if job.gather_stats() and job.munge_times() and job.process_stats():
         return job
     else:
