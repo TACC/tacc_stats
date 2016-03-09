@@ -55,7 +55,7 @@
 
    Configure register layout shown in Table 2-14.  
    These registers control every
-   counter within a CBo.  They can freeze and reset 
+   counter within a CBo.  They can freeze
    individual CBos control and counter registers.
 
    \note
@@ -224,10 +224,10 @@ static int intel_hsw_cbo_begin_box(char *cpu, int box, uint64_t *events, size_t 
     goto out;
   }
 
-  ctl = 0x00103ULL; // Freeze (Bit 8) And reset (bits 0,1)
+  ctl = 0x00100ULL; // Freeze (Bit 8)
   /* CBo ctrl registers are 16-bits apart */
   if (pwrite(msr_fd, &ctl, sizeof(ctl), CBOX_CTL0 + offset) < 0) {
-    ERROR("cannot enable freeze and reset of CBo counter %d: %m\n",box);
+    ERROR("cannot enable freeze of CBo counter %d: %m\n",box);
     goto out;
   }
 

@@ -32,7 +32,6 @@
 #define PERF_EVENT(event, umask) \
   ( (event) \
   | (umask << 8) \
-  | (0UL << 17) /* reset counter */ \
   | (0UL << 18) /* Edge Detection. */ \
   | (1UL << 22) /* Enable. */ \
   | (0UL << 23) /* Invert */ \

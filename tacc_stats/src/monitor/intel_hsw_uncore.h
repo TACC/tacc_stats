@@ -62,7 +62,7 @@ static int intel_snb_uncore_begin_dev(char *bus_dev, uint32_t *events, size_t nr
     goto out;
   }
 
-  ctl = 0x10100UL; // enable freeze (bit 16), freeze (bit 8), reset counters
+  ctl = 0x10100UL; // enable freeze (bit 16), freeze (bit 8)
   if (pwrite(pci_fd, &ctl, sizeof(ctl), BOX_CTL) < 0) {
     ERROR("cannot enable freeze of QPI counters: %m\n");
     goto out;
@@ -76,19 +76,6 @@ static int intel_snb_uncore_begin_dev(char *bus_dev, uint32_t *events, size_t nr
       ERROR("cannot write event %016lX to PCI Address %08X through `%s': %m\n", 
             (unsigned long) events[i],
             (unsigned) CTL0 + 4*i,
-            pci_path);
-      goto out;
-    }
-  }
-
-  /* Manually reset programmable Uncore counters. They are 4 apart, 
-     but each counter register is split into 2 32-bit registers, A and B */
-  uint32_t zero = 0x0UL;
-  for (i = 0; i < nr_events; i++) {
-    if (pwrite(pci_fd, &zero, sizeof(zero), A_CTR0 + 8*i) < 0 || 
-	pwrite(pci_fd, &zero, sizeof(zero), B_CTR0 + 8*i) < 0) { 
-      ERROR("cannot reset counter %08X,%08X through `%s': %m\n", 
-	    (unsigned) A_CTR0 + 8*i, (unsigned) B_CTR0 + 8*i,
             pci_path);
       goto out;
     }

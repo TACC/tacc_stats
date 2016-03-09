@@ -4,10 +4,9 @@
 
 PATH=/bin:/usr/bin
 umask 0022
-
+source _BINDIR/tacc_stats.conf
 prog=$(basename $0)
 STATS_DIR=$1
-ARCHIVE_DIR=$2
 HOST_DIR=$ARCHIVE_DIR/$(hostname --fqdn)
 
 if [ -z "$STATS_DIR" -o -z "$ARCHIVE_DIR" ]; then

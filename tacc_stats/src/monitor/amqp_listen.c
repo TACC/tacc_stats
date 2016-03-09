@@ -55,7 +55,6 @@ int consume(const char *hostname, const char* port, const char* archive_dir)
 	 hostname,port,bindingkey);
 
   {
-    syslog(LOG_INFO,"start trying to get data \n");
     amqp_queue_declare_ok_t *r = 
       amqp_queue_declare(conn, 1, 
 			 amqp_cstring_bytes(bindingkey), 
@@ -79,19 +78,17 @@ int consume(const char *hostname, const char* port, const char* archive_dir)
 		     amqp_empty_bytes, 
 		     0, 0, 0, amqp_empty_table);
   amqp_get_rpc_reply(conn);
-
+  setbuf(stdout,NULL);
   // Write data to file in hostname directory
   FILE *fd;
   {
     while (1) {
       amqp_rpc_reply_t res;
       amqp_envelope_t envelope;
-
       amqp_maybe_release_buffers(conn);
 
       res = amqp_consume_message(conn, &envelope, NULL, 0);
       status = amqp_basic_ack(conn, 1, envelope.delivery_tag, 0);
-
       if (AMQP_RESPONSE_NORMAL != res.reply_type) {
         break;
       }
@@ -102,7 +99,6 @@ int consume(const char *hostname, const char* port, const char* archive_dir)
       char *tmp_buf = data_buf;
       char *line, *hostname;
       line = wsep(&data_buf);
-
       int new_file = 0;
 
       if (*(line) == '$') {  // If schema get hostname and start new file
@@ -119,7 +115,7 @@ int consume(const char *hostname, const char* port, const char* archive_dir)
 	line = wsep(&data_buf);
 	hostname = wsep(&data_buf);
       }	
-
+      //syslog(LOG_INFO, "Consuming stats data from %s\n", hostname);
       // Make directory for host hostname if it doesn't exist
       char *stats_dir_path = strf("%s/%s",archive_dir,hostname);
       free(tmp_buf);
@@ -128,11 +124,11 @@ int consume(const char *hostname, const char* port, const char* archive_dir)
 	  syslog(LOG_ERR, "cannot create directory `%s': %m\n", stats_dir_path);
       }
       char *current_path = strf("%s/%s",stats_dir_path,"current");
-
       // Unlink from old file if starting a new file      
       if (new_file) {
 	if (unlink(current_path) < 0 && errno != ENOENT) {
 	  syslog(LOG_ERR, "cannot unlink `%s': %m\n", current_path);
+	  goto out;
 	  rc = 1;
 	}
 	syslog(LOG_INFO, "Rotating stats file for %s.\n", hostname);
@@ -152,19 +148,22 @@ int consume(const char *hostname, const char* port, const char* archive_dir)
 	free(link_path);	  	 
       }
       else {
-	fd = fopen(current_path, "a+");
+	fd = fopen(current_path, "a");
+	if (fd == NULL) {
+	  syslog(LOG_ERR,"cannot open file: %s\n", current_path);
+	  free(stats_dir_path);
+	  free(current_path);
+	  continue;
+	}
       }
-      syslog(LOG_INFO, "Consuming stats data from %s\n", hostname);
       fprintf(fd,"%.*s",
 	      (int) envelope.message.body.len, 
 	      (char *) envelope.message.body.bytes);
       fflush(fd);
       fclose(fd);
-
       free(stats_dir_path);
       free(current_path);
       amqp_destroy_envelope(&envelope);
-      //exit(1); /////////////////////////////
     }
   }
   

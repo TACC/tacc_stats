@@ -156,9 +156,11 @@
         <tr bgcolor="{{job.color}}">
           <td><a href="{% url 'machine:job'  job.id %}">{{ job.id }}</a>
           <td><a href="{% url 'machine:user_view' job.user %}" >{{ job.user }}</td> 
+	  {% if job.project %}
           <td align=right><a href="{% url 'machine:project_view' job.project %}" >{{ job.project }}</td>
+	  {% else %} <td align=right> None </td>
+	  {% endif %}
           <td align=right><a href="{% url 'machine:exe_view' job.exe %}" >{{ job.exe }}</td>
-	  
           <td align=right>{{ job.start_time }}</td>
           <td align=right>{{ job.end_time }}</td>
           <td align=right>{{ job.run_time }}</td>

@@ -1,17 +1,17 @@
 Summary: TACC system statistics collector
 Name: tacc_stats
-Version: 1.0.3
+Version: 2.3.0
 Release: 1
 License: GPL
-Vendor: TACC/Ranger
+Vendor: Texas Advanced Computing Center
 Group: System Environment/Base
-Packager: TACC - jhammond@tacc.utexas.edu
+Packager: TACC - rtevans@tacc.utexas.edu
 Source: %{name}-%{version}.tar.gz
 BuildRoot: %{_tmppath}/%{name}-%{version}-%{release}-root
+
 %define _bindir /opt/%{name}
 %define crontab_file /etc/cron.d/%{name}
 %define stats_dir /var/log/tacc_stats
-%define archive_dir /scratch/projects/%{name}/archive
 
 %description
 This package provides the tacc_stats command, along with a cron file
@@ -37,7 +37,7 @@ install -m 0755 archive.sh %{buildroot}/%{_bindir}/%{name}_archive
   echo "MAILTO=\"\""
   echo "*/10 * * * * root %{_bindir}/%{name} collect"
   echo "55 23 * * * root %{_bindir}/%{name} rotate"
-  echo "${archive_min} ${archive_hour} * * * root %{_bindir}/%{name}_archive %{stats_dir} %{archive_dir}"
+  echo "${archive_min} ${archive_hour} * * * root %{_bindir}/%{name}_archive %{stats_dir}"
 ) > %{crontab_file}
 
 /sbin/service crond restart || :

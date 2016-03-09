@@ -161,29 +161,6 @@ static int intel_pmc3_begin_cpu(char *cpu, uint64_t *events, size_t nr_events)
       goto out;
     }
   }
-
-  /* Reset all the counters */
-  uint64_t zero = 0x0ULL;
-  for (i = 0; i < nr_events; i++) {
-    if (pwrite(msr_fd, &zero, sizeof(zero), IA32_CTR0 + i) < 0) {
-      ERROR("cannot reset counter %016llX to MSR %08X through `%s': %m\n",
-            (unsigned long long) zero,
-            (unsigned) IA32_CTR0 + i,
-            msr_path);
-      goto out;
-    }
-  }
-  if (pwrite(msr_fd, &zero, sizeof(zero), IA32_FIXED_CTR0) < 0 ||
-      pwrite(msr_fd, &zero, sizeof(zero), IA32_FIXED_CTR1) < 0 || 
-      pwrite(msr_fd, &zero, sizeof(zero), IA32_FIXED_CTR2) < 0) {
-    ERROR("cannot reset counter %016llX to MSRs (%08X,%08X,%08X) through `%s': %m\n",
-	  (unsigned long long) zero,
-	  (unsigned) IA32_FIXED_CTR0,
-	  (unsigned) IA32_FIXED_CTR1,
-	  (unsigned) IA32_FIXED_CTR2,
-	  msr_path);
-      goto out;
-  }
   
   rc = 0;
 

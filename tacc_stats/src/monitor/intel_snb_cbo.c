@@ -138,13 +138,6 @@ static int intel_snb_cbo_begin_box(char *cpu, int box, uint64_t *events, size_t 
     }
   }
 
-  ctl |= 1ULL << 1; // reset counter
-  /* CBo ctrl registers are 32-bits apart */
-  if (pwrite(msr_fd, &ctl, sizeof(ctl), CBOX_CTL0 + offset) < 0) {
-    ERROR("cannot reset CBo counter: %m\n");
-    goto out;
-  }
-  
   /* Unfreeze CBo counter (64-bit) */
   ctl = 0x10000ULL; // unfreeze counter
   if (pwrite(msr_fd, &ctl, sizeof(ctl), CBOX_CTL0 + offset) < 0) {

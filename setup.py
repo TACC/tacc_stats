@@ -431,7 +431,7 @@ class MyBuildExt(build_ext):
             self.compiler.link_executable([pjoin(self.build_temp,
                                                  root,
                                                  'amqp_listen.o')] + ext.extra_objects,
-                                          'build/bin/listend',
+                                          'build/bin/amqp_listend',
                                           libraries=ext.libraries,
                                           library_dirs=ext.library_dirs,
                                           extra_postargs=extra_args,
@@ -473,8 +473,11 @@ if MODE == "DAEMON":
     print 'data will go to',SERVER
     cfg_sh(pjoin(root, 'taccstats.in'), 
            dict(paths.items() + cfg_data.items('RMQ_CFG')))
+    cfg_sh(pjoin(root, 'listend.in'), 
+           dict(paths.items() + cfg_data.items('RMQ_CFG')))
 
-    scripts  += ['build/bin/listend', 
+    scripts  += ['build/bin/amqp_listend', 
+                 'tacc_stats/listend', 
                  'tacc_stats/taccstats']
     DISTNAME += "d"
 

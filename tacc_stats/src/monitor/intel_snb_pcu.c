@@ -56,7 +56,7 @@
 /*! \name PCU global control register
 
    Layout in Table 2-74.  This register controls every
-   non-fixed counter within a PCU.   It can freeze and reset 
+   non-fixed counter within a PCU.   It can freeze
    a PCU's control and counter registers.
 
    \note

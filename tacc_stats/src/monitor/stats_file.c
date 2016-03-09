@@ -5,14 +5,6 @@
 #include <limits.h>
 #include <stdarg.h>
 #include <sys/utsname.h>
-
-//#include <syslog.h>
-#ifdef RMQ
-#include <amqp_tcp_socket.h>
-#include <amqp.h>
-#include <amqp_framing.h>
-#endif /* RMQ */
-
 #include "stats.h"
 #include "stats_file.h"
 #include "schema.h"
@@ -26,53 +18,7 @@
 #define SF_PROPERTY_CHAR '$'
 #define SF_MARK_CHAR '%'
 
-#ifdef RMQ
-#define sf_printf(sf, fmt, args...)					\
-  do {									\
-    char *tmp_string = sf->sf_data;					\
-    asprintf(&(sf->sf_data), "%s"fmt, sf->sf_data, ##args);		\
-    free(tmp_string);							\
-    fprintf(sf->sf_file, fmt, ##args);					\
-  } while (0)
-static int rmq_send(struct stats_file *sf)
-{
-  int status;
-  char const *exchange;
-  char const *routingkey;
-  amqp_socket_t *socket = NULL;
-  amqp_connection_state_t conn;
-  exchange = "amq.direct";
-  routingkey = "tacc_stats";
-  conn = amqp_new_connection();
-  socket = amqp_tcp_socket_new(conn);
-  status = amqp_socket_open(socket, sf->sf_host, atoi(sf->sf_port));
-  amqp_login(conn, "/", 0, 131072, 0, AMQP_SASL_METHOD_PLAIN, "guest", "guest");
-  amqp_channel_open(conn, 1);
-  amqp_get_rpc_reply(conn);
-
-  {
-    amqp_basic_properties_t props;
-    props._flags = AMQP_BASIC_CONTENT_TYPE_FLAG | AMQP_BASIC_DELIVERY_MODE_FLAG;
-    props.content_type = amqp_cstring_bytes("text/plain");
-    props.delivery_mode = 2; /* persistent delivery mode */
-    amqp_basic_publish(conn,
-		       1,
-		       amqp_cstring_bytes(exchange),
-		       amqp_cstring_bytes(routingkey),
-		       0,
-		       0,
-		       &props,
-		       amqp_cstring_bytes(sf->sf_data));
-  }
-  amqp_channel_close(conn, 1, AMQP_REPLY_SUCCESS);
-  amqp_connection_close(conn, AMQP_REPLY_SUCCESS);
-  amqp_destroy_connection(conn); 
-
-  return 0;
-}
-#else
 #define sf_printf(sf, fmt, args...) fprintf(sf->sf_file, fmt, ##args)
-#endif
 
 static int sf_rd_hdr(struct stats_file *sf)
 {
@@ -166,7 +112,6 @@ static int sf_wr_hdr(struct stats_file *sf)
   uname(&uts_buf);
   pscanf("/proc/uptime", "%llu", &uptime);
   
-  sf->sf_data = strdup("");
   sf_printf(sf, "%c%s %s\n", SF_PROPERTY_CHAR, STATS_PROGRAM, STATS_VERSION);
 
   sf_printf(sf, "%chostname %s\n", SF_PROPERTY_CHAR, uts_buf.nodename);
@@ -202,10 +147,6 @@ static int sf_wr_hdr(struct stats_file *sf)
     sf_printf(sf, "\n");
   }
 
-  #ifdef RMQ
-  rmq_send(sf);
-  #endif
-  free(sf->sf_data);
   fflush(sf->sf_file);
   
   return 0;
@@ -257,7 +198,6 @@ int stats_file_close(struct stats_file *sf)
   if (sf->sf_empty)
     sf_wr_hdr(sf);
 
-  sf->sf_data=strdup("");
   fseek(sf->sf_file, 0, SEEK_END);
 
   struct utsname uts_buf;
@@ -290,18 +230,14 @@ int stats_file_close(struct stats_file *sf)
       struct stats *stats = key_to_stats(dev);
 
       sf_printf(sf, "%s %s", type->st_name, stats->s_dev);
+
       size_t k;
       for (k = 0; k < type->st_schema.sc_len; k++)
-	{
 	  sf_printf(sf, " %llu", stats->s_val[k]);
-	}
+
       sf_printf(sf, "\n");
     }
   }
-
-#ifdef RMQ
-  rc = rmq_send(sf);
-#endif
 
   if (ferror(sf->sf_file)) {
     ERROR("error writing to `%s': %m\n", sf->sf_path);
@@ -315,11 +251,6 @@ int stats_file_close(struct stats_file *sf)
 
   free(sf->sf_path);
   free(sf->sf_mark);
-
-  //#ifdef RMQ
-  free(sf->sf_data);
-  //#endif
-
   memset(sf, 0, sizeof(struct stats_file));
 
   return rc;
