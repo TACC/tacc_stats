@@ -1,0 +1,93 @@
+AC_INIT([tacc_stats], [2.3.0], [rtevans@tacc.utexas.edu])
+AM_INIT_AUTOMAKE([-Wall -Werror -Wno-portability])
+AC_PROG_CC
+AM_PROG_CC_C_O
+
+AC_ARG_ENABLE([hardware],
+[  --enable-hardware  Enable processor hardware counter support],
+[case "${enableval}" in
+  yes) hardware=true ;;
+  no)  hardware=false ;;
+  *) AC_MSG_ERROR([bad value ${enableval} for --enable-hardware]) ;;
+esac],[hardware=true])
+AM_CONDITIONAL([HARDWARE], [test x$hardware = xtrue])
+
+AC_ARG_ENABLE([infiniband],
+[  --enable-infiniband  Enable Infiniband support],
+
+[case "${enableval}" in
+  yes) AC_SEARCH_LIBS([mad_rpc_open_port], [ibmad], [have_ib=yes], 
+    [AC_MSG_ERROR([Unable to find libibmad.so!])])
+  if test "x${have_ib}" = xyes; then 
+     AC_CHECK_HEADERS([infiniband/umad.h infiniband/mad.h], [infiniband=true],
+     [AC_MSG_ERROR([Unable to find umad.h or mad.h on this system!])])  
+  fi
+  ;;
+  no)  infiniband=false ;;
+  *) AC_MSG_ERROR([bad value ${enableval} for --enable-infiniband]) ;;
+esac],
+
+[AC_SEARCH_LIBS([mad_rpc_open_port], [ibmad], [have_ib=yes],
+  [AC_MSG_ERROR([Unable to find libibmad.so!])])
+  if test "x${have_ib}" = xyes; then 
+     AC_CHECK_HEADERS([infiniband/umad.h infiniband/mad.h], [infiniband=true], 
+     [AC_MSG_ERROR([Unable to find umad.h or mad.h on this system!])])  
+  fi
+])
+AM_CONDITIONAL([INFINIBAND], [test x$infiniband = xtrue])
+
+AC_ARG_ENABLE([lustre],
+[  --enable-lustre  Enable Lustre support],
+[case "${enableval}" in
+  yes) lustre=true ;;
+  no)  lustre=false ;;
+  *) AC_MSG_ERROR([bad value ${enableval} for --enable-lustre]) ;;
+esac],[lustre=true])
+AM_CONDITIONAL([LUSTRE], [test x$lustre = xtrue])
+
+AC_ARG_ENABLE([mic],
+[  --enable-mic  Enable Intel MIC (Xeon Phi) support],
+[case "${enableval}" in
+  yes) mic=true
+  AC_SEARCH_LIBS([mic_open_device], [micmgmt], [have_mic=yes], 
+  [AC_MSG_ERROR([Unable to find libmicmgmt.so!])])  
+  ;;
+  no)  mic=false ;;
+  *) AC_MSG_ERROR([bad value ${enableval} for --enable-mic]) ;;
+esac],[mic=false])
+AM_CONDITIONAL([MIC], [test x$mic = xtrue])
+
+AC_ARG_ENABLE([debug],
+[  --enable-debug    Turn on debugging],
+[case "${enableval}" in
+  yes) debug=true ;;
+  no)  debug=false ;;
+  *) AC_MSG_ERROR([bad value ${enableval} for --enable-debug]) ;;
+esac],[debug=false])
+AM_CONDITIONAL([DEBUG], [test x$debug = xtrue])
+
+AC_ARG_ENABLE([rabbitmq],
+[  --enable-rabbitmq  Build the rabbitmq/daemon version],
+[case "${enableval}" in
+  yes) rabbitmq=true 
+  AC_SEARCH_LIBS([amqp_new_connection], [rabbitmq], [have_rabbitmq=yes], [have_rabbitmq=no])
+  if test "x${have_rabbitmq}" = xno; then 
+    AC_MSG_ERROR([Unable to find rabbitmq library on this system.  Stopping...])
+  fi
+
+  if test "x${have_rabbitmq}" =	 xyes; then 
+     AC_CHECK_HEADERS([amqp.h], [], [have_rabbitmq=no])  
+  fi
+  if test "x${have_rabbitmq}" = xno; then 
+    AC_MSG_ERROR([Unable to find rabbitmq headers on this system.  Stopping...])
+  fi
+
+  ;;
+  no)  rabbitmq=false ;;
+  *) AC_MSG_ERROR([bad value ${enableval} for --enable-rabbitmq]) ;;
+esac],[rabbitmq=false])
+AM_CONDITIONAL([RABBITMQ], [test x$rabbitmq = xtrue])
+
+AC_CONFIG_FILES([Makefile src/Makefile])
+AC_OUTPUT
+
