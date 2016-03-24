@@ -9,16 +9,13 @@ Packager: TACC - rtevans@tacc.utexas.edu
 Source: %{name}-%{version}.tar.gz
 BuildRoot: %{_tmppath}/%{name}-%{version}-%{release}-root
 
-%include rpm-dir.inc
+#%include rpm-dir.inc
+
+%{!?archivedir: %{error: define archivedir!} exit 1 }
 
 %define _bindir /opt/%{name}
 %define _sysconfdir /etc
 %define crontab_file %{_sysconfdir}/cron.d/%{name}
-
-%if %{?archive_dir:0}%{!?archive_dir:1}
-   %{error: define a archive_dir!}
-   exit
-%endif
 
 %description
 This package provides the tacc_stats command, along with a cron file
@@ -46,7 +43,7 @@ install -m 0755 archive %{buildroot}/%{_bindir}/archive
   echo "MAILTO=\"\""
   echo "*/10 * * * * root %{_bindir}/%{name} collect"
   echo "55 23 * * * root %{_bindir}/%{name} rotate"
-  echo "${archive_min} ${archive_hour} * * * root %{_bindir}/archive %{archive_dir}"
+  echo "${archive_min} ${archive_hour} * * * root %{_bindir}/archive %{archivedir}"
 ) > %{crontab_file}
 
 /sbin/service crond restart || :

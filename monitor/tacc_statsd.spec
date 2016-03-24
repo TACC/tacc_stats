@@ -11,6 +11,9 @@ BuildRoot: %{_tmppath}/%{name}-%{version}-%{release}-root
 
 #%include rpm-dir.inc
 
+%{!?rmqserver: %{error: define rmqserver!} exit 1 }
+%{!?system:    %{error: define system name!} exit 1}
+
 %define _bindir /opt/%{name}
 %define _sysconfdir /etc
 
@@ -38,6 +41,8 @@ install -m 0755 taccstats %{buildroot}/%{_sysconfdir}/init.d/taccstats
 
 %post
 chkconfig --add taccstats
+sed -i 's/localhost/%{rmqserver}/' %{_sysconfdir}/tacc_stats.conf
+sed -i 's/default/%{system}/' %{_sysconfdir}/tacc_stats.conf
 /sbin/service taccstats restart
 
 %preun
