@@ -21,7 +21,8 @@ def on_message(channel, method_frame, header_frame, body):
 
         with open(current_path, 'w') as fd:
             link_path = os.path.join(host_dir, str(int(time.time())))
-            os.link(current_path, link_path)
+            if not os.path.exists(link_path):
+                os.link(current_path, link_path)
 
     with open(current_path, 'a') as fd:
         fd.write(body)
@@ -30,7 +31,7 @@ def on_message(channel, method_frame, header_frame, body):
 
 connection = pika.BlockingConnection()
 channel = connection.channel()
-channel.basic_consume(on_message, 'ls5')
+channel.basic_consume(on_message, sys.argv[1])
 try:
     channel.start_consuming()
 except KeyboardInterrupt:

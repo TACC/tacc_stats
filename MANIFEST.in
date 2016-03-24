@@ -1,6 +1,3 @@
-include tacc_stats/src/monitor/*.h
-recursive-include tacc_stats/site/machine/templates *
-recursive-include tacc_stats/site/machine/templates *
-include tacc_stats/src/monitor/*.in
-include tacc_stats/*/*.in
-include cfg/*
+recursive-include tacc_stats/site/machine/templates *.html
+recursive-include tacc_stats/site/tacc_stats_site/templates *html
+recursive-include tacc_stats/site/tacc_stats_site/media *png
