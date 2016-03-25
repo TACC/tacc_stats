@@ -13,7 +13,7 @@ import argparse, traceback
 
 def job_pickle(reader_inst, 
                pickle_dir = cfg.pickles_dir, 
-               tacc_stats_home = cfg.tacc_stats_home,
+               archive_dir = cfg.archive_dir,
                host_list_dir = cfg.host_list_dir,
                acct = None):
 
@@ -45,7 +45,7 @@ def job_pickle(reader_inst,
         print(reader_inst['id'] + " is not validated: process")
         with open(pickle_file,'w') as fd:
             job = job_stats.from_acct(reader_inst, 
-                                      tacc_stats_home, 
+                                      archive_dir, 
                                       host_list_dir, acct)            
             if job: pickle.dump(job, fd, pickle.HIGHEST_PROTOCOL)
     else:
@@ -62,7 +62,7 @@ class JobPickles:
         if not self.end:   self.end   = (datetime.now()+timedelta(days=1))
 
         self.seek = kwargs.get('seek',cfg.seek)
-        self.tacc_stats_home = kwargs.get('tacc_stats_home',cfg.tacc_stats_home)
+        self.archive_dir = kwargs.get('archive_dir',cfg.archive_dir)
         self.host_list_dir = kwargs.get('host_list_dir',cfg.host_list_dir)
 
         self.batch_system = kwargs.get('batch_system',cfg.batch_system)
@@ -85,12 +85,12 @@ class JobPickles:
 
         self.partial_pickle = functools.partial(job_pickle, 
                                                 pickle_dir = self.pickles_dir, 
-                                                tacc_stats_home = self.tacc_stats_home,
+                                                archive_dir = self.archive_dir,
                                                 host_list_dir = self.host_list_dir,
                                                 acct = self.acct)
 
         print("Use",self.processes,"processes")
-        print("Gather node-level data from",self.tacc_stats_home+"/archive/")
+        print("Gather node-level data from",self.archive_dir+"/archive/")
         print("Write pickle files to",self.pickles_dir)
 
     def run(self,jobids = None):

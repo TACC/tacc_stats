@@ -13,7 +13,7 @@ data_dir = os.path.join(path, 'data')
 
 def setup_func():
     a = open(os.path.join(path,"cfg.py"),"w")
-    a.write('tacc_stats_home = \"' + data_dir + '\"\n'
+    a.write('archive_dir = \"' + data_dir + '\"\n'
             'acct_path = \"'+ data_dir +'/tacc_jobs_completed\"\n'
             'host_list_dir= \"' + data_dir + '\"\n'
             'pickles_dir= \"' + path + '\"\n'
@@ -42,7 +42,7 @@ def test():
                        'pickle_dir'      : cfg.pickles_dir,
                        'batch_system'    : cfg.batch_system,
                        'acct_path'       : cfg.acct_path,
-                       'tacc_stats_home' : cfg.tacc_stats_home,
+                       'archive_dir' : cfg.archive_dir,
                        'host_list_dir'   : cfg.host_list_dir,
                        'host_name_ext'   : cfg.host_name_ext,
                        'seek'            : cfg.seek
@@ -69,7 +69,7 @@ def test_ids():
                        'pickle_dir'      : cfg.pickles_dir,
                        'batch_system'    : cfg.batch_system,
                        'acct_path'       : cfg.acct_path,
-                       'tacc_stats_home' : cfg.tacc_stats_home,
+                       'archive_dir' : cfg.archive_dir,
                        'host_list_dir'   : cfg.host_list_dir,
                        'host_name_ext'   : cfg.host_name_ext,
                        'seek'            : cfg.seek

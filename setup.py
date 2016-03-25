@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 from setuptools import setup, find_packages
 import os
-import ConfigParser
+from ConfigParser import ConfigParser
 
 DISTNAME = 'tacc_stats'
 LICENSE = 'LGPL'
@@ -17,17 +17,6 @@ LONG_DESCRIPTION = """
 TACC Stats unifies and extends the measurements taken by Linux monitoring utilities such as systat/SAR, iostat, etc.~and resolves measurements by job and hardware device so that individual job/applications can be analyzed separately.  It also provides a set of analysis and reporting tools which analyze TACC Stats resource use data and flags jobs/applications with low resource use efficiency.
 """
 
-config = ConfigParser.ConfigParser()
-cfg_filename = os.path.abspath('setup.cfg')
-config.read(cfg_filename)
-filename = os.path.join(os.path.dirname(__file__), 'tacc_stats', 'cfg.py')
-print '\n--- Configure Web Portal Module ---\n'
-with open(filename, 'w') as fd:
-    for name, path in dict(config.items('PORTAL_OPTIONS')).iteritems():
-        print name,'=', path
-        fd.write(name + " = " + "\"" + path + "\"" + "\n")
-    fd.write("seek = 0\n")        
-
 scripts=[
     'tacc_stats/analysis/job_sweeper.py',
     'tacc_stats/analysis/job_plotter.py',
@@ -41,6 +30,14 @@ scripts=[
     'tacc_stats/listend.py'
     ]
 
+config = ConfigParser()
+config.read("tacc_stats.ini")
+
+with open("tacc_stats/cfg.py", 'w') as fd:
+    for s in config.sections():
+        for key, val in dict(config.items(s)).iteritems():
+            fd.write(key + " = " + "\"" + val + "\"" + '\n')
+
 setup(
     name = DISTNAME,
     version = VERSION,
@@ -52,8 +49,8 @@ setup(
     download_url = DOWNLOAD_URL,
     long_description = LONG_DESCRIPTION,
     packages = find_packages(),
+    package_data = {'tacc_stats' : ['cfg.py']},
     include_package_data = True,
-    package_data = { 'tacc_stats' : ['cfg.py'] },
     scripts = scripts,
     setup_requires = ['nose'],
     install_requires = ['argparse','numpy','matplotlib','scipy','django'],

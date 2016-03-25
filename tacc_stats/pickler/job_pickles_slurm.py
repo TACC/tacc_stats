@@ -1,7 +1,8 @@
 #!/usr/bin/env python
 from __future__ import print_function
 import os, sys
-import tacc_stats.cfg as cfg
+from ConfigParser import SafeConfigParser
+from tacc_stats import cfg
 from tacc_stats.pickler import job_stats, acct_reader
 from datetime import datetime, timedelta
 from dateutil.parser import parse
@@ -10,10 +11,10 @@ import multiprocessing, functools
 import argparse, csv
 
 def job_pickle(reader_inst, 
-               pickle_dir, 
+               pickles_dir, 
                archive_dir):
 
-    date_dir = os.path.join(pickle_dir,
+    date_dir = os.path.join(pickles_dir,
                             datetime.fromtimestamp(reader_inst['end_time']).strftime('%Y-%m-%d'))
     try: os.makedirs(date_dir)
     except: pass
@@ -43,33 +44,34 @@ def job_pickle(reader_inst,
 
 class JobPickles:
 
-    def __init__(self,**kwargs):
-        print(kwargs)
+    def __init__(self, start, end, processes, pickles_dir):
 
-        self.start  = kwargs.get("start")
-        self.end    = kwargs.get("end")
-        processes   = kwargs.get('processes')        
-        pickles_dir = kwargs.get('pickle_dir')        
-        self.pool   = multiprocessing.Pool(processes = processes)
-        
+        self.pool   = multiprocessing.Pool(processes = processes)        
+
+        self.start  = start
+        self.end    = end
+        if not pickles_dir:
+            pickles_dir = cfg.pickles_dir            
+
         self.partial_pickle = functools.partial(job_pickle,
-                                                pickle_dir  = pickles_dir,
-                                                archive_dir = cfg.tacc_stats_home)
-
+                                                pickles_dir  = pickles_dir,
+                                                archive_dir = cfg.archive_dir)
         print("Use", processes, "processes")
-        print("Map node-level data from", cfg.tacc_stats_home + "/archive")
-        print("Write pickle files to", pickles_dir)
-
+        print("Map node-level data from", cfg.archive_dir,"to",pickles_dir)
+        print("From dates:", self.start.date(), "to", self.end.date())
+  
     def daterange(self, start_date, end_date):
-        for n in range(int ((end_date - start_date).days)):
-            yield start_date + timedelta(n)
+        date = start_date
+        while date <= end_date:
+            yield date
+            date = date + timedelta(days=1)       
+
 
     def run(self):
         acct = []
         for date in self.daterange(self.start, self.end):
             acct = self.acct_reader(os.path.join(cfg.acct_path, date.strftime("%Y-%m-%d") + ".txt"))
             self.pool.map(self.partial_pickle, acct)
-            #map(self.partial_pickle, acct)
 
     def acct_reader(self, filename):
         ftr = [3600,60,1]
@@ -117,26 +119,23 @@ class JobPickles:
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Run pickler for jobs')
-    parser.add_argument('-start', help = 'Start date', type = str)
-    parser.add_argument('-end',   help = 'End date',   type = str)
-    parser.add_argument('-p', help = 'number of processes',
-                        type = int, default = 1)
-    parser.add_argument('-dir', help='Directory to store data',
-                        type=str, default = cfg.pickles_dir)
-
+    parser.add_argument('start', type = parse, default = datetime.now() - timedelta(days=1), 
+                        help = 'Start (YYYY-mm-dd)')
+    parser.add_argument('end',   type = parse, nargs = '?', default = False, 
+                        help = 'End (YYYY-mm-dd)')
+    parser.add_argument('-p', '--processes', type = int, default = 1,
+                        help = 'number of processes')
+    parser.add_argument('-d', '--directory', type = str, 
+                        help='Directory to store data')
     args = parser.parse_args()
-    
-    pickle_options = { 'processes'       : args.p,
+    if not args.end:
+        args.end = args.start + timedelta(days=1)
+
+    pickle_options = { 'processes'       : args.processes,
                        'start'           : args.start,
                        'end'             : args.end,
-                       'pickle_dir'      : args.dir,
+                       'pickles_dir'      : args.directory,
                        }
-    try: 
-        pickle_options['start'] = parse(pickle_options['start'])
-        pickle_options['end']   = parse(pickle_options['end'])
-    except: 
-        pickle_options['start'] = datetime.now() - timedelta(days=1)
-        pickle_options['end']   = datetime.now() + timedelta(days=1)
-
+    
     pickler = JobPickles(**pickle_options)
     pickler.run()

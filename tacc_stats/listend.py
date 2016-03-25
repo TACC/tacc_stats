@@ -2,6 +2,7 @@
 import pika
 import os, sys
 import time
+import cfg
 
 stats_dir = "/hpc/tacc_stats_site/ls5/archive"
 
@@ -10,7 +11,7 @@ def on_message(channel, method_frame, header_frame, body):
     else: host = body.split()[2]
 
     print host
-    host_dir = os.path.join(stats_dir, host)
+    host_dir = os.path.join(cfg.archive_dir, host)
     if not os.path.exists(host_dir):
         os.makedirs(host_dir)
     
