@@ -1,13 +1,17 @@
 from django.conf.urls import patterns, include, url
+from django.views.static import serve
 import settings
 from django.contrib import admin
+from tacc_stats.site.machine.views import dates
+from tacc_stats.site.machine import urls
+
 admin.autodiscover()
 
-urlpatterns = patterns('',
-    #url(r'^$', 'tacc_stats_site.views.home', name='home'),
-    url(r'^$', 'tacc_stats.site.machine.views.dates', name='dates'),
-    url(r'^media/(?P<path>.*)$', 'django.views.static.serve',
-        {'document_root': settings.MEDIA_ROOT}),                       
-    url(r'^machine/', include('tacc_stats.site.machine.urls', namespace="machine"),name='machine'),
+urlpatterns = [
+    url(r'^$', dates, name='dates'),
+    url(r'^machine/', include(urls, 
+                              namespace="machine"), name='machine'),
     url(r'^admin/', include(admin.site.urls)),
-)
+    url(r'^media/(?P<path>.*)$', serve,
+        {'document_root': settings.MEDIA_ROOT}),                       
+]

@@ -3,7 +3,7 @@ from django.views.generic import DetailView, ListView
 from tacc_stats.site.machine.models import Job
 from tacc_stats.site.machine.views import *
 
-urlpatterns = patterns('',
+urlpatterns = [
                        url(r'^$',dates, name='dates'),
 
                        url(r'^job/(?P<pk>\d+)/$',
@@ -50,4 +50,4 @@ urlpatterns = patterns('',
                            index, name='exe_view'),
                        
                        url(r'^search/$',search, name='search'),
-                       )
+]
