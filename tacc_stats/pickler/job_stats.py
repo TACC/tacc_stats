@@ -507,7 +507,7 @@ class Job(object):
             try: host_name = host_name.split('.')[0]
             except: pass
             try:
-                host = Host(self, host_name, self.stats_home + '/archive',self.batch_acct.name_ext )
+                host = Host(self, host_name, self.stats_home, self.batch_acct.name_ext )
             except:
                 host = Host(self, host_name, self.stats_home)
             if host.gather_stats():

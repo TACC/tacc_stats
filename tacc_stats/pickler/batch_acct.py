@@ -14,13 +14,11 @@ class BatchAcct(object):
     self.field_names = [tup[0] for tup in self.fields]
     self.name_ext = '.'+host_name_ext
 
-  def reader(self,start_time=0, end_time=9223372036854775807L, seek=0):
-    """reader(start_time=0, end_time=9223372036854775807L, seek=0)
+  def reader(self,start_time=0, end_time=9223372036854775807L):
+    """reader(start_time=0, end_time=9223372036854775807L)
     Return an iterator for all jobs that finished between start_time and end_time.
     """
     file = open(self.acct_file)
-    if seek:
-      file.seek(seek, os.SEEK_SET)
 
     for d in csv.DictReader(file, delimiter=':', fieldnames=self.field_names):
       try:

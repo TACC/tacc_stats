@@ -54,14 +54,13 @@ fields = (
 field_names = [tup[0] for tup in fields]
 
 
-def reader(file, start_time=0, end_time=9223372036854775807L, seek=0):
-    """reader(file, start_time=0, end_time=9223372036854775807L, seek=0)
+def reader(file, start_time=0, end_time=9223372036854775807L):
+    """reader(file, start_time=0, end_time=9223372036854775807L)
     Return an iterator for all jobs that finished between start_time and end_time.
     """
     if type(file) == str:
         file = open(file)
-    if seek:
-        file.seek(seek, os.SEEK_SET)
+
     for d in csv.DictReader(file, delimiter=':', fieldnames=field_names):
         try:
             for n, t, x in fields:

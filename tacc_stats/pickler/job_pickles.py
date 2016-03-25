@@ -61,7 +61,6 @@ class JobPickles:
         if not self.start: self.start = (datetime.now()-timedelta(days=1))
         if not self.end:   self.end   = (datetime.now()+timedelta(days=1))
 
-        self.seek = kwargs.get('seek',cfg.seek)
         self.archive_dir = kwargs.get('archive_dir',cfg.archive_dir)
         self.host_list_dir = kwargs.get('host_list_dir',cfg.host_list_dir)
 
@@ -102,8 +101,7 @@ class JobPickles:
                   datetime.fromtimestamp(self.start),
                   "and",datetime.fromtimestamp(self.end))
             reader = self.acct.reader(start_time=self.start,
-                                      end_time=self.end,
-                                      seek=self.seek)
+                                      end_time=self.end)
         #map(self.partial_pickle,reader)
         self.pool.map(self.partial_pickle,reader)
 
