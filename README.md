@@ -139,31 +139,26 @@ batch_system    = SLURM
 ```
 Set these paths as needed.  The raw stats data will be stored in the `archive_dir` and processed stats data in the `pickles_dir`.  `machine` should match the system name used in the RabbitMQ server `QUEUE` field.  This is the only field that needs to match 
 anything in the `monitor` subpackage.
-
 3.  Install `tacc_stats`
 ```
 $ pip install tacc_stats/
 ```
-
 4.  Start the RabbitMQ server reader in the background, e.g. 
 ```
 $ nohup listend.py > /tmp/listend.log
 ```
 Raw stats files will now be generated in the `archive_dir`.
-
 5.  A PostgreSQL database must be setup on the host.  To do this, after installation
 run
 ```
 $ python manage.py migrate
 ```
 This will generate a table named `machine_db` in your database.  
-
 6.  Setup cron jobs to process raw data and ingest into database.  Add the following to your 
 cron file
 ```
 */15 * * * * source /home/rtevans/testing/bin/activate; job_pickles.py; update_db.py > /tmp/ls5_update.log 2>&1
 ```
-
 7.  Next configure the Apache server (make sure it is installed and the `mod_wsgi` Apache module is installed)
 A sample configuration file, `/etc/httpd/conf.d/ls5.conf`, looks like
 ```
@@ -184,9 +179,7 @@ Require all granted
 </Directory>
 </VirtualHost>
 ```
-
 8.  Start up Apache 
-
 
 ### Running `job_pickles.py`
 `job_pickles.py` can be run manually by:
