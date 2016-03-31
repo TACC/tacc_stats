@@ -42,12 +42,14 @@ First ensure the RabbitMQ library and header file are installed on the build and
 
 There will be a configuration file, `/etc/tacc_stats.conf`, after installation.  This file contains the fields
 
-`
-SERVER=localhost
-QUEUE=default
-PORT=5672
-FREQ=600
-`
+`SERVER=localhost`
+
+`QUEUE=default`
+
+`PORT=5672`
+
+`FREQ=600`
+
 
 `SERVER` should be set to the RabbitMQ server, `QUEUE` to the system name, `PORT` to the RabbitMQ port (5672 should be ok), and `FREQ` to the desired sampling frequency in seconds.
 
@@ -67,95 +69,100 @@ epilog for example.
 
    
 #### `tacc_stats` subpackage
- To install TACC Stats on the machine where data will be processed, analyzed, and the webserver hosted run the following commands on the server it will be hosted from:
-~~~
-    $ virtualenv machinename
-    $ cd machinename; source bin/activate
-    $ git clone https://github.com/TACC/tacc_stats
-    $ pip install tacc_stats/
-~~~
+ To install TACC Stats on the machine where data will be processed, analyzed, and the webserver hosted follow these
+ steps:
+ 
+1. Download the package and setup the Python virtual environment.
 
-Scripts and executables will be installed in
-'machinename/bin' and Python modules in 'machinename/lib'.  
-Ensure that the accounting file, hostfiles, and node-level stats data are
-visible to the server.
+```
+$ virtualenv machinename --system-site-packages
+$ cd machinename; source bin/activate
+$ git clone https://github.com/TACC/tacc_stats
+```
 
-There is a large variety of data collected and summarized below:    
-
-      `amd64_pmc`         AMD Opteron performance counters (per core)
-
-      `intel_hsw`         Intel Haswell Processor (HSW)         (per core)
-
-      `intel_hsw_ht`      Intel Haswell Processor - Hyper-threaded (per logical core)
-
-      `intel_nhm`         Intel Nehalem Processor (NHM)         (per core)
-
-      `intel_uncore`      Westmere Uncore          (WTM)        (per socket)
-
-      `intel_snb`         Intel Sandy Brige (SNB) or Ivy Bridge (IVB) Processor      (per core)
-
-      `intel_snb(hsw)_cbo`     Caching Agent (CBo) for SNB (HSW)              (per socket)
-
-      `intel_snb(hsw)_pcu`     Power Control Unit for SNB (HSW)               (per socket)
-
-      `intel_snb(hsw)_imc`     Integrated Memory Controller for SNB (HSW)     (per socket)
-
-      `intel_snb(hsw)_qpi`     QPI Link Layer for SNB (HSW)                  (per socket)
-
-      `intel_snb(hsw)_hau`     Home Agent Unit for SNB (HSW)                 (per socket)
-
-      `intel_snb(hsw)_r2pci`   Ring to PCIe Agent for SNB (HSW)               (per socket)
-
-      `ib`                Infiniband usage
-
-      `ib_sw`             InfiniBand usage
-
-      `ib_ext`            Infiniband usage
-
-      `llite`             Lustre filesystem usage (per mount),
-
-      `lnet`              Lustre network usage
-
-      `mdc`               Lustre network usage
-
-      `mic`              MIC scheduler account (per hardware thread)
-
-      `osc`               Lustre filesystem usage
-
-      `block`             block device statistics (per device)
-
-      `cpu`               scheduler accounting (per CPU)
-
-      `mem`               memory usage (per socket)
-
-      `net`               network device usage (per device)
-
-      `nfs`               NFS system usage
-
-      `numa`              weird NUMA statistics (per socket)
-
-      `proc`              Process specific data (MaxRSS, executable name etc.)
-
-      `ps`                process statistics
-
-      `sysv_shm`          SysV shared memory segment usage
-
-      `tmpfs`             ram-backed filesystem usage (per mount)
-
-      `vfs`               dentry/file/inode cache usage
-
-      `vm`                virtual memory statistics.
-
-    
-    For the source and meanings of the counters, see the tacc_stats source
-    `https://github.com/rtevans/tacc_stats`, the CentOS 5.6 kernel source,
-    especially `Documentation/*`, and the manpages, especially proc(5).
+`tacc_stats` is a pure Python package.  Dependencies should be automatically downloaded
+and installed when installed via `pip`.  The package must first be configured however.  
 
 
+2. The initialization file, `tacc_stats.ini`, controls all the configuration options and has 
+the following content and descriptions
 
+```
+## Basic configuration options - modify these
+# machine       = unique name of machine/queue
+# server        = database and rmq server hostname
+# data_dir      = where data is stored
+[DEFAULT]
+machine         = ls5
+data_dir        = /hpc/tacc_stats_site/%(machine)s
+server          = tacc-stats02.tacc.utexas.edu
 
+## RabbitMQ Configuration
+# RMQ_SERVER    = RMQ server
+# RMQ_QUEUE     = RMQ server
+[RMQ]
+rmq_server      = %(server)s
+rmq_queue       = %(machine)s
 
+## Configuration for Web Portal Support
+[PORTAL]
+acct_path       = %(data_dir)s/accounting/tacc_jobs_completed
+host_list_dir   = %(data_dir)s/hostfile_logs
+pickles_dir     = %(data_dir)s/pickles
+archive_dir     = %(data_dir)s/archive
+host_name_ext   = %(machine)s.tacc.utexas.edu
+batch_system    = SLURM
+```
 
+Set these paths as needed.  The raw stats data will be stored in the `archive_dir` and processed stats data in the `pickles_dir`.  `machine` should match the system name used in the RabbitMQ server `QUEUE` field.  This is the only field that needs to match 
+anything in the `monitor` subpackage.
+
+3. Install `tacc_stats`
+```
+$ pip install tacc_stats/
+```
+
+4. Start the RabbitMQ server reader in the background, e.g. 
+```
+$ nohup listend.py > /tmp/listend.log
+```
+Raw stats files will now be generated in the `archive_dir`.
+
+5. A PostgreSQL database must be setup on the host.  To do this, after installation
+run
+```
+$ python manage.py migrate
+```
+This will generate a table named `machine_db` in your database.  
+
+6. Setup cron jobs to process raw data and ingest into database.  Add the following to your 
+cron file
+```
+*/15 * * * * source /home/rtevans/testing/bin/activate; job_pickles.py; update_db.py > /tmp/ls5_update.log 2>&1
+```
+
+7. Next configure the Apache server (make sure it is installed and the `mod_wsgi` Apache module is installed)
+A sample configuration file, `/etc/httpd/conf.d/ls5.conf`, looks like
+```
+LoadModule wsgi_module modules/mod_wsgi.so
+WSGISocketPrefix run/wsgi
+<VirtualHost *:80>
+ServerAdmin rtevans@tacc.utexas.edu
+ServerName tacc-stats02.tacc.utexas.edu
+ServerAlias ls5-stats.tacc.utexas.edu
+WSGIDaemonProcess ls5 python-path=/usr/lib/python2.7/site-packages:/home/rtevans/tacc_stats
+WSGIProcessGroup ls5
+WSGIScriptAlias / /home/rtevans/tacc_stats/tacc_stats/site/tacc_stats_site/wsgi.py
+WSGIApplicationGroup %{GLOBAL}
+<Directory /home/rtevans/tacc_stats/tacc_stats/site/tacc_stats_site>
+<Files wsgi.py>
+Require all granted
+</Files>
+</Directory>
+</VirtualHost>
+```
+
+8. Start up Apache 
 
 Job Scheduler Configuration
 -------
@@ -184,13 +191,6 @@ with hostlist.JOBID listing the hosts allocated to the job in a single column.
 The accounting file and host-file logs will be used to map JOBID's to
 time and node ranges so that the job-level data can be extracted from the
 raw data efficiently.
-
-As mentioned above the `monitor` module produces a light-weight C
-code called `monitor` which is setuid'd to `/opt/tacc_stats/tacc_stats_monitord`.  It is called at the beginning of every job to configure Performance Monitoring Counter registers
-for specific events.  As the job is running `tacc_stats_monitord` is called at regular intervals (the default is 10 mn) to collect the counter registers values at regular time
-intervals.  This counter data is stored in "raw stats" files.  These
-stats files are node-level data labeled by JOBID and may or may not be
-locally stored, but must be visible to the node as a mount.
 
 \warning Stats from a given job on a give host may span multiple files.
 
@@ -285,6 +285,79 @@ device name.
 
 
 ### `TYPES`
+
+## Miscellaneous Information
+
+There is a large variety of data collected and summarized below:    
+
+      `amd64_pmc`         AMD Opteron performance counters (per core)
+
+      `intel_hsw`         Intel Haswell Processor (HSW)         (per core)
+
+      `intel_hsw_ht`      Intel Haswell Processor - Hyper-threaded (per logical core)
+
+      `intel_nhm`         Intel Nehalem Processor (NHM)         (per core)
+
+      `intel_uncore`      Westmere Uncore          (WTM)        (per socket)
+
+      `intel_snb`         Intel Sandy Brige (SNB) or Ivy Bridge (IVB) Processor      (per core)
+
+      `intel_snb(hsw)_cbo`     Caching Agent (CBo) for SNB (HSW)              (per socket)
+
+      `intel_snb(hsw)_pcu`     Power Control Unit for SNB (HSW)               (per socket)
+
+      `intel_snb(hsw)_imc`     Integrated Memory Controller for SNB (HSW)     (per socket)
+
+      `intel_snb(hsw)_qpi`     QPI Link Layer for SNB (HSW)                  (per socket)
+
+      `intel_snb(hsw)_hau`     Home Agent Unit for SNB (HSW)                 (per socket)
+
+      `intel_snb(hsw)_r2pci`   Ring to PCIe Agent for SNB (HSW)               (per socket)
+
+      `ib`                Infiniband usage
+
+      `ib_sw`             InfiniBand usage
+
+      `ib_ext`            Infiniband usage
+
+      `llite`             Lustre filesystem usage (per mount),
+
+      `lnet`              Lustre network usage
+
+      `mdc`               Lustre network usage
+
+      `mic`              MIC scheduler account (per hardware thread)
+
+      `osc`               Lustre filesystem usage
+
+      `block`             block device statistics (per device)
+
+      `cpu`               scheduler accounting (per CPU)
+
+      `mem`               memory usage (per socket)
+
+      `net`               network device usage (per device)
+
+      `nfs`               NFS system usage
+
+      `numa`              weird NUMA statistics (per socket)
+
+      `proc`              Process specific data (MaxRSS, executable name etc.)
+
+      `ps`                process statistics
+
+      `sysv_shm`          SysV shared memory segment usage
+
+      `tmpfs`             ram-backed filesystem usage (per mount)
+
+      `vfs`               dentry/file/inode cache usage
+
+      `vm`                virtual memory statistics.
+
+    
+    For the source and meanings of the counters, see the tacc_stats source
+    `https://github.com/rtevans/tacc_stats`, the CentOS 5.6 kernel source,
+    especially `Documentation/*`, and the manpages, especially proc(5).
 
 
 \note All chip architecture related types are checked for existence at
