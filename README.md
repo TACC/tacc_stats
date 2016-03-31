@@ -102,20 +102,15 @@ raw data efficiently.
  steps:
  
 1.  Download the package and setup the Python virtual environment.
-
 ```
 $ virtualenv machinename --system-site-packages
 $ cd machinename; source bin/activate
 $ git clone https://github.com/TACC/tacc_stats
 ```
-
 `tacc_stats` is a pure Python package.  Dependencies should be automatically downloaded
 and installed when installed via `pip`.  The package must first be configured however.  
-
-
 2.  The initialization file, `tacc_stats.ini`, controls all the configuration options and has 
 the following content and descriptions
-
 ```
 ## Basic configuration options - modify these
 # machine       = unique name of machine/queue
@@ -142,7 +137,6 @@ archive_dir     = %(data_dir)s/archive
 host_name_ext   = %(machine)s.tacc.utexas.edu
 batch_system    = SLURM
 ```
-
 Set these paths as needed.  The raw stats data will be stored in the `archive_dir` and processed stats data in the `pickles_dir`.  `machine` should match the system name used in the RabbitMQ server `QUEUE` field.  This is the only field that needs to match 
 anything in the `monitor` subpackage.
 
