@@ -44,10 +44,10 @@ def job_pickle(reader_inst,
 
 class JobPickles:
 
-    def __init__(self, start, end, processes, pickles_dir):
+    def __init__(self, start, end, processes, pickles_dir, jobids):
 
         self.pool   = multiprocessing.Pool(processes = processes)        
-
+        self.jobids = jobids
         self.start  = start
         self.end    = end
         if not pickles_dir:
@@ -78,6 +78,7 @@ class JobPickles:
         acct = []
         with open(filename, "rb") as fd:
             for job in csv.DictReader(fd, delimiter = '|'):
+                if self.jobids and job['JobID'] not in self.jobids: continue
                 nodelist_str = job['NodeList']
                 if '[' in nodelist_str and ']' in nodelist_str:
                     nodelist = []
@@ -119,7 +120,7 @@ class JobPickles:
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Run pickler for jobs')
-    parser.add_argument('start', type = parse, default = datetime.now() - timedelta(days=1), 
+    parser.add_argument('start', type = parse, nargs = '?', default = datetime.now() - timedelta(days=1), 
                         help = 'Start (YYYY-mm-dd)')
     parser.add_argument('end',   type = parse, nargs = '?', default = False, 
                         help = 'End (YYYY-mm-dd)')
@@ -127,14 +128,18 @@ if __name__ == '__main__':
                         help = 'number of processes')
     parser.add_argument('-d', '--directory', type = str, 
                         help='Directory to store data')
+    parser.add_argument('-jobids', help = 'Pickle this list of jobs', 
+                        type = str, nargs = '+')
+
     args = parser.parse_args()
     if not args.end:
-        args.end = args.start + timedelta(days=1)
+        args.end = args.start + timedelta(days=2)
 
     pickle_options = { 'processes'       : args.processes,
                        'start'           : args.start,
                        'end'             : args.end,
-                       'pickles_dir'      : args.directory,
+                       'pickles_dir'     : args.directory,
+                       'jobids'          : args.jobids
                        }
     
     pickler = JobPickles(**pickle_options)

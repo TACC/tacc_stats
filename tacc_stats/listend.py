@@ -4,13 +4,10 @@ import os, sys
 import time
 import cfg
 
-stats_dir = "/hpc/tacc_stats_site/ls5/archive"
-
 def on_message(channel, method_frame, header_frame, body):
     if body[0] == '$': host = body.split('\n')[1].split()[1]       
     else: host = body.split()[2]
 
-    print host
     host_dir = os.path.join(cfg.archive_dir, host)
     if not os.path.exists(host_dir):
         os.makedirs(host_dir)
@@ -30,9 +27,10 @@ def on_message(channel, method_frame, header_frame, body):
 
     channel.basic_ack(delivery_tag=method_frame.delivery_tag)
 
-connection = pika.BlockingConnection()
+parameters = pika.ConnectionParameters(cfg.rmq_server)
+connection = pika.BlockingConnection(parameters)
 channel = connection.channel()
-channel.basic_consume(on_message, sys.argv[1])
+channel.basic_consume(on_message, cfg.rmq_queue)
 try:
     channel.start_consuming()
 except KeyboardInterrupt:
