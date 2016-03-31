@@ -75,6 +75,8 @@ the job scheduler prolog and epilog contain the lines
 
 `echo $JOBID > jobid_file`  
 
+and
+
 `echo - > jobid_file`
 
 To perform the pickling of this data it is also necessary to
@@ -95,13 +97,11 @@ The accounting file and host-file logs will be used to map JOBID's to
 time and node ranges so that the job-level data can be extracted from the
 raw data efficiently.
 
-\warning Stats from a given job on a give host may span multiple files.
-   
 #### `tacc_stats` subpackage
  To install TACC Stats on the machine where data will be processed, analyzed, and the webserver hosted follow these
  steps:
  
-1. Download the package and setup the Python virtual environment.
+1.  Download the package and setup the Python virtual environment.
 
 ```
 $ virtualenv machinename --system-site-packages
@@ -113,7 +113,7 @@ $ git clone https://github.com/TACC/tacc_stats
 and installed when installed via `pip`.  The package must first be configured however.  
 
 
-2. The initialization file, `tacc_stats.ini`, controls all the configuration options and has 
+2.  The initialization file, `tacc_stats.ini`, controls all the configuration options and has 
 the following content and descriptions
 
 ```
@@ -146,31 +146,31 @@ batch_system    = SLURM
 Set these paths as needed.  The raw stats data will be stored in the `archive_dir` and processed stats data in the `pickles_dir`.  `machine` should match the system name used in the RabbitMQ server `QUEUE` field.  This is the only field that needs to match 
 anything in the `monitor` subpackage.
 
-3. Install `tacc_stats`
+3.  Install `tacc_stats`
 ```
 $ pip install tacc_stats/
 ```
 
-4. Start the RabbitMQ server reader in the background, e.g. 
+4.  Start the RabbitMQ server reader in the background, e.g. 
 ```
 $ nohup listend.py > /tmp/listend.log
 ```
 Raw stats files will now be generated in the `archive_dir`.
 
-5. A PostgreSQL database must be setup on the host.  To do this, after installation
+5.  A PostgreSQL database must be setup on the host.  To do this, after installation
 run
 ```
 $ python manage.py migrate
 ```
 This will generate a table named `machine_db` in your database.  
 
-6. Setup cron jobs to process raw data and ingest into database.  Add the following to your 
+6.  Setup cron jobs to process raw data and ingest into database.  Add the following to your 
 cron file
 ```
 */15 * * * * source /home/rtevans/testing/bin/activate; job_pickles.py; update_db.py > /tmp/ls5_update.log 2>&1
 ```
 
-7. Next configure the Apache server (make sure it is installed and the `mod_wsgi` Apache module is installed)
+7.  Next configure the Apache server (make sure it is installed and the `mod_wsgi` Apache module is installed)
 A sample configuration file, `/etc/httpd/conf.d/ls5.conf`, looks like
 ```
 LoadModule wsgi_module modules/mod_wsgi.so
@@ -191,9 +191,7 @@ Require all granted
 </VirtualHost>
 ```
 
-8. Start up Apache 
-
-
+8.  Start up Apache 
 
 
 ### Running `job_pickles.py`
