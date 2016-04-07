@@ -19,8 +19,9 @@ def on_message(channel, method_frame, header_frame, body):
 
         with open(current_path, 'w') as fd:
             link_path = os.path.join(host_dir, str(int(time.time())))
-            if not os.path.exists(link_path):
-                os.link(current_path, link_path)
+            if os.path.exists(link_path):
+                os.remove(link_path)
+            os.link(current_path, link_path)
 
     with open(current_path, 'a') as fd:
         fd.write(body)
