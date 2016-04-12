@@ -240,7 +240,7 @@ def sys_plot(request, pk):
     racks = []
     nodes = []
     for host in Host.objects.values_list('name',flat=True).distinct():
-        r,n=host.split('-')
+        r,n=host.split('-')[-2:]
         racks.append(r)
         nodes.append(n)
     racks = sorted(set(racks))
