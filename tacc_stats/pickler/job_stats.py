@@ -589,7 +589,9 @@ class Job(object):
                         # Rebase narrow counters and spurious resets.
                         # 64-bit overflows are correctly handled automatically                        
                         fudged = False
-                        if e.width:
+                        if 'intel_' in type_name: 
+                            r = numpy.uint(0) - A[i-1,j]
+                        elif e.width:
                             trace("time %d, counter `%s', rollover prev %d, curr %d\n",
                                   self.times[i], e.key, p, v)
                             r -= numpy.uint64(1L << e.width)
