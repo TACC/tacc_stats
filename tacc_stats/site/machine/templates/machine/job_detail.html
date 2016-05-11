@@ -107,21 +107,16 @@
   <button type="button" class="btn btn-primary" data-toggle="collapse" data-target="#libs">Click for Modules and Libraries</button>
     <div id="libs" class="collapse">
       <table style="max-width:30%;">
-	<tr><th>Modules Loaded</th></tr>
+	<tr><th>Module</th><th>Library</th></tr>
 	{% for obj in job.libraries_set.all %}
 	{% if obj.module_name != "none" %}
-	<tr><td align=left>{{ obj.module_name }}</td></tr>
+	<tr><td align=left>{{ obj.module_name }}</td><td align=left> {{ obj }}</td></tr>
+	{% endif %}
+	{% if obj.module_name == "none" %}
+	<tr><td align=left>system</td><td align=left> {{ obj }}</td></tr>
 	{% endif %}
 	{% endfor %}
       </table>
-      </br>
-    <table style="max-width:30%;">
-      <tr><th>Objects linked</th></tr>
-      {% for lib in job.libraries_set.all %}
-      <tr><td align=left>{{ lib }}</td></tr>
-      {% endfor %}
-    </table>
-    </div>
   </div>
 
 </div>  

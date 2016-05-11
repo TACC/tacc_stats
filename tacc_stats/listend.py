@@ -4,13 +4,14 @@ import os, sys
 import time
 import cfg
 
-stats_dir = "/hpc/tacc_stats_site/ls5/archive"
+stats_dir = "/hpc/tacc_stats_site/stampede/archive"
 
 def on_message(channel, method_frame, header_frame, body):
     if body[0] == '$': host = body.split('\n')[1].split()[1]       
     else: host = body.split()[2]
 
     print host
+    print body
     host_dir = os.path.join(cfg.archive_dir, host)
     if not os.path.exists(host_dir):
         os.makedirs(host_dir)

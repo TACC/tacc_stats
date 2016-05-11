@@ -20,7 +20,7 @@ sys.modules['batch_acct'] = batch_acct
 
 import cPickle as pickle 
 import time,pytz
-from datetime import datetime
+from datetime import datetime, timedelta
 
 import numpy as np
 from matplotlib.figure import Figure
@@ -52,6 +52,7 @@ def update_comp_info(thresholds = None):
                   'InternodeIBAveBW' : ['InternodeIBAveBW', '>', 10000],
                   'InternodeIBMaxBW' : ['InternodeIBMaxBW', '>', 10000],
                   'LnetAveBW'  : ['LnetAveBW', '>', 10000],
+                  'LnetAveMsgs'  : ['LnetAveMsgs', '>', 10000],
                   'LnetMaxBW'  : ['LnetMaxBW', '>', 10000],
                   'MDCReqs'  : ['MDCReqs', '>', 10000],
                   'OSCReqs'  : ['OSCReqs', '>', 10000],
@@ -144,7 +145,7 @@ def update(date,rerun=False):
                 
                 if json.has_key('host_list'):
                     del json['host_list']
-                print json
+
                 Job.objects.filter(id=json['id']).delete()
                 obj, created = Job.objects.update_or_create(**json)
                 for host_name in hosts:
@@ -173,33 +174,35 @@ def update_metric_fields(date,rerun=False):
     update_comp_info()
     aud = exam.Auditor(processes=4)
     
-    aud.stage(exam.GigEBW, ignore_qs=[], min_time = 0)
-    aud.stage(exam.HighCPI, ignore_qs=[], min_time = 0)
-    aud.stage(exam.HighCPLD, ignore_qs=[], min_time = 0)
-    aud.stage(exam.Load_L1Hits, ignore_qs=[], min_time = 0)
-    aud.stage(exam.Load_L2Hits, ignore_qs=[], min_time = 0)
-    aud.stage(exam.Load_LLCHits, ignore_qs=[], min_time = 0)
-    aud.stage(exam.MemBw, ignore_qs=[], min_time = 0)
-    aud.stage(exam.Catastrophe, ignore_qs=[], min_time = 0)
-    aud.stage(exam.MemUsage, ignore_qs=[], min_time = 0)
-    aud.stage(exam.PacketRate, ignore_qs=[], min_time = 0)
-    aud.stage(exam.PacketSize, ignore_qs=[], min_time = 0)
-    aud.stage(exam.Idle, ignore_qs=[], min_time = 0)
-    aud.stage(exam.LowFLOPS, ignore_qs=[], min_time = 0)
-    aud.stage(exam.VecPercent, ignore_qs=[], min_time = 0)
-    aud.stage(exam.CPU_Usage, ignore_qs = [], min_time = 0)
-    aud.stage(exam.MIC_Usage, ignore_qs = [], min_time = 0)
-    aud.stage(exam.Load_All, ignore_qs = [], min_time = 0)
-    aud.stage(exam.MetaDataRate, ignore_qs = [], min_time = 0)
-    aud.stage(exam.LnetAveBW, ignore_qs=[], min_time = 0)
-    aud.stage(exam.LnetMaxBW, ignore_qs=[], min_time = 0)
-    aud.stage(exam.InternodeIBAveBW, ignore_qs=[], min_time = 0)
-    aud.stage(exam.InternodeIBMaxBW, ignore_qs=[], min_time = 0)
-    aud.stage(exam.MDCReqs, ignore_qs=[], min_time = 0)
-    aud.stage(exam.MDCWait, ignore_qs=[], min_time = 0)
-    aud.stage(exam.OSCReqs, ignore_qs=[], min_time = 0)
-    aud.stage(exam.OSCWait, ignore_qs=[], min_time = 0)
-    aud.stage(exam.LLiteOpenClose, ignore_qs=[], min_time = 0)
+    min_time = 600
+    aud.stage(exam.GigEBW, ignore_qs=[], min_time = min_time)
+    aud.stage(exam.HighCPI, ignore_qs=[], min_time = min_time)
+    aud.stage(exam.HighCPLD, ignore_qs=[], min_time = min_time)
+    aud.stage(exam.Load_L1Hits, ignore_qs=[], min_time = min_time)
+    aud.stage(exam.Load_L2Hits, ignore_qs=[], min_time = min_time)
+    aud.stage(exam.Load_LLCHits, ignore_qs=[], min_time = min_time)
+    aud.stage(exam.MemBw, ignore_qs=[], min_time = min_time)
+    aud.stage(exam.Catastrophe, ignore_qs=[], min_time = min_time)
+    aud.stage(exam.MemUsage, ignore_qs=[], min_time = min_time)
+    aud.stage(exam.PacketRate, ignore_qs=[], min_time = min_time)
+    aud.stage(exam.PacketSize, ignore_qs=[], min_time = min_time)
+    aud.stage(exam.Idle, ignore_qs=[], min_time = min_time)
+    aud.stage(exam.LowFLOPS, ignore_qs=[], min_time = min_time)
+    aud.stage(exam.VecPercent, ignore_qs=[], min_time = min_time)
+    aud.stage(exam.CPU_Usage, ignore_qs = [], min_time = min_time)
+    aud.stage(exam.MIC_Usage, ignore_qs = [], min_time = min_time)
+    aud.stage(exam.Load_All, ignore_qs = [], min_time = min_time)
+    aud.stage(exam.MetaDataRate, ignore_qs = [], min_time = min_time)
+    aud.stage(exam.LnetAveMsgs, ignore_qs=[], min_time = min_time)
+    aud.stage(exam.LnetAveBW, ignore_qs=[], min_time = min_time)
+    aud.stage(exam.LnetMaxBW, ignore_qs=[], min_time = min_time)
+    aud.stage(exam.InternodeIBAveBW, ignore_qs=[], min_time = min_time)
+    aud.stage(exam.InternodeIBMaxBW, ignore_qs=[], min_time = min_time)
+    aud.stage(exam.MDCReqs, ignore_qs=[], min_time = min_time)
+    aud.stage(exam.MDCWait, ignore_qs=[], min_time = min_time)
+    aud.stage(exam.OSCReqs, ignore_qs=[], min_time = min_time)
+    aud.stage(exam.OSCWait, ignore_qs=[], min_time = min_time)
+    aud.stage(exam.LLiteOpenClose, ignore_qs=[], min_time = min_time)
 
     print 'Run the following tests for:',date
     for name, test in aud.measures.iteritems():
@@ -207,11 +210,11 @@ def update_metric_fields(date,rerun=False):
         obj = TestInfo.objects.get(test_name = name)
         print obj.field_name,obj.threshold,obj.comparator
 
-    jobs_list = Job.objects.filter(date = date).exclude(run_time__lt = 0)
+    jobs_list = Job.objects.filter(date = date).exclude(run_time__lt = min_time)
 
     # Use mem to see if job was tested.  It will always exist
     if not rerun:
-        jobs_list = jobs_list.filter(Load_L1Hits = None)
+        jobs_list = jobs_list.filter(OSCWait = None)
     
     paths = []
     for job in jobs_list:
@@ -275,13 +278,14 @@ def sys_plot(request, pk):
 
 def dates(request, error = False):
     month_dict ={}
-    dates = Job.objects.dates('date','day')
-    for date in dates:
+    date_list = Job.objects.exclude(date = None).exclude(date__lt = datetime.today() - timedelta(days = 90)).values_list('date',flat=True).distinct()
+
+    for date in sorted(date_list):
         y,m,d = date.strftime('%Y-%m-%d').split('-')
         key = y+'-'+m
         month_dict.setdefault(key, [])
         month_dict[key].append((y+'-'+m+'-'+d, d))
-        
+
     field = {}
     field["machine_name"] = cfg.host_name_ext
 
@@ -327,8 +331,8 @@ def index(request, **field):
         name += '['+key+'='+val+']-'
 
 
-    #if 'run_time__gte' in field: pass
-    #else: field['run_time__gte'] = 60
+    if 'run_time__gte' in field: pass
+    else: field['run_time__gte'] = 60
 
     order_key = '-id'
     if 'order_key' in field: 
@@ -341,7 +345,7 @@ def index(request, **field):
             field['date__year'] = date[0]
             field['date__month'] = date[1]
             del field['date']
-
+    print field
     job_list = Job.objects.filter(**field).order_by(order_key)
 
     field['name'] = name + 'search'
@@ -355,10 +359,11 @@ def index(request, **field):
     
     completed_list = job_list.exclude(status__in=['CANCELLED','FAILED']).order_by('-id')
     if len(completed_list) > 0:
-        try: 
-            field['md_job_list'] = job_list.order_by('-MetaDataRate')[0:10]
-        except:
-            field['md_job_list'] = job_list.order_by('-MetaDataRate')
+        field['md_job_list'] = job_list.exclude(LLiteOpenClose__isnull = True ).order_by('-LLiteOpenClose')
+        try:
+            field['md_job_list'] = field['md_job_list'][0:10]
+        except: pass
+
         field['idle_job_list'] = completed_list.filter(idle__gte = 0.99)
         field['mem_job_list'] = completed_list.filter(mem__lte = 30, queue = 'largemem')
 
@@ -368,10 +373,8 @@ def index(request, **field):
 
         field['gigebw_thresh'] = 2**20
         field['gigebw_job_list']  = completed_list.exclude(GigEBW = float('nan')).filter(GigEBW__gte = field['gigebw_thresh'])
-        try:
-            field['md_job_list'] = list_to_dict(field['md_job_list'],'MetaDataRate')
-        except: 
-            field['md_job_list'] = None
+
+        field['md_job_list'] = list_to_dict(field['md_job_list'],'LLiteOpenClose')
         field['idle_job_list'] = list_to_dict(field['idle_job_list'],'idle')
         field['cat_job_list'] = list_to_dict(field['cat_job_list'],'cat')
         field['cpi_job_list'] = list_to_dict(field['cpi_job_list'],'cpi')
@@ -416,7 +419,7 @@ def hist_summary(job_list):
     ax.set_title('Queue Wait Time')
     ax.set_xlabel('hrs')
 
-    jobs =  np.array(job_list.values_list('MetaDataRate',flat=True))
+    jobs =  np.array(job_list.values_list('LLiteOpenClose',flat=True))
     ax = fig.add_subplot(224)
     try:
         bins = np.linspace(0, max(jobs), max(5, 5*np.log(len(jobs))))

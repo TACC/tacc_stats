@@ -11,7 +11,7 @@ def _unwrap(args):
     return args[0].get_measurements(args[1])
   except Exception as e:
     print(traceback.format_exc())
-    raise e
+    #raise e
     pass
 
 class Auditor():
@@ -34,27 +34,28 @@ class Auditor():
     if not filelist: 
       print("Please specify a job file list.")
       sys.exit()
-    pool = multiprocessing.Pool(processes=self.processes) 
-    metrics = pool.map(_unwrap, zip([self]*len(filelist), filelist))
-    #metrics = map(_unwrap, zip([self]*len(filelist), filelist))
+    #pool = multiprocessing.Pool(processes=self.processes) 
+    #metrics = pool.map(_unwrap, zip([self]*len(filelist), filelist))
+    metrics = map(_unwrap, zip([self]*len(filelist), filelist))
     
     for d in metrics:
+      if not d: continue
       for metric_name, job in d.iteritems():
         self.metrics.setdefault(metric_name, {}) 
         self.metrics[metric_name][job[0]] = job[1]
     
   # Compute metric
   def get_measurements(self,jobpath):
-    with open(jobpath) as fd:
-      try:
+    try:
+      with open(jobpath) as fd:
         job_data = pickle.load(fd)
-      except EOFError as e:
-        raise tspl.TSPLException('End of file found for: ' + jobpath)
+    except IOError as e:
+      raise tspl.TSPLException('File ' + jobpath + ' not found')
+    except EOFError as e:
+      raise tspl.TSPLException('End of file found for: ' + jobpath)
 
     metrics = {}
-    print(">>>", job_data.id)
     for name, measure in self.measures.iteritems():
-      print(name)
       metrics[name] = (job_data.id, measure.test(jobpath,job_data))
     return metrics
 

@@ -2,6 +2,7 @@
 
 from django.db import models
 from django.forms import ModelForm
+from django.contrib.postgres.fields import ArrayField
 
 class Job(models.Model):
     id = models.BigIntegerField(primary_key=True)
@@ -47,6 +48,7 @@ class Job(models.Model):
     CPU_Usage = models.FloatField(null=True)
     MIC_Usage = models.FloatField(null=True)
     MetaDataRate = models.FloatField(null=True)
+    LnetAveMsgs = models.FloatField(null=True)
     LnetAveBW = models.FloatField(null=True)
     LnetMaxBW = models.FloatField(null=True)
     InternodeIBAveBW = models.FloatField(null=True)
@@ -75,6 +77,21 @@ class Job(models.Model):
         factor = 1
         if self.queue == 'largemem': factor = 2 # double charge rate
         return self.nodes * self.run_time * 0.0002777777777777778 * factor
+
+class Proc(models.Model):
+    job  = models.ForeignKey(Job)
+    name = models.CharField(max_length=128)
+    host = models.CharField(max_length=128)
+    uid  = models.IntegerField(null=True)
+    pid  = models.IntegerField(null=True)
+    VmHWM = models.FloatField(null=True)
+    Threads = models.IntegerField(null=True)
+    Cpus_allowed_list = models.CharField(max_length=128)
+    Mems_allowed_list = models.CharField(max_length=128)
+
+    def __unicode__(self):
+        return str(self.name)
+
 
 class Host(models.Model):
     name = models.CharField(max_length=128)
