@@ -257,7 +257,7 @@ int main(int argc, char *argv[])
     goto out;
   }
 
-  wd = inotify_add_watch(ifd, JOBID_FILE_PATH, IN_CLOSE_WRITE);
+  wd = inotify_add_watch(ifd, JOBID_FILE_PATH, IN_CLOSE_WRITE | IN_DELETE_SELF);
   if ( wd < 0) {
     ERROR("inotify failed: %m\n");  
     rc = -1;
@@ -275,6 +275,20 @@ int main(int argc, char *argv[])
     sigprocmask(SIG_BLOCK, &mask, NULL);
 
     read(ifd, buffer, EVENT_BUF_LEN);
+
+    // If Job ID file was deleted recreate and watch
+    struct inotify_event *event = ( struct inotify_event * ) &buffer[0];
+    if (event->mask & IN_DELETE_SELF) {
+	syslog(LOG_INFO, "Job ID file was deleted.  Write a new one and watch.");
+	FILE *jobfd = fopen(JOBID_FILE_PATH, "w+");
+	fwrite(current_jobid, sizeof(char), sizeof(current_jobid), jobfd);
+	fclose(jobfd);
+	wd = inotify_add_watch(ifd, JOBID_FILE_PATH, IN_CLOSE_WRITE | IN_DELETE_SELF);
+	if ( wd < 0) {
+	  TRACE("inotify failed: %m\n");  
+	}
+    }
+
     FD_ZERO(&descriptors);
     FD_SET(ifd, &descriptors);
     pscanf(JOBID_FILE_PATH, "%79s", new_jobid);

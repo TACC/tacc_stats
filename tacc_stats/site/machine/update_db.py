@@ -24,4 +24,4 @@ def daterange(start_date, end_date):
 for date in daterange(start, end):
     directory = date.strftime("%Y-%m-%d")
     views.update(directory, rerun = False)         
-    views.update_metric_fields(directory, rerun = True)
+    views.update_metric_fields(directory, rerun = False)

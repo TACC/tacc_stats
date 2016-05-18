@@ -20,7 +20,9 @@ from tacc_stats.analysis.exam.gige_bw import GigEBW
 from tacc_stats.analysis.exam.mic_usage import MIC_Usage
 from tacc_stats.analysis.exam.cpu_usage import CPU_Usage
 from tacc_stats.analysis.exam.lnet_avebw import LnetAveBW
+from tacc_stats.analysis.exam.lnet_avemsgs import LnetAveMsgs
 from tacc_stats.analysis.exam.lnet_maxbw import LnetMaxBW
+
 from tacc_stats.analysis.exam.internodeib_avebw import InternodeIBAveBW
 from tacc_stats.analysis.exam.internodeib_maxbw import InternodeIBMaxBW
 

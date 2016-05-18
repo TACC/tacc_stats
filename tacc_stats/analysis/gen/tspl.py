@@ -18,6 +18,8 @@ class TSPLException(Exception):
     print self.value
 
 class TSPLBase:
+  k1 = None
+  k2 = None
   def __init__(self,file,k1,k2,job_data = None):
 
     if job_data:
@@ -115,6 +117,9 @@ class TSPLBase:
       raise TSPLException('Input types must match and be lists or dicts: ' +
                           str(type(k1)) + ' ' + str(type(k2)))
 
+    if not self.k1 or not self.k2: 
+      raise TSPLException('Input types not available')
+      
     try:
       self.t=(self.j.times-self.j.times[0])
     except:

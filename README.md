@@ -148,12 +148,27 @@ $ pip install tacc_stats/
 $ nohup listend.py > /tmp/listend.log
 ```
 Raw stats files will now be generated in the `archive_dir`.
-5.  A PostgreSQL database must be setup on the host.  To do this, after installation
-run
+5.  A PostgreSQL database must be setup on the host.  To do this, after installation of PostgreSQL
+and the `tacc_stats` Python module 
+```
+$ sudo su - postgresql
+$ psql
+# CREATE DATABASE machinename_db;
+# CREATE USER taccstats WITH PASSWORD 'taccstats';
+# ALTER ROLE taccstats SET client_encoding TO 'utf8';
+# ALTER ROLE taccstats SET default_transaction_isolation TO 'read committed';
+# ALTER ROLE taccstats SET timezone TO 'UTC';
+# GRANT ALL PRIVILEGES ON DATABASE machinename_db TO taccstats;
+# \q
+```
+
+then
+
 ```
 $ python manage.py migrate
 ```
-This will generate a table named `machine_db` in your database.  
+This will generate a table named `machinename_db` in your database.  
+
 6.  Setup cron jobs to process raw data and ingest into database.  Add the following to your 
 cron file
 ```

@@ -4,7 +4,7 @@ import tacc_stats.cfg as cfg
 import tacc_stats.site.tacc_stats_site as tacc_stats_site
 DIR = os.path.dirname(os.path.abspath(__file__))
 
-DEBUG = False
+DEBUG = True
 
 ADMINS = (
     ('Richard Todd Evans', 'rtevans@tacc.utexas.edu'),
@@ -28,7 +28,7 @@ DATABASES = {
         'NAME' : 'xalt',
         'USER' : 'xaltUser',
         'PASSWORD' : 'kutwgbh',
-        'HOST' : 'tacc-stats'
+        'HOST' : 'xalt'
         }        
     }
 
@@ -78,11 +78,11 @@ STATIC_ROOT = ''
 
 # URL prefix for static files.
 # Example: "http://example.com/static/", "http://static.example.com/"
-STATIC_URL = 'static/'
+STATIC_URL = '/static/'
 
 # Additional locations of static files
 STATICFILES_DIRS = (
-    os.path.join(DIR,'static/')
+    os.path.join(DIR,'static/'),
 )
 
 # List of finder classes that know how to find static files in
@@ -117,13 +117,13 @@ TEMPLATES = [
         },
     },
 ]
-
+"""
 MIDDLEWARE_CLASSES = (
     'django.middleware.cache.UpdateCacheMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.cache.FetchFromCacheMiddleware',
 )
-
+"""
 ROOT_URLCONF = 'tacc_stats.site.tacc_stats_site.urls'
 # Python dotted path to the WSGI application used by Django's runserver.
 WSGI_APPLICATION = 'tacc_stats.site.tacc_stats_site.wsgi.application'
@@ -138,13 +138,14 @@ INSTALLED_APPS = (
     #'django_extensions',
     # Uncomment the next line to enable the admin:
     'django.contrib.admin',
+    #'debug_toolbar',
     #'django_pdf',
     # Uncomment the next line to enable admin documentation:
     # 'django.contrib.admindocs',
     'tacc_stats.site.machine',
     'tacc_stats.site.xalt',
 )
-
+INTERNAL_IPS = ['127.0.0.1']
 SESSION_SERIALIZER = 'django.contrib.sessions.serializers.JSONSerializer'
 SESSION_ENGINE = 'django.contrib.sessions.backends.file'
 
@@ -171,7 +172,7 @@ LOGGING = {
         },
     }
 }
-
+"""
 CACHES = {
     'normal': {
         'BACKEND': 'django.core.cache.backends.memcached.MemcachedCache',
@@ -184,3 +185,4 @@ CACHES = {
         'TIMEOUT': None,
         }
     }
+"""
