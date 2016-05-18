@@ -100,6 +100,7 @@ TEMPLATES = [
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
         'DIRS': [
             # insert your TEMPLATE_DIRS here
+        #    'tacc_stats_site/templates',
         ],
         'APP_DIRS': True,
         'OPTIONS': {
@@ -117,13 +118,17 @@ TEMPLATES = [
         },
     },
 ]
-"""
+
 MIDDLEWARE_CLASSES = (
-    'django.middleware.cache.UpdateCacheMiddleware',
     'django.middleware.common.CommonMiddleware',
-    'django.middleware.cache.FetchFromCacheMiddleware',
+    'django.contrib.sessions.middleware.SessionMiddleware',
+    'django.middleware.csrf.CsrfViewMiddleware',
+    'django.contrib.auth.middleware.AuthenticationMiddleware',
+    'django.contrib.messages.middleware.MessageMiddleware',
+    #'django.middleware.cache.UpdateCacheMiddleware',
+    #'django.middleware.cache.FetchFromCacheMiddleware',
 )
-"""
+
 ROOT_URLCONF = 'tacc_stats.site.tacc_stats_site.urls'
 # Python dotted path to the WSGI application used by Django's runserver.
 WSGI_APPLICATION = 'tacc_stats.site.tacc_stats_site.wsgi.application'
@@ -144,6 +149,7 @@ INSTALLED_APPS = (
     # 'django.contrib.admindocs',
     'tacc_stats.site.machine',
     'tacc_stats.site.xalt',
+    'tacc_stats.site.tacc_stats_site',
 )
 INTERNAL_IPS = ['127.0.0.1']
 SESSION_SERIALIZER = 'django.contrib.sessions.serializers.JSONSerializer'
