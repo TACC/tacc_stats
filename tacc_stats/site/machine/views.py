@@ -83,6 +83,7 @@ def update(date,rerun=False):
         num_files = len(pickle_files)
         print "Number of pickle files in",root,'=',num_files
         for pickle_file in sorted(pickle_files):
+
             ctr += 1
             print pickle_file
             try:
