@@ -81,6 +81,7 @@
 /* Schema Keys 
    All counter registers are 48 bits wide. 
 */
+
 #define KEYS \
     X(CTL0, "C", ""), \
     X(CTL1, "C", ""), \
@@ -101,6 +102,32 @@
     X(FIXED_CTR0, "E,W=48", ""), \
     X(FIXED_CTR1, "E,W=48", ""), \
     X(FIXED_CTR2, "E,W=48", "")
+
+#define HT_KEYS \
+    X(CTL0, "C", ""), \
+    X(CTL1, "C", ""), \
+    X(CTL2, "C", ""), \
+    X(CTL3, "C", ""), \
+    X(CTR0, "E,W=48", ""), \
+    X(CTR1, "E,W=48", ""), \
+    X(CTR2, "E,W=48", ""), \
+    X(CTR3, "E,W=48", ""), \
+    X(FIXED_CTR0, "E,W=48", ""), \
+    X(FIXED_CTR1, "E,W=48", ""), \
+    X(FIXED_CTR2, "E,W=48", "")
+/* Schema Keys 
+   All counter registers are 48 bits wide. 
+*/
+#define KNL_KEYS		 \
+  X(CTL0, "C", ""),		 \
+    X(CTL1, "C", ""),		 \
+    X(CTR0, "E,W=40", ""),	 \
+    X(CTR1, "E,W=40", ""),	 \
+    X(FIXED_CTR0, "E,W=40", ""), \
+    X(FIXED_CTR1, "E,W=40", ""), \
+    X(FIXED_CTR2, "E,W=40", "")
+
+
 
 /*! \brief Event select */
 // IA32_PERFEVTSELx MSR layout
@@ -187,7 +214,6 @@ static void intel_pmc3_collect_cpu(struct stats_type *type, char *cpu)
   struct stats *stats = NULL;
   char msr_path[80];
   int msr_fd = -1;
-
   stats = get_current_stats(type, cpu);
   if (stats == NULL)
     goto out;
@@ -205,7 +231,7 @@ static void intel_pmc3_collect_cpu(struct stats_type *type, char *cpu)
     ({									\
       uint64_t val = 0;							\
       if (pread(msr_fd, &val, sizeof(val), IA32_##k) < 0)		\
-	ERROR("cannot read `%s' (%08X) through `%s': %m\n", #k, IA32_##k, msr_path); \
+	TRACE("cannot read `%s' (%08X) through `%s': %m\n", #k, IA32_##k, msr_path); \
       else								\
 	stats_set(stats, #k, val);					\
     })

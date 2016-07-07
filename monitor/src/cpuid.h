@@ -7,12 +7,13 @@ typedef enum {
   AMD_10H,
   NEHALEM, WESTMERE, 
   SANDYBRIDGE, IVYBRIDGE, 
-  HASWELL, BROADWELL,
+  HASWELL, BROADWELL, KNL,
   SKYLAKE
 } processor_t;
   
 // Return 1 for true and 0 for false
-int signature(processor_t p, char *cpu, int *nr_events);
+int percore_signature(processor_t p, char *cpu, int *nr_events);
+int signature(processor_t p, int *nr_events);
 int topology(char *cpu, int *pkg, int *core, int *smt, int *nr_core);
 
 #endif

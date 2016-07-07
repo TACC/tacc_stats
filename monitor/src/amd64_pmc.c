@@ -159,6 +159,7 @@ static int amd64_pmc_begin_cpu(char *cpu, uint64_t events[], size_t nr_events)
 
 static int amd64_pmc_begin(struct stats_type *type)
 {
+  int n_pmcs = 0;
   int nr = 0;
 
   uint64_t events[4][4] = {
@@ -169,14 +170,14 @@ static int amd64_pmc_begin(struct stats_type *type)
   };
 
   int i;
-  for (i = 0; i < nr_cpus; i++) {
-    char cpu[80];
-    snprintf(cpu, sizeof(cpu), "%d", i);
-    int nr_events = 0;
-    if (signature(AMD_10H, cpu, &nr_events))
-      if (amd64_pmc_begin_cpu(cpu, events[i % 4], nr_events) == 0)
+  if (signature(AMD_10H, &n_pmcs))
+    for (i = 0; i < nr_cpus; i++) {
+      char cpu[80];
+      snprintf(cpu, sizeof(cpu), "%d", i);
+      if (amd64_pmc_begin_cpu(cpu, events[i % 4], n_pmcs) == 0)
         nr++;
-  }
+    }
+
   if (nr == 0)
     type->st_enabled = 0;
   return nr > 0 ? 0 : -1;
@@ -220,14 +221,14 @@ static void amd64_pmc_collect_cpu(struct stats_type *type, char *cpu, int nr_eve
 
 static void amd64_pmc_collect(struct stats_type *type)
 {
+  int n_pmcs = 0;
   int i;
-  for (i = 0; i < nr_cpus; i++) {
-    char cpu[80];
-    snprintf(cpu, sizeof(cpu), "%d", i);
-    int nr_events = 0;
-    if (signature(AMD_10H, cpu, &nr_events))
-      amd64_pmc_collect_cpu(type, cpu, nr_events);
-  }
+  if (signature(AMD_10H, &n_pmcs))
+    for (i = 0; i < nr_cpus; i++) {
+      char cpu[80];
+      snprintf(cpu, sizeof(cpu), "%d", i);
+      amd64_pmc_collect_cpu(type, cpu, n_pmcs);
+    }
 }
 
 struct stats_type amd64_pmc_stats_type = {

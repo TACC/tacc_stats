@@ -57,6 +57,18 @@ AC_ARG_ENABLE([mic],
 esac],[mic=false])
 AM_CONDITIONAL([MIC], [test x$mic = xtrue])
 
+AC_ARG_ENABLE([opa],
+[  --enable-opa  Enable Intel Omnipath Fabric support],
+[case "${enableval}" in
+  yes) opa=true
+  AC_SEARCH_LIBS([oib_open_port], [oib_utils], [have_opa=yes], 
+  [AC_MSG_ERROR([Unable to find liboib_utils.a!])])  
+  ;;
+  no)  opa=false ;;
+  *) AC_MSG_ERROR([bad value ${enableval} for --enable-opa]) ;;
+esac],[opa=false])
+AM_CONDITIONAL([OPA], [test x$opa = xtrue])
+
 AC_ARG_ENABLE([debug],
 [  --enable-debug    Turn on debugging],
 [case "${enableval}" in

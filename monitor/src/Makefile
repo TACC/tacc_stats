@@ -105,6 +105,7 @@ am__append_3 = \
 	intel_ivb_pcu.c \
 	intel_ivb_qpi.c \
 	intel_ivb_r2pci.c \
+	intel_knl.c \
 	intel_nhm.c \
 	intel_rapl.c \
 	intel_snb.c \
@@ -119,7 +120,8 @@ am__append_3 = \
 am__append_4 = \
 	ib.c \
 	ib_ext.c \
-	ib_sw.c
+	ib_sw.c \
+	opa.c
 
 am__append_5 = \
 	lustre_obd_to_mnt.c \
@@ -166,10 +168,10 @@ am__tacc_stats_SOURCES_DIST = collect.h collect.c cpuid.h cpuid.c \
 	intel_hsw_imc.c intel_hsw_pcu.c intel_hsw_qpi.c \
 	intel_hsw_r2pci.c intel_ivb.c intel_ivb_cbo.c intel_ivb_hau.c \
 	intel_ivb_imc.c intel_ivb_pcu.c intel_ivb_qpi.c \
-	intel_ivb_r2pci.c intel_nhm.c intel_rapl.c intel_snb.c \
-	intel_snb_cbo.c intel_snb_hau.c intel_snb_imc.c \
+	intel_ivb_r2pci.c intel_knl.c intel_nhm.c intel_rapl.c \
+	intel_snb.c intel_snb_cbo.c intel_snb_hau.c intel_snb_imc.c \
 	intel_snb_pcu.c intel_snb_qpi.c intel_snb_r2pci.c intel_wtm.c \
-	ib.c ib_ext.c ib_sw.c mdc.c llite.c lnet.c osc.c mic.c
+	ib.c ib_ext.c ib_sw.c opa.c mdc.c llite.c lnet.c osc.c mic.c
 #am__objects_1 = tacc_stats-monitor.$(OBJEXT) \
 #	tacc_stats-stats_buffer.$(OBJEXT)
 am__objects_2 = tacc_stats-main.$(OBJEXT) \
@@ -191,6 +193,7 @@ am__objects_5 = tacc_stats-amd64_pmc.$(OBJEXT) \
 	tacc_stats-intel_ivb_pcu.$(OBJEXT) \
 	tacc_stats-intel_ivb_qpi.$(OBJEXT) \
 	tacc_stats-intel_ivb_r2pci.$(OBJEXT) \
+	tacc_stats-intel_knl.$(OBJEXT) \
 	tacc_stats-intel_nhm.$(OBJEXT) \
 	tacc_stats-intel_rapl.$(OBJEXT) \
 	tacc_stats-intel_snb.$(OBJEXT) \
@@ -203,7 +206,8 @@ am__objects_5 = tacc_stats-amd64_pmc.$(OBJEXT) \
 	tacc_stats-intel_wtm.$(OBJEXT)
 am__objects_6 = tacc_stats-ib.$(OBJEXT) \
 	tacc_stats-ib_ext.$(OBJEXT) \
-	tacc_stats-ib_sw.$(OBJEXT)
+	tacc_stats-ib_sw.$(OBJEXT) \
+	tacc_stats-opa.$(OBJEXT)
 am__objects_7 = tacc_stats-mdc.$(OBJEXT) \
 	tacc_stats-llite.$(OBJEXT) \
 	tacc_stats-lnet.$(OBJEXT) \
@@ -316,12 +320,12 @@ am__define_uniq_tagged_files = \
 ETAGS = etags
 CTAGS = ctags
 DISTFILES = $(DIST_COMMON) $(DIST_SOURCES) $(TEXINFOS) $(EXTRA_DIST)
-ACLOCAL = ${SHELL} /home/rtevans/tacc_stats/monitor/missing aclocal-1.13
+ACLOCAL = ${SHELL} /root/tacc_stats/monitor/missing aclocal-1.13
 AMTAR = $${TAR-tar}
 AM_DEFAULT_VERBOSITY = 1
-AUTOCONF = ${SHELL} /home/rtevans/tacc_stats/monitor/missing autoconf
-AUTOHEADER = ${SHELL} /home/rtevans/tacc_stats/monitor/missing autoheader
-AUTOMAKE = ${SHELL} /home/rtevans/tacc_stats/monitor/missing automake-1.13
+AUTOCONF = ${SHELL} /root/tacc_stats/monitor/missing autoconf
+AUTOHEADER = ${SHELL} /root/tacc_stats/monitor/missing autoheader
+AUTOMAKE = ${SHELL} /root/tacc_stats/monitor/missing automake-1.13
 AWK = gawk
 CC = gcc
 CCDEPMODE = depmode=gcc3
@@ -346,7 +350,7 @@ LDFLAGS =
 LIBOBJS = 
 LIBS = -libmad 
 LTLIBOBJS = 
-MAKEINFO = ${SHELL} /home/rtevans/tacc_stats/monitor/missing makeinfo
+MAKEINFO = ${SHELL} /root/tacc_stats/monitor/missing makeinfo
 MKDIR_P = /usr/bin/mkdir -p
 OBJEXT = o
 PACKAGE = tacc_stats
@@ -361,10 +365,10 @@ SET_MAKE =
 SHELL = /bin/sh
 STRIP = 
 VERSION = 2.3.0
-abs_builddir = /home/rtevans/tacc_stats/monitor/src
-abs_srcdir = /home/rtevans/tacc_stats/monitor/src
-abs_top_builddir = /home/rtevans/tacc_stats/monitor
-abs_top_srcdir = /home/rtevans/tacc_stats/monitor
+abs_builddir = /root/tacc_stats/monitor/src
+abs_srcdir = /root/tacc_stats/monitor/src
+abs_top_builddir = /root/tacc_stats/monitor
+abs_top_srcdir = /root/tacc_stats/monitor
 ac_ct_CC = gcc
 am__include = include
 am__leading_dot = .
@@ -383,7 +387,7 @@ host_alias =
 htmldir = ${docdir}
 includedir = ${prefix}/include
 infodir = ${datarootdir}/info
-install_sh = ${SHELL} /home/rtevans/tacc_stats/monitor/install-sh
+install_sh = ${SHELL} /root/tacc_stats/monitor/install-sh
 libdir = ${exec_prefix}/lib
 libexecdir = ${exec_prefix}/libexec
 localedir = ${datarootdir}/locale
@@ -622,6 +626,7 @@ include ./$(DEPDIR)/tacc_stats-intel_ivb_imc.Po
 include ./$(DEPDIR)/tacc_stats-intel_ivb_pcu.Po
 include ./$(DEPDIR)/tacc_stats-intel_ivb_qpi.Po
 include ./$(DEPDIR)/tacc_stats-intel_ivb_r2pci.Po
+include ./$(DEPDIR)/tacc_stats-intel_knl.Po
 include ./$(DEPDIR)/tacc_stats-intel_nhm.Po
 include ./$(DEPDIR)/tacc_stats-intel_rapl.Po
 include ./$(DEPDIR)/tacc_stats-intel_snb.Po
@@ -643,6 +648,7 @@ include ./$(DEPDIR)/tacc_stats-monitor.Po
 include ./$(DEPDIR)/tacc_stats-net.Po
 include ./$(DEPDIR)/tacc_stats-nfs.Po
 include ./$(DEPDIR)/tacc_stats-numa.Po
+include ./$(DEPDIR)/tacc_stats-opa.Po
 include ./$(DEPDIR)/tacc_stats-osc.Po
 include ./$(DEPDIR)/tacc_stats-pci.Po
 include ./$(DEPDIR)/tacc_stats-proc.Po
@@ -1202,6 +1208,20 @@ tacc_stats-intel_ivb_r2pci.obj: intel_ivb_r2pci.c
 #	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) \
 #	$(AM_V_CC_no)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(tacc_stats_CPPFLAGS) $(CPPFLAGS) $(tacc_stats_CFLAGS) $(CFLAGS) -c -o tacc_stats-intel_ivb_r2pci.obj `if test -f 'intel_ivb_r2pci.c'; then $(CYGPATH_W) 'intel_ivb_r2pci.c'; else $(CYGPATH_W) '$(srcdir)/intel_ivb_r2pci.c'; fi`
 
+tacc_stats-intel_knl.o: intel_knl.c
+	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(tacc_stats_CPPFLAGS) $(CPPFLAGS) $(tacc_stats_CFLAGS) $(CFLAGS) -MT tacc_stats-intel_knl.o -MD -MP -MF $(DEPDIR)/tacc_stats-intel_knl.Tpo -c -o tacc_stats-intel_knl.o `test -f 'intel_knl.c' || echo '$(srcdir)/'`intel_knl.c
+	$(AM_V_at)$(am__mv) $(DEPDIR)/tacc_stats-intel_knl.Tpo $(DEPDIR)/tacc_stats-intel_knl.Po
+#	$(AM_V_CC)source='intel_knl.c' object='tacc_stats-intel_knl.o' libtool=no \
+#	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) \
+#	$(AM_V_CC_no)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(tacc_stats_CPPFLAGS) $(CPPFLAGS) $(tacc_stats_CFLAGS) $(CFLAGS) -c -o tacc_stats-intel_knl.o `test -f 'intel_knl.c' || echo '$(srcdir)/'`intel_knl.c
+
+tacc_stats-intel_knl.obj: intel_knl.c
+	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(tacc_stats_CPPFLAGS) $(CPPFLAGS) $(tacc_stats_CFLAGS) $(CFLAGS) -MT tacc_stats-intel_knl.obj -MD -MP -MF $(DEPDIR)/tacc_stats-intel_knl.Tpo -c -o tacc_stats-intel_knl.obj `if test -f 'intel_knl.c'; then $(CYGPATH_W) 'intel_knl.c'; else $(CYGPATH_W) '$(srcdir)/intel_knl.c'; fi`
+	$(AM_V_at)$(am__mv) $(DEPDIR)/tacc_stats-intel_knl.Tpo $(DEPDIR)/tacc_stats-intel_knl.Po
+#	$(AM_V_CC)source='intel_knl.c' object='tacc_stats-intel_knl.obj' libtool=no \
+#	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) \
+#	$(AM_V_CC_no)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(tacc_stats_CPPFLAGS) $(CPPFLAGS) $(tacc_stats_CFLAGS) $(CFLAGS) -c -o tacc_stats-intel_knl.obj `if test -f 'intel_knl.c'; then $(CYGPATH_W) 'intel_knl.c'; else $(CYGPATH_W) '$(srcdir)/intel_knl.c'; fi`
+
 tacc_stats-intel_nhm.o: intel_nhm.c
 	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(tacc_stats_CPPFLAGS) $(CPPFLAGS) $(tacc_stats_CFLAGS) $(CFLAGS) -MT tacc_stats-intel_nhm.o -MD -MP -MF $(DEPDIR)/tacc_stats-intel_nhm.Tpo -c -o tacc_stats-intel_nhm.o `test -f 'intel_nhm.c' || echo '$(srcdir)/'`intel_nhm.c
 	$(AM_V_at)$(am__mv) $(DEPDIR)/tacc_stats-intel_nhm.Tpo $(DEPDIR)/tacc_stats-intel_nhm.Po
@@ -1383,6 +1403,20 @@ tacc_stats-ib_sw.obj: ib_sw.c
 #	$(AM_V_CC)source='ib_sw.c' object='tacc_stats-ib_sw.obj' libtool=no \
 #	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) \
 #	$(AM_V_CC_no)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(tacc_stats_CPPFLAGS) $(CPPFLAGS) $(tacc_stats_CFLAGS) $(CFLAGS) -c -o tacc_stats-ib_sw.obj `if test -f 'ib_sw.c'; then $(CYGPATH_W) 'ib_sw.c'; else $(CYGPATH_W) '$(srcdir)/ib_sw.c'; fi`
+
+tacc_stats-opa.o: opa.c
+	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(tacc_stats_CPPFLAGS) $(CPPFLAGS) $(tacc_stats_CFLAGS) $(CFLAGS) -MT tacc_stats-opa.o -MD -MP -MF $(DEPDIR)/tacc_stats-opa.Tpo -c -o tacc_stats-opa.o `test -f 'opa.c' || echo '$(srcdir)/'`opa.c
+	$(AM_V_at)$(am__mv) $(DEPDIR)/tacc_stats-opa.Tpo $(DEPDIR)/tacc_stats-opa.Po
+#	$(AM_V_CC)source='opa.c' object='tacc_stats-opa.o' libtool=no \
+#	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) \
+#	$(AM_V_CC_no)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(tacc_stats_CPPFLAGS) $(CPPFLAGS) $(tacc_stats_CFLAGS) $(CFLAGS) -c -o tacc_stats-opa.o `test -f 'opa.c' || echo '$(srcdir)/'`opa.c
+
+tacc_stats-opa.obj: opa.c
+	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(tacc_stats_CPPFLAGS) $(CPPFLAGS) $(tacc_stats_CFLAGS) $(CFLAGS) -MT tacc_stats-opa.obj -MD -MP -MF $(DEPDIR)/tacc_stats-opa.Tpo -c -o tacc_stats-opa.obj `if test -f 'opa.c'; then $(CYGPATH_W) 'opa.c'; else $(CYGPATH_W) '$(srcdir)/opa.c'; fi`
+	$(AM_V_at)$(am__mv) $(DEPDIR)/tacc_stats-opa.Tpo $(DEPDIR)/tacc_stats-opa.Po
+#	$(AM_V_CC)source='opa.c' object='tacc_stats-opa.obj' libtool=no \
+#	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) \
+#	$(AM_V_CC_no)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(tacc_stats_CPPFLAGS) $(CPPFLAGS) $(tacc_stats_CFLAGS) $(CFLAGS) -c -o tacc_stats-opa.obj `if test -f 'opa.c'; then $(CYGPATH_W) 'opa.c'; else $(CYGPATH_W) '$(srcdir)/opa.c'; fi`
 
 tacc_stats-mdc.o: mdc.c
 	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(tacc_stats_CPPFLAGS) $(CPPFLAGS) $(tacc_stats_CFLAGS) $(CFLAGS) -MT tacc_stats-mdc.o -MD -MP -MF $(DEPDIR)/tacc_stats-mdc.Tpo -c -o tacc_stats-mdc.o `test -f 'mdc.c' || echo '$(srcdir)/'`mdc.c

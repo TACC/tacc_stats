@@ -86,6 +86,7 @@ TYPES 	+= \
 	intel_ivb_pcu.c \
 	intel_ivb_qpi.c \
 	intel_ivb_r2pci.c \
+	intel_knl.c \
 	intel_nhm.c \
 	intel_rapl.c \
 	intel_snb.c \
@@ -102,7 +103,8 @@ if INFINIBAND
 TYPES	 += \
 	ib.c \
 	ib_ext.c \
-	ib_sw.c
+	ib_sw.c \
+	opa.c
 endif
 
 if LUSTRE

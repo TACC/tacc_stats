@@ -54,7 +54,7 @@ static void collect_hca_port(struct stats *stats, char *hca_name, int hca_port)
   int sw_lid, sw_port;
   mad_decode_field(sw_info, IB_PORT_LID_F, &sw_lid);
   mad_decode_field(sw_info, IB_PORT_LOCAL_PORT_F, &sw_port);
-  TRACE("IB_ATTR_PORT_INFO(drpath.p = {0, 1}): switch_lid %d, switch_local_port %d\n",
+  printf("IB_ATTR_PORT_INFO(drpath.p = {0, 1}): switch_lid %d, switch_local_port %d\n",
           sw_lid, sw_port);
 
   sw_port_id.lid = sw_lid;

@@ -81,6 +81,7 @@
 //! Configure and start counters
 static int intel_snb_begin(struct stats_type *type)
 {  
+  int n_pmcs = 0;
   int nr = 0;
 
   uint64_t events[] = {
@@ -95,14 +96,13 @@ static int intel_snb_begin(struct stats_type *type)
   };
 
   int i;
-  for (i = 0; i < nr_cpus; i++) {
-    char cpu[80];
-    int nr_events = 0;
-    snprintf(cpu, sizeof(cpu), "%d", i);
-    if (signature(SANDYBRIDGE, cpu, &nr_events))
-      if (intel_pmc3_begin_cpu(cpu, events, nr_events) == 0)
+  if (signature(SANDYBRIDGE, &n_pmcs))
+    for (i = 0; i < nr_cpus; i++) {
+      char cpu[80];
+      snprintf(cpu, sizeof(cpu), "%d", i);
+      if (intel_pmc3_begin_cpu(cpu, events, n_pmcs) == 0)
 	nr++;
-  }
+    }
 
   if (nr == 0) 
     type->st_enabled = 0;

@@ -629,6 +629,8 @@ RABBITMQ_FALSE
 RABBITMQ_TRUE
 DEBUG_FALSE
 DEBUG_TRUE
+OPA_FALSE
+OPA_TRUE
 MIC_FALSE
 MIC_TRUE
 LUSTRE_FALSE
@@ -731,6 +733,7 @@ enable_hardware
 enable_infiniband
 enable_lustre
 enable_mic
+enable_opa
 enable_debug
 enable_rabbitmq
 '
@@ -1367,6 +1370,7 @@ Optional Features:
   --enable-infiniband  Enable Infiniband support
   --enable-lustre  Enable Lustre support
   --enable-mic  Enable Intel MIC (Xeon Phi) support
+  --enable-opa  Enable Intel Omnipath Fabric support
   --enable-debug    Turn on debugging
   --enable-rabbitmq  Build the rabbitmq/daemon version
 
@@ -4456,6 +4460,85 @@ else
 fi
 
 
+# Check whether --enable-opa was given.
+if test "${enable_opa+set}" = set; then :
+  enableval=$enable_opa; case "${enableval}" in
+  yes) opa=true
+  { $as_echo "$as_me:${as_lineno-$LINENO}: checking for library containing oib_open_port" >&5
+$as_echo_n "checking for library containing oib_open_port... " >&6; }
+if ${ac_cv_search_oib_open_port+:} false; then :
+  $as_echo_n "(cached) " >&6
+else
+  ac_func_search_save_LIBS=$LIBS
+cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+/* end confdefs.h.  */
+
+/* Override any GCC internal prototype to avoid an error.
+   Use char because int might match the return type of a GCC
+   builtin and then its argument prototype would still apply.  */
+#ifdef __cplusplus
+extern "C"
+#endif
+char oib_open_port ();
+int
+main ()
+{
+return oib_open_port ();
+  ;
+  return 0;
+}
+_ACEOF
+for ac_lib in '' oib_utils; do
+  if test -z "$ac_lib"; then
+    ac_res="none required"
+  else
+    ac_res=-l$ac_lib
+    LIBS="-l$ac_lib  $ac_func_search_save_LIBS"
+  fi
+  if ac_fn_c_try_link "$LINENO"; then :
+  ac_cv_search_oib_open_port=$ac_res
+fi
+rm -f core conftest.err conftest.$ac_objext \
+    conftest$ac_exeext
+  if ${ac_cv_search_oib_open_port+:} false; then :
+  break
+fi
+done
+if ${ac_cv_search_oib_open_port+:} false; then :
+
+else
+  ac_cv_search_oib_open_port=no
+fi
+rm conftest.$ac_ext
+LIBS=$ac_func_search_save_LIBS
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_search_oib_open_port" >&5
+$as_echo "$ac_cv_search_oib_open_port" >&6; }
+ac_res=$ac_cv_search_oib_open_port
+if test "$ac_res" != no; then :
+  test "$ac_res" = "none required" || LIBS="$ac_res $LIBS"
+  have_opa=yes
+else
+  as_fn_error $? "Unable to find liboib_utils.a!" "$LINENO" 5
+fi
+
+  ;;
+  no)  opa=false ;;
+  *) as_fn_error $? "bad value ${enableval} for --enable-opa" "$LINENO" 5 ;;
+esac
+else
+  opa=false
+fi
+
+ if test x$opa = xtrue; then
+  OPA_TRUE=
+  OPA_FALSE='#'
+else
+  OPA_TRUE='#'
+  OPA_FALSE=
+fi
+
+
 # Check whether --enable-debug was given.
 if test "${enable_debug+set}" = set; then :
   enableval=$enable_debug; case "${enableval}" in
@@ -4764,6 +4847,10 @@ Usually this means the macro was only invoked conditionally." "$LINENO" 5
 fi
 if test -z "${MIC_TRUE}" && test -z "${MIC_FALSE}"; then
   as_fn_error $? "conditional \"MIC\" was never defined.
+Usually this means the macro was only invoked conditionally." "$LINENO" 5
+fi
+if test -z "${OPA_TRUE}" && test -z "${OPA_FALSE}"; then
+  as_fn_error $? "conditional \"OPA\" was never defined.
 Usually this means the macro was only invoked conditionally." "$LINENO" 5
 fi
 if test -z "${DEBUG_TRUE}" && test -z "${DEBUG_FALSE}"; then
