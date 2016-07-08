@@ -2,49 +2,40 @@
 #include <stdlib.h>
 #include <string.h>
 #include <dirent.h>
-#include <infiniband/umad.h>
-#include <infiniband/mad.h>
 #include "pscanf.h"
 
 #include "oib_utils.h"
 #include "iba/stl_pa.h"
 #include "stl_print.h"
-/* opa collects IB HCA/PORT statistics by querying the extended
-   performance counters of the switch port to which the HCA/PORT is
-   connected.  This is used on Ranger, where the HCA firmware only
-   exports the (useless) 32-bit performance counters, but the switch
-   port does provide 64-bit counters. */
-
-#define KEYS \
-  X(rx_bytes, "E,U=4B", ""), \
-  X(rx_packets, "E", ""), \
-  X(tx_bytes, "E,U=4B", ""), \
-  X(tx_packets, "E", "")
+/* opa collects OPA HFI/PORT statistics by querying the OPA Performance Agent.
+   These counters should all be 64-bit.
+*/
 
 static void collect_hfi_port(char *hfi_name, uint32_t nodeLid, int portNumber)
 {
   struct oib_port *mad_port = NULL;
 
+  // These are used to obtain historical data saved by PM (we want live)
   uint64 imageNumber = 0;  
   int32 imageOffset = 0;  
 
+  // Whether to report deltas
   uint32_t deltaFlag = 0;
+  // User ctrs ?
   uint32_t userCntrsFlag = 0;
-  FSTATUS fstatus;
-  int c, index;
 
   // initialize connections to IB related entities 
   // Open the port
   int verbose = 0;
-  
-  if ( oib_pa_client_init( &mad_port, (int)1, portNumber, (verbose ? stderr : NULL)) == 1 )
-      fstatus = FSUCCESS;
-  else {
-      fprintf(stderr, "%s: failed to open the port: hfi %d, port %d\n", __func__, 1, portNumber);
-      goto out;
+
+  // Open the port
+  if ( oib_pa_client_init( &mad_port, (int)0, portNumber, (verbose ? stderr : NULL)) != 1 ) {
+    fprintf(stderr, "%s: failed to open the port: hfi %d, port %d\n", __func__, 1, portNumber);
+    goto out;
   }
 
-  FSTATUS status = FERROR;
+  // Historical data (about 10 images supposedly) are available from PA
+  // We want live
   STL_PA_IMAGE_ID_DATA imageId = {0};
   imageId.imageNumber = imageNumber;
   imageId.imageOffset = imageOffset;
@@ -52,10 +43,10 @@ static void collect_hfi_port(char *hfi_name, uint32_t nodeLid, int portNumber)
   printf("Getting Port Counters...\n");
 
   STL_PORT_COUNTERS_DATA *pPortCounters;  
+  // Query the PA and get the counters for the port
   pPortCounters = iba_pa_single_mad_port_counters_response_query(mad_port, nodeLid, (uint8_t)portNumber, 
 								 deltaFlag, userCntrsFlag, &imageId);
     if (pPortCounters != NULL) {
-      status = FSUCCESS;
       printf( "%*s%s controlled Port Counters (%s) for NODELID 0x%04x, port number %u%s:\n",
 	      0, "", (pPortCounters->flags & STL_PA_PC_FLAG_USER_COUNTERS) ? "User" : "PM",
 	      (pPortCounters->flags & STL_PA_PC_FLAG_DELTA) ? "delta" : "total",

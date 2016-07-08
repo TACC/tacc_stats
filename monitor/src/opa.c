@@ -2,95 +2,104 @@
 #include <stdlib.h>
 #include <string.h>
 #include <dirent.h>
-#include <infiniband/umad.h>
-#include <infiniband/mad.h>
-#include "stats.h"
-#include "trace.h"
 #include "pscanf.h"
 
-/* opa collects IB HCA/PORT statistics by querying the extended
-   performance counters of the switch port to which the HCA/PORT is
-   connected.  This is used on Ranger, where the HCA firmware only
-   exports the (useless) 32-bit performance counters, but the switch
-   port does provide 64-bit counters. */
+#include "oib_utils.h"
+#include "iba/stl_pa.h"
+#include "stl_print.h"
+/* opa collects OPA HFI/PORT statistics by querying the OPA Performance Agent.
+   These counters should all be 64-bit.
+*/
 
 #define KEYS \
-  X(rx_bytes, "E,U=4B", ""), \
-  X(rx_packets, "E", ""), \
-  X(tx_bytes, "E,U=4B", ""), \
-  X(tx_packets, "E", "")
+  X(portRcvData, "E", ""),			\
+    X(portXmitPkts, "E", ""),			\
+    X(portRcvPkts, "E", ""),			\
+    X(portMulticastXmitPkts, "E", ""),		\
+    X(portMulticastRcvPkts, "E", ""),		\
+    X(localLinkIntegrityErrors, "E", ""),	\
+    X(fmConfigErrors, "E", ""),			\
+    X(portRcvErrors, "E", ""),			\
+    X(excessiveBufferOverruns, "E", ""),	\
+    X(portRcvConstraintErrors, "E", ""),	\
+    X(portRcvSwitchRelayErrors, "E", ""),	\
+    X(portXmitDiscards, "E", ""),		\
+    X(portXmitConstraintErrors, "E", ""),	\
+    X(portRcvRemotePhysicalErrors, "E", ""),	\
+    X(swPortCongestion, "E", ""),		\
+    X(portXmitWait, "E", ""),			\
+    X(portRcvFECN, "E", ""),			\
+    X(portRcvBECN, "E", ""),			\
+    X(portXmitTimeCong, "E", ""),		\
+    X(portXmitWastedBW, "E", ""),		\
+    X(portXmitWaitData, "E", ""),		\
+    X(portRcvBubble, "E", ""),			\
+    X(portMarkFECN, "E", ""),			\
+    X(linkErrorRecovery, "E", ""),		\
+    X(linkDowned, "E", ""),			\
+    X(uncorrectableErrors, "E", "")
 
-static void collect_hca_port(struct stats *stats, char *hca_name, int hca_port)
+static void collect_hfi_port(char *hfi_name, uint32_t nodeLid, int portNumber)
 {
-  struct ibmad_port *mad_port = NULL;
-  int mad_timeout = 15;
-  int mad_classes[] = { IB_SMI_DIRECT_CLASS, IB_PERFORMANCE_CLASS, };
+  struct oib_port *mad_port = NULL;
 
-  mad_port = mad_rpc_open_port(hca_name, hca_port, mad_classes, 2);
-  if (mad_port == NULL) {
-    ERROR("cannot open MAD port for HCA `%s' port %d\n", hca_name, hca_port);
+  // These are used to obtain historical data saved by PM (we want live)
+  uint64 imageNumber = 0;  
+  int32 imageOffset = 0;  
+
+  // Whether to report deltas
+  uint32_t deltaFlag = 0;
+  // User ctrs ?
+  uint32_t userCntrsFlag = 0;
+
+  // initialize connections to IB related entities 
+  // Open the port
+  int verbose = 0;
+
+  // Open the port
+  if ( oib_pa_client_init( &mad_port, (int)0, portNumber, (verbose ? stderr : NULL)) != 1 ) {
+    ERROR("%s: failed to open the port: hfi %d, port %d\n", __func__, 1, portNumber);
     goto out;
   }
 
-  /* For reasons we don't understand, PMA queries can only be LID
-     addressed.  But we don't know the LID of the switch to which the
-     HCA is connected, so we send a SMP on the directed route 0,1 and
-     ask the port to identify itself. */
+  // Historical data (about 10 images supposedly) are available from PA
+  // We want live
+  STL_PA_IMAGE_ID_DATA imageId = {0};
+  imageId.imageNumber = imageNumber;
+  imageId.imageOffset = imageOffset;
 
-  ib_portid_t sw_port_id = {
-    .drpath = {
-      .cnt = 1,
-      .p = { 0, 1, },
-    },
-  };
+  TRACE("Getting Port Counters...\n");
 
-  uint8_t sw_info[64];
-  memset(sw_info, 0, sizeof(sw_info));
-  if (smp_query_via(sw_info, &sw_port_id, IB_ATTR_PORT_INFO, 0, mad_timeout, mad_port) == NULL) {
-    ERROR("cannot query port info: %m\n");
+  STL_PORT_COUNTERS_DATA *pPortCounters;  
+  // Query the PA and get the counters for the port
+  if ((pPortCounters = (STL_PORT_COUNTERS_DATA *)iba_pa_single_mad_port_counters_response_query(mad_port, nodeLid, (uint8_t)portNumber, 
+								      deltaFlag, userCntrsFlag, &imageId)) == NULL) {
+    ERROR("cannot query performance counters: %m\n");
     goto out;
   }
+  TRACE( "PM controlled Port Counters (total) for NODELID 0x%04x, port number %u\n", nodeLid, portNumber);
 
-  int sw_lid, sw_port;
-  mad_decode_field(sw_info, IB_PORT_LID_F, &sw_lid);
-  mad_decode_field(sw_info, IB_PORT_LOCAL_PORT_F, &sw_port);
-  printf("IB_ATTR_PORT_INFO(drpath.p = {0, 1}): switch_lid %d, switch_local_port %d\n",
-          sw_lid, sw_port);
+#define X(n, r...)				\
+  do {						\
+    stats_set(stats, #n, pPortCounters->n);	\
+    TRACE(#n"%20"PRIu64"\n")
+  } while (0);
+  KEYS;
+#undef X
 
-  sw_port_id.lid = sw_lid;
-
-  uint8_t sw_pma[1024];
-  memset(sw_pma, 0, sizeof(sw_pma));
-  if (pma_query_via(sw_pma, &sw_port_id, sw_port, mad_timeout, IB_GSI_PORT_COUNTERS_EXT, mad_port) == NULL) {
-    ERROR("cannot query performance counters of switch LID %d, port %d: %m\n", sw_lid, sw_port);
-    goto out;
-  }
-
-  uint64_t sw_rx_bytes, sw_rx_packets, sw_tx_bytes, sw_tx_packets;
-  mad_decode_field(sw_pma, IB_PC_EXT_RCV_BYTES_F, &sw_rx_bytes);
-  mad_decode_field(sw_pma, IB_PC_EXT_RCV_PKTS_F,  &sw_rx_packets);
-  mad_decode_field(sw_pma, IB_PC_EXT_XMT_BYTES_F, &sw_tx_bytes);
-  mad_decode_field(sw_pma, IB_PC_EXT_XMT_PKTS_F,  &sw_tx_packets);
-
-  TRACE("sw_rx_bytes %lu, sw_rx_packets %lu, sw_tx_bytes %lu, sw_tx_packets %lu\n",
-        sw_rx_bytes, sw_rx_packets, sw_tx_bytes, sw_tx_packets);
-
-  /* The transposition of tx and rx is intentional: the switch port
-     receives what we send, and conversely. */
-  stats_set(stats, "rx_bytes",   sw_tx_bytes);
-  stats_set(stats, "rx_packets", sw_tx_packets);
-  stats_set(stats, "tx_bytes",   sw_rx_bytes);
-  stats_set(stats, "tx_packets", sw_rx_packets);
-
- out:
+  if (pPortCounters)
+    MemoryDeallocate(pPortCounters);
+  
+ out:  
   if (mad_port != NULL)
-    mad_rpc_close_port(mad_port);
+    oib_close_port(mad_port);
 }
 
-static void collect_opa(struct stats_type *type)
+static void collect_opa()
 {
   const char *ib_dir_path = "/sys/class/infiniband";
   DIR *ib_dir = NULL;
+  unsigned int lid = -1;
 
   ib_dir = opendir(ib_dir_path);
   if (ib_dir == NULL) {
@@ -98,20 +107,20 @@ static void collect_opa(struct stats_type *type)
     goto out;
   }
 
-  struct dirent *hca_ent;
-  while ((hca_ent = readdir(ib_dir)) != NULL) {
-    char *hca = hca_ent->d_name;
+  struct dirent *hfi_ent;
+  while ((hfi_ent = readdir(ib_dir)) != NULL) {
+    char *hfi = hfi_ent->d_name;
     char ports_path[80];
     DIR *ports_dir = NULL;
 
-    if (hca[0] == '.')
-      goto next_hca;
+    if (hfi[0] == '.')
+      goto next_hfi;
 
-    snprintf(ports_path, sizeof(ports_path), "%s/%s/ports", ib_dir_path, hca);
+    snprintf(ports_path, sizeof(ports_path), "%s/%s/ports", ib_dir_path, hfi);
     ports_dir = opendir(ports_path);
     if (ports_dir == NULL) {
       ERROR("cannot open `%s': %m\n", ports_path);
-      goto next_hca;
+      goto next_hfi;
     }
 
     struct dirent *port_ent;
@@ -120,33 +129,37 @@ static void collect_opa(struct stats_type *type)
       if (port <= 0)
         continue;
 
-      /* Check that port is active. .../HCA/ports/PORT/state should read "4: ACTIVE." */
+      /* Check that port is active. .../HFI/ports/PORT/state should read "4: ACTIVE." */
       int state = -1;
       char state_path[80];
-      snprintf(state_path, sizeof(state_path), "/sys/class/infiniband/%s/ports/%d/state", hca, port);
+      snprintf(state_path, sizeof(state_path), "/sys/class/infiniband/%s/ports/%d/state", hfi, port);
       if (pscanf(state_path, "%d", &state) != 1) {
-        ERROR("cannot read state of IB HCA `%s' port %d: %m\n", hca, port);
+        ERROR("cannot read state of IB HFI `%s' port %d: %m\n", hfi, port);
         continue;
       }
 
       if (state != 4) {
-        TRACE("skipping inactive IB HCA `%s', port %d, state %d\n", hca, port, state);
+        ERROR("skipping inactive IB HFI `%s', port %d, state %d\n", hfi, port, state);
         continue;
       }
 
-      /* Create dev name (HCA/PORT) and get stats for dev. */
+      /* Get the lid. */
+      char lid_path[80];
+      snprintf(lid_path, sizeof(lid_path), "/sys/class/infiniband/%s/ports/%i/lid", hfi, port);
+      if (pscanf(lid_path, "%x", &lid) != 1) {
+	ERROR("cannot read lid of IB HCA `%s' port %d: %m\n", hfi, port);
+	continue;
+      }
+
+      /* Create dev name (HFI/PORT) and get stats for dev. */
       char dev[80];
-      snprintf(dev, sizeof(dev), "%s/%d", hca, port);
-      TRACE("IB HCA `%s', port %d, dev `%s'\n", hca, port, dev);
+      snprintf(dev, sizeof(dev), "%s/%d", hfi, port);
+      TRACE("IB HFI `%s', port %d, dev `%s'\n", hfi, port, dev);
 
-      struct stats *stats = get_current_stats(type, dev);
-      if (stats == NULL)
-        continue;
-
-      collect_hca_port(stats, hca, port);
+      collect_hfi_port(hfi, lid, port);
     }
 
-  next_hca:
+  next_hfi:
     if (ports_dir != NULL)
       closedir(ports_dir);
   }
@@ -156,10 +169,7 @@ static void collect_opa(struct stats_type *type)
     closedir(ib_dir);
 }
 
-struct stats_type opa_stats_type = {
-  .st_name = "opa",
-  .st_collect = &collect_opa,
-#define X SCHEMA_DEF
-  .st_schema_def = JOIN(KEYS),
-#undef X
-};
+int main() {
+  collect_opa();
+  return 0;
+}
