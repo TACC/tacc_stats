@@ -3,7 +3,7 @@
 #include <string.h>
 #include <dirent.h>
 #include "pscanf.h"
-
+#include "stats.h"
 #include "oib_utils.h"
 #include "iba/stl_pa.h"
 #include "stl_print.h"
@@ -44,7 +44,7 @@ static void collect_hfi_port(char *hfi_name, uint32_t nodeLid, int portNumber)
 
   STL_PORT_COUNTERS_DATA *pPortCounters;  
   // Query the PA and get the counters for the port
-  pPortCounters = iba_pa_single_mad_port_counters_response_query(mad_port, nodeLid, (uint8_t)portNumber, 
+  pPortCounters = (STL_PORT_COUNTERS_DATA *)iba_pa_single_mad_port_counters_response_query(mad_port, nodeLid, (uint8_t)portNumber, 
 								 deltaFlag, userCntrsFlag, &imageId);
     if (pPortCounters != NULL) {
       printf( "%*s%s controlled Port Counters (%s) for NODELID 0x%04x, port number %u%s:\n",

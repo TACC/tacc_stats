@@ -3,16 +3,19 @@
 #include <string.h>
 #include <dirent.h>
 #include "pscanf.h"
-
+#include "stats.h"
+#include "trace.h"
 #include "oib_utils.h"
+//#include "oib_utils_pa.h"
 #include "iba/stl_pa.h"
-#include "stl_print.h"
+//#include "stl_print.h"
 /* opa collects OPA HFI/PORT statistics by querying the OPA Performance Agent.
    These counters should all be 64-bit.
 */
 
 #define KEYS \
-  X(portRcvData, "E", ""),			\
+  X(portXmitData, "E", ""),			\
+    X(portRcvData, "E", ""),			\
     X(portXmitPkts, "E", ""),			\
     X(portRcvPkts, "E", ""),			\
     X(portMulticastXmitPkts, "E", ""),		\
@@ -39,7 +42,7 @@
     X(linkDowned, "E", ""),			\
     X(uncorrectableErrors, "E", "")
 
-static void collect_hfi_port(char *hfi_name, uint32_t nodeLid, int portNumber)
+static void collect_hfi_port(struct stats *stats, char *hfi_name, uint32_t nodeLid, int portNumber)
 {
   struct oib_port *mad_port = NULL;
 
@@ -72,7 +75,7 @@ static void collect_hfi_port(char *hfi_name, uint32_t nodeLid, int portNumber)
 
   STL_PORT_COUNTERS_DATA *pPortCounters;  
   // Query the PA and get the counters for the port
-  if ((pPortCounters = (STL_PORT_COUNTERS_DATA *)iba_pa_single_mad_port_counters_response_query(mad_port, nodeLid, (uint8_t)portNumber, 
+  if ((pPortCounters = iba_pa_single_mad_port_counters_response_query(mad_port, nodeLid, (uint8_t)portNumber, 
 								      deltaFlag, userCntrsFlag, &imageId)) == NULL) {
     ERROR("cannot query performance counters: %m\n");
     goto out;
@@ -80,10 +83,10 @@ static void collect_hfi_port(char *hfi_name, uint32_t nodeLid, int portNumber)
   TRACE( "PM controlled Port Counters (total) for NODELID 0x%04x, port number %u\n", nodeLid, portNumber);
 
 #define X(n, r...)				\
-  do {						\
+  ({						\
     stats_set(stats, #n, pPortCounters->n);	\
-    TRACE(#n"%20"PRIu64"\n")
-  } while (0);
+    TRACE(#n"%20"PRIu64"\n");			\
+  })
   KEYS;
 #undef X
 
@@ -95,7 +98,7 @@ static void collect_hfi_port(char *hfi_name, uint32_t nodeLid, int portNumber)
     oib_close_port(mad_port);
 }
 
-static void collect_opa()
+static void collect_opa(struct stats_type *type)
 {
   const char *ib_dir_path = "/sys/class/infiniband";
   DIR *ib_dir = NULL;
@@ -156,7 +159,11 @@ static void collect_opa()
       snprintf(dev, sizeof(dev), "%s/%d", hfi, port);
       TRACE("IB HFI `%s', port %d, dev `%s'\n", hfi, port, dev);
 
-      collect_hfi_port(hfi, lid, port);
+      struct stats *stats = get_current_stats(type, dev);
+      if (stats == NULL)
+        continue;
+
+      collect_hfi_port(stats, hfi, lid, port);
     }
 
   next_hfi:
@@ -169,7 +176,10 @@ static void collect_opa()
     closedir(ib_dir);
 }
 
-int main() {
-  collect_opa();
-  return 0;
-}
+struct stats_type opa_stats_type = {
+  .st_name = "opa",
+  .st_collect = &collect_opa,
+#define X SCHEMA_DEF
+  .st_schema_def = JOIN(KEYS),
+#undef X
+};

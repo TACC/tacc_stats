@@ -120,30 +120,36 @@ bin_PROGRAMS = tacc_stats$(EXEEXT)
 @INFINIBAND_TRUE@am__append_4 = \
 @INFINIBAND_TRUE@	ib.c \
 @INFINIBAND_TRUE@	ib_ext.c \
-@INFINIBAND_TRUE@	ib_sw.c \
-@INFINIBAND_TRUE@	opa.c
+@INFINIBAND_TRUE@	ib_sw.c
 
-@LUSTRE_TRUE@am__append_5 = \
+@OPA_TRUE@am__append_5 = \
+@OPA_TRUE@	opa.c
+
+@OPA_TRUE@am__append_6 = \
+@OPA_TRUE@		-lpthread \
+@OPA_TRUE@		-lmemusage
+
+@LUSTRE_TRUE@am__append_7 = \
 @LUSTRE_TRUE@	lustre_obd_to_mnt.c \
 @LUSTRE_TRUE@	lustre_obd_to_mnt.h
 
-@LUSTRE_TRUE@am__append_6 = \
+@LUSTRE_TRUE@am__append_8 = \
 @LUSTRE_TRUE@	mdc.c \
 @LUSTRE_TRUE@	llite.c \
 @LUSTRE_TRUE@	lnet.c \
 @LUSTRE_TRUE@	osc.c
 
-@MIC_TRUE@am__append_7 = \
+@MIC_TRUE@am__append_9 = \
 @MIC_TRUE@	miclib.h 
 
-@MIC_TRUE@am__append_8 = \
+@MIC_TRUE@am__append_10 = \
 @MIC_TRUE@	mic.c
 
-@RABBITMQ_TRUE@am__append_9 = taccstats
-@RABBITMQ_TRUE@am__append_10 = \
+@RABBITMQ_TRUE@am__append_11 = taccstats
+@RABBITMQ_TRUE@am__append_12 = \
 @RABBITMQ_TRUE@	taccstats
 
-@RABBITMQ_TRUE@am__append_11 = $(initd_SCRIPTS) $(sysconfdir_DATA)
+@RABBITMQ_TRUE@am__append_13 = $(initd_SCRIPTS) $(sysconfdir_DATA)
 subdir = src
 DIST_COMMON = $(srcdir)/Makefile.in $(srcdir)/Makefile.am \
 	$(top_srcdir)/depcomp
@@ -206,26 +212,26 @@ am__objects_4 =
 @HARDWARE_TRUE@	tacc_stats-intel_wtm.$(OBJEXT)
 @INFINIBAND_TRUE@am__objects_6 = tacc_stats-ib.$(OBJEXT) \
 @INFINIBAND_TRUE@	tacc_stats-ib_ext.$(OBJEXT) \
-@INFINIBAND_TRUE@	tacc_stats-ib_sw.$(OBJEXT) \
-@INFINIBAND_TRUE@	tacc_stats-opa.$(OBJEXT)
-@LUSTRE_TRUE@am__objects_7 = tacc_stats-mdc.$(OBJEXT) \
+@INFINIBAND_TRUE@	tacc_stats-ib_sw.$(OBJEXT)
+@OPA_TRUE@am__objects_7 = tacc_stats-opa.$(OBJEXT)
+@LUSTRE_TRUE@am__objects_8 = tacc_stats-mdc.$(OBJEXT) \
 @LUSTRE_TRUE@	tacc_stats-llite.$(OBJEXT) \
 @LUSTRE_TRUE@	tacc_stats-lnet.$(OBJEXT) \
 @LUSTRE_TRUE@	tacc_stats-osc.$(OBJEXT)
-@MIC_TRUE@am__objects_8 = tacc_stats-mic.$(OBJEXT)
-am__objects_9 = tacc_stats-block.$(OBJEXT) tacc_stats-cpu.$(OBJEXT) \
+@MIC_TRUE@am__objects_9 = tacc_stats-mic.$(OBJEXT)
+am__objects_10 = tacc_stats-block.$(OBJEXT) tacc_stats-cpu.$(OBJEXT) \
 	tacc_stats-mem.$(OBJEXT) tacc_stats-net.$(OBJEXT) \
 	tacc_stats-nfs.$(OBJEXT) tacc_stats-numa.$(OBJEXT) \
 	tacc_stats-proc.$(OBJEXT) tacc_stats-ps.$(OBJEXT) \
 	tacc_stats-sysv_shm.$(OBJEXT) tacc_stats-tmpfs.$(OBJEXT) \
 	tacc_stats-vfs.$(OBJEXT) tacc_stats-vm.$(OBJEXT) \
 	$(am__objects_5) $(am__objects_6) $(am__objects_7) \
-	$(am__objects_8)
+	$(am__objects_8) $(am__objects_9)
 am_tacc_stats_OBJECTS = tacc_stats-collect.$(OBJEXT) \
 	tacc_stats-cpuid.$(OBJEXT) tacc_stats-dict.$(OBJEXT) \
 	tacc_stats-pci.$(OBJEXT) tacc_stats-schema.$(OBJEXT) \
 	tacc_stats-stats.$(OBJEXT) $(am__objects_1) $(am__objects_2) \
-	$(am__objects_3) $(am__objects_4) $(am__objects_9)
+	$(am__objects_3) $(am__objects_4) $(am__objects_10)
 nodist_tacc_stats_OBJECTS = $(am__objects_4)
 tacc_stats_OBJECTS = $(am_tacc_stats_OBJECTS) \
 	$(nodist_tacc_stats_OBJECTS)
@@ -422,20 +428,18 @@ tacc_stats_CPPFLAGS = \
 	-DSTATS_LOCK_PATH=\"$(STATS_LOCK_PATH)\" \
 	-DJOBID_FILE_PATH=\"$(JOBID_FILE_PATH)\"
 
-tacc_stats_LDFLAGS = \
-	-lm
-
 tacc_stats_SOURCES = collect.h collect.c cpuid.h cpuid.c dict.h dict.c \
 	intel_hsw_uncore.h intel_pmc3.h intel_snb_uncore.h JOIN.h \
 	pci.h pci.c pscanf.h schema.h schema.c stats.h stats.c \
 	string1.h trace.h $(am__append_1) $(am__append_2) \
-	$(am__append_5) $(am__append_7) $(TYPES)
+	$(am__append_7) $(am__append_9) $(TYPES)
 TYPES = block.c cpu.c mem.c net.c nfs.c numa.c proc.c ps.c sysv_shm.c \
 	tmpfs.c vfs.c vm.c $(am__append_3) $(am__append_4) \
-	$(am__append_6) $(am__append_8)
-nodist_tacc_stats_SOURCES = stats.x $(am__append_10)
-BUILT_SOURCES = stats.x $(am__append_9)
-CLEANFILES = stats.x $(am__append_11)
+	$(am__append_5) $(am__append_8) $(am__append_10)
+tacc_stats_LDFLAGS = $(am__append_6) -lm
+nodist_tacc_stats_SOURCES = stats.x $(am__append_12)
+BUILT_SOURCES = stats.x $(am__append_11)
+CLEANFILES = stats.x $(am__append_13)
 @RABBITMQ_TRUE@initddir = $(sysconfdir)/rc.d/init.d
 @RABBITMQ_TRUE@initd_SCRIPTS = taccstats
 @RABBITMQ_TRUE@sysconf_DATA = tacc_stats.conf

@@ -4464,9 +4464,9 @@ fi
 if test "${enable_opa+set}" = set; then :
   enableval=$enable_opa; case "${enableval}" in
   yes) opa=true
-  { $as_echo "$as_me:${as_lineno-$LINENO}: checking for library containing oib_open_port" >&5
-$as_echo_n "checking for library containing oib_open_port... " >&6; }
-if ${ac_cv_search_oib_open_port+:} false; then :
+  { $as_echo "$as_me:${as_lineno-$LINENO}: checking for library containing iba_fstatus_msg" >&5
+$as_echo_n "checking for library containing iba_fstatus_msg... " >&6; }
+if ${ac_cv_search_iba_fstatus_msg+:} false; then :
   $as_echo_n "(cached) " >&6
 else
   ac_func_search_save_LIBS=$LIBS
@@ -4479,11 +4479,67 @@ cat confdefs.h - <<_ACEOF >conftest.$ac_ext
 #ifdef __cplusplus
 extern "C"
 #endif
-char oib_open_port ();
+char iba_fstatus_msg ();
 int
 main ()
 {
-return oib_open_port ();
+return iba_fstatus_msg ();
+  ;
+  return 0;
+}
+_ACEOF
+for ac_lib in '' public; do
+  if test -z "$ac_lib"; then
+    ac_res="none required"
+  else
+    ac_res=-l$ac_lib
+    LIBS="-l$ac_lib  $ac_func_search_save_LIBS"
+  fi
+  if ac_fn_c_try_link "$LINENO"; then :
+  ac_cv_search_iba_fstatus_msg=$ac_res
+fi
+rm -f core conftest.err conftest.$ac_objext \
+    conftest$ac_exeext
+  if ${ac_cv_search_iba_fstatus_msg+:} false; then :
+  break
+fi
+done
+if ${ac_cv_search_iba_fstatus_msg+:} false; then :
+
+else
+  ac_cv_search_iba_fstatus_msg=no
+fi
+rm conftest.$ac_ext
+LIBS=$ac_func_search_save_LIBS
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_search_iba_fstatus_msg" >&5
+$as_echo "$ac_cv_search_iba_fstatus_msg" >&6; }
+ac_res=$ac_cv_search_iba_fstatus_msg
+if test "$ac_res" != no; then :
+  test "$ac_res" = "none required" || LIBS="$ac_res $LIBS"
+
+fi
+
+  { $as_echo "$as_me:${as_lineno-$LINENO}: checking for library containing oib_pa_client_init" >&5
+$as_echo_n "checking for library containing oib_pa_client_init... " >&6; }
+if ${ac_cv_search_oib_pa_client_init+:} false; then :
+  $as_echo_n "(cached) " >&6
+else
+  ac_func_search_save_LIBS=$LIBS
+cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+/* end confdefs.h.  */
+
+/* Override any GCC internal prototype to avoid an error.
+   Use char because int might match the return type of a GCC
+   builtin and then its argument prototype would still apply.  */
+#ifdef __cplusplus
+extern "C"
+#endif
+char oib_pa_client_init ();
+int
+main ()
+{
+return oib_pa_client_init ();
   ;
   return 0;
 }
@@ -4493,33 +4549,217 @@ for ac_lib in '' oib_utils; do
     ac_res="none required"
   else
     ac_res=-l$ac_lib
-    LIBS="-l$ac_lib  $ac_func_search_save_LIBS"
+    LIBS="-l$ac_lib  -libmad -libumad -libverbs -lpublic -lpthread  $ac_func_search_save_LIBS"
   fi
   if ac_fn_c_try_link "$LINENO"; then :
-  ac_cv_search_oib_open_port=$ac_res
+  ac_cv_search_oib_pa_client_init=$ac_res
 fi
 rm -f core conftest.err conftest.$ac_objext \
     conftest$ac_exeext
-  if ${ac_cv_search_oib_open_port+:} false; then :
+  if ${ac_cv_search_oib_pa_client_init+:} false; then :
   break
 fi
 done
-if ${ac_cv_search_oib_open_port+:} false; then :
+if ${ac_cv_search_oib_pa_client_init+:} false; then :
 
 else
-  ac_cv_search_oib_open_port=no
+  ac_cv_search_oib_pa_client_init=no
 fi
 rm conftest.$ac_ext
 LIBS=$ac_func_search_save_LIBS
 fi
-{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_search_oib_open_port" >&5
-$as_echo "$ac_cv_search_oib_open_port" >&6; }
-ac_res=$ac_cv_search_oib_open_port
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_search_oib_pa_client_init" >&5
+$as_echo "$ac_cv_search_oib_pa_client_init" >&6; }
+ac_res=$ac_cv_search_oib_pa_client_init
 if test "$ac_res" != no; then :
   test "$ac_res" = "none required" || LIBS="$ac_res $LIBS"
   have_opa=yes
 else
   as_fn_error $? "Unable to find liboib_utils.a!" "$LINENO" 5
+fi
+
+  if test "x${have_opa}" = xyes; then
+     for ac_header in oib_utils.h
+do :
+  ac_fn_c_check_header_mongrel "$LINENO" "oib_utils.h" "ac_cv_header_oib_utils_h" "$ac_includes_default"
+if test "x$ac_cv_header_oib_utils_h" = xyes; then :
+  cat >>confdefs.h <<_ACEOF
+#define HAVE_OIB_UTILS_H 1
+_ACEOF
+ opa=true
+else
+  as_fn_error $? "Unable to find oib_utils.h on this system!" "$LINENO" 5
+fi
+
+done
+
+  fi
+  { $as_echo "$as_me:${as_lineno-$LINENO}: checking for library containing ibv_create_cq" >&5
+$as_echo_n "checking for library containing ibv_create_cq... " >&6; }
+if ${ac_cv_search_ibv_create_cq+:} false; then :
+  $as_echo_n "(cached) " >&6
+else
+  ac_func_search_save_LIBS=$LIBS
+cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+/* end confdefs.h.  */
+
+/* Override any GCC internal prototype to avoid an error.
+   Use char because int might match the return type of a GCC
+   builtin and then its argument prototype would still apply.  */
+#ifdef __cplusplus
+extern "C"
+#endif
+char ibv_create_cq ();
+int
+main ()
+{
+return ibv_create_cq ();
+  ;
+  return 0;
+}
+_ACEOF
+for ac_lib in '' ibverbs; do
+  if test -z "$ac_lib"; then
+    ac_res="none required"
+  else
+    ac_res=-l$ac_lib
+    LIBS="-l$ac_lib  $ac_func_search_save_LIBS"
+  fi
+  if ac_fn_c_try_link "$LINENO"; then :
+  ac_cv_search_ibv_create_cq=$ac_res
+fi
+rm -f core conftest.err conftest.$ac_objext \
+    conftest$ac_exeext
+  if ${ac_cv_search_ibv_create_cq+:} false; then :
+  break
+fi
+done
+if ${ac_cv_search_ibv_create_cq+:} false; then :
+
+else
+  ac_cv_search_ibv_create_cq=no
+fi
+rm conftest.$ac_ext
+LIBS=$ac_func_search_save_LIBS
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_search_ibv_create_cq" >&5
+$as_echo "$ac_cv_search_ibv_create_cq" >&6; }
+ac_res=$ac_cv_search_ibv_create_cq
+if test "$ac_res" != no; then :
+  test "$ac_res" = "none required" || LIBS="$ac_res $LIBS"
+
+fi
+
+  { $as_echo "$as_me:${as_lineno-$LINENO}: checking for library containing umad_set_addr" >&5
+$as_echo_n "checking for library containing umad_set_addr... " >&6; }
+if ${ac_cv_search_umad_set_addr+:} false; then :
+  $as_echo_n "(cached) " >&6
+else
+  ac_func_search_save_LIBS=$LIBS
+cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+/* end confdefs.h.  */
+
+/* Override any GCC internal prototype to avoid an error.
+   Use char because int might match the return type of a GCC
+   builtin and then its argument prototype would still apply.  */
+#ifdef __cplusplus
+extern "C"
+#endif
+char umad_set_addr ();
+int
+main ()
+{
+return umad_set_addr ();
+  ;
+  return 0;
+}
+_ACEOF
+for ac_lib in '' ibumad; do
+  if test -z "$ac_lib"; then
+    ac_res="none required"
+  else
+    ac_res=-l$ac_lib
+    LIBS="-l$ac_lib  $ac_func_search_save_LIBS"
+  fi
+  if ac_fn_c_try_link "$LINENO"; then :
+  ac_cv_search_umad_set_addr=$ac_res
+fi
+rm -f core conftest.err conftest.$ac_objext \
+    conftest$ac_exeext
+  if ${ac_cv_search_umad_set_addr+:} false; then :
+  break
+fi
+done
+if ${ac_cv_search_umad_set_addr+:} false; then :
+
+else
+  ac_cv_search_umad_set_addr=no
+fi
+rm conftest.$ac_ext
+LIBS=$ac_func_search_save_LIBS
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_search_umad_set_addr" >&5
+$as_echo "$ac_cv_search_umad_set_addr" >&6; }
+ac_res=$ac_cv_search_umad_set_addr
+if test "$ac_res" != no; then :
+  test "$ac_res" = "none required" || LIBS="$ac_res $LIBS"
+
+fi
+
+  { $as_echo "$as_me:${as_lineno-$LINENO}: checking for library containing mad_rpc_open_port" >&5
+$as_echo_n "checking for library containing mad_rpc_open_port... " >&6; }
+if ${ac_cv_search_mad_rpc_open_port+:} false; then :
+  $as_echo_n "(cached) " >&6
+else
+  ac_func_search_save_LIBS=$LIBS
+cat confdefs.h - <<_ACEOF >conftest.$ac_ext
+/* end confdefs.h.  */
+
+/* Override any GCC internal prototype to avoid an error.
+   Use char because int might match the return type of a GCC
+   builtin and then its argument prototype would still apply.  */
+#ifdef __cplusplus
+extern "C"
+#endif
+char mad_rpc_open_port ();
+int
+main ()
+{
+return mad_rpc_open_port ();
+  ;
+  return 0;
+}
+_ACEOF
+for ac_lib in '' ibmad; do
+  if test -z "$ac_lib"; then
+    ac_res="none required"
+  else
+    ac_res=-l$ac_lib
+    LIBS="-l$ac_lib  $ac_func_search_save_LIBS"
+  fi
+  if ac_fn_c_try_link "$LINENO"; then :
+  ac_cv_search_mad_rpc_open_port=$ac_res
+fi
+rm -f core conftest.err conftest.$ac_objext \
+    conftest$ac_exeext
+  if ${ac_cv_search_mad_rpc_open_port+:} false; then :
+  break
+fi
+done
+if ${ac_cv_search_mad_rpc_open_port+:} false; then :
+
+else
+  ac_cv_search_mad_rpc_open_port=no
+fi
+rm conftest.$ac_ext
+LIBS=$ac_func_search_save_LIBS
+fi
+{ $as_echo "$as_me:${as_lineno-$LINENO}: result: $ac_cv_search_mad_rpc_open_port" >&5
+$as_echo "$ac_cv_search_mad_rpc_open_port" >&6; }
+ac_res=$ac_cv_search_mad_rpc_open_port
+if test "$ac_res" != no; then :
+  test "$ac_res" = "none required" || LIBS="$ac_res $LIBS"
+
 fi
 
   ;;
