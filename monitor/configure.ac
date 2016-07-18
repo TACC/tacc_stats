@@ -1,4 +1,4 @@
-AC_INIT([tacc_stats], [2.3.0], [rtevans@tacc.utexas.edu])
+AC_INIT([tacc_stats], [2.3.1], [rtevans@tacc.utexas.edu])
 AM_INIT_AUTOMAKE([-Wall -Werror -Wno-portability])
 AC_PROG_CC
 AM_PROG_CC_C_O

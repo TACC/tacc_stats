@@ -148,7 +148,7 @@
     | (umask << 8)		 \
     | (1ULL << 16)		 \
     | (1ULL << 17)		 \
-    | (1ULL << 21)		 \
+    | (0ULL << 21)		 \
     | (1ULL << 22)		 \
     )
 
@@ -192,7 +192,7 @@ static int intel_pmc3_begin_cpu(char *cpu, uint64_t *events, size_t nr_events)
   rc = 0;
 
   /* Enable fixed counters.  Three 4 bit blocks, enable OS, User, Turn off any thread. */
-  fixed_ctr_ctrl = 0x777UL;
+  fixed_ctr_ctrl = 0x333UL;
   if (pwrite(msr_fd, &fixed_ctr_ctrl, sizeof(fixed_ctr_ctrl), IA32_FIXED_CTR_CTRL) < 0)
     ERROR("cannot enable fixed counters: %m\n");
 
