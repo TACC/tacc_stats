@@ -1,5 +1,5 @@
 /*! 
- \file intel_snb.c
+ \file intel_knl.c
  \author Todd Evans 
  \brief Performance Monitoring Counters for Intel Sandy Bridge Processors
 
@@ -56,6 +56,8 @@
 #include "cpuid.h"
 #include "intel_pmc3.h"
 
+
+
 /*! \name Events 
 
   Non-architectural events are listed in Table 19-7, 19-8, and 19-9. 
@@ -63,40 +65,23 @@
 
   @{
 */
-#define DTLB_LOAD_MISSES_WALK_CYCLES   PERF_EVENT(0x08, 0x04)
-#define FP_COMP_OPS_EXE_SSE_FP_PACKED  PERF_EVENT(0x10, 0x10)
-#define FP_COMP_OPS_EXE_SSE_FP_SCALAR  PERF_EVENT(0x10, 0x80)
-#define SSE_DOUBLE_SCALAR_PACKED       PERF_EVENT(0x10, 0x90)
-#define SIMD_FP_256_PACKED_DOUBLE      PERF_EVENT(0x11, 0x02)
-#define L1D_REPLACEMENT                PERF_EVENT(0x51, 0x01) 
-#define RESOURCE_STALLS_ANY            PERF_EVENT(0xA2, 0x01) 
-#define MEM_UOPS_RETIRED_ALL_LOADS     PERF_EVENT(0xD0, 0x81) // CTR0-3 Only
-#define MEM_LOAD_UOPS_RETIRED_L1_HIT   PERF_EVENT(0xD1, 0x01) // CTR0-3 Only
-#define MEM_LOAD_UOPS_RETIRED_L2_HIT   PERF_EVENT(0xD1, 0x02) // CTR0-3 Only
-#define MEM_LOAD_UOPS_RETIRED_LLC_HIT  PERF_EVENT(0xD1, 0x04) // CTR0-3 Only
-#define MEM_LOAD_UOPS_RETIRED_LLC_MISS PERF_EVENT(0xD1, 0x20) // CTR0-3 Only
-#define MEM_LOAD_UOPS_RETIRED_HIT_LFB  PERF_EVENT(0xD1, 0x40) // CTR0-3 Only
+#define MEM_UOPS_RETIRED_ALL_LOADS     PERF_EVENT(0x04, 0x40)
+#define MEM_UOPS_RETIRED_L2_HIT_LOADS  PERF_EVENT(0x04, 0x02)
 //@}
 
 //! Configure and start counters
-static int intel_snb_begin(struct stats_type *type)
+static int intel_knl_begin(struct stats_type *type)
 {  
   int n_pmcs = 0;
   int nr = 0;
 
   uint64_t events[] = {
     MEM_UOPS_RETIRED_ALL_LOADS,
-    MEM_LOAD_UOPS_RETIRED_L1_HIT,
-    MEM_LOAD_UOPS_RETIRED_L2_HIT,
-    MEM_LOAD_UOPS_RETIRED_LLC_HIT,
-    L1D_REPLACEMENT,
-    FP_COMP_OPS_EXE_SSE_FP_SCALAR,
-    FP_COMP_OPS_EXE_SSE_FP_PACKED,
-    SIMD_FP_256_PACKED_DOUBLE,
+    MEM_UOPS_RETIRED_L2_HIT_LOADS,
   };
 
   int i;
-  if (signature(SANDYBRIDGE, &n_pmcs))
+  if (signature(KNL, &n_pmcs))
     for (i = 0; i < nr_cpus; i++) {
       char cpu[80];
       snprintf(cpu, sizeof(cpu), "%d", i);
@@ -109,7 +94,7 @@ static int intel_snb_begin(struct stats_type *type)
   return nr > 0 ? 0 : -1;
 }
 
-static void intel_snb_collect(struct stats_type *type)
+static void intel_knl_collect(struct stats_type *type)
 {
   int i;
   for (i = 0; i < nr_cpus; i++) {
@@ -120,11 +105,11 @@ static void intel_snb_collect(struct stats_type *type)
 }
 
 //! Definition of stats entry for this type
-struct stats_type intel_snb_stats_type = {
-  .st_name = "intel_snb",
-  .st_begin = &intel_snb_begin,
-  .st_collect = &intel_snb_collect,
+struct stats_type intel_knl_stats_type = {
+  .st_name = "intel_knl",
+  .st_begin = &intel_knl_begin,
+  .st_collect = &intel_knl_collect,
 #define X SCHEMA_DEF
-  .st_schema_def = JOIN(KEYS),
+  .st_schema_def = JOIN(KNL_KEYS),
 #undef X
 };

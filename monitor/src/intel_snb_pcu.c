@@ -256,6 +256,7 @@ static int intel_snb_pcu_begin_socket(char *cpu, uint64_t *events, size_t nr_eve
 //! Configure and start counters
 static int intel_snb_pcu_begin(struct stats_type *type)
 {
+  int n_pmcs = 0;
   int nr = 0;
   uint64_t pcu_events[4] = {
     FREQ_MAX_TEMP_CYCLES,
@@ -264,23 +265,20 @@ static int intel_snb_pcu_begin(struct stats_type *type)
     FREQ_MIN_SNOOP_CYCLES
   };
 
-
   int i;
-  for (i = 0; i < nr_cpus; i++) {
-    char cpu[80];
-    int pkg_id = -1;
-    int core_id = -1;
-    int smt_id = -1;
-    int nr_events;
-    int nr_cores = 0;
-    snprintf(cpu, sizeof(cpu), "%d", i);
-    if (signature(SANDYBRIDGE, cpu, &nr_events)) {      
+  if (signature(SANDYBRIDGE, &n_pmcs))
+    for (i = 0; i < nr_cpus; i++) {
+      char cpu[80];
+      int pkg_id = -1;
+      int core_id = -1;
+      int smt_id = -1;
+      int nr_cores = 0;
+      snprintf(cpu, sizeof(cpu), "%d", i);      
       topology(cpu, &pkg_id, &core_id, &smt_id, &nr_cores);
       if (core_id == 0 && smt_id == 0)
 	if (intel_snb_pcu_begin_socket(cpu, pcu_events,4) == 0)
 	  nr++;
     }
-  }
   
   if (nr == 0)
     type->st_enabled = 0;

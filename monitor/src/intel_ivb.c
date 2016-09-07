@@ -80,6 +80,7 @@
 //! Configure and start counters
 static int intel_ivb_begin(struct stats_type *type)
 {
+  int n_pmcs = 0;
   int nr = 0;
 
   uint64_t events[] = {
@@ -94,18 +95,19 @@ static int intel_ivb_begin(struct stats_type *type)
   };
 
   int i;
-  for (i = 0; i < nr_cpus; i++) {
-    char cpu[80];
-    int nr_events = 0;
-    snprintf(cpu, sizeof(cpu), "%d", i);
-    if (signature(IVYBRIDGE, cpu, &nr_events))
-      if (intel_pmc3_begin_cpu(cpu, events, nr_events) == 0)
+  if (signature(IVYBRIDGE, &n_pmcs))
+    for (i = 0; i < nr_cpus; i++) {
+      char cpu[80];
+      snprintf(cpu, sizeof(cpu), "%d", i);
+      if (intel_pmc3_begin_cpu(cpu, events, n_pmcs) == 0)
 	nr++;
-  }
+    }
+
   if (nr == 0) 
     type->st_enabled = 0;
   return nr > 0 ? 0 : -1;
 }
+
 static void intel_ivb_collect(struct stats_type *type)
 {
   int i;
@@ -115,6 +117,7 @@ static void intel_ivb_collect(struct stats_type *type)
     intel_pmc3_collect_cpu(type, cpu);
   }
 }
+
 //! Definition of stats entry for this type
 struct stats_type intel_ivb_stats_type = {
   .st_name = "intel_ivb",

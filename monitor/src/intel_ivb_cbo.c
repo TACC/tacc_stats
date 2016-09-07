@@ -158,6 +158,7 @@ static int intel_ivb_cbo_begin_box(char *cpu, int box, uint64_t *events, size_t 
 //! Configure and start counters
 static int intel_ivb_cbo_begin(struct stats_type *type)
 {
+  int n_pmcs = 0;
   int nr = 0;
   uint64_t events[] = {
     LLC_LOOKUP_DATA_READ, 
@@ -167,27 +168,23 @@ static int intel_ivb_cbo_begin(struct stats_type *type)
   };
 
   int i,j;
-  for (i = 0; i < nr_cpus; i++) {
-    char cpu[80];
-    int pkg_id = -1;
-    int core_id = -1;
-    int smt_id = -1;
-    int nr_cores;
-    int nr_events;
-
-    snprintf(cpu, sizeof(cpu), "%d", i);
-    if (signature(IVYBRIDGE, cpu, &nr_events)) {
+  if (signature(IVYBRIDGE, &n_pmcs))
+    for (i = 0; i < nr_cpus; i++) {
+      char cpu[80];
+      int pkg_id = -1;
+      int core_id = -1;
+      int smt_id = -1;
+      int nr_cores;
+      snprintf(cpu, sizeof(cpu), "%d", i);
       topology(cpu, &pkg_id, &core_id, &smt_id, &nr_cores);
       if (smt_id == 0 && core_id == 0)
         for (j = 0; j < nr_cores; j++)
           if (intel_ivb_cbo_begin_box(cpu, j, events, 4) == 0)
             nr++;
     }
-  }
   
   if (nr == 0)
     type->st_enabled = 0;
-
   return nr > 0 ? 0 : -1;
 }
 

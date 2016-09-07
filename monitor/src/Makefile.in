@@ -105,6 +105,7 @@ bin_PROGRAMS = tacc_stats$(EXEEXT)
 @HARDWARE_TRUE@	intel_ivb_pcu.c \
 @HARDWARE_TRUE@	intel_ivb_qpi.c \
 @HARDWARE_TRUE@	intel_ivb_r2pci.c \
+@HARDWARE_TRUE@	intel_knl.c \
 @HARDWARE_TRUE@	intel_nhm.c \
 @HARDWARE_TRUE@	intel_rapl.c \
 @HARDWARE_TRUE@	intel_snb.c \
@@ -121,27 +122,34 @@ bin_PROGRAMS = tacc_stats$(EXEEXT)
 @INFINIBAND_TRUE@	ib_ext.c \
 @INFINIBAND_TRUE@	ib_sw.c
 
-@LUSTRE_TRUE@am__append_5 = \
+@OPA_TRUE@am__append_5 = \
+@OPA_TRUE@	opa.c
+
+@OPA_TRUE@am__append_6 = \
+@OPA_TRUE@		-lpthread \
+@OPA_TRUE@		-lmemusage
+
+@LUSTRE_TRUE@am__append_7 = \
 @LUSTRE_TRUE@	lustre_obd_to_mnt.c \
 @LUSTRE_TRUE@	lustre_obd_to_mnt.h
 
-@LUSTRE_TRUE@am__append_6 = \
+@LUSTRE_TRUE@am__append_8 = \
 @LUSTRE_TRUE@	mdc.c \
 @LUSTRE_TRUE@	llite.c \
 @LUSTRE_TRUE@	lnet.c \
 @LUSTRE_TRUE@	osc.c
 
-@MIC_TRUE@am__append_7 = \
+@MIC_TRUE@am__append_9 = \
 @MIC_TRUE@	miclib.h 
 
-@MIC_TRUE@am__append_8 = \
+@MIC_TRUE@am__append_10 = \
 @MIC_TRUE@	mic.c
 
-@RABBITMQ_TRUE@am__append_9 = taccstats
-@RABBITMQ_TRUE@am__append_10 = \
+@RABBITMQ_TRUE@am__append_11 = taccstats
+@RABBITMQ_TRUE@am__append_12 = \
 @RABBITMQ_TRUE@	taccstats
 
-@RABBITMQ_TRUE@am__append_11 = $(initd_SCRIPTS) $(sysconfdir_DATA)
+@RABBITMQ_TRUE@am__append_13 = $(initd_SCRIPTS) $(sysconfdir_DATA)
 subdir = src
 DIST_COMMON = $(srcdir)/Makefile.in $(srcdir)/Makefile.am \
 	$(top_srcdir)/depcomp
@@ -166,10 +174,10 @@ am__tacc_stats_SOURCES_DIST = collect.h collect.c cpuid.h cpuid.c \
 	intel_hsw_imc.c intel_hsw_pcu.c intel_hsw_qpi.c \
 	intel_hsw_r2pci.c intel_ivb.c intel_ivb_cbo.c intel_ivb_hau.c \
 	intel_ivb_imc.c intel_ivb_pcu.c intel_ivb_qpi.c \
-	intel_ivb_r2pci.c intel_nhm.c intel_rapl.c intel_snb.c \
-	intel_snb_cbo.c intel_snb_hau.c intel_snb_imc.c \
+	intel_ivb_r2pci.c intel_knl.c intel_nhm.c intel_rapl.c \
+	intel_snb.c intel_snb_cbo.c intel_snb_hau.c intel_snb_imc.c \
 	intel_snb_pcu.c intel_snb_qpi.c intel_snb_r2pci.c intel_wtm.c \
-	ib.c ib_ext.c ib_sw.c mdc.c llite.c lnet.c osc.c mic.c
+	ib.c ib_ext.c ib_sw.c opa.c mdc.c llite.c lnet.c osc.c mic.c
 @RABBITMQ_TRUE@am__objects_1 = tacc_stats-monitor.$(OBJEXT) \
 @RABBITMQ_TRUE@	tacc_stats-stats_buffer.$(OBJEXT)
 @RABBITMQ_FALSE@am__objects_2 = tacc_stats-main.$(OBJEXT) \
@@ -191,6 +199,7 @@ am__objects_4 =
 @HARDWARE_TRUE@	tacc_stats-intel_ivb_pcu.$(OBJEXT) \
 @HARDWARE_TRUE@	tacc_stats-intel_ivb_qpi.$(OBJEXT) \
 @HARDWARE_TRUE@	tacc_stats-intel_ivb_r2pci.$(OBJEXT) \
+@HARDWARE_TRUE@	tacc_stats-intel_knl.$(OBJEXT) \
 @HARDWARE_TRUE@	tacc_stats-intel_nhm.$(OBJEXT) \
 @HARDWARE_TRUE@	tacc_stats-intel_rapl.$(OBJEXT) \
 @HARDWARE_TRUE@	tacc_stats-intel_snb.$(OBJEXT) \
@@ -204,24 +213,25 @@ am__objects_4 =
 @INFINIBAND_TRUE@am__objects_6 = tacc_stats-ib.$(OBJEXT) \
 @INFINIBAND_TRUE@	tacc_stats-ib_ext.$(OBJEXT) \
 @INFINIBAND_TRUE@	tacc_stats-ib_sw.$(OBJEXT)
-@LUSTRE_TRUE@am__objects_7 = tacc_stats-mdc.$(OBJEXT) \
+@OPA_TRUE@am__objects_7 = tacc_stats-opa.$(OBJEXT)
+@LUSTRE_TRUE@am__objects_8 = tacc_stats-mdc.$(OBJEXT) \
 @LUSTRE_TRUE@	tacc_stats-llite.$(OBJEXT) \
 @LUSTRE_TRUE@	tacc_stats-lnet.$(OBJEXT) \
 @LUSTRE_TRUE@	tacc_stats-osc.$(OBJEXT)
-@MIC_TRUE@am__objects_8 = tacc_stats-mic.$(OBJEXT)
-am__objects_9 = tacc_stats-block.$(OBJEXT) tacc_stats-cpu.$(OBJEXT) \
+@MIC_TRUE@am__objects_9 = tacc_stats-mic.$(OBJEXT)
+am__objects_10 = tacc_stats-block.$(OBJEXT) tacc_stats-cpu.$(OBJEXT) \
 	tacc_stats-mem.$(OBJEXT) tacc_stats-net.$(OBJEXT) \
 	tacc_stats-nfs.$(OBJEXT) tacc_stats-numa.$(OBJEXT) \
 	tacc_stats-proc.$(OBJEXT) tacc_stats-ps.$(OBJEXT) \
 	tacc_stats-sysv_shm.$(OBJEXT) tacc_stats-tmpfs.$(OBJEXT) \
 	tacc_stats-vfs.$(OBJEXT) tacc_stats-vm.$(OBJEXT) \
 	$(am__objects_5) $(am__objects_6) $(am__objects_7) \
-	$(am__objects_8)
+	$(am__objects_8) $(am__objects_9)
 am_tacc_stats_OBJECTS = tacc_stats-collect.$(OBJEXT) \
 	tacc_stats-cpuid.$(OBJEXT) tacc_stats-dict.$(OBJEXT) \
 	tacc_stats-pci.$(OBJEXT) tacc_stats-schema.$(OBJEXT) \
 	tacc_stats-stats.$(OBJEXT) $(am__objects_1) $(am__objects_2) \
-	$(am__objects_3) $(am__objects_4) $(am__objects_9)
+	$(am__objects_3) $(am__objects_4) $(am__objects_10)
 nodist_tacc_stats_OBJECTS = $(am__objects_4)
 tacc_stats_OBJECTS = $(am_tacc_stats_OBJECTS) \
 	$(nodist_tacc_stats_OBJECTS)
@@ -418,20 +428,18 @@ tacc_stats_CPPFLAGS = \
 	-DSTATS_LOCK_PATH=\"$(STATS_LOCK_PATH)\" \
 	-DJOBID_FILE_PATH=\"$(JOBID_FILE_PATH)\"
 
-tacc_stats_LDFLAGS = \
-	-lm
-
 tacc_stats_SOURCES = collect.h collect.c cpuid.h cpuid.c dict.h dict.c \
 	intel_hsw_uncore.h intel_pmc3.h intel_snb_uncore.h JOIN.h \
 	pci.h pci.c pscanf.h schema.h schema.c stats.h stats.c \
 	string1.h trace.h $(am__append_1) $(am__append_2) \
-	$(am__append_5) $(am__append_7) $(TYPES)
+	$(am__append_7) $(am__append_9) $(TYPES)
 TYPES = block.c cpu.c mem.c net.c nfs.c numa.c proc.c ps.c sysv_shm.c \
 	tmpfs.c vfs.c vm.c $(am__append_3) $(am__append_4) \
-	$(am__append_6) $(am__append_8)
-nodist_tacc_stats_SOURCES = stats.x $(am__append_10)
-BUILT_SOURCES = stats.x $(am__append_9)
-CLEANFILES = stats.x $(am__append_11)
+	$(am__append_5) $(am__append_8) $(am__append_10)
+tacc_stats_LDFLAGS = $(am__append_6) -lm
+nodist_tacc_stats_SOURCES = stats.x $(am__append_12)
+BUILT_SOURCES = stats.x $(am__append_11)
+CLEANFILES = stats.x $(am__append_13)
 @RABBITMQ_TRUE@initddir = $(sysconfdir)/rc.d/init.d
 @RABBITMQ_TRUE@initd_SCRIPTS = taccstats
 @RABBITMQ_TRUE@sysconf_DATA = tacc_stats.conf
@@ -622,6 +630,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/tacc_stats-intel_ivb_pcu.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/tacc_stats-intel_ivb_qpi.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/tacc_stats-intel_ivb_r2pci.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/tacc_stats-intel_knl.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/tacc_stats-intel_nhm.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/tacc_stats-intel_rapl.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/tacc_stats-intel_snb.Po@am__quote@
@@ -643,6 +652,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/tacc_stats-net.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/tacc_stats-nfs.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/tacc_stats-numa.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/tacc_stats-opa.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/tacc_stats-osc.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/tacc_stats-pci.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/tacc_stats-proc.Po@am__quote@
@@ -1202,6 +1212,20 @@ tacc_stats-intel_ivb_r2pci.obj: intel_ivb_r2pci.c
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(tacc_stats_CPPFLAGS) $(CPPFLAGS) $(tacc_stats_CFLAGS) $(CFLAGS) -c -o tacc_stats-intel_ivb_r2pci.obj `if test -f 'intel_ivb_r2pci.c'; then $(CYGPATH_W) 'intel_ivb_r2pci.c'; else $(CYGPATH_W) '$(srcdir)/intel_ivb_r2pci.c'; fi`
 
+tacc_stats-intel_knl.o: intel_knl.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(tacc_stats_CPPFLAGS) $(CPPFLAGS) $(tacc_stats_CFLAGS) $(CFLAGS) -MT tacc_stats-intel_knl.o -MD -MP -MF $(DEPDIR)/tacc_stats-intel_knl.Tpo -c -o tacc_stats-intel_knl.o `test -f 'intel_knl.c' || echo '$(srcdir)/'`intel_knl.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/tacc_stats-intel_knl.Tpo $(DEPDIR)/tacc_stats-intel_knl.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='intel_knl.c' object='tacc_stats-intel_knl.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(tacc_stats_CPPFLAGS) $(CPPFLAGS) $(tacc_stats_CFLAGS) $(CFLAGS) -c -o tacc_stats-intel_knl.o `test -f 'intel_knl.c' || echo '$(srcdir)/'`intel_knl.c
+
+tacc_stats-intel_knl.obj: intel_knl.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(tacc_stats_CPPFLAGS) $(CPPFLAGS) $(tacc_stats_CFLAGS) $(CFLAGS) -MT tacc_stats-intel_knl.obj -MD -MP -MF $(DEPDIR)/tacc_stats-intel_knl.Tpo -c -o tacc_stats-intel_knl.obj `if test -f 'intel_knl.c'; then $(CYGPATH_W) 'intel_knl.c'; else $(CYGPATH_W) '$(srcdir)/intel_knl.c'; fi`
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/tacc_stats-intel_knl.Tpo $(DEPDIR)/tacc_stats-intel_knl.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='intel_knl.c' object='tacc_stats-intel_knl.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(tacc_stats_CPPFLAGS) $(CPPFLAGS) $(tacc_stats_CFLAGS) $(CFLAGS) -c -o tacc_stats-intel_knl.obj `if test -f 'intel_knl.c'; then $(CYGPATH_W) 'intel_knl.c'; else $(CYGPATH_W) '$(srcdir)/intel_knl.c'; fi`
+
 tacc_stats-intel_nhm.o: intel_nhm.c
 @am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(tacc_stats_CPPFLAGS) $(CPPFLAGS) $(tacc_stats_CFLAGS) $(CFLAGS) -MT tacc_stats-intel_nhm.o -MD -MP -MF $(DEPDIR)/tacc_stats-intel_nhm.Tpo -c -o tacc_stats-intel_nhm.o `test -f 'intel_nhm.c' || echo '$(srcdir)/'`intel_nhm.c
 @am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/tacc_stats-intel_nhm.Tpo $(DEPDIR)/tacc_stats-intel_nhm.Po
@@ -1383,6 +1407,20 @@ tacc_stats-ib_sw.obj: ib_sw.c
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='ib_sw.c' object='tacc_stats-ib_sw.obj' libtool=no @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(tacc_stats_CPPFLAGS) $(CPPFLAGS) $(tacc_stats_CFLAGS) $(CFLAGS) -c -o tacc_stats-ib_sw.obj `if test -f 'ib_sw.c'; then $(CYGPATH_W) 'ib_sw.c'; else $(CYGPATH_W) '$(srcdir)/ib_sw.c'; fi`
+
+tacc_stats-opa.o: opa.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(tacc_stats_CPPFLAGS) $(CPPFLAGS) $(tacc_stats_CFLAGS) $(CFLAGS) -MT tacc_stats-opa.o -MD -MP -MF $(DEPDIR)/tacc_stats-opa.Tpo -c -o tacc_stats-opa.o `test -f 'opa.c' || echo '$(srcdir)/'`opa.c
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/tacc_stats-opa.Tpo $(DEPDIR)/tacc_stats-opa.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='opa.c' object='tacc_stats-opa.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(tacc_stats_CPPFLAGS) $(CPPFLAGS) $(tacc_stats_CFLAGS) $(CFLAGS) -c -o tacc_stats-opa.o `test -f 'opa.c' || echo '$(srcdir)/'`opa.c
+
+tacc_stats-opa.obj: opa.c
+@am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(tacc_stats_CPPFLAGS) $(CPPFLAGS) $(tacc_stats_CFLAGS) $(CFLAGS) -MT tacc_stats-opa.obj -MD -MP -MF $(DEPDIR)/tacc_stats-opa.Tpo -c -o tacc_stats-opa.obj `if test -f 'opa.c'; then $(CYGPATH_W) 'opa.c'; else $(CYGPATH_W) '$(srcdir)/opa.c'; fi`
+@am__fastdepCC_TRUE@	$(AM_V_at)$(am__mv) $(DEPDIR)/tacc_stats-opa.Tpo $(DEPDIR)/tacc_stats-opa.Po
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(AM_V_CC)source='opa.c' object='tacc_stats-opa.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	DEPDIR=$(DEPDIR) $(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(AM_V_CC@am__nodep@)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(tacc_stats_CPPFLAGS) $(CPPFLAGS) $(tacc_stats_CFLAGS) $(CFLAGS) -c -o tacc_stats-opa.obj `if test -f 'opa.c'; then $(CYGPATH_W) 'opa.c'; else $(CYGPATH_W) '$(srcdir)/opa.c'; fi`
 
 tacc_stats-mdc.o: mdc.c
 @am__fastdepCC_TRUE@	$(AM_V_CC)$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(tacc_stats_CPPFLAGS) $(CPPFLAGS) $(tacc_stats_CFLAGS) $(CFLAGS) -MT tacc_stats-mdc.o -MD -MP -MF $(DEPDIR)/tacc_stats-mdc.Tpo -c -o tacc_stats-mdc.o `test -f 'mdc.c' || echo '$(srcdir)/'`mdc.c

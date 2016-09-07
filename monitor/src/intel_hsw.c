@@ -72,11 +72,10 @@
 #define MEM_LOAD_UOPS_RETIRED_HIT_LFB  PERF_EVENT(0xD1, 0x40)
 #define L2_LINES_IN_ALL                PERF_EVENT(0xF1, 0x07)
 
-//@}
-
 //! Configure and start counters
 static int intel_hsw_begin(struct stats_type *type)
 {
+  int n_pmcs = 0;
   int nr = 0;
 
   uint64_t events[] = {
@@ -91,13 +90,12 @@ static int intel_hsw_begin(struct stats_type *type)
   };
 
   int i;
+  if (signature(HASWELL, &n_pmcs))
   for (i = 0; i < nr_cpus; i++) {
     char cpu[80];
-    int nr_events = 0;
-    snprintf(cpu, sizeof(cpu), "%d", i);
-    if (signature(HASWELL, cpu, &nr_events))
-      if (intel_pmc3_begin_cpu(cpu, events, nr_events) == 0)
-	nr++;
+    snprintf(cpu, sizeof(cpu), "%d", i);    
+    if (intel_pmc3_begin_cpu(cpu, events, n_pmcs) == 0)
+      nr++;
   }
   
   if (nr == 0) 

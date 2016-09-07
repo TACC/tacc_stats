@@ -1,4 +1,4 @@
-AC_INIT([tacc_stats], [2.3.0], [rtevans@tacc.utexas.edu])
+AC_INIT([tacc_stats], [2.3.1], [rtevans@tacc.utexas.edu])
 AM_INIT_AUTOMAKE([-Wall -Werror -Wno-portability])
 AC_PROG_CC
 AM_PROG_CC_C_O
@@ -56,6 +56,26 @@ AC_ARG_ENABLE([mic],
   *) AC_MSG_ERROR([bad value ${enableval} for --enable-mic]) ;;
 esac],[mic=false])
 AM_CONDITIONAL([MIC], [test x$mic = xtrue])
+
+AC_ARG_ENABLE([opa],
+[  --enable-opa  Enable Intel Omnipath Fabric support],
+[case "${enableval}" in
+  yes) opa=true
+  AC_SEARCH_LIBS([iba_fstatus_msg], [public])
+  AC_SEARCH_LIBS([oib_pa_client_init], [oib_utils], [have_opa=yes], 
+  [AC_MSG_ERROR([Unable to find liboib_utils.a!])], [ -libmad -libumad -libverbs -lpublic -lpthread ])  
+  if test "x${have_opa}" = xyes; then 
+     AC_CHECK_HEADERS([oib_utils.h], [opa=true], 
+     [AC_MSG_ERROR([Unable to find oib_utils.h on this system!])])  
+  fi
+  AC_SEARCH_LIBS([ibv_create_cq], [ibverbs])
+  AC_SEARCH_LIBS([umad_set_addr], [ibumad])
+  AC_SEARCH_LIBS([mad_rpc_open_port], [ibmad])	
+  ;;
+  no)  opa=false ;;
+  *) AC_MSG_ERROR([bad value ${enableval} for --enable-opa]) ;;
+esac],[opa=false])
+AM_CONDITIONAL([OPA], [test x$opa = xtrue])
 
 AC_ARG_ENABLE([debug],
 [  --enable-debug    Turn on debugging],

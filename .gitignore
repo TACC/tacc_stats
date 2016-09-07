@@ -29,3 +29,6 @@ tacc_stats/cfg.py
 #*
 tacc_stats/taccstats
 *.cfg
+monitor/autom4te.cache
+monitor/src/.deps
+*.rpm

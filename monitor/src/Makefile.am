@@ -19,9 +19,6 @@ tacc_stats_CPPFLAGS = \
 	-DSTATS_LOCK_PATH=\"$(STATS_LOCK_PATH)\" \
 	-DJOBID_FILE_PATH=\"$(JOBID_FILE_PATH)\"
 
-tacc_stats_LDFLAGS = \
-	-lm
-
 tacc_stats_SOURCES = \
 	collect.h \
 	collect.c \
@@ -86,6 +83,7 @@ TYPES 	+= \
 	intel_ivb_pcu.c \
 	intel_ivb_qpi.c \
 	intel_ivb_r2pci.c \
+	intel_knl.c \
 	intel_nhm.c \
 	intel_rapl.c \
 	intel_snb.c \
@@ -103,6 +101,15 @@ TYPES	 += \
 	ib.c \
 	ib_ext.c \
 	ib_sw.c
+endif
+
+tacc_stats_LDFLAGS =
+if OPA
+TYPES	+= \
+	opa.c
+tacc_stats_LDFLAGS += \
+		-lpthread \
+		-lmemusage
 endif
 
 if LUSTRE
@@ -126,6 +133,9 @@ endif
 
 tacc_stats_SOURCES += \
 	$(TYPES)
+
+tacc_stats_LDFLAGS += \
+	-lm
 
 nodist_tacc_stats_SOURCES = \
 	stats.x
