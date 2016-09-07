@@ -9,6 +9,7 @@ from dateutil.parser import parse
 import cPickle as pickle
 import multiprocessing, functools
 import argparse, csv
+import hostlist
 
 def job_pickle(reader_inst, 
                pickles_dir, 
@@ -79,20 +80,9 @@ class JobPickles:
         with open(filename, "rb") as fd:
             for job in csv.DictReader(fd, delimiter = '|'):
                 if self.jobids and job['JobID'] not in self.jobids: continue
-                nodelist_str = job['NodeList']
-                if '[' in nodelist_str and ']' in nodelist_str:
-                    nodelist = []
-                    prefix, nids = nodelist_str.rstrip("]").split("[")
-                    for nid in nids.split(','):
-                        if '-' in nid:
-                            bot, top = nid.split('-')
-                            nodelist += range(int(bot), int(top)+1)
-                        else: nodelist += [nid]
-                    zfac = len(str(max(nodelist)))
-                    nodelist = [prefix + str(x).zfill(zfac) for x in nodelist]
-                    job['NodeList'] = nodelist
-                else:
-                    job['NodeList'] = [nodelist_str]
+                if(not job.get('NodeList')):
+                    job['NodeList'] = ''
+                job['NodeList'] = hostlist.expand_hostlist(job['NodeList'])
 
                 jent = {}
                 jent['id']         = job['JobID']
