@@ -140,7 +140,6 @@ int stats_wr_hdr(struct stats_buffer *sf)
     sf_printf(sf, "\n");
   }
 
-  send(sf);
   return 0;
 }
 

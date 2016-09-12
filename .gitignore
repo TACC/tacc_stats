@@ -32,3 +32,7 @@ tacc_stats/taccstats
 monitor/autom4te.cache
 monitor/src/.deps
 *.rpm
+monitor/config.log
+monitor/config.status
+monitor/Makefile
+monitor/src/Makefile
