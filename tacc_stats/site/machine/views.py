@@ -22,17 +22,20 @@ from matplotlib.backends.backend_agg import FigureCanvasAgg as FigureCanvas
 
 def sys_plot(request, pk):
 
+    job = Job.objects.get(id=pk)
+    hosts = job.host_set.all().values_list('name',flat=True)
+
     racks = []
     nodes = []
     for host in Host.objects.values_list('name',flat=True).distinct():
-        r,n=host.split('-')
-        racks.append(r)
-        nodes.append(n)
+        try:
+            r,n=host.split('-')
+            racks.append(r)
+            nodes.append(n)
+        except:
+            pass
     racks = sorted(set(racks))
     nodes = sorted(set(nodes))
-
-    job = Job.objects.get(id=pk)
-    hosts = job.host_set.all().values_list('name',flat=True)
 
     x = np.zeros((len(nodes),len(racks)))
     for r in range(len(racks)):

@@ -107,6 +107,10 @@ def update_acct(date, rerun = False):
 
             json['date']       = json['end_time'].date()
             json['user']       = job['User']
+            if json.has_key('user'):
+                try: 
+                    json['uid'] = int(pwd.getpwnam(json['user']).pw_uid)
+                except: pass
 
             host_list = hostlist.expand_hostlist(job['NodeList'])
             del job['NodeList']
@@ -224,7 +228,7 @@ def update(date,rerun=False):
                 h = Host(name=host_name)
                 h.save()
                 h.jobs.add(obj)
-
+                
             if xd:
                 for join in join_run_object.objects.using('xalt').filter(run_id = xd.run_id):
                     try:
