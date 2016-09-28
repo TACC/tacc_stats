@@ -208,7 +208,7 @@ def stats_file_discard_record(file):
 
 
 class Host(object):
-    __slots__ = ('job', 'name', 'name_ext', 'times', 'marks', 'raw_stats', 'raw_stats_dir', 'stats')
+    #__slots__ = ('job', 'name', 'name_ext', 'times', 'marks', 'raw_stats', 'raw_stats_dir', 'stats')
 
     def __init__(self, job, name, raw_stats_dir, name_ext = ''):
         self.job = job
@@ -439,7 +439,7 @@ class Host(object):
 class Job(object):
     # TODO errors/comments
     __slots__ = ('id', 'start_time', 'end_time', 'acct', 'schemas', 'hosts',
-    'times','stats_home', 'host_list_dir', 'host_name_ext', 'edit_flags', 'errors', 'overflows')
+                 'times','stats_home', 'host_list_dir', 'host_name_ext', 'edit_flags', 'errors', 'overflows', 'batch_acct')
 
     def __init__(self, acct, stats_home, host_list_dir, host_name_ext):
         self.id = acct['id']
