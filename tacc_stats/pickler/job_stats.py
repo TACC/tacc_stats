@@ -1,8 +1,7 @@
 #!/usr/bin/env python
 import datetime, errno, glob, numpy, os, sys, time, gzip
-import amd64_pmc, intel_process, batch_acct
+import amd64_pmc, intel_process
 import re
-#import procdump
 import string
 
 verbose = os.getenv('TACC_STATS_VERBOSE')
@@ -209,16 +208,16 @@ def stats_file_discard_record(file):
 
 
 class Host(object):
-    # __slots__ = ('job', 'name', 'times', 'marks', 'raw_stats')
+    __slots__ = ('job', 'name', 'name_ext', 'times', 'marks', 'raw_stats', 'raw_stats_dir', 'stats')
 
-    def __init__(self, job, name, raw_stats_dir, name_ext=''):
+    def __init__(self, job, name, raw_stats_dir, name_ext = ''):
         self.job = job
         self.name = name
         self.name_ext=name_ext
         self.times = []
         self.marks = {}
         self.raw_stats = {}
-        self.raw_stats_dir=raw_stats_dir
+        self.raw_stats_dir = raw_stats_dir
 
     def trace(self, fmt, *args):
         self.job.trace('%s: ' + fmt, self.name, *args)
@@ -227,7 +226,7 @@ class Host(object):
         self.job.error('%s: ' + fmt, self.name, *args)
 
     def get_stats_paths(self):
-        raw_host_stats_dir = os.path.join(self.raw_stats_dir, self.name+self.name_ext)
+        raw_host_stats_dir = os.path.join(self.raw_stats_dir, self.name + self.name_ext)
         job_start = self.job.start_time - RAW_STATS_TIME_PAD
         job_end = self.job.end_time + RAW_STATS_TIME_PAD
         path_list = []
@@ -236,8 +235,6 @@ class Host(object):
                 base, dot, ext = ent.partition(".")
                 if not base.isdigit():
                     continue
-                #if ext != "gz":
-                #    continue
                 # Support for filenames of the form %Y%m%d
                 if re.match('^[0-9]{4}[0-1][0-9][0-3][0-9]$', base):
                     base = (datetime.datetime.strptime(base,"%Y%m%d") - datetime.datetime(1970,1,1)).total_seconds()
@@ -256,7 +253,7 @@ class Host(object):
 
     def read_stats_file_header(self, file):
         file_schemas = {}
-#        print "DEBUG ", file
+
         for line in file:
             try:
                 c = line[0]
@@ -442,9 +439,9 @@ class Host(object):
 class Job(object):
     # TODO errors/comments
     __slots__ = ('id', 'start_time', 'end_time', 'acct', 'schemas', 'hosts',
-    'times','stats_home', 'host_list_dir', 'batch_acct', 'edit_flags')#, 'errors', 'overflows')
+    'times','stats_home', 'host_list_dir', 'host_name_ext', 'edit_flags', 'errors', 'overflows')
 
-    def __init__(self, acct, stats_home, host_list_dir, batch_acct):
+    def __init__(self, acct, stats_home, host_list_dir, host_name_ext):
         self.id = acct['id']
         self.start_time = acct['start_time']
         self.end_time = acct['end_time']
@@ -452,14 +449,12 @@ class Job(object):
         self.schemas = {}
         self.hosts = {}
         self.times = []
-        self.stats_home=stats_home
-        self.host_list_dir=host_list_dir
-        self.batch_acct=batch_acct
+        self.stats_home = stats_home
+        self.host_name_ext = '.' + host_name_ext
+        self.host_list_dir = host_list_dir
         self.edit_flags = []
-
-        # Not compatible with existing data at TACC
-        #self.errors = set()
-        #self.overflows = dict()
+        self.errors = set()
+        self.overflows = dict()
 
     def trace(self, fmt, *args):
         trace('%s: ' + fmt, self.id, *args)
@@ -481,11 +476,23 @@ class Job(object):
             schema = self.schemas[type_name] = Schema(desc)
         return schema
 
+    def get_host_list_path(self,acct,host_list_dir):
+        """Return the path of the host list written during the prolog."""
+        start_date = datetime.date.fromtimestamp(acct['start_time'])
+        base_glob = 'hostlist.' + acct['id']
+        for days in (0, -1, 1, -2, 2, -3, 3):
+            yyyy_mm_dd = (start_date + datetime.timedelta(days)).strftime("%Y/%m/%d")
+            full_glob = os.path.join(host_list_dir, yyyy_mm_dd, base_glob)
+
+            for path in glob.iglob(full_glob):
+                return path
+        return None
+
     def gather_stats(self):
         if "host_list" in self.acct:
             host_list = self.acct['host_list']
         else:
-            path = self.batch_acct.get_host_list_path(self.acct, self.host_list_dir)
+            path = self.get_host_list_path(self.acct, self.host_list_dir)
             if not path:
                 self.error("no host list found\n")
                 return False
@@ -507,7 +514,7 @@ class Job(object):
             try: host_name = host_name.split('.')[0]
             except: pass
             try:
-                host = Host(self, host_name, self.stats_home, self.batch_acct.name_ext )
+                host = Host(self, host_name, self.stats_home, self.host_name_ext)
             except:
                 host = Host(self, host_name, self.stats_home)
             if host.gather_stats():
@@ -693,13 +700,13 @@ class Job(object):
         return host_stats
 
 
-def from_acct(acct, stats_home, host_list_dir, batch_acct):
+def from_acct(acct, stats_home, host_list_dir, host_name_ext):
     """from_acct(acct, stats_home)
     Return a Job object constructed from the appropriate accounting data acct using
     stats_home as the base directory, running all required processing.
     """
-    job = Job(acct, stats_home, host_list_dir, batch_acct)
-    print job.acct
+    job = Job(acct, stats_home, host_list_dir, host_name_ext)
+
     if job.gather_stats() and job.munge_times() and job.process_stats():
         return job
     else:

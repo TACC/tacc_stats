@@ -15,7 +15,7 @@ def job_pickle(reader_inst,
                pickle_dir = cfg.pickles_dir, 
                archive_dir = cfg.archive_dir,
                host_list_dir = cfg.host_list_dir,
-               acct = None):
+               host_name_ext = cfg.host_name_ext):
 
     if reader_inst['end_time'] == 0:
         return
@@ -44,9 +44,8 @@ def job_pickle(reader_inst,
     if not validated:
         print(reader_inst['id'] + " is not validated: process")
         with open(pickle_file,'w') as fd:
-            job = job_stats.from_acct(reader_inst, 
-                                      archive_dir, 
-                                      host_list_dir, acct)            
+            job = job_stats.from_acct(reader_inst, archive_dir, 
+                                      host_list_dir, host_name_ext)            
             if job: pickle.dump(job, fd, pickle.HIGHEST_PROTOCOL)
     else:
         print(reader_inst['id'] + " is validated: do not process")
@@ -70,8 +69,7 @@ class JobPickles:
 
         print(self.batch_system,self.acct_path,self.host_name_ext)
         self.acct = batch_acct.factory(self.batch_system,
-                                       self.acct_path,
-                                       self.host_name_ext)
+                                       self.acct_path)
 
         try:
             self.start = datetime.strptime(self.start,'%Y-%m-%d')
@@ -86,7 +84,7 @@ class JobPickles:
                                                 pickle_dir = self.pickles_dir, 
                                                 archive_dir = self.archive_dir,
                                                 host_list_dir = self.host_list_dir,
-                                                acct = self.acct)
+                                                host_name_ext = self.host_name_ext)
 
         print("Use",self.processes,"processes")
         print("Gather node-level data from",self.archive_dir+"/archive/")

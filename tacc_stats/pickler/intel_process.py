@@ -266,7 +266,7 @@ intel_xeon = {'intel_snb' : cpu_event_map, 'intel_snb_cbo' : cbo_event_map, 'int
 
 
 def process_job(job):
-    print '>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>',cpu_event_map
+
     # These events work for SNB,IVB,HSW at this time 2015/05/27
     for device, mapping in intel_xeon.iteritems():
         if device in job.schemas:

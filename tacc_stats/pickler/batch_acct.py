@@ -1,18 +1,17 @@
 import csv, os, subprocess, datetime, glob
 
-def factory(batch_system,acct_path,host_name_ext):
+def factory(batch_system,acct_path):
   if batch_system == 'SGE':
-    return SGEAcct(acct_path,host_name_ext)
+    return SGEAcct(acct_path)
   elif batch_system == 'SLURM':
-    return SLURMAcct(acct_path,host_name_ext)
+    return SLURMAcct(acct_path)
 
 class BatchAcct(object):
 
-  def __init__(self,batch_kind,acct_file,host_name_ext):
+  def __init__(self,batch_kind, acct_file):
     self.batch_kind=batch_kind
     self.acct_file=acct_file
     self.field_names = [tup[0] for tup in self.fields]
-    self.name_ext = '.'+host_name_ext
 
   def reader(self,start_time=0, end_time=9223372036854775807L):
     """reader(start_time=0, end_time=9223372036854775807L)
@@ -72,7 +71,7 @@ class BatchAcct(object):
 
 class SGEAcct(BatchAcct):
 
-  def __init__(self, acct_file, host_name_ext):
+  def __init__(self, acct_file):
     self.fields = (
       ('queue',           str, 'Name of the cluster queue in which the job has run.'), # sge 'qname'
       ('hostname',        str, 'Name of the execution host.'),
@@ -121,30 +120,16 @@ class SGEAcct(BatchAcct):
       ('ar_submission_time', int, 'If the job used resources of an advance reservation then this field contains the submission time (GMT unix time stamp) of the advance reservation, otherwise the value is 0.'),
       )
 
-    BatchAcct.__init__(self,'SGE',acct_file,host_name_ext)
+    BatchAcct.__init__(self,'SGE',acct_file)
     
   def keymap(key): # Batch account keywords are based on SGE names for
                    # historical reasons
     return key
 
-  def get_host_list_path(self,acct,host_list_dir):
-    """Return the path of the host list written during the prolog."""
-    # Example: /share/sge6.2/default/tacc/hostfile_logs/2011/05/19/prolog_hostfile.1957000.IV32627
-    start_date = datetime.date.fromtimestamp(acct['start_time'])
-    base_glob = 'prolog_hostfile.' + acct['id'] + '.*'
-    for days in (0, -1, 1):
-      yyyy_mm_dd = (start_date + datetime.timedelta(days)).strftime("%Y/%m/%d")
-      full_glob = os.path.join(host_list_dir, yyyy_mm_dd, base_glob)
-      for path in glob.iglob(full_glob):
-        return path
-    return None
-
-
-
 
 class SLURMAcct(BatchAcct):
 
-  def __init__(self,acct_file,host_name_ext):
+  def __init__(self,acct_file):
     
     self.fields = (
       ('id', str, 'Job ID'),
@@ -162,16 +147,5 @@ class SLURMAcct(BatchAcct):
       ('cores', int, 'CPU cores requested')
       )
     
-    BatchAcct.__init__(self,'SLURM',acct_file,host_name_ext)
+    BatchAcct.__init__(self,'SLURM',acct_file)
 
-  def get_host_list_path(self,acct,host_list_dir):
-    """Return the path of the host list written during the prolog."""
-    start_date = datetime.date.fromtimestamp(acct['start_time'])
-    base_glob = 'hostlist.' + acct['id']
-    for days in (0, -1, 1, -2, 2, -3, 3):
-      yyyy_mm_dd = (start_date + datetime.timedelta(days)).strftime("%Y/%m/%d")
-      full_glob = os.path.join(host_list_dir, yyyy_mm_dd, base_glob)
-
-      for path in glob.iglob(full_glob):
-        return path
-    return None

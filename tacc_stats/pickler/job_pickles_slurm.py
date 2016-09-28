@@ -1,21 +1,34 @@
 #!/usr/bin/env python
 from __future__ import print_function
 import os, sys
-from ConfigParser import SafeConfigParser
-from tacc_stats import cfg
-from tacc_stats.pickler import job_stats, acct_reader
+from tacc_stats.pickler import job_stats
 from datetime import datetime, timedelta
 from dateutil.parser import parse
 import cPickle as pickle
 import multiprocessing, functools
 import argparse, csv
+import hostlist
+from tacc_stats import cfg
+from tacc_stats.progress import progress
 
-def job_pickle(reader_inst, 
+def test_job(job):
+    validated = []
+    for host in job.hosts.values():
+        if host.marks.has_key('begin %s' % job.id) and host.marks.has_key('end %s' % job.id):
+            validated += [True]
+        else:
+            validated += [False]
+    validated = all(validated)
+    return validated
+
+def job_pickle(reader_inst,
                pickles_dir, 
-               archive_dir):
+               archive_dir,
+               host_name_ext = cfg.host_name_ext):
 
     date_dir = os.path.join(pickles_dir,
                             datetime.fromtimestamp(reader_inst['end_time']).strftime('%Y-%m-%d'))
+
     try: os.makedirs(date_dir)
     except: pass
 
@@ -23,24 +36,19 @@ def job_pickle(reader_inst,
 
     validated = False
     if os.path.exists(pickle_file):
-        validated = True
-        with open(pickle_file) as fd:
-            try:
-                job = pickle.load(fd)
-                for host in job.hosts.values():
-                    if not host.marks.has_key('begin %s' % job.id) or not host.marks.has_key('end %s' % job.id):
-                        validated = False
-                        break
-            except: 
-                validated = False
-
+        try:
+            with open(pickle_file) as fd: job = pickle.load(fd)
+            validated = test_job(job)
+        except EOFError as e:
+            print(e)
+            
     if not validated:
-        print(reader_inst['id'] + " is not validated: process")
-        with open(pickle_file, 'w') as fd:
-            job = job_stats.from_acct(reader_inst, archive_dir, '', '') 
-            if job: pickle.dump(job, fd, pickle.HIGHEST_PROTOCOL)
-    else:
-        print(reader_inst['id'] + " is validated: do not process")
+        job = job_stats.from_acct(reader_inst, archive_dir, '', host_name_ext) 
+        if job and test_job(job):
+            pickle.dump(job, open(pickle_file, 'w'), pickle.HIGHEST_PROTOCOL)
+            validated = True
+
+    return (reader_inst['id'], validated)
 
 class JobPickles:
 
@@ -50,14 +58,16 @@ class JobPickles:
         self.jobids = jobids
         self.start  = start
         self.end    = end
-        if not pickles_dir:
-            pickles_dir = cfg.pickles_dir            
 
+        if not pickles_dir: pickles_dir = cfg.pickles_dir
+        self.acct_path = cfg.acct_path
+        self.pickles_dir = pickles_dir
         self.partial_pickle = functools.partial(job_pickle,
                                                 pickles_dir  = pickles_dir,
-                                                archive_dir = cfg.archive_dir)
+                                                archive_dir = cfg.archive_dir)        
+        
         print("Use", processes, "processes")
-        print("Map node-level data from", cfg.archive_dir,"to",pickles_dir)
+        print("Map node-level data from", cfg.archive_dir, "to", pickles_dir)
         print("From dates:", self.start.date(), "to", self.end.date())
   
     def daterange(self, start_date, end_date):
@@ -66,12 +76,33 @@ class JobPickles:
             yield date
             date = date + timedelta(days=1)       
 
-
     def run(self):
-        acct = []
         for date in self.daterange(self.start, self.end):
-            acct = self.acct_reader(os.path.join(cfg.acct_path, date.strftime("%Y-%m-%d") + ".txt"))
-            self.pool.map(self.partial_pickle, acct)
+            if not os.path.exists(os.path.join(self.acct_path, date.strftime("%Y-%m-%d") + ".txt")): continue
+            acct = self.acct_reader(os.path.join(self.acct_path, date.strftime("%Y-%m-%d") + ".txt"))
+
+            try: os.makedirs(os.path.join(self.pickles_dir, date.strftime("%Y-%m-%d")))
+            except: pass
+
+            vfile = os.path.join(self.pickles_dir, date.strftime("%Y-%m-%d"), "validated")            
+            val_stat = {}
+            if os.path.exists(vfile):
+                with open(vfile, 'r') as fdv:
+                    for line in sorted(list(set(fdv.readlines()))):
+                        jobid, stat = line.split()
+                        val_stat[jobid] = stat
+            ntot = len(acct)
+            print(len(acct),'Job records in accounting file')
+            acct = [x for x in acct if val_stat.get(x['id']) == "False" or val_stat.get(x['id']) == None]
+            print(len(acct),'Jobs to process')
+            ntod = len(acct)
+            ctr = 0
+            with open(vfile, "a+") as fdv:
+                for result in self.pool.imap(self.partial_pickle, acct):
+                    fdv.write("%s %s\n" % result)
+                    fdv.flush()
+                    ctr += 1.0
+                    progress(ctr+(ntot-ntod), ntot, date.strftime("%Y-%m-%d"))
 
     def acct_reader(self, filename):
         ftr = [3600,60,1]
@@ -79,20 +110,7 @@ class JobPickles:
         with open(filename, "rb") as fd:
             for job in csv.DictReader(fd, delimiter = '|'):
                 if self.jobids and job['JobID'] not in self.jobids: continue
-                nodelist_str = job['NodeList']
-                if '[' in nodelist_str and ']' in nodelist_str:
-                    nodelist = []
-                    prefix, nids = nodelist_str.rstrip("]").split("[")
-                    for nid in nids.split(','):
-                        if '-' in nid:
-                            bot, top = nid.split('-')
-                            nodelist += range(int(bot), int(top)+1)
-                        else: nodelist += [nid]
-                    zfac = len(str(max(nodelist)))
-                    nodelist = [prefix + str(x).zfill(zfac) for x in nodelist]
-                    job['NodeList'] = nodelist
-                else:
-                    job['NodeList'] = [nodelist_str]
+                if job['NodeList'] == "None assigned": continue
 
                 jent = {}
                 jent['id']         = job['JobID']
@@ -106,7 +124,7 @@ class JobPickles:
                 jent['status']     = job['State'].split()[0]
                 jent['nodes']      = int(job['NNodes'])
                 jent['cores']      = int(job['ReqCPUS'])
-                jent['host_list']  = job['NodeList']
+                jent['host_list']  = hostlist.expand_hostlist(job['NodeList'])
 
                 if '-' in job['Timelimit']:
                     days, time = job['Timelimit'].split('-')
@@ -120,9 +138,10 @@ class JobPickles:
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Run pickler for jobs')
-    parser.add_argument('start', type = parse, nargs = '?', default = datetime.now() - timedelta(days=1), 
+
+    parser.add_argument('start', type = parse, nargs='?', default = datetime.now() - timedelta(days=1), 
                         help = 'Start (YYYY-mm-dd)')
-    parser.add_argument('end',   type = parse, nargs = '?', default = False, 
+    parser.add_argument('end',   type = parse, nargs='?', default = False, 
                         help = 'End (YYYY-mm-dd)')
     parser.add_argument('-p', '--processes', type = int, default = 1,
                         help = 'number of processes')
@@ -132,6 +151,7 @@ if __name__ == '__main__':
                         type = str, nargs = '+')
 
     args = parser.parse_args()
+    print (args)
     if not args.end:
         args.end = args.start + timedelta(days=2)
 
