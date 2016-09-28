@@ -153,7 +153,7 @@ if __name__ == '__main__':
     args = parser.parse_args()
     print (args)
     if not args.end:
-        args.end = args.start + timedelta(days=2)
+        args.end = args.start# + timedelta(days=2)
 
     pickle_options = { 'processes'       : args.processes,
                        'start'           : args.start,

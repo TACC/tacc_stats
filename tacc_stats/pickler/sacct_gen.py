@@ -1,8 +1,9 @@
 import os, sys
 from datetime import timedelta, date, datetime
 from dateutil.parser import parse
+from tacc_stats import cfg
 
-acct_path = "/corral-repl/tacc/hpc/tacc_stats_site/ls5/accounting"
+acct_path = cfg.acct_path
 
 def daterange(start_date, end_date):
     for n in range(int ((end_date - start_date).days)):
