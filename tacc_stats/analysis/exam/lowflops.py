@@ -23,7 +23,7 @@ class LowFLOPS(Test):
     if self.ts.pmc_type == 'amd64' :
       gfloprate += self.arc(self.ts.data[0])
       
-    if self.ts.pmc_type == 'intel_hsw':
+    if self.ts.pmc_type == 'intel_hsw' or self.ts.pmc_type == 'intel_knl':
       # print "Haswell chips do not have FLOP counters"
       return
 

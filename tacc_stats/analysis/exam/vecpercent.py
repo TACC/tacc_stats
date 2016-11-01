@@ -24,7 +24,7 @@ class VecPercent(Test):
     if self.ts.pmc_type == 'amd64' :
       gvecrate += self.arc(self.ts.data[0])
 
-    if self.ts.pmc_type == 'intel_hsw':
+    if self.ts.pmc_type == 'intel_hsw' or self.ts.pmc_type == 'intel_knl' :
       #print "Haswell does not support FLOP counters"
       return
     if self.ts.pmc_type == 'intel_snb':

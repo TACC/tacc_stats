@@ -323,5 +323,5 @@ if __name__ == "__main__":
 
     for date in daterange(start, end):
         directory = date.strftime("%Y-%m-%d")
-        update_acct(directory, rerun = False)         
+        update(directory, rerun = False)         
         update_metric_fields(directory, rerun = False)

@@ -80,6 +80,8 @@ class TSPLBase:
       self.pmc_type='intel_ivb'
     elif 'intel_hsw' in self.j.hosts.values()[0].stats:
       self.pmc_type='intel_hsw'
+    elif 'intel_knl' in self.j.hosts.values()[0].stats:
+      self.pmc_type='intel_knl'
 
     default_wayness = len(self.j.hosts.values()[0].stats[self.pmc_type].keys())
 

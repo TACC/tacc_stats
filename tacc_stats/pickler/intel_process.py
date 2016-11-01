@@ -13,6 +13,8 @@ import numpy
 ## Processor events
 def CORE_PERF_EVENT(event_select, unit_mask):
     return event_select | (unit_mask << 8) | (1L << 16) | (1L << 17) | (0L << 21) | (1L << 22)
+
+# bit 21 is any thread (every hardware thread on a core increments on event)
 def CORE_PERF_EVENT1(event_select, unit_mask):
     return event_select | (unit_mask << 8) | (1L << 16) | (1L << 17) | (1L << 21) | (1L << 22)
 ## Processor event map
@@ -49,6 +51,8 @@ cpu_event_map = {
     CORE_PERF_EVENT1(0x10,0x80) : 'SSE_DOUBLE_SCALAR,E',
     CORE_PERF_EVENT1(0x10,0x10) : 'SSE_DOUBLE_PACKED,E',
     CORE_PERF_EVENT1(0xF1,0x07) : 'L2_LINES_IN_ALL,E',
+    CORE_PERF_EVENT(0x04, 0x40) : 'MEM_UOPS_RETIRED_ALL_LOADS',
+    CORE_PERF_EVENT(0x04, 0x02) : 'MEM_UOPS_RETIRED_L2_HIT_LOADS',
     'FIXED0'                   : 'INSTRUCTIONS_RETIRED,E',
     'FIXED1'                   : 'CLOCKS_UNHALTED_CORE,E',
     'FIXED2'                   : 'CLOCKS_UNHALTED_REF,E',
@@ -262,6 +266,7 @@ intel_xeon = {'intel_snb' : cpu_event_map, 'intel_snb_cbo' : cbo_event_map, 'int
               'intel_hsw' : cpu_event_map, 'intel_hsw_cbo' : cbo_event_map, 'intel_hsw_hau' : hau_event_map, 
               'intel_hsw_imc' : imc_event_map,  'intel_hsw_qpi' : qpi_event_map, 'intel_hsw_pcu' : pcu_event_map, 'intel_hsw_r2pci' : r2pci_event_map,
               'intel_hsw_ht' : cpu_event_map, 'intel_hsw_cbo_ht' : cbo_event_map,
+              'intel_knl' : cpu_event_map,
 }
 
 
