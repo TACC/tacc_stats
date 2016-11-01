@@ -3,11 +3,13 @@ from exams import Test
 class HighCPI(Test):
   k1 = {'intel_snb' : ['intel_snb', 'intel_snb'],
         'intel_ivb' : ['intel_ivb', 'intel_ivb'],
-        'intel_hsw' : ['intel_hsw', 'intel_hsw']
+        'intel_hsw' : ['intel_hsw', 'intel_hsw'],
+        'intel_knl' : ['intel_knl', 'intel_knl']
         }      
   k2 = {'intel_snb' : ['CLOCKS_UNHALTED_REF','INSTRUCTIONS_RETIRED'],
         'intel_ivb' : ['CLOCKS_UNHALTED_REF','INSTRUCTIONS_RETIRED'],
-        'intel_hsw' : ['CLOCKS_UNHALTED_REF','INSTRUCTIONS_RETIRED']
+        'intel_hsw' : ['CLOCKS_UNHALTED_REF','INSTRUCTIONS_RETIRED'],        
+        'intel_knl' : ['CLOCKS_UNHALTED_REF','INSTRUCTIONS_RETIRED']
         }
   comp_operator = '>'
 

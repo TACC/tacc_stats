@@ -6,12 +6,14 @@ class LowFLOPS(Test):
   k1={'amd64' : ['amd64_core','amd64_sock','cpu'],
       'intel_snb' : [ 'intel_snb', 'intel_snb', 'intel_snb'],
       'intel_ivb' : [ 'intel_ivb', 'intel_ivb', 'intel_ivb'],
-      'intel_hsw' : [ 'intel_hsw', 'intel_hsw', 'intel_hsw']
+      'intel_hsw' : [ 'intel_hsw', 'intel_hsw', 'intel_hsw'],
+      'intel_knl' : [ 'intel_knl']
       }
   k2={'amd64' : ['SSE_FLOPS', 'DRAM',      'user'],
       'intel_snb' : ['SIMD_D_256','SSE_D_ALL','LOAD_L1D_ALL'],
       'intel_ivb' : ['SIMD_D_256','SSE_D_ALL','LOAD_L1D_ALL'],
-      'intel_hsw' : ['SIMD_D_256','SSE_D_ALL','LOAD_L1D_ALL']
+      'intel_hsw' : ['SIMD_D_256','SSE_D_ALL','LOAD_L1D_ALL'],
+      'intel_knl' : ['']
       }
 
   # If metric is less than threshold then flag 
@@ -23,7 +25,7 @@ class LowFLOPS(Test):
     if self.ts.pmc_type == 'amd64' :
       gfloprate += self.arc(self.ts.data[0])
       
-    if self.ts.pmc_type == 'intel_hsw':
+    if self.ts.pmc_type == 'intel_hsw' or self.ts.pmc_type == 'intel_knl':
       # print "Haswell chips do not have FLOP counters"
       return
 
