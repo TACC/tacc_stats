@@ -128,8 +128,8 @@ struct stats *get_current_stats(struct stats_type *type, const char *dev)
   de = dict_entry_ref(&type->st_current_dict, hash, dev);
   if (de->d_key != NULL)
     return key_to_stats(de->d_key);
-
   stats = stats_create(type, dev);
+
   if (stats == NULL) {
     ERROR("stats_create: %m\n");
     return NULL;

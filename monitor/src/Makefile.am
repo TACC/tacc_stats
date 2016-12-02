@@ -3,7 +3,7 @@ ACLOCAL_AMFLAGS = -I m4
 bin_PROGRAMS = tacc_stats
 
 STATS_DIR_PATH = /var/log/tacc_stats
-STATS_LOCK_PATH= /var/lock/tacc_stats
+STATS_LOCK_PATH= /var/lock/tacc_stats_test
 JOBID_FILE_PATH= /var/run/TACC_jobid
 
 if DEBUG
@@ -84,6 +84,8 @@ TYPES 	+= \
 	intel_ivb_qpi.c \
 	intel_ivb_r2pci.c \
 	intel_knl.c \
+	intel_knl_edc.c \
+	intel_knl_mc.c \
 	intel_nhm.c \
 	intel_rapl.c \
 	intel_snb.c \
