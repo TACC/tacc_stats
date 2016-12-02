@@ -110,7 +110,6 @@ static int intel_knl_edc_eclk_begin_dev(uint32_t dev, uint32_t *map_dev, uint32_
   size_t n = 4;
 
   uint32_t pci = pci_cfg_address(BUS, dev, 0x02);
-  TRACE("begin EDC \n");
   memcpy(&map_dev[reg(pci, ECLK_PMON_UNIT_CTL_REG)], &ctl, n);
   memcpy(&map_dev[reg(pci, ECLK_PMON_UNIT_STATUS_REG)], &ctl, n);
 
@@ -123,10 +122,9 @@ static int intel_knl_edc_eclk_begin_dev(uint32_t dev, uint32_t *map_dev, uint32_
 
 static int intel_knl_edc_uclk_collect_dev(struct stats_type *type, uint32_t dev, uint32_t *map_dev)
 {
-  TRACE("collect EDC \n");
   struct stats *stats = NULL;
   char dev_str[80];
-  snprintf(dev_str, sizeof(dev_str), "%02x", dev);
+  snprintf(dev_str, sizeof(dev_str), "%02x/%02x.0", BUS, dev);
   stats = get_current_stats(type, dev_str);
 
   if (stats == NULL)
@@ -157,7 +155,7 @@ static void intel_knl_edc_eclk_collect_dev(struct stats_type *type, uint32_t dev
 {
   struct stats *stats = NULL;
   char dev_str[80];
-  snprintf(dev_str, sizeof(dev_str),"%02x", dev);
+  snprintf(dev_str, sizeof(dev_str), "%02x/%02x.2", BUS, dev);
   stats = get_current_stats(type, dev_str);
   if (stats == NULL)
     return;

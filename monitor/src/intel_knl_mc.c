@@ -120,7 +120,7 @@ static int intel_knl_mc_uclk_collect_dev(struct stats_type *type, uint32_t dev, 
 {
   struct stats *stats = NULL;
   char dev_str[80];
-  snprintf(dev_str, sizeof(dev_str), "%02x/00", dev);
+  snprintf(dev_str, sizeof(dev_str), "%02x/%02x.0", BUS, dev);
   stats = get_current_stats(type, dev_str);
 
   if (stats == NULL)
@@ -151,7 +151,7 @@ static void intel_knl_mc_dclk_collect_dev(struct stats_type *type, uint32_t func
 {
   struct stats *stats = NULL;
   char dev_str[80];
-  snprintf(dev_str, sizeof(dev_str),"%02x/%02x", dev, func);
+  snprintf(dev_str, sizeof(dev_str), "%02x/%02x.%x", BUS, dev, func);
   stats = get_current_stats(type, dev_str);
   if (stats == NULL)
     return;
