@@ -10,6 +10,7 @@ import time
 import cPickle as pickle
 import multiprocessing, functools
 import argparse, traceback
+from fcntl import flock, LOCK_EX, LOCK_NB
 
 def job_pickle(reader_inst, 
                pickle_dir = cfg.pickles_dir, 
@@ -115,11 +116,20 @@ if __name__ == '__main__':
                         type=str,nargs='+')
 
     args = parser.parse_args()
+
+    with open(os.path.join(os.path.dirname(os.path.realpath(__file__)), "job_pickles_lock"), "w") as fd:
+        try:
+            flock(fd, LOCK_EX | LOCK_NB)
+        except IOError:
+            print("job_pickles is already running")
+            sys.exit()
+
+        pickle_options = { 'processes'       : args.p,
+                           'start'           : args.start,
+                           'end'             : args.end,
+                           'pickle_dir'      : args.dir,
+                           }
+        pickler = JobPickles(**pickle_options)
+        pickler.run(jobids = args.jobids)
+        
     
-    pickle_options = { 'processes'       : args.p,
-                       'start'           : args.start,
-                       'end'             : args.end,
-                       'pickle_dir'      : args.dir,
-                       }
-    pickler = JobPickles(**pickle_options)
-    pickler.run(jobids = args.jobids)

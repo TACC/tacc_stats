@@ -10,6 +10,7 @@ import argparse, csv
 import hostlist
 from tacc_stats import cfg
 from tacc_stats.progress import progress
+from fcntl import flock, LOCK_EX, LOCK_NB
 
 def test_job(job):
     validated = []
@@ -155,12 +156,18 @@ if __name__ == '__main__':
     if not args.end:
         args.end = args.start + timedelta(days=2)
 
-    pickle_options = { 'processes'       : args.processes,
-                       'start'           : args.start,
-                       'end'             : args.end,
-                       'pickles_dir'     : args.directory,
-                       'jobids'          : args.jobids
-                       }
-    
-    pickler = JobPickles(**pickle_options)
-    pickler.run()
+    with open(os.path.join(os.path.dirname(os.path.realpath(__file__)), "job_pickles_slurm_lock"), "w") as fd:
+        try:
+            flock(fd, LOCK_EX | LOCK_NB)
+        except IOError:
+            print("job_pickles is already running")
+            sys.exit()
+        
+        pickle_options = { 'processes'       : args.processes,
+                           'start'           : args.start,
+                           'end'             : args.end,
+                           'pickles_dir'     : args.directory,
+                           'jobids'          : args.jobids
+                           }    
+        pickler = JobPickles(**pickle_options)
+        pickler.run()

@@ -84,6 +84,8 @@ TYPES 	+= \
 	intel_ivb_qpi.c \
 	intel_ivb_r2pci.c \
 	intel_knl.c \
+	intel_knl_edc.c \
+	intel_knl_mc.c \
 	intel_nhm.c \
 	intel_rapl.c \
 	intel_snb.c \

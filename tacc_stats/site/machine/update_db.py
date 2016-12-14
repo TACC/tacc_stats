@@ -201,6 +201,7 @@ def update(date,rerun=False):
                 json['status'] = json['state']
                 del json['state']
             json['status'] = json['status'].split()[0]
+
             try:
                 if json.has_key('user'):
                     json['uid'] = int(pwd.getpwnam(json['user']).pw_uid)
