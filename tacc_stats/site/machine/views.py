@@ -1,7 +1,7 @@
 from django.http import HttpResponse, HttpResponseRedirect
 from django.shortcuts import render_to_response, render
 from django.views.generic import DetailView, ListView
-from django.db.models import Q
+from django.db.models import Q, F, FloatField, ExpressionWrapper
 from django.core.cache import cache 
 
 import os,sys,pwd
@@ -74,6 +74,14 @@ def dates(request, error = False):
     field = {}
     field["machine_name"] = cfg.host_name_ext
 
+ 
+    field['md_job_list'] = Job.objects.filter(date__gt = datetime.today() - timedelta(days = 5)).exclude(LLiteOpenClose__isnull = True ).annotate(io = ExpressionWrapper(F('LLiteOpenClose')*F('nodes'), output_field = FloatField())).order_by('-io')
+
+    try:
+        field['md_job_list'] = field['md_job_list'][0:10]
+    except: pass    
+    field['md_job_list'] = list_to_dict(field['md_job_list'],'io')
+
     field['date_list'] = sorted(month_dict.iteritems())[::-1]
     field['error'] = error
     return render_to_response("machine/search.html", field)
@@ -90,15 +98,15 @@ def search(request):
         new_fields = {k:v for k,v in fields.items() if v}
         fields = new_fields
 
-        if 'opt_field0' in fields.keys() and 'value0' in fields.keys():
-            fields[fields['opt_field0']] = fields['value0']
-            del fields['opt_field0'], fields['value0']
         if 'opt_field1' in fields.keys() and 'value1' in fields.keys():
             fields[fields['opt_field1']] = fields['value1']
             del fields['opt_field1'], fields['value1']
         if 'opt_field2' in fields.keys() and 'value2' in fields.keys():
             fields[fields['opt_field2']] = fields['value2']
             del fields['opt_field2'], fields['value2']
+        if 'opt_field3' in fields.keys() and 'value3' in fields.keys():
+            fields[fields['opt_field3']] = fields['value3']
+            del fields['opt_field3'], fields['value3']
 
         print 'search', fields
         return index(request, **fields)
@@ -204,8 +212,9 @@ def hist_summary(job_list):
     ax.set_title('Queue Wait Time')
     ax.set_xlabel('hrs')
 
-    jobs =  np.array(job_list.values_list('LLiteOpenClose',flat=True))
+    jobs =  np.array(job_list.filter(LLiteOpenClose__isnull = False).values_list('LLiteOpenClose',flat=True))
     ax = fig.add_subplot(224)
+
     try:
         bins = np.linspace(0, max(jobs), max(5, 5*np.log(len(jobs))))
         ax.hist(jobs, bins = bins, log=True, color='#bf0a30')
@@ -326,16 +335,18 @@ class JobDetailView(DetailView):
                         proc_list += [proc]
                 proc_list = list(set(proc_list))
             host_list.append(host_name)
+            try:
+                if host.stats.has_key('llite'):
+                    schema = data.get_schema('llite')
+                    rd_idx = schema['osc_read'].index
+                    wr_idx = schema['osc_write'].index
 
-            if host.stats.has_key('llite'):
-                schema = data.get_schema('llite')
-                rd_idx = schema['osc_read'].index
-                wr_idx = schema['osc_write'].index
-
-                for device, value in host.stats['llite'].iteritems():
-                    fsio_dict.setdefault(device, [0.0, 0.0])
-                    fsio_dict[device][0] += value[-1, rd_idx] 
-                    fsio_dict[device][1] += value[-1, wr_idx]
+                    for device, value in host.stats['llite'].iteritems():
+                        fsio_dict.setdefault(device, [0.0, 0.0])
+                        fsio_dict[device][0] += value[-1, rd_idx] 
+                        fsio_dict[device][1] += value[-1, wr_idx]
+            except:
+                pass
         for key, val in fsio_dict.iteritems():
             val[0] = val[0] * 2.0**(-20)
             val[1] = val[1] * 2.0**(-20)

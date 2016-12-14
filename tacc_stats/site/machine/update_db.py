@@ -201,13 +201,15 @@ def update(date,rerun=False):
                 json['status'] = json['state']
                 del json['state']
             json['status'] = json['status'].split()[0]
-            if json.has_key('user'):
-                json['uid'] = int(pwd.getpwnam(json['user']).pw_uid)
-            elif json.has_key('uid'):
-                json['user'] = pwd.getpwuid(int(json['uid']))[0]
-            else: 
-                json['user']='unknown'
-                
+
+            try:
+                if json.has_key('user'):
+                    json['uid'] = int(pwd.getpwnam(json['user']).pw_uid)
+                elif json.has_key('uid'):
+                    json['user'] = pwd.getpwuid(int(json['uid']))[0]
+                else: 
+                    json['user']='unknown'
+            except: continue
             ### If xalt is available add data to the DB 
             xd = None
             try:
@@ -323,5 +325,5 @@ if __name__ == "__main__":
 
     for date in daterange(start, end):
         directory = date.strftime("%Y-%m-%d")
-        update_acct(directory, rerun = False)         
+        update(directory, rerun = False)         
         update_metric_fields(directory, rerun = False)
