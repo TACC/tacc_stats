@@ -24,7 +24,7 @@ class MasterPlot(Plot):
                      'lnet', 'lnet', 'ib_sw','ib_sw','cpu',
                      'intel_ivb', 'intel_ivb', 'intel_ivb', 'mem', 'mem','mem'],
       'intel_knl' : ['intel_knl', 'intel_knl', 
-                     'lnet', 'lnet', 'opa','opa','cpu',
+                     'lnet', 'lnet', 'opa','opa','cpu','cpu','cpu','cpu','cpu','cpu','cpu',
                      'mem', 'mem','mem'],
 
       }
@@ -66,7 +66,7 @@ class MasterPlot(Plot):
                      'SSE_DOUBLE_SCALAR', 'SSE_DOUBLE_PACKED', 
                      'SIMD_DOUBLE_256', 'MemUsed', 'FilePages','Slab'],
       'intel_knl' : ['MEM_UOPS_RETIRED_L2_HIT_LOADS', 'MEM_UOPS_RETIRED_ALL_LOADS',
-                     'rx_bytes','tx_bytes', 'portRcvData','portXmitData','user',
+                     'rx_bytes','tx_bytes', 'portRcvData','portXmitData','user', 'system', 'nice', 'idle', 'iowait', 'irq', 'softirq',
                      'MemUsed', 'FilePages','Slab'],
       }
 
@@ -87,6 +87,8 @@ class MasterPlot(Plot):
       shift = 1
     if self.mode == 'hist':
       plot=self.plot_thist
+    if self.mode == 'ratio':
+      plot=self.plot_ratio
     elif self.mode == 'percentile':
       plot=self.plot_mmm
     else:
@@ -130,6 +132,14 @@ class MasterPlot(Plot):
     except: 
       print sys.exc_info()[0]
       print("FLOP plot not available for JOBID",self.ts.j.id)
+
+    if self.ts.pmc_type == 'intel_knl':
+        idx0 = k2_tmp.index('MEM_UOPS_RETIRED_L2_HIT_LOADS')
+        idx1 = k2_tmp.index('MEM_UOPS_RETIRED_ALL_LOADS')
+        plot_ctr += 1
+        self.plot_ratio(self.fig.add_subplot(6,cols,plot_ctr*shift), [idx0], [idx1], 3600., 
+                        0.01, ylabel="L2LoadHits/Loads %")
+        
 
     # Plot key 2
     try:
@@ -178,11 +188,12 @@ class MasterPlot(Plot):
     if 'opa' in self.ts.j.hosts.values()[0].stats:
         idx2=k2_tmp.index('portXmitData')
         idx3=k2_tmp.index('portRcvData')
-
-        plot(self.fig.add_subplot(6,cols,plot_ctr*shift),[idx2,idx3,-idx0,-idx1],3600.,2.**20,
+        plot_ctr += 1
+        plot(self.fig.add_subplot(6,cols,plot_ctr*shift),[idx2,idx3],3600.,2.**20,
              ylabel='Total (opa-lnet) MB/s') 
 
     #Plot CPU user time
+    """
     idx0 = [k2_tmp.index('user')]
     plot_ctr += 1
 
@@ -190,6 +201,20 @@ class MasterPlot(Plot):
     plot(self.fig.add_subplot(6,cols,plot_ctr*shift),idx0,3600.,wayness,
          xlabel='Time (hr)',
          ylabel='cpu usage %')
-    
+    """
+    idx0 = k2_tmp.index('user')
+    idx1 = k2_tmp.index('system')
+    idx2 = k2_tmp.index('nice')
+
+    idx3 = k2_tmp.index('iowait')
+    idx4 = k2_tmp.index('idle')
+    idx5 = k2_tmp.index('irq')
+    idx6 = k2_tmp.index('softirq')
+    plot_ctr += 1
+
+    self.plot_ratio(self.fig.add_subplot(6,cols,plot_ctr*shift),[idx0, idx1, idx2],[idx3,idx4,idx5,idx6], 3600., 0.01,
+                    xlabel='Time (hr)',
+                    ylabel='cpu usage %')
+
     self.fig.subplots_adjust(hspace=0.35)
     self.output('master')

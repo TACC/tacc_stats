@@ -74,6 +74,11 @@ def dates(request, error = False):
     field = {}
     field["machine_name"] = cfg.host_name_ext
 
+    field['md_job_list'] = job_list.filter(date__gt = datetime.today() - timedelta(days=7)).exclude(LLiteOpenClose__isnull = True).order_by('-LLiteOpenClose')
+    try:
+        field['md_job_list'] = field['md_job_list'][0:10]
+    except: pass
+
     field['date_list'] = sorted(month_dict.iteritems())[::-1]
     field['error'] = error
     return render_to_response("machine/search.html", field)
@@ -301,6 +306,7 @@ class JobDetailView(DetailView):
                 metric = test.test(os.path.join(cfg.pickles_dir, 
                                                 job.date.strftime('%Y-%m-%d'),
                                                 str(job.id)), data)
+                print test,metric
                 if not metric: continue            
                 setattr(job,obj.field_name,metric)
                 result = comp[obj.comparator](metric, obj.threshold)
@@ -379,11 +385,13 @@ def type_plot(request, pk, type_name):
     k1 = {'intel_snb' : [type_name]*len(schema),
           'intel_hsw' : [type_name]*len(schema),
           'intel_ivb' : [type_name]*len(schema),
+          'intel_knl' : [type_name]*len(schema),
           'intel_pmc3' : [type_name]*len(schema)
           }
     k2 = {'intel_snb': schema,
           'intel_hsw': schema,
           'intel_ivb' : schema,
+          'intel_knl' : schema,
           'intel_pmc3': schema
           }
 

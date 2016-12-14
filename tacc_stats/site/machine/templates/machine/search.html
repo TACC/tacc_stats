@@ -19,6 +19,22 @@
 
 <form action="{% url 'machine:search' %}" method="get">
 
+  <table class="table table-condensed" style="max-width=100%;">
+    {% if md_job_list %}
+
+    <tr>
+      <th>Top metadata request rates (B)</th>
+    </tr>
+    {% for key,values in md_job_list.items %} 
+    <tr><td><a href="{% url 'machine:user_view' key %}"> {{ key }}</a> </td>
+      {% for v,d in values %} 
+      <td><a href="{% url 'machine:job' v %}">{{ v }}</a>({{ d|stringformat:"0.1f" }})</td>
+      {% endfor %}
+    </tr>
+    {% endfor %}
+    {% endif %}
+
+
 <h4>Search for jobs on multiple fields </h4>
 </br>
 <div class="row">

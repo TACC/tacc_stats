@@ -80,6 +80,22 @@ class Plot(object):
     else:
       ax.set_ylabel('Total '+self.ts.label(self.ts.k1[index[0]],
                                       self.ts.k2[index[0]],yscale)+'/s' )
+
+  def plot_ratio(self,ax,index1, index2, xscale=1.0,yscale=1.0,xlabel='',ylabel=''):
+    ax.hold=True
+
+    for k in self.ts.j.hosts.keys():
+      v1=self.ts.assemble(index1,k,0)
+      v2=self.ts.assemble(index2,k,0)
+      val=numpy.divide(numpy.diff(v1),numpy.diff(v2))
+      ax.step(self.ts.t/xscale,numpy.append(val,[val[-1]])/yscale,where="post")
+
+    tspl_utils.adjust_yaxis_range(ax,0.1)
+    ax.yaxis.set_major_locator(matplotlib.ticker.MaxNLocator(nbins=6))
+    self.setlabels(ax,index1,xlabel,ylabel,yscale)
+    ax.set_xlim([0,self.ts.t[-1]/3600.])
+
+
   # Plots lines for each host
   def plot_lines(self,ax,index,xscale=1.0,yscale=1.0,xlabel='',ylabel='',
                  do_rate=True):

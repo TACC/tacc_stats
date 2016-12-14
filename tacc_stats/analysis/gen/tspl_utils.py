@@ -3,7 +3,7 @@ import tspl
 from numpy import zeros,array
 from scipy import interpolate
 
-VERBOSE = False
+VERBOSE = True
 
 # Check a TSPickleLoader object to see if its job has a minimum run time and has
 # its wayness in a list

@@ -150,7 +150,7 @@ def update(date,rerun=False):
 
     tz = pytz.timezone('US/Central')
     pickle_dir = os.path.join(cfg.pickles_dir,date)
-
+    print pickle_dir
     ctr = 0
     for root, directory, pickle_files in os.walk(pickle_dir):
         num_files = len(pickle_files)
@@ -305,11 +305,14 @@ def update_metric_fields(date,rerun=False):
         obj = TestInfo.objects.get(test_name = name)
         print name,len(results.keys())
         for jobid, result in results.iteritems():            
+            jobs_list.filter(id = jobid).update(**{ obj.field_name : result })
+
+"""
             try:
-                jobs_list.filter(id = jobid).update(**{ obj.field_name : result })
+
             except:
                 pass
-
+"""
 
 if __name__ == "__main__":
     try:
