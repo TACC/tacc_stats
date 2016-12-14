@@ -19,7 +19,7 @@ DATABASES = {
         'NAME'  : cfg.machine + '_db',
         'USER': 'taccstats',
         'PASSWORD': 'taccstats',
-        'HOST': 'localhost',         
+        'HOST': cfg.server,         
         'PORT': '5432',               
         },
     # Uncomment this portion if an xalt database exists

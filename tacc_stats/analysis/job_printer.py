@@ -8,8 +8,7 @@ from tacc_stats.pickler import batch_acct,job_stats
 def main(**args):
 
     acct = batch_acct.factory(cfg.batch_system,
-                              cfg.acct_path,
-                              cfg.host_name_ext)
+                              cfg.acct_path)
     if args['jobid']:
         reader = acct.find_jobids(args['jobid']).next()    
         date_dir = os.path.join(cfg.pickles_dir,

@@ -261,6 +261,7 @@ def heat_map(request, pk):
     hm = plots.HeatMap(k1={'intel_snb' : ['intel_snb','intel_snb'],
                            'intel_hsw' : ['intel_hsw','intel_hsw'],
                            'intel_ivb' : ['intel_ivb','intel_ivb'],
+                           'intel_knl' : ['intel_knl','intel_knl'],
                            'intel_pmc3' : ['intel_pmc3','intel_pmc3']
                            },
                        k2={'intel_snb' : ['CLOCKS_UNHALTED_REF', 
@@ -268,6 +269,8 @@ def heat_map(request, pk):
                            'intel_ivb' : ['CLOCKS_UNHALTED_REF', 
                                           'INSTRUCTIONS_RETIRED'],
                            'intel_hsw' : ['CLOCKS_UNHALTED_REF', 
+                                          'INSTRUCTIONS_RETIRED'],
+                           'intel_knl' : ['CLOCKS_UNHALTED_REF', 
                                           'INSTRUCTIONS_RETIRED'],
                            'intel_pmc3' : ['CLOCKS_UNHALTED_REF', 
                                            'INSTRUCTIONS_RETIRED']                           

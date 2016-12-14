@@ -23,6 +23,9 @@ class MasterPlot(Plot):
       'intel_ivb' : ['intel_ivb_imc', 'intel_ivb_imc', 'intel_ivb', 
                      'lnet', 'lnet', 'ib_sw','ib_sw','cpu',
                      'intel_ivb', 'intel_ivb', 'intel_ivb', 'mem', 'mem','mem'],
+      'intel_knl' : ['intel_knl', 'intel_knl', 
+                     'lnet', 'lnet', 'opa','opa','cpu',
+                     'mem', 'mem','mem'],
 
       }
   
@@ -62,7 +65,9 @@ class MasterPlot(Plot):
                      'rx_bytes','tx_bytes', 'rx_bytes','tx_bytes','user',
                      'SSE_DOUBLE_SCALAR', 'SSE_DOUBLE_PACKED', 
                      'SIMD_DOUBLE_256', 'MemUsed', 'FilePages','Slab'],
-
+      'intel_knl' : ['MEM_UOPS_RETIRED_L2_HIT_LOADS', 'MEM_UOPS_RETIRED_ALL_LOADS',
+                     'rx_bytes','tx_bytes', 'portRcvData','portXmitData','user',
+                     'MemUsed', 'FilePages','Slab'],
       }
 
   fname='master'
@@ -170,6 +175,12 @@ class MasterPlot(Plot):
         plot(self.fig.add_subplot(6,cols,plot_ctr*shift),[idx2,idx3,-idx0,-idx1],3600.,2.**20,
              ylabel='Total (ib-lnet) MB/s') 
       except: pass
+    if 'opa' in self.ts.j.hosts.values()[0].stats:
+        idx2=k2_tmp.index('portXmitData')
+        idx3=k2_tmp.index('portRcvData')
+
+        plot(self.fig.add_subplot(6,cols,plot_ctr*shift),[idx2,idx3,-idx0,-idx1],3600.,2.**20,
+             ylabel='Total (opa-lnet) MB/s') 
 
     #Plot CPU user time
     idx0 = [k2_tmp.index('user')]
