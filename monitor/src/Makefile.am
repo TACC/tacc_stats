@@ -3,7 +3,7 @@ ACLOCAL_AMFLAGS = -I m4
 bin_PROGRAMS = tacc_stats
 
 STATS_DIR_PATH = /var/log/tacc_stats
-STATS_LOCK_PATH= /var/lock/tacc_stats_test
+STATS_LOCK_PATH= /var/lock/tacc_stats
 JOBID_FILE_PATH= /var/run/TACC_jobid
 
 if DEBUG
