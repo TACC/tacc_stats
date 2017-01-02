@@ -53,6 +53,8 @@ cpu_event_map = {
     CORE_PERF_EVENT1(0xF1,0x07) : 'L2_LINES_IN_ALL,E',
     CORE_PERF_EVENT(0x04, 0x40) : 'MEM_UOPS_RETIRED_ALL_LOADS',
     CORE_PERF_EVENT(0x04, 0x02) : 'MEM_UOPS_RETIRED_L2_HIT_LOADS',
+    CORE_PERF_EVENT1(0x04, 0x40) : 'MEM_UOPS_RETIRED_ALL_LOADS',
+    CORE_PERF_EVENT1(0x04, 0x02) : 'MEM_UOPS_RETIRED_L2_HIT_LOADS',
     'FIXED0'                   : 'INSTRUCTIONS_RETIRED,E',
     'FIXED1'                   : 'CLOCKS_UNHALTED_CORE,E',
     'FIXED2'                   : 'CLOCKS_UNHALTED_REF,E',
@@ -166,6 +168,44 @@ wtmunc_event_map = {
     'FIXED0'                      : 'CLOCKS_UNCORE,E',
     }
 
+## KNL EDC UCLK events (func 0 dev 0x0f, 0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16)
+def KNL_EDC_UCLK_PERF_EVENT(event, umask):
+    return (event) | (umask << 8) | (1L << 22)
+knl_edc_uclk_event_map = {
+    KNL_EDC_UCLK_PERF_EVENT(0x02, 0x01) : 'EDC_HIT_CLEAN,E',
+    KNL_EDC_UCLK_PERF_EVENT(0x02, 0x02) : 'EDC_HIT_DIRTY,E',
+    KNL_EDC_UCLK_PERF_EVENT(0x02, 0x04) : 'EDC_MISS_CLEAN,E',
+    KNL_EDC_UCLK_PERF_EVENT(0x02, 0x08) : 'EDC_MISS_DIRTY,E',
+}
+
+## KNL EDC ECLK events (func 2 dev 0x18, 0x19, 0x1a, 0x1b, 0x1c, 0x1d, 0x1e, 0x1f)
+def KNL_EDC_ECLK_PERF_EVENT(event, umask):
+    return (event) | (umask << 8) | (1L << 22)
+knl_edc_eclk_event_map = {
+    KNL_EDC_ECLK_PERF_EVENT(0x01, 0x01) : 'RPQ_INSERTS,E',
+    KNL_EDC_ECLK_PERF_EVENT(0x02, 0x01) : 'WPQ_INSERTS,E',
+    KNL_EDC_ECLK_PERF_EVENT(0x00, 0x00) : 'ECLK_CYCLES,E'
+}
+
+## KNL MC UCLK events (func 0 dev 0x0a, 0x0b)
+def KNL_MC_UCLK_PERF_EVENT(event, umask):
+    return (event) | (umask << 8) | (1L << 22)
+knl_mc_uclk_event_map = {
+    KNL_MC_UCLK_PERF_EVENT(0x00, 0x00) : 'UCLK_CYCLES,E',
+}
+
+## KNL MC DCLK events (func 2, 3, 4 dev 0x08, 0x09)
+def KNL_MC_DCLK_PERF_EVENT(event, umask):
+    return (event) | (umask << 8) | (1L << 22)
+knl_mc_dclk_event_map = {
+    KNL_MC_DCLK_PERF_EVENT(0x03, 0x01) : 'CAS_READS,E',
+    KNL_MC_DCLK_PERF_EVENT(0x03, 0x02) : 'CAS_WRITES,E',
+    KNL_MC_DCLK_PERF_EVENT(0x00, 0x00) : 'DCLK_CYCLES,E'
+}
+
+
+
+
 ## Reformats the counter arrays with configurable events
 class reformat_counters:
 
@@ -211,7 +251,6 @@ class reformat_counters:
             for j in self.ctl_registers:
                 dev_schema.append(event_map.get(array[0,j],str(array[0,j])))
             break
-
 
         # Now check for all hosts:
         # all devices have the same control settings
@@ -266,8 +305,53 @@ intel_xeon = {'intel_snb' : cpu_event_map, 'intel_snb_cbo' : cbo_event_map, 'int
               'intel_hsw' : cpu_event_map, 'intel_hsw_cbo' : cbo_event_map, 'intel_hsw_hau' : hau_event_map, 
               'intel_hsw_imc' : imc_event_map,  'intel_hsw_qpi' : qpi_event_map, 'intel_hsw_pcu' : pcu_event_map, 'intel_hsw_r2pci' : r2pci_event_map,
               'intel_hsw_ht' : cpu_event_map, 'intel_hsw_cbo_ht' : cbo_event_map,
-              'intel_knl' : cpu_event_map,
+              'intel_knl' : cpu_event_map
 }
+
+def format_knl(job, typename):
+    if typename in job.schemas:
+        schema_desc = job.schemas.get(typename).desc
+        registers = schema_desc.split()
+
+        for host in job.hosts.itervalues():
+            if typename not in host.stats: return
+            stats = host.stats[typename]
+            for device, values in stats.iteritems():
+                func = device.split('.')[-1]
+                if typename == 'intel_knl_edc' and func == '0': 
+                    event_map = knl_edc_uclk_event_map
+                    name = "intel_knl_edc_uclk"
+                elif typename == 'intel_knl_edc' and func == '2': 
+                    event_map = knl_edc_eclk_event_map
+                    name = "intel_knl_edc_eclk"
+                elif typename == 'intel_knl_mc' and func == '0': 
+                    event_map = knl_mc_uclk_event_map
+                    name = "intel_knl_mc_uclk"
+                elif typename == 'intel_knl_mc' and func in ['2','3','4']: 
+                    event_map = knl_mc_dclk_event_map
+                    name = "intel_knl_mc_dclk"
+                else:
+                    print typename + " function " + func + " unknown"
+                    continue
+
+                host.stats.setdefault(name, {device : 0})
+                schema = []
+                ctr_idx = []
+                for idx, r in enumerate(registers):
+                    ctl, c = r.split(',')[0:2]
+                    if c == 'C': 
+                        try:
+                            if min(values[:,idx]) == max(values[:,idx]):                                
+                                schema += [event_map[values[0,idx]]]
+                            else:
+                                schema += ["ERROR,E"]
+                            ctr_idx += [registers.index("CTR"+ctl.lstrip("CTL")+",E,W=48")]
+                        except: continue
+                values = values[:,ctr_idx]
+                host.stats[name][device] = values
+                job.get_schema(name, ' '.join(schema) + '\n')                
+            del host.stats[typename]
+        del job.schemas[typename]
 
 
 def process_job(job):
@@ -278,6 +362,9 @@ def process_job(job):
             d = reformat_counters(job, device, mapping)
             for host in job.hosts.itervalues():
                 d.register(host)
+
+    format_knl(job, 'intel_knl_edc')
+    format_knl(job, 'intel_knl_mc')
 
     # Backwards compatibility
     if 'intel_pmc3' in job.schemas:
