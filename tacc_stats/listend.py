@@ -28,12 +28,19 @@ def on_message(channel, method_frame, header_frame, body):
 
     channel.basic_ack(delivery_tag=method_frame.delivery_tag)
 
-parameters = pika.ConnectionParameters(cfg.rmq_server)
-connection = pika.BlockingConnection(parameters)
-channel = connection.channel()
-channel.basic_consume(on_message, cfg.rmq_queue)
-try:
-    channel.start_consuming()
-except KeyboardInterrupt:
-    channel.stop_consuming()
-connection.close()
+with open(os.path.join(os.path.dirname(os.path.realpath(__file__)), "listend_lock"), "w") as fd:
+    try:
+        flock(fd, LOCK_EX | LOCK_NB)
+    except IOError:
+        print("listend is already running")
+        sys.exit()
+
+    parameters = pika.ConnectionParameters(cfg.rmq_server)
+    connection = pika.BlockingConnection(parameters)
+    channel = connection.channel()
+    channel.basic_consume(on_message, cfg.rmq_queue)
+    try:
+        channel.start_consuming()
+    except KeyboardInterrupt:
+        channel.stop_consuming()
+    connection.close()
