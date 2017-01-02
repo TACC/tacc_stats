@@ -19,22 +19,6 @@
 
 <form action="{% url 'machine:search' %}" method="get">
 
-  <table class="table table-condensed" style="max-width=100%;">
-    {% if md_job_list %}
-
-    <tr>
-      <th>Top metadata request rates (B)</th>
-    </tr>
-    {% for key,values in md_job_list.items %} 
-    <tr><td><a href="{% url 'machine:user_view' key %}"> {{ key }}</a> </td>
-      {% for v,d in values %} 
-      <td><a href="{% url 'machine:job' v %}">{{ v }}</a>({{ d|stringformat:"0.1f" }})</td>
-      {% endfor %}
-    </tr>
-    {% endfor %}
-    {% endif %}
-
-
 <h4>Search for jobs on multiple fields </h4>
 </br>
 <div class="row">
@@ -92,7 +76,7 @@
 <hr>
 
 <div class="table-responsive">
-  <table class="table table-condensed table-bordered" style="max-width=100%">
+  <table class="table table-condensed table-bordered" style="max-width=75%">
     <thead><font size="5" color="#002868">Top 10 Lustre jobs in past 5 days: JobID(Open/Close IOPS)</font></thead>
     {% for key,values in md_job_list.items %}
     <tr><td><a href="{% url 'machine:user_view' key %}"> {{ key }}</a> </td>

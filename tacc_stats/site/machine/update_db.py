@@ -47,6 +47,7 @@ def update_comp_info(thresholds = None):
                   'OSCWait'  : ['OSCWait', '>', 10000],
                   'MDCWait'  : ['MDCWait', '>', 10000],
                   'LLiteOpenClose'  : ['LLiteOpenClose', '>', 10000],
+                  'MCDRAMBW'  : ['MCDRAMBW', '>', 400],
                   }
     if thresholds:
         for key,val in thresholds.iteritems():
@@ -244,7 +245,7 @@ def update(date,rerun=False):
 
             progress(ctr, num_files, date)
 
-def update_metric_fields(date,rerun=False):
+def update_metric_fields(date, rerun = False):
     update_comp_info()
     aud = exam.Auditor(processes=4)
     
@@ -277,6 +278,7 @@ def update_metric_fields(date,rerun=False):
     aud.stage(exam.OSCReqs, ignore_qs=[], min_time = min_time)
     aud.stage(exam.OSCWait, ignore_qs=[], min_time = min_time)
     aud.stage(exam.LLiteOpenClose, ignore_qs=[], min_time = min_time)
+    aud.stage(exam.MCDRAMBW, ignore_qs=[], min_time = min_time)
 
     print 'Run the following tests for:',date
     for name, test in aud.measures.iteritems():
@@ -287,7 +289,7 @@ def update_metric_fields(date,rerun=False):
 
     # Use mem to see if job was tested.  It will always exist
     if not rerun:
-        jobs_list = jobs_list.filter(OSCWait = None)
+        jobs_list = jobs_list.filter(CPU_Usage = None)
     
     paths = []
     for job in jobs_list:

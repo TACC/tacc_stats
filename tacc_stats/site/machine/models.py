@@ -60,6 +60,7 @@ class Job(models.Model):
     OSCWait          =  models.FloatField(null=True)
 
     LLiteOpenClose   =  models.FloatField(null=True)
+    MCDRAMBW   =  models.FloatField(null=True)
     
     def __unicode__(self):
         return str(self.id)

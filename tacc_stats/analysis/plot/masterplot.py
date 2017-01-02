@@ -23,7 +23,7 @@ class MasterPlot(Plot):
       'intel_ivb' : ['intel_ivb_imc', 'intel_ivb_imc', 'intel_ivb', 
                      'lnet', 'lnet', 'ib_sw','ib_sw','cpu',
                      'intel_ivb', 'intel_ivb', 'intel_ivb', 'mem', 'mem','mem'],
-      'intel_knl' : ['intel_knl', 'intel_knl', 
+      'intel_knl' : ['intel_knl', 'intel_knl', 'intel_knl_edc_eclk', 'intel_knl_edc_uclk', 'intel_knl_edc_uclk', 'intel_knl_edc_eclk', 'intel_knl_mc_dclk',
                      'lnet', 'lnet', 'opa','opa','cpu','cpu','cpu','cpu','cpu','cpu','cpu',
                      'mem', 'mem','mem'],
 
@@ -65,7 +65,7 @@ class MasterPlot(Plot):
                      'rx_bytes','tx_bytes', 'rx_bytes','tx_bytes','user',
                      'SSE_DOUBLE_SCALAR', 'SSE_DOUBLE_PACKED', 
                      'SIMD_DOUBLE_256', 'MemUsed', 'FilePages','Slab'],
-      'intel_knl' : ['MEM_UOPS_RETIRED_L2_HIT_LOADS', 'MEM_UOPS_RETIRED_ALL_LOADS',
+      'intel_knl' : ['MEM_UOPS_RETIRED_L2_HIT_LOADS', 'MEM_UOPS_RETIRED_ALL_LOADS', 'RPQ_INSERTS', 'EDC_MISS_CLEAN', 'EDC_MISS_DIRTY', 'WPQ_INSERTS', 'CAS_READS',
                      'rx_bytes','tx_bytes', 'portRcvData','portXmitData','user', 'system', 'nice', 'idle', 'iowait', 'irq', 'softirq',
                      'MemUsed', 'FilePages','Slab'],
       }
@@ -134,11 +134,22 @@ class MasterPlot(Plot):
       print("FLOP plot not available for JOBID",self.ts.j.id)
 
     if self.ts.pmc_type == 'intel_knl':
-        idx0 = k2_tmp.index('MEM_UOPS_RETIRED_L2_HIT_LOADS')
-        idx1 = k2_tmp.index('MEM_UOPS_RETIRED_ALL_LOADS')
-        plot_ctr += 1
-        self.plot_ratio(self.fig.add_subplot(6,cols,plot_ctr*shift), [idx0], [idx1], 3600., 
-                        0.01, ylabel="L2LoadHits/Loads %")
+      if "Flat" in self.ts.j.acct["queue"]:               
+        idxs = [k2_tmp.index('RPQ_INSERTS'), k2_tmp.index('WPQ_INSERTS')]
+      else:
+        idxs = [k2_tmp.index('RPQ_INSERTS'), -k2_tmp.index('EDC_MISS_CLEAN'), -k2_tmp.index('EDC_MISS_DIRTY'), k2_tmp.index('WPQ_INSERTS'), -k2_tmp.index('CAS_READS')]
+
+      plot_ctr += 1
+      plot(self.fig.add_subplot(6,cols,plot_ctr*shift), idxs, 3600., 
+           (2**30.0)/64., ylabel="MCDRAM BW (GB)")
+
+        
+
+      idx0 = k2_tmp.index('MEM_UOPS_RETIRED_L2_HIT_LOADS')
+      idx1 = k2_tmp.index('MEM_UOPS_RETIRED_ALL_LOADS')
+      plot_ctr += 1
+      self.plot_ratio(self.fig.add_subplot(6,cols,plot_ctr*shift), [idx0], [idx1], 3600., 
+                      0.01, ylabel="%L2LoadHits/Loads")
         
 
     # Plot key 2
