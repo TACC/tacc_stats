@@ -135,6 +135,7 @@ class MasterPlot(Plot):
       print sys.exc_info()[0]
       print("FLOP plot not available for JOBID",self.ts.j.id)
 
+    # Plot MCDRAM BW for KNL
     if self.ts.pmc_type == 'intel_knl':
       if "Flat" in self.ts.j.acct["queue"]:               
         idxs = [k2_tmp.index('RPQ_INSERTS'), k2_tmp.index('WPQ_INSERTS')]
@@ -143,13 +144,7 @@ class MasterPlot(Plot):
                 -k2_tmp.index('EDC_MISS_DIRTY'), k2_tmp.index('WPQ_INSERTS'), -k2_tmp.index('CAS_READS')]
       plot_ctr += 1
       plot(self.fig.add_subplot(6,cols,plot_ctr*shift), idxs, 3600., 
-           (2**30.0)/64., ylabel="MCDRAM BW (GB/s)")
-      """  
-      idxs = [k2_tmp.index('CAS_READS'), k2_tmp.index('CAS_WRITES')]
-      plot_ctr += 1
-      plot(self.fig.add_subplot(6,cols,plot_ctr*shift), idxs, 3600., 
-           (2**30./64.), ylabel="DRAM BW (GB/s)")
-      """  
+           (2**30.0)/64., ylabel="MCDRAM BW [GB/s]")
 
     # Plot key 2
     try:
@@ -159,7 +154,7 @@ class MasterPlot(Plot):
         idxs = [k2_tmp.index('MEM_UNCORE_RETIRED_REMOTE_DRAM'), k2_tmp.index('MEM_UNCORE_RETIRED_LOCAL_DRAM')]
       plot_ctr += 1
       plot(self.fig.add_subplot(6,cols,plot_ctr*shift), idxs, 3600., 
-           1.0/64.0*1024.*1024.*1024., ylabel='DRAM BW GB/s')
+           1.0/64.0*1024.*1024.*1024., ylabel='DRAM BW [GB/s]')
     except:
       print(self.ts.pmc_type + ' missing Memory Bandwidth plot' + ' for jobid ' + self.ts.j.id )
 
@@ -169,13 +164,13 @@ class MasterPlot(Plot):
     idx2=k2_tmp.index('Slab')
     plot_ctr += 1
     plot(self.fig.add_subplot(6,cols,plot_ctr*shift), [idx0,-idx1,-idx2], 3600.,2.**30.0, 
-         ylabel='Memory Usage GB',do_rate=False)
+         ylabel='Memory Use [GB]',do_rate=False)
 
     # Plot lnet sum rate
     idx0=k1_tmp.index('lnet')
     idx1=idx0 + k1_tmp[idx0+1:].index('lnet') + 1
     plot_ctr += 1
-    plot(self.fig.add_subplot(6,cols,plot_ctr*shift), [idx0,idx1], 3600., 1024.**2, ylabel='Total lnet MB/s')
+    plot(self.fig.add_subplot(6,cols,plot_ctr*shift), [idx0,idx1], 3600., 1024.**2, ylabel='Lustre BW [MB/s]')
 
     # Plot remaining IB sum rate
     if 'ib_ext' in self.ts.j.hosts.values()[0].stats:
@@ -187,39 +182,24 @@ class MasterPlot(Plot):
         idx3=idx2 + k1_tmp[idx2+1:].index('ib_ext') + 1
       try:
         plot_ctr += 1
-        plot(self.fig.add_subplot(6,cols,plot_ctr*shift),[idx2,idx3,-idx0,-idx1],3600.,2.**20,
-             ylabel='Total (ib-lnet) MB/s') 
+        plot(self.fig.add_subplot(6,cols,plot_ctr*shift),[idx2,idx3],3600.,2.**20,
+             ylabel='IB BW [MB/s]') 
       except: pass
     if 'opa' in self.ts.j.hosts.values()[0].stats:
         idx2=k2_tmp.index('portXmitData')
         idx3=k2_tmp.index('portRcvData')
         plot_ctr += 1
         plot(self.fig.add_subplot(6,cols,plot_ctr*shift),[idx2,idx3],3600.,2.**20,
-             ylabel='Total (opa-lnet) MB/s') 
+             ylabel='OPA BW [MB/s]') 
 
     #Plot CPU user time
-    """
-    idx0 = [k2_tmp.index('user')]
+    busy = [k2_tmp.index('user'), k2_tmp.index('system'), k2_tmp.index('nice')]
+    idle = [k2_tmp.index('iowait'), k2_tmp.index('idle'), k2_tmp.index('irq'), k2_tmp.index('softirq')]
     plot_ctr += 1
 
-    wayness = len(self.ts.j.hosts.values()[0].stats['cpu'].keys())
-    plot(self.fig.add_subplot(6,cols,plot_ctr*shift),idx0,3600.,wayness,
-         xlabel='Time (hr)',
-         ylabel='cpu usage %')    
-    """
-    idx0 = k2_tmp.index('user')
-    idx1 = k2_tmp.index('system')
-    idx2 = k2_tmp.index('nice')
-
-    idx3 = k2_tmp.index('iowait')
-    idx4 = k2_tmp.index('idle')
-    idx5 = k2_tmp.index('irq')
-    idx6 = k2_tmp.index('softirq')
-    plot_ctr += 1
-
-    self.plot_ratio(self.fig.add_subplot(6,cols,plot_ctr*shift),[idx0, idx1, idx2],[idx3,idx4,idx5,idx6], 3600., 0.01,
-                    xlabel='Time (hr)',
-                    ylabel='cpu usage %')
+    self.plot_ratio(self.fig.add_subplot(6,cols,plot_ctr*shift), busy, busy + idle, 3600., 0.01,
+                    xlabel='Time [hrs]',
+                    ylabel='Logical Core Use %')
     
     self.fig.subplots_adjust(hspace=0.35)
     self.output('master')
