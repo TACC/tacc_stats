@@ -23,9 +23,9 @@ class MasterPlot(Plot):
       'intel_ivb' : ['intel_ivb_imc', 'intel_ivb_imc', 'intel_ivb', 
                      'lnet', 'lnet', 'ib_sw','ib_sw','cpu',
                      'intel_ivb', 'intel_ivb', 'intel_ivb', 'mem', 'mem','mem'],
-      'intel_knl' : ['intel_knl', 'intel_knl', 'intel_knl_edc_eclk', 'intel_knl_edc_uclk', 'intel_knl_edc_uclk', 'intel_knl_edc_eclk', 'intel_knl_mc_dclk',
-                     'lnet', 'lnet', 'opa','opa','cpu','cpu','cpu','cpu','cpu','cpu','cpu',
-                     'mem', 'mem','mem'],
+      'intel_knl' : ['intel_knl_mc_dclk', 'intel_knl_mc_dclk', 'intel_knl_edc_eclk', 'intel_knl_edc_uclk', 'intel_knl_edc_uclk', 
+                     'intel_knl_edc_eclk', 'intel_knl_mc_dclk', 'lnet', 'lnet', 'opa','opa','cpu',
+                     'cpu','cpu','cpu','cpu','cpu','cpu', 'mem', 'mem','mem'],
 
       }
   
@@ -65,8 +65,10 @@ class MasterPlot(Plot):
                      'rx_bytes','tx_bytes', 'rx_bytes','tx_bytes','user',
                      'SSE_DOUBLE_SCALAR', 'SSE_DOUBLE_PACKED', 
                      'SIMD_DOUBLE_256', 'MemUsed', 'FilePages','Slab'],
-      'intel_knl' : ['MEM_UOPS_RETIRED_L2_HIT_LOADS', 'MEM_UOPS_RETIRED_ALL_LOADS', 'RPQ_INSERTS', 'EDC_MISS_CLEAN', 'EDC_MISS_DIRTY', 'WPQ_INSERTS', 'CAS_READS',
-                     'rx_bytes','tx_bytes', 'portRcvData','portXmitData','user', 'system', 'nice', 'idle', 'iowait', 'irq', 'softirq',
+      'intel_knl' : ['CAS_READS', 'CAS_WRITES', 'RPQ_INSERTS', 'EDC_MISS_CLEAN', 'EDC_MISS_DIRTY', 
+                     'WPQ_INSERTS', 'CAS_READS',
+                     'rx_bytes','tx_bytes', 'portRcvData','portXmitData',
+                     'user', 'system', 'nice', 'idle', 'iowait', 'irq', 'softirq',
                      'MemUsed', 'FilePages','Slab'],
       }
 
@@ -137,35 +139,27 @@ class MasterPlot(Plot):
       if "Flat" in self.ts.j.acct["queue"]:               
         idxs = [k2_tmp.index('RPQ_INSERTS'), k2_tmp.index('WPQ_INSERTS')]
       else:
-        idxs = [k2_tmp.index('RPQ_INSERTS'), -k2_tmp.index('EDC_MISS_CLEAN'), -k2_tmp.index('EDC_MISS_DIRTY'), k2_tmp.index('WPQ_INSERTS'), -k2_tmp.index('CAS_READS')]
-
+        idxs = [k2_tmp.index('RPQ_INSERTS'), -k2_tmp.index('EDC_MISS_CLEAN'), 
+                -k2_tmp.index('EDC_MISS_DIRTY'), k2_tmp.index('WPQ_INSERTS'), -k2_tmp.index('CAS_READS')]
       plot_ctr += 1
       plot(self.fig.add_subplot(6,cols,plot_ctr*shift), idxs, 3600., 
-           (2**30.0)/64., ylabel="MCDRAM BW (GB)")
-
-        
-
-      idx0 = k2_tmp.index('MEM_UOPS_RETIRED_L2_HIT_LOADS')
-      idx1 = k2_tmp.index('MEM_UOPS_RETIRED_ALL_LOADS')
+           (2**30.0)/64., ylabel="MCDRAM BW (GB/s)")
+      """  
+      idxs = [k2_tmp.index('CAS_READS'), k2_tmp.index('CAS_WRITES')]
       plot_ctr += 1
-      self.plot_ratio(self.fig.add_subplot(6,cols,plot_ctr*shift), [idx0], [idx1], 3600., 
-                      0.01, ylabel="%L2LoadHits/Loads")
-        
+      plot(self.fig.add_subplot(6,cols,plot_ctr*shift), idxs, 3600., 
+           (2**30./64.), ylabel="DRAM BW (GB/s)")
+      """  
 
     # Plot key 2
     try:
       if 'CAS_READS' in k2_tmp and 'CAS_WRITES' in k2_tmp:
-        idx0=k2_tmp.index('CAS_READS')
-        idx1=k2_tmp.index('CAS_WRITES')
+        idxs = [k2_tmp.index('CAS_READS'), k2_tmp.index('CAS_WRITES')]
       elif 'MEM_UNCORE_RETIRED_REMOTE_DRAM' in k2_tmp and 'MEM_UNCORE_RETIRED_LOCAL_DRAM' in k2_tmp:
-        idx0=k2_tmp.index('MEM_UNCORE_RETIRED_REMOTE_DRAM')
-        idx1=k2_tmp.index('MEM_UNCORE_RETIRED_LOCAL_DRAM')
-      else:
-        print(self.ts.pmc_type + ' missing Memory Bandwidth data' + ' for jobid ' + self.ts.j.id )
-        raise      
+        idxs = [k2_tmp.index('MEM_UNCORE_RETIRED_REMOTE_DRAM'), k2_tmp.index('MEM_UNCORE_RETIRED_LOCAL_DRAM')]
       plot_ctr += 1
-      plot(self.fig.add_subplot(6,cols,plot_ctr*shift), [idx0,idx1], 3600., 
-           1.0/64.0*1024.*1024.*1024., ylabel='Total Mem BW GB/s')
+      plot(self.fig.add_subplot(6,cols,plot_ctr*shift), idxs, 3600., 
+           1.0/64.0*1024.*1024.*1024., ylabel='DRAM BW GB/s')
     except:
       print(self.ts.pmc_type + ' missing Memory Bandwidth plot' + ' for jobid ' + self.ts.j.id )
 
@@ -211,7 +205,7 @@ class MasterPlot(Plot):
     wayness = len(self.ts.j.hosts.values()[0].stats['cpu'].keys())
     plot(self.fig.add_subplot(6,cols,plot_ctr*shift),idx0,3600.,wayness,
          xlabel='Time (hr)',
-         ylabel='cpu usage %')
+         ylabel='cpu usage %')    
     """
     idx0 = k2_tmp.index('user')
     idx1 = k2_tmp.index('system')
@@ -226,6 +220,6 @@ class MasterPlot(Plot):
     self.plot_ratio(self.fig.add_subplot(6,cols,plot_ctr*shift),[idx0, idx1, idx2],[idx3,idx4,idx5,idx6], 3600., 0.01,
                     xlabel='Time (hr)',
                     ylabel='cpu usage %')
-
+    
     self.fig.subplots_adjust(hspace=0.35)
     self.output('master')

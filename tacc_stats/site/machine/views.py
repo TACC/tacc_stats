@@ -107,7 +107,6 @@ def search(request):
             fields[fields['opt_field3']] = fields['value3']
             del fields['opt_field3'], fields['value3']
 
-        print 'search', fields
         return index(request, **fields)
     except: pass
 
@@ -116,15 +115,9 @@ def search(request):
 
 def index(request, **field):
 
-
-    print 'index',field
     name = ''
     for key, val in field.iteritems():
         name += '['+key+'='+val+']-'
-
-
-    if 'run_time__gte' in field: pass
-    else: field['run_time__gte'] = 60
 
     order_key = '-id'
     if 'order_key' in field: 
@@ -137,8 +130,9 @@ def index(request, **field):
             field['date__year'] = date[0]
             field['date__month'] = date[1]
             del field['date']
+
     print field
-    job_list = Job.objects.filter(**field).order_by(order_key)
+    job_list = Job.objects.filter(**field).distinct().order_by(order_key)
 
     field['name'] = name + 'search'
     field['histograms'] = hist_summary(job_list)
