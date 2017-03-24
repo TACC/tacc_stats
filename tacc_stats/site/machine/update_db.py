@@ -48,6 +48,7 @@ def update_comp_info(thresholds = None):
                   'MDCWait'  : ['MDCWait', '>', 10000],
                   'LLiteOpenClose'  : ['LLiteOpenClose', '>', 10000],
                   'MCDRAMBW'  : ['MCDRAMBW', '>', 400],
+                  'BlockAveBW'  : ['BlockAveBW', '>', 400],
                   }
     if thresholds:
         for key,val in thresholds.iteritems():
@@ -155,7 +156,8 @@ def update(date,rerun=False):
     ctr = 0
     for root, directory, pickle_files in os.walk(pickle_dir):
         num_files = len(pickle_files)
-        print "Number of pickle files in",root,'=',num_files
+        print "Number of pickle files in", root,'=',num_files
+        print "Number of database records", Job.objects.filter(date = date).count()
         for pickle_file in sorted(pickle_files):
 
             ctr += 1
@@ -279,6 +281,7 @@ def update_metric_fields(date, rerun = False):
     aud.stage(exam.OSCWait, ignore_qs=[], min_time = min_time)
     aud.stage(exam.LLiteOpenClose, ignore_qs=[], min_time = min_time)
     aud.stage(exam.MCDRAMBW, ignore_qs=[], min_time = min_time)
+    aud.stage(exam.BlockAveBW, ignore_qs=[], min_time = min_time)
 
     print 'Run the following tests for:',date
     for name, test in aud.measures.iteritems():
