@@ -10,7 +10,7 @@ Source: %{name}-%{version}.tar.gz
 BuildRoot: %{_tmppath}/%{name}-%{version}-%{release}-root
 
 #%include rpm-dir.inc
-
+%define debug_package %{nil}
 %{!?archivedir: %{error: define archivedir!} exit 1 }
 
 %define _bindir /opt/%{name}
