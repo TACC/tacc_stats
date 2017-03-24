@@ -3,6 +3,7 @@ import pika
 import os, sys
 import time
 import tacc_stats.cfg as cfg
+from fcntl import flock, LOCK_EX, LOCK_NB
 
 def on_message(channel, method_frame, header_frame, body):
     if body[0] == '$': host = body.split('\n')[1].split()[1]       
