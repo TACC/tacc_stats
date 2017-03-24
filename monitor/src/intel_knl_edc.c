@@ -268,7 +268,7 @@ static void intel_knl_edc_collect(struct stats_type *type)
  out:
   if (fd >= 0)
     close(fd);
-v}
+}
 
 struct stats_type intel_knl_edc_stats_type = {
   .st_name = "intel_knl_edc",
