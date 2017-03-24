@@ -226,9 +226,9 @@ static int intel_knl_mc_begin(struct stats_type *type)
       if (intel_knl_mc_dclk_begin_dev(mc_dclk_dev[i], 0x04, mmconfig_ptr, mc_dclk_events, nr_mc_dclk_events) == 0)
 	nr++;
     }
+  munmap(mmconfig_ptr, mmconfig_size);
 
  out:
-  munmap(mmconfig_ptr, mmconfig_size);
   if (fd >= 0)
     close(fd);
 
@@ -265,10 +265,10 @@ static void intel_knl_mc_collect(struct stats_type *type)
     intel_knl_mc_dclk_collect_dev(type, 0x02, mc_dclk_dev[i], mmconfig_ptr);
     intel_knl_mc_dclk_collect_dev(type, 0x03, mc_dclk_dev[i], mmconfig_ptr);
     intel_knl_mc_dclk_collect_dev(type, 0x04, mc_dclk_dev[i], mmconfig_ptr);
-  }
+  }  
+  munmap(mmconfig_ptr, mmconfig_size);
 
  out:
-  munmap(mmconfig_ptr, mmconfig_size);
   if (fd >= 0)
     close(fd);
 }

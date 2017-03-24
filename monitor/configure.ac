@@ -57,6 +57,23 @@ AC_ARG_ENABLE([mic],
 esac],[mic=false])
 AM_CONDITIONAL([MIC], [test x$mic = xtrue])
 
+AC_ARG_ENABLE([gpu],
+[  --enable-gpu  Enable Nvidia GPU support],
+[case "${enableval}" in
+  yes) gpu=true
+  AC_SEARCH_LIBS([nvmlInit], [nvidia-ml], [have_gpu=yes], 
+  [AC_MSG_ERROR([Unable to find libnvidia-ml.so!])])
+
+  if test "x${have_gpu}" = xyes; then 
+     AC_CHECK_HEADERS([nvml.h], [gpu=true], 
+     [AC_MSG_ERROR([Unable to find nvml.h on this system!])])  
+  fi
+  ;;
+  no)  gpu=false ;;
+  *) AC_MSG_ERROR([bad value ${enableval} for --enable-gpu]) ;;
+esac],[gpu=false])
+AM_CONDITIONAL([GPU], [test x$gpu = xtrue])
+
 AC_ARG_ENABLE([opa],
 [  --enable-opa  Enable Intel Omnipath Fabric support],
 [case "${enableval}" in
