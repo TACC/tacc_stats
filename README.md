@@ -1,6 +1,8 @@
 tacc_stats Documentation               {#mainpage}
 ========================
 
+[![DOI](https://zenodo.org/badge/21212519.svg)](https://zenodo.org/badge/latestdoi/21212519)
+
 Developers and Maintainers
 -------
 R. Todd Evans  (<mailto:rtevans@tacc.utexas.edu>)
