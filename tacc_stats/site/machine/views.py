@@ -3,6 +3,7 @@ from django.shortcuts import render_to_response, render
 from django.views.generic import DetailView, ListView
 from django.db.models import Q, F, FloatField, ExpressionWrapper
 from django.core.cache import cache 
+from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
 
 import os,sys,pwd
 import cPickle as pickle 
@@ -93,81 +94,96 @@ def search(request):
             return HttpResponseRedirect("/machine/job/"+str(job.id)+"/")
         except: pass
     try:
-        fields = request.GET.dict()
-        new_fields = {k:v for k,v in fields.items() if v}
-        fields = new_fields
-
-        if 'opt_field1' in fields.keys() and 'value1' in fields.keys():
-            fields[fields['opt_field1']] = fields['value1']
-            del fields['opt_field1'], fields['value1']
-        if 'opt_field2' in fields.keys() and 'value2' in fields.keys():
-            fields[fields['opt_field2']] = fields['value2']
-            del fields['opt_field2'], fields['value2']
-        if 'opt_field3' in fields.keys() and 'value3' in fields.keys():
-            fields[fields['opt_field3']] = fields['value3']
-            del fields['opt_field3'], fields['value3']
-
-        return index(request, **fields)
+        return index(request)
     except: pass
 
     return dates(request, error = True)
     
 
-def index(request, **field):
+def index(request, **kwargs):
+
+    fields = request.GET.dict()
+    fields = {k:v for k,v in fields.items() if v}
+    fields.update(kwargs)
+
+    if 'page' in fields: del fields['page']
+    if 'opt_field1' in fields.keys() and 'value1' in fields.keys():
+        fields[fields['opt_field1']] = fields['value1']
+        del fields['opt_field1'], fields['value1']
+    if 'opt_field2' in fields.keys() and 'value2' in fields.keys():
+        fields[fields['opt_field2']] = fields['value2']
+        del fields['opt_field2'], fields['value2']
+    if 'opt_field3' in fields.keys() and 'value3' in fields.keys():
+        fields[fields['opt_field3']] = fields['value3']
+        del fields['opt_field3'], fields['value3']
 
     name = ''
-    for key, val in field.iteritems():
-        name += '['+key+'='+val+']-'
+    for key, val in fields.iteritems():
+        name += key+'='+val+'\n'
 
     order_key = '-id'
-    if 'order_key' in field: 
-        order_key = field['order_key']
-        del field['order_key']
+    if 'order_key' in fields: 
+        order_key = fields['order_key']
+        del fields['order_key']
         
-    if field.has_key('date'): 
-        date = field['date'].split('-')
+    if fields.has_key('date'): 
+        date = fields['date'].split('-')
         if len(date) == 2:
-            field['date__year'] = date[0]
-            field['date__month'] = date[1]
-            del field['date']
+            fields['date__year'] = date[0]
+            fields['date__month'] = date[1]
+            del fields['date']
 
-    print field
-    job_list = Job.objects.filter(**field).distinct().order_by(order_key)
 
-    field['name'] = name + 'search'
-    field['histograms'] = hist_summary(job_list)
+    job_list = Job.objects.filter(**fields).distinct().order_by(order_key)
+
+    fields['name'] =  'Query [fields=values] ' + name.rstrip('-')    
+
+    paginator = Paginator(job_list,100)
+    page = request.GET.get('page')
+    try:
+        jobs = paginator.page(page)
+    except PageNotAnInteger:
+        jobs = paginator.page(1)
+    except EmptyPage:
+        jobs = paginator.page(paginator.num_pages)
+
+    fields['histograms'] = hist_summary(job_list)
     
-    field['job_list'] = job_list
-    field['nj'] = job_list.count()
+    #fields['job_list'] = job_list
+    fields['job_list'] = jobs
+
+    fields['nj'] = job_list.count()
 
     # Computed Metrics
-    field['cat_job_list']  = job_list.filter(Q(cat__lte = 0.001) | Q(cat__gte = 1000)).exclude(cat = float('nan'))
+    fields['cat_job_list']  = job_list.filter(Q(cat__lte = 0.001) | Q(cat__gte = 1000)).exclude(cat = float('nan'))
     
     completed_list = job_list.exclude(status__in=['CANCELLED','FAILED']).order_by('-id')
     if len(completed_list) > 0:
-        field['md_job_list'] = job_list.exclude(LLiteOpenClose__isnull = True ).order_by('-LLiteOpenClose')
+        fields['md_job_list'] = job_list.exclude(LLiteOpenClose__isnull = True ).order_by('-LLiteOpenClose')
         try:
-            field['md_job_list'] = field['md_job_list'][0:10]
+            fields['md_job_list'] = fields['md_job_list'][0:10]
         except: pass
 
-        field['idle_job_list'] = completed_list.filter(idle__gte = 0.99)
-        field['mem_job_list'] = completed_list.filter(mem__lte = 30, queue = 'largemem')
+        fields['idle_job_list'] = completed_list.filter(idle__gte = 0.99)
+        fields['mem_job_list'] = completed_list.filter(mem__lte = 30, queue = 'largemem')
 
-        field['cpi_thresh'] = 1.5
-        field['cpi_job_list']  = completed_list.exclude(cpi = float('nan')).filter(cpi__gte = field['cpi_thresh'])
-        field['cpi_per'] = 100*field['cpi_job_list'].count()/float(completed_list.count())
+        fields['cpi_thresh'] = 1.5
+        fields['cpi_job_list']  = completed_list.exclude(cpi = float('nan')).filter(cpi__gte = fields['cpi_thresh'])
+        fields['cpi_per'] = 100*fields['cpi_job_list'].count()/float(completed_list.count())
 
-        field['gigebw_thresh'] = 2**20
-        field['gigebw_job_list']  = completed_list.exclude(GigEBW = float('nan')).filter(GigEBW__gte = field['gigebw_thresh'])
+        fields['gigebw_thresh'] = 2**20
+        fields['gigebw_job_list']  = completed_list.exclude(GigEBW = float('nan')).filter(GigEBW__gte = fields['gigebw_thresh'])
 
-        field['md_job_list'] = list_to_dict(field['md_job_list'],'LLiteOpenClose')
-        field['idle_job_list'] = list_to_dict(field['idle_job_list'],'idle')
-        field['cat_job_list'] = list_to_dict(field['cat_job_list'],'cat')
-        field['cpi_job_list'] = list_to_dict(field['cpi_job_list'],'cpi')
-        field['mem_job_list'] = list_to_dict(field['mem_job_list'],'mem')
-        field['gigebw_job_list'] = list_to_dict(field['gigebw_job_list'],'GigEBW')
+        fields['md_job_list'] = list_to_dict(fields['md_job_list'],'LLiteOpenClose')
+        fields['idle_job_list'] = list_to_dict(fields['idle_job_list'],'idle')
+        fields['cat_job_list'] = list_to_dict(fields['cat_job_list'],'cat')
+        fields['cpi_job_list'] = list_to_dict(fields['cpi_job_list'],'cpi')
+        fields['mem_job_list'] = list_to_dict(fields['mem_job_list'],'mem')
+        fields['gigebw_job_list'] = list_to_dict(fields['gigebw_job_list'],'GigEBW')
 
-    return render_to_response("machine/index.html", field)
+    if '?' in request.get_full_path():
+        fields['current_path'] = request.get_full_path()
+    return render_to_response("machine/index.html", fields)
 
 def list_to_dict(job_list,metric):
     job_dict={}

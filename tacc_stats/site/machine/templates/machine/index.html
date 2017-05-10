@@ -95,8 +95,51 @@
   </table>
 </div>
 </div>
+{% if date %}
+<h3>List of Jobs run on {{ date }}</h3>
+{% endif %}
+<h4> #Jobs = {{nj}} </h4>
 
-<h3># Jobs over 1 mn in run time = {{nj}}</h3>
+    {% if job_list.has_other_pages %}
+    <ul class="pagination">
+      {% if job_list.has_previous %}
+
+      {% if current_path %}
+      <li><a href="{{ current_path }}&page={{ job_list.previous_page_number }}">&laquo;</a></li>
+      {% else %}
+      <li><a href="?page={{ job_list.previous_page_number }}">&laquo;</a></li>
+      {% endif %}
+
+      {% else %}
+      <li class="disabled"><span>&laquo;</span></li>
+      {% endif %}
+      {% for i in job_list.paginator.page_range %}
+      {% if job_list.number == i %}
+      <li class="active"><span>{{ i }} <span class="sr-only">(current)</span></span></li>
+      {% else %}
+
+      {% if current_path %}
+      <li><a href="{{ current_path }}&page={{ i }}">{{ i }}</a></li>
+      {% else %}
+      <li><a href="?page={{ i }}">{{ i }}</a></li>
+      {% endif %}
+
+      {% endif %}
+      {% endfor %}
+      {% if job_list.has_next %}
+
+      {% if current_path %}
+      <li><a href="{{ current_path }}&page={{ job_list.next_page_number }}">&raquo;</a></li>
+      {% else %}
+      <li><a href="?page={{ job_list.next_page_number }}">&raquo;</a></li>
+      {% endif %}
+
+      {% else %}
+      <li class="disabled"><span>&raquo;</span></li>
+      {% endif %}
+    </ul>
+    {% endif %}
+
     <table class="table table-condensed table-bordered">
       <thead>
         <tr>
@@ -140,4 +183,46 @@
 	{% endfor %}
       <tbody> 
     </table>
+
+    {% if job_list.has_other_pages %}
+    <ul class="pagination">
+      {% if job_list.has_previous %}
+
+      {% if current_path %}
+      <li><a href="{{ current_path }}&page={{ job_list.previous_page_number }}">&laquo;</a></li>
+      {% else %}
+      <li><a href="?page={{ job_list.previous_page_number }}">&laquo;</a></li>
+      {% endif %}
+
+      {% else %}
+      <li class="disabled"><span>&laquo;</span></li>
+      {% endif %}
+      {% for i in job_list.paginator.page_range %}
+      {% if job_list.number == i %}
+      <li class="active"><span>{{ i }} <span class="sr-only">(current)</span></span></li>
+      {% else %}
+
+      {% if current_path %}
+      <li><a href="{{ current_path }}&page={{ i }}">{{ i }}</a></li>
+      {% else %}
+      <li><a href="?page={{ i }}">{{ i }}</a></li>
+      {% endif %}
+
+      {% endif %}
+      {% endfor %}
+      {% if job_list.has_next %}
+
+      {% if current_path %}
+      <li><a href="{{ current_path }}&page={{ job_list.next_page_number }}">&raquo;</a></li>
+      {% else %}
+      <li><a href="?page={{ job_list.next_page_number }}">&raquo;</a></li>
+      {% endif %}
+
+      {% else %}
+      <li class="disabled"><span>&raquo;</span></li>
+      {% endif %}
+    </ul>
+    {% endif %}
+
+
 {% endblock %}

@@ -142,6 +142,13 @@ tacc_stats_LDFLAGS += \
 nodist_tacc_stats_SOURCES = \
 	stats.x
 
+if GPU
+nodist_tacc_stats_SOURCES += \
+	nvml.h 
+TYPES += \
+	nvidia_gpu.c
+endif
+
 BUILT_SOURCES = stats.x
 CLEANFILES = stats.x
 stats.o: stats.x

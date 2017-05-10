@@ -227,8 +227,8 @@ static int intel_knl_edc_begin(struct stats_type *type)
 	nr++;
     }
 
- out:
   munmap(mmconfig_ptr, mmconfig_size);
+ out:
   if (fd >= 0)
     close(fd);
 
@@ -264,8 +264,8 @@ static void intel_knl_edc_collect(struct stats_type *type)
     intel_knl_edc_eclk_collect_dev(type, edc_eclk_dev[i], mmconfig_ptr);
   }
 
- out:
   munmap(mmconfig_ptr, mmconfig_size);
+ out:
   if (fd >= 0)
     close(fd);
 }

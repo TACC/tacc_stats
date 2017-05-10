@@ -33,5 +33,6 @@ from tacc_stats.analysis.exam.oscwait import OSCWait
 
 from tacc_stats.analysis.exam.lliteopenclose import LLiteOpenClose
 from tacc_stats.analysis.exam.mcdrambw import MCDRAMBW
+from tacc_stats.analysis.exam.block_avebw import BlockAveBW
 from tacc_stats.analysis.exam.exams import Auditor
 

@@ -107,8 +107,9 @@ TEMPLATES = [
             'context_processors': [
                 # Insert your TEMPLATE_CONTEXT_PROCESSORS here or use this
                 # list if you haven't customized them:
-                'django.contrib.auth.context_processors.auth',
                 'django.template.context_processors.debug',
+                'django.template.context_processors.request',
+                'django.contrib.auth.context_processors.auth',
                 'django.template.context_processors.i18n',
                 'django.template.context_processors.media',
                 'django.template.context_processors.static',
@@ -125,8 +126,8 @@ MIDDLEWARE_CLASSES = (
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
-    #'django.middleware.cache.UpdateCacheMiddleware',
-    #'django.middleware.cache.FetchFromCacheMiddleware',
+    'django.middleware.cache.UpdateCacheMiddleware',
+    'django.middleware.cache.FetchFromCacheMiddleware',
 )
 
 ROOT_URLCONF = 'tacc_stats.site.tacc_stats_site.urls'
@@ -178,17 +179,15 @@ LOGGING = {
         },
     }
 }
-"""
+
 CACHES = {
     'normal': {
         'BACKEND': 'django.core.cache.backends.memcached.MemcachedCache',
         'LOCATION': '127.0.0.1:11211',
         },
-
-    'default': { 
-        'BACKEND':'tacc_stats.site.tacc_stats_site.cache.LargeMemcachedCache',
+    'default': {
+        'BACKEND': 'tacc_stats.site.tacc_stats_site.cache.LargeMemcachedCache',
         'LOCATION': '127.0.0.1:11211',
-        'TIMEOUT': None,
-        }
-    }
-"""
+        'TIMEOUT' : None,
+        },
+}
