@@ -1,4 +1,4 @@
-from django.conf.urls import patterns, url
+from django.conf.urls import url
 from django.views.generic import DetailView, ListView
 from tacc_stats.site.machine.models import Job
 from tacc_stats.site.machine.views import *
