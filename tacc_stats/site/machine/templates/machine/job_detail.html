@@ -7,7 +7,7 @@
  <table class="table table-condensed table-bordered">
   <thead>
     <th>Job ID</th>{% if job.uid %}<th>UID</th>{% endif %}{% if job.user %}<th>user</th>{% endif %}<th>project</th><th>executable</th><th>start time</th><th>end time</th>
-      <th>run time (s)</th><th>requested time (s)</th><th>queue</th><th>name</th><th>status</th><th>wayness</th><th>cores</th><th>nodes</th><th>threads</th>
+      <th>run time (s)</th><th>requested time (m)</th><th>queue</th><th>name</th><th>status</th><th>wayness</th><th>cores</th><th>nodes</th><th>threads</th>
   </thead>
   <tbody>
     <tr bgcolor="{{job.color}}"><td><a href="{% url 'machine:job'  job.id %}">{{ job.id }}</a></td>
