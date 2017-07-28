@@ -204,19 +204,17 @@ def update(date,rerun=False):
                 json['status'] = json['state']
                 del json['state']
             json['status'] = json['status'].split()[0]
-
-            try:
-                if json.has_key('user'):
+            
+            if json.has_key('user'):
+                try:
                     json['uid'] = int(pwd.getpwnam(json['user']).pw_uid)
-                elif json.has_key('uid'):
-                    json['user'] = pwd.getpwuid(int(json['uid']))[0]
-            except: 
-                json['user']='unknown'
-                
+                except:
+                    json['uid'] = None
+            print json
             ### If xalt is available add data to the DB 
             xd = None
             try:
-                xd = run.objects.using('xalt').filter(job_id = json['id'])[0]
+                xd = run.objects.using('xalt').filter(job_id = json['id'])[0]                
                 json['user']    = xd.user
                 json['exe']     = xd.exec_path.split('/')[-1][0:128]
                 json['exec_path'] = xd.exec_path
@@ -292,7 +290,7 @@ def update_metric_fields(date, rerun = False):
 
     # Use mem to see if job was tested.  It will always exist
     if not rerun:
-        jobs_list = jobs_list.filter(CPU_Usage = None)
+        jobs_list = jobs_list.filter(mem = None)
     
     paths = []
     for job in jobs_list:
@@ -313,12 +311,6 @@ def update_metric_fields(date, rerun = False):
         for jobid, result in results.iteritems():            
             jobs_list.filter(id = jobid).update(**{ obj.field_name : result })
 
-"""
-            try:
-
-            except:
-                pass
-"""
 
 if __name__ == "__main__":
     try:
@@ -328,7 +320,7 @@ if __name__ == "__main__":
         except:
             end = start
     except:
-        start = datetime.now()
+        start = datetime.now() - timedelta(days=1)
         end   = datetime.now()
 
     for date in daterange(start, end):

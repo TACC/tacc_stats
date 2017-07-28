@@ -66,7 +66,7 @@ class JobPickles:
         self.partial_pickle = functools.partial(job_pickle,
                                                 pickles_dir  = pickles_dir,
                                                 archive_dir = cfg.archive_dir)        
-        
+        print (self.acct_path)
         print("Use", processes, "processes")
         print("Map node-level data from", cfg.archive_dir, "to", pickles_dir)
         print("From dates:", self.start.date(), "to", self.end.date())
