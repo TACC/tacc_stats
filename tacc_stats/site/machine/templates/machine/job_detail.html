@@ -6,14 +6,24 @@
 <p>
  <table class="table table-condensed table-bordered">
   <thead>
-    <th>Job ID</th><th>UID</th><th>user</th><th>project</th><th>executable</th><th>start time</th><th>end time</th>
-      <th>run time (s)</th><th>requested time (s)</th><th>queue</th><th>name</th><th>status</th><th>wayness</th><th>cores</th><th>nodes</th><th>threads</th>
+      {% if job.uid %}
+    <th>Job ID</th>
+    {% endif %}
+<th>UID</th>
+<th>user</th><th>project</th><th>executable</th><th>start time</th><th>end time</th>
+      <th>run time (s)</th><th>requested time (m)</th><th>queue</th><th>name</th><th>status</th><th>wayness</th><th>cores</th><th>nodes</th><th>threads</th>
   </thead>
   <tbody>
     <tr bgcolor="{{job.color}}"><td><a href="{% url 'machine:job'  job.id %}">{{ job.id }}</a></td>
+      {% if job.uid %}
       <td><a href="{% url 'machine:uid_view' job.uid %}" >{{ job.uid }}</td>           
-      <td><a href="{% url 'machine:uid_view' job.uid %}" >{{ job.user }}</td>
+      {% endif %}
+      <td><a href="{% url 'machine:user_view' job.user %}" >{{ job.user }}</td>
+      {% if job.project %}
       <td><a href="{% url 'machine:project_view' job.project %}">{{ job.project }}</td>
+      {% else %}
+      <td>None</td>
+      {% endif %}
       <td><a href="{% url 'machine:exe_view' job.exe %}" >{{ job.exe }}</td>
       <td align=right>{{ job.start_time }}</td>
       <td align=right>{{ job.end_time }}</td>

@@ -1,4 +1,4 @@
-from django.conf.urls import patterns, url
+from django.conf.urls import url
 from django.views.generic import DetailView, ListView
 from tacc_stats.site.machine.models import Job
 from tacc_stats.site.machine.views import *
@@ -42,7 +42,7 @@ urlpatterns = [
 
                        url(r'^uid/(?P<uid>\d+?)/$',
                            index, name='uid_view'),
-                       url(r'^user/(?P<user>\w+?)/$',
+                       url(r'^user/(?P<user>.+?)/$',
                            index, name='user_view'),
                        url(r'^project/(?P<project>.+?)/$',
                            index, name='project_view'),

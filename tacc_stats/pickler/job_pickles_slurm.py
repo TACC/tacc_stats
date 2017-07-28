@@ -85,26 +85,31 @@ class JobPickles:
             try: os.makedirs(os.path.join(self.pickles_dir, date.strftime("%Y-%m-%d")))
             except: pass
 
-            vfile = os.path.join(self.pickles_dir, date.strftime("%Y-%m-%d"), "validated")            
-            val_stat = {}
-            if os.path.exists(vfile):
-                with open(vfile, 'r') as fdv:
-                    for line in sorted(list(set(fdv.readlines()))):
-                        jobid, stat = line.split()
-                        val_stat[jobid] = stat
-            ntot = len(acct)
-            print(len(acct),'Job records in accounting file')
-            acct = [x for x in acct if val_stat.get(x['id']) == "False" or val_stat.get(x['id']) == None]
-            print(len(acct),'Jobs to process')
-            ntod = len(acct)
+            val_file = os.path.join(self.pickles_dir, date.strftime("%Y-%m-%d"), "validated")            
+            val_jids = []
+            if os.path.exists(val_file):
+                with open(val_file, 'r') as fd:
+                    val_jids = fd.read().splitlines()
+
+            acct_jids = [x['id'] for x in acct]
+            ntot = len(acct_jids)
+            print(len(acct_jids),'Job records in accounting file')
+
+            run_jids = sorted(list(set(acct_jids) - set(val_jids)))
+            print(len(run_jids),'Jobs to process')
+            ntod = len(run_jids)
+
+            acct = [job for job in acct if job['id'] in run_jids]
+
             ctr = 0
-            with open(vfile, "a+") as fdv:
+            with open(val_file, "w") as fd:
                 for result in self.pool.imap(self.partial_pickle, acct):
-                    fdv.write("%s %s\n" % result)
-                    fdv.flush()
+                    if result[1]:
+                        fd.write("%s\n" % result[0])
+                    fd.flush()
                     ctr += 1.0
                     progress(ctr+(ntot-ntod), ntot, date.strftime("%Y-%m-%d"))
-
+                    
     def acct_reader(self, filename):
         ftr = [3600,60,1]
         acct = []

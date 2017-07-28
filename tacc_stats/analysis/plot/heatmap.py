@@ -6,7 +6,7 @@ from numpy import *
 class HeatMap(Plot):
 
   def __init__(self,k1=['intel_snb','intel_snb'],
-               k2=['CLOCKS_UNHALTED_REF','INSTRUCTIONS_RETIRED'],
+               k2=['CLOCKS_UNHALTED_CORE','INSTRUCTIONS_RETIRED'],
                processes=1,aggregate=False,**kwargs):
 
     self.k1 = k1

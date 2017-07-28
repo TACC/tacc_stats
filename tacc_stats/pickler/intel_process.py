@@ -249,7 +249,10 @@ class reformat_counters:
         dev_schema = []
         for dev, array in stats.iteritems():
             for j in self.ctl_registers:
-                dev_schema.append(event_map.get(array[0,j],str(array[0,j])))
+                fac = 1.0
+                if name == "intel_knl": fac=1.0/272.0
+                
+                dev_schema.append(event_map.get(array[0,j]*fac,str(array[0,j]*fac)))
             break
 
         # Now check for all hosts:
@@ -261,10 +264,9 @@ class reformat_counters:
                     devidx = 0
                     for j in self.ctl_registers:
                         settings = array[:,j]
-                        if event_map.get(settings[0],str(settings[0])) != dev_schema[devidx] or settings.min() != settings.max():
-                            #if name in 'intel_snb': print host.name,dev,settings
-                            #print '>>>>>>>>>>>>>>>>>>>>>error'
-                            # The control settings for this device changed during the run
+                        fac = 1.0
+                        if name == "intel_knl": fac=1.0/272.0
+                        if event_map.get(settings[0]*fac,str(settings[0]*fac)) != dev_schema[devidx] or settings.min() != settings.max():
                             # mark as the error metric
                             dev_schema[devidx] = "ERROR,E"
                         devidx += 1

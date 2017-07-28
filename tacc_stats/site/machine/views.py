@@ -439,18 +439,17 @@ def proc_detail(request, pk, proc_name):
     schema = data.get_schema('proc')
     hwm_idx = schema['VmHWM'].index
     hwm_unit = "gB"#schema['VmHWM'].unit
-    aff_idx = schema['Cpus_allowed_list'].index
+
     thr_idx = schema['Threads'].index
 
     for host_name, host in data.hosts.iteritems():
 
         for proc_pid, val in host.stats['proc'].iteritems():
+
             host_map.setdefault(host_name, {})
-            try:
-                proc_ = proc_pid.split('/')[0] 
-            except: 
-                proc_ = proc_pid
+            proc_, pid, cpu_aff, mem_aff = proc_pid.split('/') 
+
             if  proc_ == proc_name:
-                host_map[host_name][proc_pid] = [ val[-1][hwm_idx]/2**20, format(int(val[-1][aff_idx]),'#018b')[2:], val[-1][thr_idx] ]
+                host_map[host_name][proc_+'/'+pid] = [ val[-1][hwm_idx]/2**20, cpu_aff, val[-1][thr_idx] ]
 
     return render_to_response("machine/proc_detail.html",{"proc_name" : proc_name, "jobid" : pk, "host_map" : host_map, "hwm_unit" : hwm_unit})
