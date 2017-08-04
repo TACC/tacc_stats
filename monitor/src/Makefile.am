@@ -57,7 +57,6 @@ TYPES 	= \
 	cpu.c \
 	mem.c \
 	net.c \
-	nfs.c \
 	numa.c \
 	proc.c \
 	ps.c \
