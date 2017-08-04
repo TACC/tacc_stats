@@ -12,7 +12,7 @@ class MCDRAMBW(Test):
 
   def compute_metric(self):
     
-    if "Flat" in self.ts.j.acct['queue']:
+    if "flat" in self.ts.j.acct['queue'].lower():
       print self.ts.j.acct['queue']
       gdramrate = 64*(self.arc(self.ts.data[0]) + self.arc(self.ts.data[3]))
     else:
