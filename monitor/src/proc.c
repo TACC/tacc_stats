@@ -28,19 +28,21 @@
     X(VmPTE, "U=kB", "page table entry size"),				\
     X(VmSwap, "U=kB", "swapped vm size"),				\
     X(Threads, "", "number of threads"),				\
-    X(Cpus_allowed_list, "", "cores process can use"),			\
-    X(Mems_allowed_list, "", "memory nodes process can use"),		\
     
 static void proc_collect_pid(struct stats_type *type, const char *pid)
 {
   struct stats *stats = NULL;
   char path[32];
-  char process[128];
+  char process[512];
   FILE *file = NULL;
   char file_buf[4096];
   char *line = NULL;
   size_t line_size = 0;
-  
+
+  char name[16];
+  char cmask[512];
+  char mmask[32];
+
   TRACE("pid %s\n", pid);
 
   snprintf(path, sizeof(path), "/proc/%s/status", pid);
@@ -58,48 +60,39 @@ static void proc_collect_pid(struct stats_type *type, const char *pid)
     
     if (key == NULL || rest == NULL)
 	continue;
-    if (strcmp(key,"Name:") == 0) 
-      {
-	rest[strlen(rest) - 1] = '\0';
 
-	if (!strcmp("bash", rest) || !strcmp("ssh", rest) || 
-	    !strcmp("sshd", rest) || !strcmp("metacity", rest))
-	  goto out;
-  
-	snprintf(process, sizeof(process), "%s/%s", rest, pid);
-	stats = get_current_stats(type, process);
-	continue;
-      }
-    if (stats == NULL)
-      goto out;
- 
-    errno = 0;
-    key[strlen(key) - 1] = '\0';
+    rest[strlen(rest) - 1] = '\0';
+    if (strcmp(key, "Name:") == 0) {     
+      if (!strcmp("bash", rest) || !strcmp("ssh", rest) || 
+	  !strcmp("sshd", rest) || !strcmp("metacity", rest))
+	goto out;
+      
+      strcpy(name, rest);
+    }
+    else if (strcmp(key, "Cpus_allowed_list:") == 0) {
+      strcpy(cmask, rest);
+    }
+    else if (strcmp(key, "Mems_allowed_list:") == 0) {
+      strcpy(mmask, rest);
+    }
+  }
+
+  snprintf(process, sizeof(process), "%s/%s/%s/%s", name, pid, cmask, mmask);
+  stats = get_current_stats(type, process);       
+  if (stats == NULL)
+    goto out;
+
+  fseek(file, 0, SEEK_SET);
+  while (getline(&line, &line_size, file) >= 0) {
+    char *key, *rest = line;
+    key = wsep(&rest);
     
-    int base = 0;
-    char mask[nr_cpus];
-    if (strcmp(key,"Cpus_allowed_list") == 0 || strcmp(key,"Mems_allowed_list") == 0)
-      {
-	memset(mask, '0', nr_cpus);
-        mask[nr_cpus]='\0';
-	char *range;
-	char *first;
-	int i, second;
-	while (rest) 
-	  {
-	    range = strsep(&rest, ",");
-	    first = strsep(&range, "-");
-	    if (range) second = atoi(range);
-	    else second = atoi(first);
+    if (key == NULL || rest == NULL)
+	continue;
 
-	    for (i = atoi(first); i < MIN(second + 1, nr_cpus); i++)
-	      mask[nr_cpus-i-1] = '1';
-	  }
-	rest = mask;
-	base = 2;
-      }
-  
-    unsigned long long val = strtoull(rest, NULL, base);
+    errno = 0;
+    key[strlen(key) - 1] = '\0';  
+    unsigned long long val = strtoull(rest, NULL, 0);
     if (errno == 0)
       stats_set(stats, key, val);
   }
