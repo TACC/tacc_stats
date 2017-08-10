@@ -17,6 +17,8 @@ Makefile.in
 /config.guess
 /config.h.in
 /config.sub
+/config.log
+/config.status
 /configure
 /configure.scan
 /depcomp
@@ -31,3 +33,8 @@ Makefile.in
 # http://www.gnu.org/software/texinfo
 
 /texinfo.tex
+
+/Makefile
+/src/Makefile
+/src/tacc_stats
+/src/.deps

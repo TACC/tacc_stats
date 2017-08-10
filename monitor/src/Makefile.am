@@ -6,11 +6,6 @@ STATS_DIR_PATH = /var/log/tacc_stats
 STATS_LOCK_PATH= /var/lock/tacc_stats
 JOBID_FILE_PATH= /var/run/TACC_jobid
 
-if DEBUG
-tacc_stats_CFLAGS = \
-	-DDEBUG
-endif
-
 tacc_stats_CPPFLAGS = \
 	-D_GNU_SOURCE \
 	-DSTATS_PROGRAM=\"@PACKAGE@\" \
@@ -18,6 +13,11 @@ tacc_stats_CPPFLAGS = \
 	-DSTATS_DIR_PATH=\"$(STATS_DIR_PATH)\" \
 	-DSTATS_LOCK_PATH=\"$(STATS_LOCK_PATH)\" \
 	-DJOBID_FILE_PATH=\"$(JOBID_FILE_PATH)\"
+
+if DEBUG
+tacc_stats_CPPFLAGS += \
+	-DDEBUG
+endif
 
 tacc_stats_SOURCES = \
 	collect.h \
@@ -45,6 +45,8 @@ tacc_stats_SOURCES += \
 	monitor.c \
 	stats_buffer.c \
 	stats_buffer.h
+tacc_stats_CPPFLAGS += \
+	-DRABBITMQ
 else
 tacc_stats_SOURCES += \
 	main.c \

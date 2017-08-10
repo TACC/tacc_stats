@@ -4,17 +4,17 @@ AC_PROG_CC
 AM_PROG_CC_C_O
 
 AC_ARG_ENABLE([hardware],
-[  --enable-hardware  Enable processor hardware counter support],
+[  --enable-hardware	Enable processor hardware counter support (default is true)],
 [case "${enableval}" in
   yes) hardware=true ;;
   no)  hardware=false ;;
   *) AC_MSG_ERROR([bad value ${enableval} for --enable-hardware]) ;;
-esac],[hardware=true])
+esac],
+[hardware=true])
 AM_CONDITIONAL([HARDWARE], [test x$hardware = xtrue])
 
 AC_ARG_ENABLE([infiniband],
-[  --enable-infiniband  Enable Infiniband support],
-
+[  --enable-infiniband	Enable Infiniband support (must be set to true or false)],
 [case "${enableval}" in
   yes) AC_SEARCH_LIBS([mad_rpc_open_port], [ibmad], [have_ib=yes], 
     [AC_MSG_ERROR([Unable to find libibmad.so!])])
@@ -26,7 +26,6 @@ AC_ARG_ENABLE([infiniband],
   no)  infiniband=false ;;
   *) AC_MSG_ERROR([bad value ${enableval} for --enable-infiniband]) ;;
 esac],
-
 [AC_SEARCH_LIBS([mad_rpc_open_port], [ibmad], [have_ib=yes],
   [AC_MSG_ERROR([Unable to find libibmad.so!])])
   if test "x${have_ib}" = xyes; then 
@@ -37,16 +36,17 @@ esac],
 AM_CONDITIONAL([INFINIBAND], [test x$infiniband = xtrue])
 
 AC_ARG_ENABLE([lustre],
-[  --enable-lustre  Enable Lustre support],
+[  --enable-lustre	Enable Lustre support (default is true)],
 [case "${enableval}" in
   yes) lustre=true ;;
   no)  lustre=false ;;
   *) AC_MSG_ERROR([bad value ${enableval} for --enable-lustre]) ;;
-esac],[lustre=true])
+esac],
+[lustre=true])
 AM_CONDITIONAL([LUSTRE], [test x$lustre = xtrue])
 
 AC_ARG_ENABLE([mic],
-[  --enable-mic  Enable Intel MIC (Xeon Phi) support],
+[  --enable-mic		Enable Intel MIC (Xeon Phi) support (default is false)],
 [case "${enableval}" in
   yes) mic=true
   AC_SEARCH_LIBS([mic_open_device], [micmgmt], [have_mic=yes], 
@@ -54,16 +54,16 @@ AC_ARG_ENABLE([mic],
   ;;
   no)  mic=false ;;
   *) AC_MSG_ERROR([bad value ${enableval} for --enable-mic]) ;;
-esac],[mic=false])
+esac],
+[mic=false])
 AM_CONDITIONAL([MIC], [test x$mic = xtrue])
 
 AC_ARG_ENABLE([gpu],
-[  --enable-gpu  Enable Nvidia GPU support],
+[  --enable-gpu		Enable Nvidia GPU support (default is false)],
 [case "${enableval}" in
   yes) gpu=true
   AC_SEARCH_LIBS([nvmlInit], [nvidia-ml], [have_gpu=yes], 
   [AC_MSG_ERROR([Unable to find libnvidia-ml.so!])])
-
   if test "x${have_gpu}" = xyes; then 
      AC_CHECK_HEADERS([nvml.h], [gpu=true], 
      [AC_MSG_ERROR([Unable to find nvml.h on this system!])])  
@@ -71,16 +71,17 @@ AC_ARG_ENABLE([gpu],
   ;;
   no)  gpu=false ;;
   *) AC_MSG_ERROR([bad value ${enableval} for --enable-gpu]) ;;
-esac],[gpu=false])
+esac],
+[gpu=false])
 AM_CONDITIONAL([GPU], [test x$gpu = xtrue])
 
 AC_ARG_ENABLE([opa],
-[  --enable-opa  Enable Intel Omnipath Fabric support],
+[  --enable-opa		Enable Intel Omnipath Fabric support (default is false)],
 [case "${enableval}" in
   yes) opa=true
   AC_SEARCH_LIBS([iba_fstatus_msg], [public])
   AC_SEARCH_LIBS([oib_pa_client_init], [oib_utils], [have_opa=yes], 
-  [AC_MSG_ERROR([Unable to find liboib_utils.a!])], [ -libmad -libumad -libverbs -lpublic -lpthread ])  
+  [AC_MSG_ERROR([Unable to find liboib_utils.a!])], [ -libmad -libumad -libverbs -lpublic -lpthread ])
   if test "x${have_opa}" = xyes; then 
      AC_CHECK_HEADERS([oib_utils.h], [opa=true], 
      [AC_MSG_ERROR([Unable to find oib_utils.h on this system!])])  
@@ -91,38 +92,39 @@ AC_ARG_ENABLE([opa],
   ;;
   no)  opa=false ;;
   *) AC_MSG_ERROR([bad value ${enableval} for --enable-opa]) ;;
-esac],[opa=false])
+esac],
+[opa=false])
 AM_CONDITIONAL([OPA], [test x$opa = xtrue])
 
 AC_ARG_ENABLE([debug],
-[  --enable-debug    Turn on debugging],
+[  --enable-debug	Turn on debugging (default is false)],
 [case "${enableval}" in
   yes) debug=true ;;
   no)  debug=false ;;
   *) AC_MSG_ERROR([bad value ${enableval} for --enable-debug]) ;;
-esac],[debug=false])
+esac],
+[debug=false])
 AM_CONDITIONAL([DEBUG], [test x$debug = xtrue])
 
 AC_ARG_ENABLE([rabbitmq],
-[  --enable-rabbitmq  Build the rabbitmq/daemon version],
+[  --enable-rabbitmq	Build the rabbitmq/daemon version (default is false)],
 [case "${enableval}" in
   yes) rabbitmq=true 
   AC_SEARCH_LIBS([amqp_new_connection], [rabbitmq], [have_rabbitmq=yes], [have_rabbitmq=no])
   if test "x${have_rabbitmq}" = xno; then 
     AC_MSG_ERROR([Unable to find rabbitmq library on this system.  Stopping...])
   fi
-
   if test "x${have_rabbitmq}" =	 xyes; then 
      AC_CHECK_HEADERS([amqp.h], [], [have_rabbitmq=no])  
   fi
   if test "x${have_rabbitmq}" = xno; then 
     AC_MSG_ERROR([Unable to find rabbitmq headers on this system.  Stopping...])
   fi
-
   ;;
   no)  rabbitmq=false ;;
   *) AC_MSG_ERROR([bad value ${enableval} for --enable-rabbitmq]) ;;
-esac],[rabbitmq=false])
+esac],
+[rabbitmq=false])
 AM_CONDITIONAL([RABBITMQ], [test x$rabbitmq = xtrue])
 
 AC_CONFIG_FILES([Makefile src/Makefile])

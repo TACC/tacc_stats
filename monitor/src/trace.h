@@ -10,15 +10,20 @@
 static inline void TRACE(const char *fmt, ...) { }
 #endif
 
-#ifdef DEBUG
-#define ERROR(fmt,arg...) \
-  fprintf(stderr, "%s:%d: "fmt, __func__, __LINE__, ##arg)
-  //syslog(LOG_ERR, "%s:%d: "fmt, __func__, __LINE__, ##arg) 
+#ifdef RABBITMQ
+#define logger syslog
+#define logtag LOG_ERR
 #else
-#define ERROR(fmt,arg...) \
-  fprintf(stderr, "%s: "fmt, program_invocation_short_name, ##arg)
-//syslog(LOG_ERR, "%s: "fmt, program_invocation_short_name, ##arg)
+#define logger fprintf
+#define logtag stderr
+#endif
 
+#ifdef DEBUG
+#define ERROR(fmt,arg...)					\
+  logger(logtag, "%s:%d: "fmt, __func__, __LINE__, ##arg) 
+#else
+#define ERROR(fmt,arg...)						\
+  logger(logtag, "%s: "fmt, program_invocation_short_name, ##arg)
 #endif
 
 #define FATAL(fmt,arg...) do { \
