@@ -1,4 +1,4 @@
-AC_INIT([tacc_stats], [2.3.1], [rtevans@tacc.utexas.edu])
+AC_INIT([tacc_stats], [2.3.2], [rtevans@tacc.utexas.edu])
 AM_INIT_AUTOMAKE([-Wall -Werror -Wno-portability])
 AC_PROG_CC
 AM_PROG_CC_C_O
@@ -99,7 +99,7 @@ AM_CONDITIONAL([OPA], [test x$opa = xtrue])
 AC_ARG_ENABLE([debug],
 [  --enable-debug	Turn on debugging (default is false)],
 [case "${enableval}" in
-  yes) debug=true ;;
+  yes) debug=true ;;     
   no)  debug=false ;;
   *) AC_MSG_ERROR([bad value ${enableval} for --enable-debug]) ;;
 esac],

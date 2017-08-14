@@ -25,8 +25,7 @@ script to provide control.
 %setup -n tacc_stats-%{version}
 
 %build
-./configure --bindir=%{_bindir} --sysconfdir=%{_sysconfdir} --enable-rabbitmq \
-            CPPFLAGS=-I/opt/ofed/include LDFLAGS=-L/opt/ofed/lib64
+./configure --bindir=%{_bindir} --sysconfdir=%{_sysconfdir} --disable-infiniband --disable-opa CPPFLAGS=-I/admin/build/admin/rpms/stampede2/SOURCES/opa-ff/builtinclude.OPENIB_FF.release LDFLAGS=-L/admin/build/admin/rpms/stampede2/SOURCES/opa-ff/builtlibs.OPENIB_FF.release --enable-rabbitmq
 make
 
 %install

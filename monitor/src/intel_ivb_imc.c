@@ -13,7 +13,7 @@
 #include "trace.h"
 #include "pscanf.h"
 #include "pci.h"
-#include "intel_snb_uncore.h"
+#include "intel_pmc_uncore.h"
 
 #define CTL_KEYS \
   X(CTL0, "C", ""),   \
@@ -45,15 +45,15 @@
 #define PRE_COUNT_ALL       PERF_EVENT(0x02, 0x03)
 #define PRE_COUNT_MISS      PERF_EVENT(0x02, 0x01)
 
+static uint32_t events[] = {
+  CAS_READS, CAS_WRITES, ACT_COUNT, PRE_COUNT_MISS,
+};
+static int dids[] = {0x0eb4, 0x0eb5, 0x0eb0, 0x0eb1}; 
+
 static int intel_ivb_imc_begin(struct stats_type *type)
 {
   int nr = 0;
-  
-  uint32_t events[] = {
-    CAS_READS, CAS_WRITES, ACT_COUNT, PRE_COUNT_MISS,
-  };
-  int dids[] = {0x0eb4, 0x0eb5, 0x0eb0, 0x0eb1}; 
-  
+    
   char **dev_paths = NULL;
   int nr_devs;
 
@@ -62,7 +62,7 @@ static int intel_ivb_imc_begin(struct stats_type *type)
   
   int i;
   for (i = 0; i < nr_devs; i++)
-    if (intel_snb_uncore_begin_dev(dev_paths[i], events, 4) == 0)
+    if (intel_pmc_uncore_begin_dev(dev_paths[i], events, 4) == 0)
       nr++;
 
   if (nr == 0)
@@ -73,8 +73,6 @@ static int intel_ivb_imc_begin(struct stats_type *type)
 
 static void intel_ivb_imc_collect(struct stats_type *type)
 {
-
-  int dids[] = {0x0eb4, 0x0eb5, 0x0eb0, 0x0eb1}; 
   char **dev_paths = NULL;
   int nr_devs;
   if (pci_map_create(&dev_paths, &nr_devs, dids, 4) < 0)
@@ -82,7 +80,7 @@ static void intel_ivb_imc_collect(struct stats_type *type)
   
   int i;
   for (i = 0; i < nr_devs; i++)
-    intel_snb_uncore_collect_dev(type, dev_paths[i]);  
+    intel_pmc_uncore_collect_dev(type, dev_paths[i]);  
   pci_map_destroy(&dev_paths, nr_devs);
 }
 

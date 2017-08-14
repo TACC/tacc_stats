@@ -243,7 +243,7 @@ int main(int argc, char *argv[])
     goto out;
   }
   char *dash = "-\n";
-  if (fwrite(dash, sizeof(char), sizeof(dash), jobfd) < 2) {
+  if (fwrite(dash, sizeof(char), 2, jobfd) < 2) {
     ERROR("cannot write to %s: %m\n", JOBID_FILE_PATH);
     goto out;
   }

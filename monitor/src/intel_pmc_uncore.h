@@ -47,7 +47,7 @@
     X(CTR2),	   \
     X(CTR3)
 
-static int intel_snb_uncore_begin_dev(char *bus_dev, uint32_t *events, size_t nr_events)
+static int intel_pmc_uncore_begin_dev(char *bus_dev, uint32_t *events, size_t nr_events)
 {
   int rc = -1;
   char pci_path[80];
@@ -96,7 +96,7 @@ static int intel_snb_uncore_begin_dev(char *bus_dev, uint32_t *events, size_t nr
   return rc;
 }
 
-static void intel_snb_uncore_collect_dev(struct stats_type *type, char *bus_dev)
+static void intel_pmc_uncore_collect_dev(struct stats_type *type, char *bus_dev)
 {
   struct stats *stats = NULL;
   char pci_path[80];

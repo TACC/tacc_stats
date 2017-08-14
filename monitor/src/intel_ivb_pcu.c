@@ -253,18 +253,19 @@ static int intel_ivb_pcu_begin_socket(char *cpu, uint64_t *events, size_t nr_eve
   return rc;
 }
 
+
+static uint64_t pcu_events[4] = {
+  FREQ_MAX_TEMP_CYCLES,
+  FREQ_MAX_POWER_CYCLES,
+  FREQ_MIN_IO_CYCLES,
+  FREQ_MIN_SNOOP_CYCLES
+};
+
 //! Configure and start counters
 static int intel_ivb_pcu_begin(struct stats_type *type)
 {
   int n_pmcs = 0;
   int nr = 0;
-
-  uint64_t pcu_events[4] = {
-    FREQ_MAX_TEMP_CYCLES,
-    FREQ_MAX_POWER_CYCLES,
-    FREQ_MIN_IO_CYCLES,
-    FREQ_MIN_SNOOP_CYCLES
-  };
 
   int i;
   if (signature(IVYBRIDGE, &n_pmcs))

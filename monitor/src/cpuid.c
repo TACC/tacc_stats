@@ -22,7 +22,7 @@ int signature(processor_t p, int *n_pmcs) {
            ebx & 0xff, (ebx >> 8) & 0xff, (ebx >> 16) & 0xff, (ebx >> 24) & 0xff,
            edx & 0xff, (edx >> 8) & 0xff, (edx >> 16) & 0xff, (edx >> 24) & 0xff,
            ecx & 0xff, (ecx >> 8) & 0xff, (ecx >> 16) & 0xff, (ecx >> 24) & 0xff);
-  printf("vendor %s\n", vendor);
+  TRACE("vendor %s\n", vendor);
 
   cpuid(1, eax, ebx, ecx, edx);
   char signature[6];
@@ -32,7 +32,7 @@ int signature(processor_t p, int *n_pmcs) {
   int extended_family_code = (eax & 0xFF00000) >> 16;
   snprintf(signature,sizeof(signature),"%02x_%x",
            extended_family_code | family_code, extended_model | model);
-  printf("signature %s\n", signature);
+  TRACE("signature %s\n", signature);
 
   if (strncmp(vendor, "GenuineIntel", 12) == 0) {
     cpuid(0x0A, eax, ebx, ecx, edx);
@@ -45,92 +45,97 @@ int signature(processor_t p, int *n_pmcs) {
     ERROR("Processor Vendor not recognized %s", vendor);
     goto out;
   }
-  printf("Number of PMCs = %d\n", *n_pmcs);
+  TRACE("Number of PMCs = %d\n", *n_pmcs);
 
 
   // Determine Processor Type
+  if (strncmp(vendor, "GenuineIntel", 12) == 0) {
+    switch(p) {
+    case NEHALEM:
+      if (strncmp(signature, "06_1a", 5) == 0 || 
+	  strncmp(signature, "06_1e", 5) == 0 || 
+	  strncmp(signature, "06_1f", 5) == 0 || 
+	  strncmp(signature, "06_2e", 5) == 0) {
+	rc = 1;
+	TRACE("Nehalem %s\n", signature);
+      }
+      goto out;
+      
+    case WESTMERE:
+      if (strncmp(signature, "06_25", 5) == 0 || 
+	  strncmp(signature, "06_2c", 5) == 0 || 
+	  strncmp(signature, "06_1f", 5) == 0) {
+	rc = 1;
+	TRACE("Westmere %s\n", signature);
+      }
+      goto out;
+      
+    case IVYBRIDGE:
+      if 	(strncmp(signature, "06_3a", 5) == 0 ||
+		 strncmp(signature, "06_3e", 5) == 0) {
+	rc = 1;
+	TRACE("Ivy Bridge %s\n", signature);
+      }
+      goto out;
+      
+    case SANDYBRIDGE:
+      if (strncmp(signature, "06_2a", 5) == 0 || 
+	  strncmp(signature, "06_2d", 5) == 0) {	
+	rc = 1;
+	TRACE("Sandy Bridge %s\n", signature);
+      }
+      goto out;
+      
+    case HASWELL:
+      if (strncmp(signature, "06_3c", 5) == 0 || 
+	  strncmp(signature, "06_45", 5) == 0 || 
+	  strncmp(signature, "06_46", 5) == 0 || 
+	  strncmp(signature, "06_3f", 5) == 0) {
+	rc = 1;
+	TRACE("Haswell %s\n", signature);
+      }
+      goto out;
+      
+    case BROADWELL:
+      if (strncmp(signature, "06_3d", 5) == 0 || 
+	  strncmp(signature, "06_47", 5) == 0 ||
+	  strncmp(signature, "06_4f", 5) == 0) {
+	rc = 1;
+	TRACE("Broadwell %s\n", signature);
+      }
+      goto out;
+      
+    case KNL:
+      if (strncmp(signature, "06_57", 5) == 0) {
+	rc = 1;
+	TRACE("Knight's Landing %s\n", signature);
+      }
+      goto out;
+      
+    case SKYLAKE:
+      if (strncmp(signature, "06_4e", 5) == 0 || 
+	  strncmp(signature, "06_5e", 5) == 0) {
+	rc = 1;
+	TRACE("Skylake %s\n", signature);
+      }
+      goto out;
+
+    default:
+      ERROR("non-intel processor signature %s\n",signature);
+      goto out;  
+    }
+  }
+  
   switch(p) {
-  case NEHALEM:
-    if (strncmp(vendor, "GenuineIntel", 12) == 0 && 
-	(strncmp(signature, "06_1a", 5) == 0 || 
-	 strncmp(signature, "06_1e", 5) == 0 || 
-	 strncmp(signature, "06_1f", 5) == 0 || 
-	 strncmp(signature, "06_2e", 5) == 0)) {
-      rc = 1;
-      TRACE("Nehalem %s\n", signature);
-    }
-    goto out;
-  case WESTMERE:
-    if (strncmp(vendor, "GenuineIntel", 12) == 0 && 
-	(strncmp(signature, "06_25", 5) == 0 || 
-	 strncmp(signature, "06_2c", 5) == 0 || 
-	 strncmp(signature, "06_1f", 5) == 0)) {
-      rc = 1;
-      TRACE("Westmere %s\n", signature);
-    }
-    goto out;
-  case IVYBRIDGE:
-    if (strncmp(vendor, "GenuineIntel", 12) == 0 &&
-	(strncmp(signature, "06_3a", 5) == 0 ||
-	 strncmp(signature, "06_3e", 5) == 0)) {
-      rc = 1;
-      TRACE("Ivy Bridge %s\n", signature);
-    }
-    goto out;
-  case SANDYBRIDGE:
-    if (strncmp(vendor, "GenuineIntel", 12) == 0 && 
-	(strncmp(signature, "06_2a", 5) == 0 || 
-	 strncmp(signature, "06_2d", 5) == 0)) {	
-      rc = 1;
-      TRACE("Sandy Bridge %s\n", signature);
-    }
-    goto out;
-  case HASWELL:
-    if (strncmp(vendor, "GenuineIntel", 12) == 0 &&
-	(strncmp(signature, "06_3c", 5) == 0 || 
-	 strncmp(signature, "06_45", 5) == 0 || 
-	 strncmp(signature, "06_46", 5) == 0 || 
-	 strncmp(signature, "06_3f", 5) == 0)) {
-      rc = 1;
-      TRACE("Haswell %s\n", signature);
-    }
-    goto out;
-  case BROADWELL:
-    if (strncmp(vendor, "GenuineIntel", 12) == 0 &&
-	(strncmp(signature, "06_3d", 5) == 0 || 
-	 strncmp(signature, "06_47", 5) == 0)) {
-      rc = 1;
-      TRACE("Broadwell %s\n", signature);
-    }
-    goto out;
-  case KNL:
-    if (strncmp(vendor, "GenuineIntel", 12) == 0 &&
-	(strncmp(signature, "06_57", 5) == 0)) {
-      rc = 1;
-      TRACE("Knight's Landing %s\n", signature);
-    }
-    goto out;
-  case SKYLAKE:
-    if (strncmp(vendor, "GenuineIntel", 12) == 0 &&
-	(strncmp(signature, "06_4e", 5) == 0 || 
-	 strncmp(signature, "06_5e", 5) == 0)) {
-      rc = 1;
-      TRACE("Skylake %s\n", signature);
-    }
-    goto out;
   case AMD_10H:
     if (strncmp(vendor, "AuthenticAMD", 12) == 0) {
       rc = 1;
       TRACE("AMD_10h %s\n", signature);
     }
     goto out;
-  default:
-    ERROR("unknown processor signature %s\n",signature);
-    goto out;    
   }
   
  out:
-
   return rc;
 }
 

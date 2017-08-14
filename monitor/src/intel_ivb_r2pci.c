@@ -13,7 +13,7 @@
 #include "trace.h"
 #include "pscanf.h"
 #include "pci.h"
-#include "intel_snb_uncore.h"
+#include "intel_pmc_uncore.h"
 
 #define CTL_KEYS \
     X(CTL0, "C", ""), \
@@ -44,15 +44,15 @@
 #define RING_AK_USED_ALL PERF_EVENT(0x08,0x0F) 
 #define RING_BL_USED_ALL PERF_EVENT(0x09,0x0F) 
 
+static uint32_t events[] = {
+  TxR_INSERTS, RING_BL_USED_ALL, RING_AD_USED_ALL, RING_AK_USED_ALL,
+};
+static int dids[] = {0x0e34};
+
 static int intel_ivb_r2pci_begin(struct stats_type *type)
 {
   int nr = 0;
   
-  uint32_t events[] = {
-    TxR_INSERTS, RING_BL_USED_ALL, RING_AD_USED_ALL, RING_AK_USED_ALL,
-  };
-
-  int dids[] = {0x0e34};
 
   char **dev_paths = NULL;
   int nr_devs;
@@ -62,7 +62,7 @@ static int intel_ivb_r2pci_begin(struct stats_type *type)
   
   int i;
   for (i = 0; i < nr_devs; i++)
-    if (intel_snb_uncore_begin_dev(dev_paths[i], events, 4) == 0)
+    if (intel_pmc_uncore_begin_dev(dev_paths[i], events, 4) == 0)
       nr++;
 
   if (nr == 0)
@@ -73,8 +73,6 @@ static int intel_ivb_r2pci_begin(struct stats_type *type)
 
 static void intel_ivb_r2pci_collect(struct stats_type *type)
 {
-  int dids[] = {0x0e34};
-
   char **dev_paths = NULL;
   int nr_devs;
   if (pci_map_create(&dev_paths, &nr_devs, dids, 1) < 0)
@@ -82,7 +80,7 @@ static void intel_ivb_r2pci_collect(struct stats_type *type)
   
   int i;
   for (i = 0; i < nr_devs; i++)
-    intel_snb_uncore_collect_dev(type, dev_paths[i]);  
+    intel_pmc_uncore_collect_dev(type, dev_paths[i]);  
   pci_map_destroy(&dev_paths, nr_devs);
 }
 

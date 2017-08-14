@@ -1,5 +1,5 @@
 /*! 
- \file intel_hsw_imc.c
+ \file intel_bdw_imc.c
 */
 #include <stddef.h>
 #include <stdlib.h>
@@ -51,7 +51,7 @@
   
   To change events to count:
   -# Define event below
-  -# Modify events array in intel_hsw_imc_begin()
+  -# Modify events array in intel_bdw_imc_begin()
 */
 #define MBOX_PERF_EVENT(event, umask) \
   ( (event) \
@@ -80,10 +80,10 @@ static uint32_t events[] = {
   CAS_READS, CAS_WRITES, ACT_COUNT, PRE_COUNT_MISS,
 };
 
-static int dids[] = {0x2fb0, 0x2fb1, 0x2fb4, 0x2fb5, 
-		     0x2fd0, 0x2fd1, 0x2fd4, 0x2fd5}; 
+static int dids[] = {0x6fb0, 0x6fb1, 0x6fb4, 0x6fb5, 
+		     0x6fd0, 0x6fd1, 0x6fd4, 0x6fd5}; 
 
-static int intel_hsw_imc_begin(struct stats_type *type)
+static int intel_bdw_imc_begin(struct stats_type *type)
 {
   int nr = 0;
 
@@ -104,7 +104,7 @@ static int intel_hsw_imc_begin(struct stats_type *type)
   return nr > 0 ? 0 : -1;
 }
 
-static void intel_hsw_imc_collect(struct stats_type *type)
+static void intel_bdw_imc_collect(struct stats_type *type)
 {
   char **dev_paths = NULL;
   int nr_devs;
@@ -118,10 +118,10 @@ static void intel_hsw_imc_collect(struct stats_type *type)
   pci_map_destroy(&dev_paths, nr_devs);
 }
 
-struct stats_type intel_hsw_imc_stats_type = {
-  .st_name = "intel_hsw_imc",
-  .st_begin = &intel_hsw_imc_begin,
-  .st_collect = &intel_hsw_imc_collect,
+struct stats_type intel_bdw_imc_stats_type = {
+  .st_name = "intel_bdw_imc",
+  .st_begin = &intel_bdw_imc_begin,
+  .st_collect = &intel_bdw_imc_collect,
 #define X SCHEMA_DEF
   .st_schema_def = JOIN(KEYS),
 #undef X

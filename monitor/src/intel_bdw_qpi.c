@@ -49,13 +49,12 @@
 #define G2_NCB_DATA       PERF_EVENT(0x03,0x04) //!< for data bandwidth, flits x 8B/time
 
 static uint32_t events[] = {TxL_FLITS_G1_SNP,  TxL_FLITS_G1_HOM, G1_DRS_DATA, G2_NCB_DATA};
-static int dids[] = {0x0e32, 0x0e33, 0x0e3a};
+static int dids[] = {0x6F32, 0x6F33, 0x6F3A};
 
-static int intel_ivb_qpi_begin(struct stats_type *type)
+static int intel_bdw_qpi_begin(struct stats_type *type)
 {
   int nr = 0;
   int nr_dids = 3;
-
   int nr_events = 4;
 
   char **dev_paths = NULL;
@@ -71,13 +70,12 @@ static int intel_ivb_qpi_begin(struct stats_type *type)
   
   if (nr == 0)
     type->st_enabled = 0;
-
   pci_map_destroy(&dev_paths, nr_devs);
   return nr > 0 ? 0 : -1;
 
 }
 
-static void intel_ivb_qpi_collect(struct stats_type *type)
+static void intel_bdw_qpi_collect(struct stats_type *type)
 {
   int nr_dids = 3;
 
@@ -92,10 +90,10 @@ static void intel_ivb_qpi_collect(struct stats_type *type)
   pci_map_destroy(&dev_paths, nr_devs);
 }
 
-struct stats_type intel_ivb_qpi_stats_type = {
-  .st_name = "intel_ivb_qpi",
-  .st_begin = &intel_ivb_qpi_begin,
-  .st_collect = &intel_ivb_qpi_collect,
+struct stats_type intel_bdw_qpi_stats_type = {
+  .st_name = "intel_bdw_qpi",
+  .st_begin = &intel_bdw_qpi_begin,
+  .st_collect = &intel_bdw_qpi_collect,
 #define X SCHEMA_DEF
   .st_schema_def = JOIN(KEYS),
 #undef X

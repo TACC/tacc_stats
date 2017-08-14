@@ -26,9 +26,8 @@ tacc_stats_SOURCES = \
 	cpuid.c \
 	dict.h \
 	dict.c \
-	intel_hsw_uncore.h \
 	intel_pmc3.h \
-	intel_snb_uncore.h \
+	intel_pmc_uncore.h \
 	JOIN.h \
 	pci.h \
 	pci.c \
@@ -70,6 +69,13 @@ TYPES 	= \
 if HARDWARE
 TYPES 	+= \
 	amd64_pmc.c \
+	intel_bdw.c \
+	intel_bdw_cbo.c \
+	intel_bdw_hau.c \
+	intel_bdw_imc.c \
+	intel_bdw_pcu.c \
+	intel_bdw_qpi.c \
+	intel_bdw_r2pci.c \
 	intel_hsw.c \
 	intel_hsw_cbo.c \
 	intel_hsw_hau.c \

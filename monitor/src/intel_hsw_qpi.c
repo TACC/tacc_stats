@@ -13,7 +13,7 @@
 #include "trace.h"
 #include "pscanf.h"
 #include "pci.h"
-#include "intel_snb_uncore.h"
+#include "intel_pmc_uncore.h"
 
 #define MASK0    0x238
 #define MASK1    0x23C
@@ -48,12 +48,13 @@
 #define G1_DRS_DATA       PERF_EVENT(0x02,0x08) //!< for data bandwidth, flits x 8B/time
 #define G2_NCB_DATA       PERF_EVENT(0x03,0x04) //!< for data bandwidth, flits x 8B/time
 
+static int dids[] = {0x2F32, 0x2F33, 0x2F3A};
+static uint32_t events[] = {TxL_FLITS_G1_SNP,  TxL_FLITS_G1_HOM, G1_DRS_DATA, G2_NCB_DATA};
+
 static int intel_hsw_qpi_begin(struct stats_type *type)
 {
   int nr = 0;
-  int dids[] = {0x2F32, 0x2F33, 0x2F3A};
   int nr_dids = 3;
-  uint32_t events[] = {TxL_FLITS_G1_SNP,  TxL_FLITS_G1_HOM, G1_DRS_DATA, G2_NCB_DATA};
   int nr_events = 4;
 
   char **dev_paths = NULL;
@@ -64,7 +65,7 @@ static int intel_hsw_qpi_begin(struct stats_type *type)
   
   int i;
   for (i = 0; i < nr_devs; i++)
-    if (intel_snb_uncore_begin_dev(dev_paths[i], events, nr_events) == 0)
+    if (intel_pmc_uncore_begin_dev(dev_paths[i], events, nr_events) == 0)
       nr++;
   
   if (nr == 0)
@@ -76,7 +77,6 @@ static int intel_hsw_qpi_begin(struct stats_type *type)
 
 static void intel_hsw_qpi_collect(struct stats_type *type)
 {
-  int dids[] = {0x2F32, 0x2F33, 0x2F3A};
   int nr_dids = 3;
 
   char **dev_paths = NULL;
@@ -86,7 +86,7 @@ static void intel_hsw_qpi_collect(struct stats_type *type)
   
   int i;
   for (i = 0; i < nr_devs; i++)
-    intel_snb_uncore_collect_dev(type, dev_paths[i]);  
+    intel_pmc_uncore_collect_dev(type, dev_paths[i]);  
   pci_map_destroy(&dev_paths, nr_devs);
 }
 

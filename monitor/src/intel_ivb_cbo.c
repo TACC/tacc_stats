@@ -154,18 +154,18 @@ static int intel_ivb_cbo_begin_box(char *cpu, int box, uint64_t *events, size_t 
   return rc;
 }
 
+static uint64_t events[] = {
+  LLC_LOOKUP_DATA_READ, 
+  LLC_LOOKUP_WRITE,
+  RING_IV_USED,
+  COUNTER0_OCCUPANCY
+};
 
 //! Configure and start counters
 static int intel_ivb_cbo_begin(struct stats_type *type)
 {
   int n_pmcs = 0;
   int nr = 0;
-  uint64_t events[] = {
-    LLC_LOOKUP_DATA_READ, 
-    LLC_LOOKUP_WRITE,
-    RING_IV_USED,
-    COUNTER0_OCCUPANCY
-  };
 
   int i,j;
   if (signature(IVYBRIDGE, &n_pmcs))

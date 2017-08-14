@@ -47,9 +47,9 @@
 static uint32_t events[] = {
   TxR_INSERTS, RING_BL_USED_ALL, RING_AD_USED_ALL, RING_AK_USED_ALL,
 };
-static int dids[] = {0x3c43};
+static int dids[] = {0x6F34};
 
-static int intel_snb_r2pci_begin(struct stats_type *type)
+static int intel_bdw_r2pci_begin(struct stats_type *type)
 {
   int nr = 0;
   
@@ -70,7 +70,7 @@ static int intel_snb_r2pci_begin(struct stats_type *type)
   return nr > 0 ? 0 : -1;
 }
 
-static void intel_snb_r2pci_collect(struct stats_type *type)
+static void intel_bdw_r2pci_collect(struct stats_type *type)
 {
   char **dev_paths = NULL;
   int nr_devs;
@@ -79,14 +79,14 @@ static void intel_snb_r2pci_collect(struct stats_type *type)
   
   int i;
   for (i = 0; i < nr_devs; i++)
-    intel_pmc_uncore_collect_dev(type, dev_paths[i]);  
-  pci_map_destroy(&dev_paths, nr_devs);
+    intel_pmc_uncore_collect_dev(type, dev_paths[i]);
+  pci_map_destroy(&dev_paths, nr_devs);  
 }
 
-struct stats_type intel_snb_r2pci_stats_type = {
-  .st_name = "intel_snb_r2pci",
-  .st_begin = &intel_snb_r2pci_begin,
-  .st_collect = &intel_snb_r2pci_collect,
+struct stats_type intel_bdw_r2pci_stats_type = {
+  .st_name = "intel_bdw_r2pci",
+  .st_begin = &intel_bdw_r2pci_begin,
+  .st_collect = &intel_bdw_r2pci_collect,
 #define X SCHEMA_DEF
   .st_schema_def = JOIN(KEYS),
 #undef X
