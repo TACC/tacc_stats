@@ -166,6 +166,7 @@ if RABBITMQ
 initddir = $(sysconfdir)/rc.d/init.d
 initd_SCRIPTS = taccstats
 sysconf_DATA = tacc_stats.conf
+sysconf_DATA += taccstats.service
 BUILT_SOURCES += taccstats
 nodist_tacc_stats_SOURCES += \
 	taccstats
@@ -181,4 +182,4 @@ else
 bin_SCRIPTS = archive
 endif
 
-EXTRA_DIST = taccstats.in tacc_stats.conf archive
+EXTRA_DIST = taccstats.in tacc_stats.conf archive taccstats.service
