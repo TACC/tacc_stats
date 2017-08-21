@@ -13,7 +13,6 @@ class MetaDataRate(Test):
       'removexattr', 'readdir',
       'create','lookup','link','unlink','symlink','mkdir',
       'rmdir','mknod','rename',]
-  comp_operator = '>'
 
   def compute_metric(self):
 

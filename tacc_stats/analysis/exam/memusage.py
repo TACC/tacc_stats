@@ -8,9 +8,7 @@ class MemUsage(Test):
 
   k1=['mem', 'mem', 'mem']
   k2=['MemUsed', 'FilePages', 'Slab']
-  
-  comp_operator = '<'
-  
+    
   def compute_metric(self):
     # mem usage in GB
     max_memusage = 0 

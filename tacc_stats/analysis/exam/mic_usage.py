@@ -8,7 +8,6 @@ from exams import Test
 class MIC_Usage(Test):
   k1 = ['mic']      
   k2 = ['user_sum']
-  comp_operator = '>'
   
   def compute_metric(self):
     # Get mic stats aggregated over all hosts and mics

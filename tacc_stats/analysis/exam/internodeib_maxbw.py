@@ -4,7 +4,6 @@ import numpy
 class InternodeIBMaxBW(Test):
     k1 = ['ib_sw', 'ib_sw', 'lnet', 'lnet']     
     k2 = ['rx_bytes', 'tx_bytes', 'rx_bytes', 'tx_bytes']    
-    comp_operator='>'
 
     def compute_metric(self):
    

@@ -6,8 +6,6 @@ class PacketSize(Test):
   k2=['rx_packets','tx_packets',
       'rx_bytes', 'tx_bytes']
 
-  comp_operator='<'
-
   def compute_metric(self):
 
     rx_mean_size = self.arc(self.ts.data[2])/self.arc(self.ts.data[0])

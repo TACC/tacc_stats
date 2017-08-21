@@ -6,7 +6,6 @@ class GigEBW(Test):
     
     k2 = ['rx_bytes', 'tx_bytes']
     
-    comp_operator='>'
     aggregate = False
 
     def compute_metric(self):

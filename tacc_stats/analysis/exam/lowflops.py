@@ -16,8 +16,6 @@ class LowFLOPS(Test):
       'intel_knl' : ['']
       }
 
-  # If metric is less than threshold then flag 
-  comp_operator = '<'
   
   def compute_metric(self):
 

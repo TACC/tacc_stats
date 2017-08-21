@@ -8,10 +8,8 @@ class MCDRAMBW(Test):
   k2={'intel_knl' : ['RPQ_INSERTS', 'EDC_MISS_CLEAN', 'EDC_MISS_DIRTY', 'WPQ_INSERTS', 'CAS_READS']
       }
 
-  comp_operator = '>'
-
   def compute_metric(self):
-    
+
     if "flat" in self.ts.j.acct['queue'].lower():
       print self.ts.j.acct['queue']
       gdramrate = 64*(self.arc(self.ts.data[0]) + self.arc(self.ts.data[3]))

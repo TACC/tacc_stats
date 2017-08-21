@@ -9,7 +9,6 @@ class Load_L1Hits(Test):
         'intel_ivb' : ['LOAD_OPS_L1_HIT'],
         'intel_hsw' : ['LOAD_OPS_L1_HIT']
         }
-  comp_operator = '>'
 
   def compute_metric(self):
     self.metric = self.arc(self.ts.data[0])

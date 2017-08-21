@@ -8,17 +8,13 @@ from tacc_stats.analysis.gen import tspl,tspl_utils
 
 def _unwrap(args):
   try:
-    return args[0].get_measurements(args[1])
+    return args[0].compute_metrics(args[1])
   except Exception as e:
     print(traceback.format_exc())
     #raise e
     pass
 
 class Auditor():
-
-  comp = {'>': operator.gt, '>=': operator.ge,
-          '<': operator.le, '<=': operator.le,
-          '==': operator.eq}
 
   def __init__(self, processes = 4, **kwargs):
     self.processes = processes
@@ -43,9 +39,9 @@ class Auditor():
       for metric_name, job in d.iteritems():
         self.metrics.setdefault(metric_name, {}) 
         self.metrics[metric_name][job[0]] = job[1]
-    
+
   # Compute metric
-  def get_measurements(self,jobpath):
+  def compute_metrics(self,jobpath):
     try:
       with open(jobpath) as fd:
         job_data = pickle.load(fd)
@@ -58,17 +54,7 @@ class Auditor():
     for name, measure in self.measures.iteritems():
       metrics[name] = (job_data.id, measure.test(jobpath,job_data))
     return metrics
-
-  # Compare metric to threshold
-  def test(self, Measure, threshold = 1.0):
-    self.results[Measure.__name__] ={}
-    for jobid in self.metrics[Measure.__name__].keys():
-      self.results[Measure.__name__][jobid] = None
-      if self.metrics[Measure.__name__][jobid]:
-        self.results[Measure.__name__][jobid] = self.comp[Measure.comp_operator](self.metrics[Measure.__name__][jobid], threshold)
     
-  
-
 class Test(object):
   __metaclass__ = abc.ABCMeta
 
@@ -76,11 +62,6 @@ class Test(object):
   def k1(self): pass
   @abc.abstractproperty
   def k2(self): pass
-
-  # '>' If metric is greater than threshold flag the job 
-  # '<' If metric is less than threshold flag the job 
-  @abc.abstractproperty
-  def comp_operator(self): pass
   
   ts = None
   metric = None

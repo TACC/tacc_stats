@@ -6,9 +6,7 @@ class PacketRate(Test):
         'ib_ext','ib_ext']
     k2=['rx_packets','tx_packets',
         'port_xmit_pkts', 'port_rcv_pkts']
-    
-    comp_operator='>'
-    
+        
     def compute_metric(self):
 
         max_rx=0.

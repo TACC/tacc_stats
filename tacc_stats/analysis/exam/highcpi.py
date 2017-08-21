@@ -11,7 +11,6 @@ class HighCPI(Test):
         'intel_hsw' : ['CLOCKS_UNHALTED_REF','INSTRUCTIONS_RETIRED'],        
         'intel_knl' : ['CLOCKS_UNHALTED_REF','INSTRUCTIONS_RETIRED']
         }
-  comp_operator = '>'
 
   def compute_metric(self):
     

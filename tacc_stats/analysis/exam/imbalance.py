@@ -11,9 +11,6 @@ class Imbalance(Test):
   k2 = {'intel_snb' : ['LOAD_L1D_ALL'],
         'intel_hsw' : ['LOAD_L1D_ALL']
         }
-
-
-  comp_operator = '>'
   
   def __init__(self,**kwargs):
 

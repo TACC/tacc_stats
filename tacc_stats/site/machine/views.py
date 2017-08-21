@@ -149,9 +149,7 @@ def index(request, **kwargs):
 
     fields['histograms'] = hist_summary(job_list)
     
-    #fields['job_list'] = job_list
     fields['job_list'] = jobs
-
     fields['nj'] = job_list.count()
 
     # Computed Metrics
@@ -305,12 +303,7 @@ class JobDetailView(DetailView):
         job = context['job']
 
         data = get_data(job.id)
-
-        
-        comp = {'>': operator.gt, '>=': operator.ge,
-                '<': operator.le, '<=': operator.le,
-                '==': operator.eq}
-        
+                
         testinfo_dict = {}
         for obj in TestInfo.objects.all():
             test_type = getattr(sys.modules[exam.__name__],obj.test_name)
@@ -320,12 +313,9 @@ class JobDetailView(DetailView):
                                                 job.date.strftime('%Y-%m-%d'),
                                                 str(job.id)), data)
                 print test,metric
-                if not metric: continue            
+                if not metric or np.isnan(metric) : continue            
                 setattr(job,obj.field_name,metric)
-                result = comp[obj.comparator](metric, obj.threshold)
-                if result: string = 'Failed'
-                else: string = 'Passed'
-                testinfo_dict[obj.test_name] = (metric,obj.threshold,string)
+                testinfo_dict[obj.test_name] = metric
             except: continue
         context['testinfo_dict'] = testinfo_dict
 

@@ -76,14 +76,14 @@
 
   <div class="col-md-3">
   <button type="button" class="btn btn-primary" data-toggle="collapse" data-target="#tests">
-    Click for For Tests Summary
+    Open Metrics Summary
   </button>
     <div id="tests" class="collapse">
       <table class="table table-condensed table-bordered" style="max-width:10px;">
-	<thead><th>Test</th><th>Measured</th><th>Threshold</th><th>Result</th></thead>
+	<thead><th>Metric</th><th>Value</th></thead>
 	<tbody>
 	  {% for key,val in testinfo_dict.items %}
-	  <tr align=center><th>{{ key }}</th><td>{{ val.0|stringformat:"0.1e" }}</td><td>{{ val.1|stringformat:"0.1e" }}</td><td>{{ val.2 }}</td></tr>
+	  <tr align=center><th>{{ key }}</th><td>{{ val|stringformat:"0.1e" }}</td></tr>
 	  {% endfor %}	
 	</tbody>
       </table>

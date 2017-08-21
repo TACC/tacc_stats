@@ -4,7 +4,6 @@ import numpy, math
 class Idle(Test):
   k1 = ['cpu']
   k2 = ['user']
-  comp_operator = '>'
 
   def compute_metric(self):
 

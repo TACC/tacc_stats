@@ -19,7 +19,6 @@ class MemBw(Test):
           'intel_hsw' : 104.*1.e9,
           'intel_knl' : 90.*1.e9
           }
-  comp_operator = '>'
 
   def compute_metric(self):
 

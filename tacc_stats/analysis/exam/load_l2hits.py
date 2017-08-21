@@ -12,7 +12,5 @@ class Load_L2Hits(Test):
         'intel_knl' : ['MEM_UOPS_RETIRED_L2_HIT_LOADS']
         }
 
-  comp_operator = '>'
-
   def compute_metric(self):
     self.metric = self.arc(self.ts.data[0])

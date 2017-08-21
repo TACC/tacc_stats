@@ -5,7 +5,6 @@ class GigEPacketSize(Test):
   k2=['rx_packets','tx_packets',
       'rx_bytes', 'tx_bytes']
 
-  comp_operator='<'
 
   def compute_metric(self):
 

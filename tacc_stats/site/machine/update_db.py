@@ -17,43 +17,39 @@ import traceback
 import csv
 import hostlist
 
-def update_comp_info(thresholds = None):
-    
-    schema_map = {'HighCPI' : ['cpi','>',1.5], 
-                  'HighCPLD' : ['cpld','>',1.5], 
-                  'Load_L1Hits' : ['Load_L1Hits','>',1.5], 
-                  'Load_L2Hits' : ['Load_L2Hits','>',1.5], 
-                  'Load_LLCHits' : ['Load_LLCHits','>',1.5], 
-                  'MemBw' : ['mbw', '<', 1.0 ],
-                  'Catastrophe' : ['cat', '<',0.01] ,
-                  'MemUsage' : ['mem','>',31], 
-                  'PacketRate' : ['packetrate','>',0], 
-                  'PacketSize' : ['packetsize','>',0],
-                  'Idle' : ['idle','>',0.99],
-                  'LowFLOPS' : ['flops','<',10],
-                  'VecPercent' : ['VecPercent','<',0.05],
-                  'GigEBW' : ['GigEBW','>',1e7],
-                  'CPU_Usage' : ['CPU_Usage','<',800],
-                  'MIC_Usage' : ['MIC_Usage','>',0.0],
-                  'Load_All' : ['Load_All','<',1e7],
-                  'MetaDataRate' : ['MetaDataRate','>',10000],
-                  'InternodeIBAveBW' : ['InternodeIBAveBW', '>', 10000],
-                  'InternodeIBMaxBW' : ['InternodeIBMaxBW', '>', 10000],
-                  'LnetAveBW'  : ['LnetAveBW', '>', 10000],
-                  'LnetAveMsgs'  : ['LnetAveMsgs', '>', 10000],
-                  'LnetMaxBW'  : ['LnetMaxBW', '>', 10000],
-                  'MDCReqs'  : ['MDCReqs', '>', 10000],
-                  'OSCReqs'  : ['OSCReqs', '>', 10000],
-                  'OSCWait'  : ['OSCWait', '>', 10000],
-                  'MDCWait'  : ['MDCWait', '>', 10000],
-                  'LLiteOpenClose'  : ['LLiteOpenClose', '>', 10000],
-                  'MCDRAMBW'  : ['MCDRAMBW', '>', 400],
-                  'BlockAveBW'  : ['BlockAveBW', '>', 400],
-                  }
-    if thresholds:
-        for key,val in thresholds.iteritems():
-            schema_map[key][1:3] = val
+schema_map = {'HighCPI' : ['cpi','>',1.5], 
+              'HighCPLD' : ['cpld','>',1.5], 
+              'Load_L1Hits' : ['Load_L1Hits','>',1.5], 
+              'Load_L2Hits' : ['Load_L2Hits','>',1.5], 
+              'Load_LLCHits' : ['Load_LLCHits','>',1.5], 
+              'MemBw' : ['mbw', '<', 1.0 ],
+              'Catastrophe' : ['cat', '<',0.01] ,
+              'MemUsage' : ['mem','>',31], 
+              'PacketRate' : ['packetrate','>',0], 
+              'PacketSize' : ['packetsize','>',0],
+              'Idle' : ['idle','>',0.99],
+              'LowFLOPS' : ['flops','<',10],
+              'VecPercent' : ['VecPercent','<',0.05],
+              'GigEBW' : ['GigEBW','>',1e7],
+              'CPU_Usage' : ['CPU_Usage','<',800],
+              'MIC_Usage' : ['MIC_Usage','>',0.0],
+              'Load_All' : ['Load_All','<',1e7],
+              'MetaDataRate' : ['MetaDataRate','>',10000],
+              'InternodeIBAveBW' : ['InternodeIBAveBW', '>', 10000],
+              'InternodeIBMaxBW' : ['InternodeIBMaxBW', '>', 10000],
+              'LnetAveBW'  : ['LnetAveBW', '>', 10000],
+              'LnetAveMsgs'  : ['LnetAveMsgs', '>', 10000],
+              'LnetMaxBW'  : ['LnetMaxBW', '>', 10000],
+              'MDCReqs'  : ['MDCReqs', '>', 10000],
+              'OSCReqs'  : ['OSCReqs', '>', 10000],
+              'OSCWait'  : ['OSCWait', '>', 10000],
+              'MDCWait'  : ['MDCWait', '>', 10000],
+              'LLiteOpenClose'  : ['LLiteOpenClose', '>', 10000],
+              'MCDRAMBW'  : ['MCDRAMBW', '>', 400],
+              'BlockAveBW'  : ['BlockAveBW', '>', 400],
+}
 
+def update_comp_info():
     for name in schema_map:
         if TestInfo.objects.filter(test_name = name).exists():
             TestInfo.objects.filter(test_name = name).delete()
@@ -283,14 +279,13 @@ def update_metric_fields(date, rerun = False):
 
     print 'Run the following tests for:',date
     for name, test in aud.measures.iteritems():
-        obj = TestInfo.objects.get(test_name = name)
-        print obj.field_name,obj.threshold,obj.comparator
+        print name
 
     jobs_list = Job.objects.filter(date = date).exclude(run_time__lt = min_time)
 
     # Use mem to see if job was tested.  It will always exist
     if not rerun:
-        jobs_list = jobs_list.filter(mem = None)
+        jobs_list = jobs_list.filter(MCDRAMBW = None)
     
     paths = []
     for job in jobs_list:
@@ -306,10 +301,9 @@ def update_metric_fields(date, rerun = False):
     print 'finished computing metrics'
 
     for name, results in aud.metrics.iteritems():
-        obj = TestInfo.objects.get(test_name = name)
         print name,len(results.keys())
         for jobid, result in results.iteritems():            
-            jobs_list.filter(id = jobid).update(**{ obj.field_name : result })
+            jobs_list.filter(id = jobid).update(**{ schema_map[name][0] : result })
 
 
 if __name__ == "__main__":

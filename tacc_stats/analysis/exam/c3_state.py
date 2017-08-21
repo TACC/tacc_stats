@@ -8,8 +8,6 @@ class C3State(Test):
     k2 = {'intel_snb' :['CLOCKS_UNHALTED_REF','ERROR','C3_CYCLES'],
           'intel_hsw' :['CLOCKS_UNHALTED_REF','ERROR','C3_CYCLES']
           }
-    comp_operator = '>'
-    
     def compute_metric(self):
         print self.ts.j.id
         c3 = self.arc(self.ts.data[2])

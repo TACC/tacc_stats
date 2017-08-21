@@ -14,9 +14,6 @@ class VecPercent(Test):
       'intel_ivb' : ['SIMD_D_256','SSE_D_ALL','LOAD_L1D_ALL'],      
       'intel_hsw' : ['SIMD_D_256','SSE_D_ALL','LOAD_L1D_ALL']
       }
-
-  # If metric is less than threshold then flag 
-  comp_operator = '<'
   
   def compute_metric(self):
 
