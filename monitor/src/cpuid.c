@@ -25,14 +25,14 @@ int signature(processor_t p, int *n_pmcs) {
   TRACE("vendor %s\n", vendor);
 
   cpuid(1, eax, ebx, ecx, edx);
-  char signature[6];
+  char sig[6];
   int model = (eax & 0x0FF) >> 4;
   int extended_model = (eax & 0xF0000) >> 12;
   int family_code = (eax & 0xF00) >> 8;
   int extended_family_code = (eax & 0xFF00000) >> 16;
-  snprintf(signature,sizeof(signature),"%02x_%x",
+  snprintf(sig,sizeof(sig),"%02x_%x",
            extended_family_code | family_code, extended_model | model);
-  TRACE("signature %s\n", signature);
+  TRACE("sig %s\n", sig);
 
   if (strncmp(vendor, "GenuineIntel", 12) == 0) {
     cpuid(0x0A, eax, ebx, ecx, edx);
@@ -52,76 +52,77 @@ int signature(processor_t p, int *n_pmcs) {
   if (strncmp(vendor, "GenuineIntel", 12) == 0) {
     switch(p) {
     case NEHALEM:
-      if (strncmp(signature, "06_1a", 5) == 0 || 
-	  strncmp(signature, "06_1e", 5) == 0 || 
-	  strncmp(signature, "06_1f", 5) == 0 || 
-	  strncmp(signature, "06_2e", 5) == 0) {
+      if (strncmp(sig, "06_1a", 5) == 0 || 
+	  strncmp(sig, "06_1e", 5) == 0 || 
+	  strncmp(sig, "06_1f", 5) == 0 || 
+	  strncmp(sig, "06_2e", 5) == 0) {
 	rc = 1;
-	TRACE("Nehalem %s\n", signature);
+	TRACE("Nehalem %s\n", sig);
       }
       goto out;
       
     case WESTMERE:
-      if (strncmp(signature, "06_25", 5) == 0 || 
-	  strncmp(signature, "06_2c", 5) == 0 || 
-	  strncmp(signature, "06_1f", 5) == 0) {
+      if (strncmp(sig, "06_25", 5) == 0 || 
+	  strncmp(sig, "06_2c", 5) == 0 || 
+	  strncmp(sig, "06_1f", 5) == 0) {
 	rc = 1;
-	TRACE("Westmere %s\n", signature);
+	TRACE("Westmere %s\n", sig);
       }
       goto out;
       
     case IVYBRIDGE:
-      if 	(strncmp(signature, "06_3a", 5) == 0 ||
-		 strncmp(signature, "06_3e", 5) == 0) {
+      if 	(strncmp(sig, "06_3a", 5) == 0 ||
+		 strncmp(sig, "06_3e", 5) == 0) {
 	rc = 1;
-	TRACE("Ivy Bridge %s\n", signature);
+	TRACE("Ivy Bridge %s\n", sig);
       }
       goto out;
       
     case SANDYBRIDGE:
-      if (strncmp(signature, "06_2a", 5) == 0 || 
-	  strncmp(signature, "06_2d", 5) == 0) {	
+      if (strncmp(sig, "06_2a", 5) == 0 || 
+	  strncmp(sig, "06_2d", 5) == 0) {	
 	rc = 1;
-	TRACE("Sandy Bridge %s\n", signature);
+	TRACE("Sandy Bridge %s\n", sig);
       }
       goto out;
       
     case HASWELL:
-      if (strncmp(signature, "06_3c", 5) == 0 || 
-	  strncmp(signature, "06_45", 5) == 0 || 
-	  strncmp(signature, "06_46", 5) == 0 || 
-	  strncmp(signature, "06_3f", 5) == 0) {
+      if (strncmp(sig, "06_3c", 5) == 0 || 
+	  strncmp(sig, "06_45", 5) == 0 || 
+	  strncmp(sig, "06_46", 5) == 0 || 
+	  strncmp(sig, "06_3f", 5) == 0) {
 	rc = 1;
-	TRACE("Haswell %s\n", signature);
+	TRACE("Haswell %s\n", sig);
       }
       goto out;
       
     case BROADWELL:
-      if (strncmp(signature, "06_3d", 5) == 0 || 
-	  strncmp(signature, "06_47", 5) == 0 ||
-	  strncmp(signature, "06_4f", 5) == 0) {
+      if (strncmp(sig, "06_3d", 5) == 0 || 
+	  strncmp(sig, "06_47", 5) == 0 ||
+	  strncmp(sig, "06_4f", 5) == 0) {
 	rc = 1;
-	TRACE("Broadwell %s\n", signature);
+	TRACE("Broadwell %s %d\n", sig, (int)p);
       }
       goto out;
       
     case KNL:
-      if (strncmp(signature, "06_57", 5) == 0) {
+      if (strncmp(sig, "06_57", 5) == 0) {
 	rc = 1;
-	TRACE("Knight's Landing %s\n", signature);
+	TRACE("Knights Landing %s\n", sig);
       }
       goto out;
       
     case SKYLAKE:
-      if (strncmp(signature, "06_4e", 5) == 0 || 
-	  strncmp(signature, "06_5e", 5) == 0) {
+      if (strncmp(sig, "06_55", 5) == 0 || 
+	  strncmp(sig, "06_4e", 5) == 0 || 
+	  strncmp(sig, "06_5e", 5) == 0) {
 	rc = 1;
-	TRACE("Skylake %s\n", signature);
+	TRACE("Skylake %s\n", sig);
       }
       goto out;
 
     default:
-      ERROR("non-intel processor signature %s\n",signature);
+      ERROR("non-intel processor sig %s %p\n", sig, (int)p);
       goto out;  
     }
   }
@@ -130,7 +131,7 @@ int signature(processor_t p, int *n_pmcs) {
   case AMD_10H:
     if (strncmp(vendor, "AuthenticAMD", 12) == 0) {
       rc = 1;
-      TRACE("AMD_10h %s\n", signature);
+      TRACE("AMD_10h %s\n", sig);
     }
     goto out;
   }

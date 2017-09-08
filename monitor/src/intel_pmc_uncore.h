@@ -64,7 +64,7 @@ static int intel_pmc_uncore_begin_dev(char *bus_dev, uint32_t *events, size_t nr
 
   ctl = 0x10100UL; // enable freeze (bit 16), freeze (bit 8)
   if (pwrite(pci_fd, &ctl, sizeof(ctl), BOX_CTL) < 0) {
-    ERROR("cannot enable freeze of QPI counters: %m\n");
+    ERROR("cannot enable freeze of counters: %m\n");
     goto out;
   }
   

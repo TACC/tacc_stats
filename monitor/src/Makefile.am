@@ -3,8 +3,8 @@ ACLOCAL_AMFLAGS = -I m4
 bin_PROGRAMS = tacc_stats
 
 STATS_DIR_PATH = /var/log/tacc_stats
-STATS_LOCK_PATH= /var/lock/tacc_stats
-JOBID_FILE_PATH= /var/run/TACC_jobid
+STATS_LOCK_PATH = /var/lock/tacc_stats
+JOBID_FILE_PATH = /var/run/TACC_jobid
 
 tacc_stats_CPPFLAGS = \
 	-D_GNU_SOURCE \
@@ -95,6 +95,8 @@ TYPES 	+= \
 	intel_knl_mc.c \
 	intel_nhm.c \
 	intel_rapl.c \
+	intel_skx.c \
+	intel_skx_imc.c \
 	intel_snb.c \
 	intel_snb_cbo.c \
 	intel_snb_hau.c \
