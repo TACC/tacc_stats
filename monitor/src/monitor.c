@@ -268,7 +268,7 @@ int main(int argc, char *argv[])
   ///////////////////////
   // START OF MAIN LOOP//
   ///////////////////////
-  struct timespec timeout = {.tv_sec = 3600, .tv_nsec = 0};    
+  struct timespec timeout = {.tv_sec = (time_t)3600, .tv_nsec = 0};    
   fd_set descriptors;
   while(1) {
     // Block rotate until sample is complete

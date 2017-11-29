@@ -150,6 +150,9 @@ static int intel_skx_imc_begin(struct stats_type *type)
   int nr = 0;
   int n_pmcs;
 
+  if (signature(SKYLAKE, &n_pmcs))
+    { 
+
   uint32_t *mmconfig_ptr;
 
   int fd = open(path, O_RDWR);    // first check to see if file can be opened with read permission
@@ -174,20 +177,21 @@ static int intel_skx_imc_begin(struct stats_type *type)
   // Devices: 0x10 0x10 0x11 (Controllers)
   // Functions: 0x02 0x06 0x02 (Channels)
   int i;  
-  if (signature(SKYLAKE, &n_pmcs))
-    for (i = 0; i < nr_devs; i++) {
-      uint32_t bus = strtol(strsep_ne(&dev_paths[i], "/"), NULL, 16);
-      uint32_t dev = strtol(strsep_ne(&dev_paths[i], "."), NULL, 16);
-      uint32_t fun = strtol(dev_paths[i], NULL, 16);
-
-      if (intel_skx_imc_begin_dev(bus, dev, fun, mmconfig_ptr, events, nr_events) == 0)
-	nr++;      
-    }
+  for (i = 0; i < nr_devs; i++) {
+    uint32_t bus = strtol(strsep_ne(&dev_paths[i], "/"), NULL, 16);
+    uint32_t dev = strtol(strsep_ne(&dev_paths[i], "."), NULL, 16);
+    uint32_t fun = strtol(dev_paths[i], NULL, 16);
+      
+    if (intel_skx_imc_begin_dev(bus, dev, fun, mmconfig_ptr, events, nr_events) == 0)
+      nr++;      
+  }
   munmap(mmconfig_ptr, mmconfig_size);
+    
 
  out:
   if (fd >= 0)
     close(fd);
+    }
 
   if (nr == 0)
     type->st_enabled = 0;
