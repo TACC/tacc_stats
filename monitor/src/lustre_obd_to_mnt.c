@@ -120,6 +120,9 @@ char *lustre_obd_to_mnt(const char *name)
     sb_mnt = dict_ref(&sb_dict, name + strlen(name) - 16);
   }
 
+  if (sb_mnt == NULL)
+    return NULL;
+
   return sb_mnt + 16 + 1;
 }
 
