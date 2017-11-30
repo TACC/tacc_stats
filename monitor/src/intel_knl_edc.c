@@ -187,7 +187,8 @@ static int intel_knl_edc_begin(struct stats_type *type)
 {
   int nr = 0;
   int n_pmcs = 0;
- 
+  if (signature(KNL, &n_pmcs))
+    { 
   const char *path = "/dev/mem";
   uint64_t mmconfig_base = 0xc0000000;
   uint64_t mmconfig_size = 0x10000000;
@@ -219,7 +220,7 @@ static int intel_knl_edc_begin(struct stats_type *type)
   int nr_edc_eclk_events = 3;
   uint32_t edc_eclk_dev[] = {0x18, 0x19, 0x1a, 0x1b, 0x1c, 0x1d, 0x1e, 0x1f};
 
-  if (signature(KNL, &n_pmcs))
+
     for (i = 0; i < nr_edc_devs; i++) {
       if (intel_knl_edc_uclk_begin_dev(edc_uclk_dev[i], mmconfig_ptr, edc_uclk_events, nr_edc_uclk_events) == 0)
 	nr++;
@@ -231,7 +232,7 @@ static int intel_knl_edc_begin(struct stats_type *type)
  out:
   if (fd >= 0)
     close(fd);
-
+    }
   if (nr == 0)
     type->st_enabled = 0;
   return nr > 0 ? 0 : -1;  
