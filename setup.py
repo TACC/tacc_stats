@@ -23,8 +23,6 @@ scripts=[
     'tacc_stats/analysis/job_printer.py',
     'tacc_stats/site/manage.py',
     'tacc_stats/site/machine/update_db.py',
-    'tacc_stats/site/machine/update_thresholds.py',
-    'tacc_stats/site/machine/thresholds.cfg',
     'tacc_stats/pickler/job_pickles.py',
     'tacc_stats/pickler/job_pickles_slurm.py',
     'tacc_stats/listend.py'

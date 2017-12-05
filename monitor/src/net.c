@@ -74,7 +74,7 @@ static void net_collect(struct stats_type *type)
     /* Only collect if dev is up. */
     snprintf(flags_path, sizeof(flags_path), "/sys/class/net/%s/flags", ent->d_name);
     if (pscanf(flags_path, "%x", &flags) != 1) {
-      ERROR("cannot read flags for device `%s'\n", ent->d_name);
+      //ERROR("cannot read flags for device `%s'\n", ent->d_name);
       continue;
     }
 

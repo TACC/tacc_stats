@@ -1,0 +1,93 @@
+#!/bin/sh
+#
+# chkconfig: 12345 99 01
+# description: Starts, stops, restarts and reloads tacc_stats monitor daemon
+
+
+PATH=/usr/local/bin:/bin:/sbin:/usr/bin
+CONF=/usr/local/etc/tacc_stats.conf
+PID_FILE=/var/lock/tacc_stats
+
+if [ -f $CONF ]; then
+    . $CONF
+else
+    echo -n $"No $CONF found"
+    failure
+    exit
+fi
+
+status() {
+    pid_status
+}
+
+pid_status() {
+    if pidof tacc_stats > /dev/null; then
+	if [ "$1" != "quiet" ] ; then
+	    echo "tacc_stats process is running"
+	fi
+	RETVAL=1
+    else
+	if [ "$1" != "quiet" ] ; then 
+	    echo "no tacc_stats process running"	
+	fi
+	RETVAL=0		   
+    fi
+}
+
+start() {
+    pid_status quiet
+    if [ $RETVAL = 0 ] ; then 
+	echo "start tacc_stats"
+	tacc_stats -s ${SERVER} -q ${QUEUE} -p ${PORT} -f ${FREQ}
+    fi
+}
+	
+stop() {
+    pid_status quiet
+    if [ $RETVAL = 1 ] ; then 
+	echo "stop tacc_stats"
+        cat ${PID_FILE} | kill -9 `awk '{print $1}'`	
+       	rm -f ${PID_FILE}
+	logger "Stop tacc_stats"
+	sleep 0.5
+    else
+	echo "no tacc_stats process running"
+    fi
+}    
+
+restart() {
+    stop
+    start
+}
+
+rotate() {
+   pid_status quiet
+   if [ $RETVAL = 1 ] ; then 
+       echo "rotating tacc_stats"
+       cat ${PID_FILE} | kill `awk '{print $1}'`	
+   else
+       echo "no tacc_stats process running"
+   fi
+}
+
+case "$1" in 
+    start)
+	start
+	;;
+    stop)
+	stop
+	;;
+    status)
+	status
+	;;
+    restart)
+	restart
+	;;
+    rotate)
+	rotate
+	;;
+    *)
+	echo $"Usage: $0 {start|stop|status|restart|rotate}"
+esac
+
+exit $?

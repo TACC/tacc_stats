@@ -183,7 +183,8 @@ static int intel_knl_mc_begin(struct stats_type *type)
 {
   int nr = 0;
   int n_pmcs = 0;
- 
+  if (signature(KNL, &n_pmcs))
+    { 
   const char *path = "/dev/mem";
   uint64_t mmconfig_base = 0xc0000000;
   uint64_t mmconfig_size = 0x10000000;
@@ -215,7 +216,6 @@ static int intel_knl_mc_begin(struct stats_type *type)
   int nr_mc_dclk_events = 3;
   uint32_t mc_dclk_dev[] = {0x08, 0x09};
 
-  if (signature(KNL, &n_pmcs))
     for (i = 0; i < nr_mc_devs; i++) {
       if (intel_knl_mc_uclk_begin_dev(mc_uclk_dev[i], mmconfig_ptr, mc_uclk_events, nr_mc_uclk_events) == 0)
 	nr++;      
@@ -231,7 +231,7 @@ static int intel_knl_mc_begin(struct stats_type *type)
  out:
   if (fd >= 0)
     close(fd);
-
+    }
   if (nr == 0)
     type->st_enabled = 0;
   return nr > 0 ? 0 : -1;  

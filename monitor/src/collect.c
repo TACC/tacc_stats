@@ -93,7 +93,7 @@ int str_collect_key_list(const char *str, struct stats *stats, ...)
       goto out;
     }
 
-    stats_inc(stats, key, val);
+    stats_set(stats, key, val);
     str = end;
     rc++;
   }

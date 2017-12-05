@@ -52,7 +52,7 @@ static void cpu_collect(struct stats_type *type)
     if (!isdigit(*cpu))
       continue;
 
-    struct stats *stats = get_current_stats(type, "-");
+    struct stats *stats = get_current_stats(type, cpu);
     if (stats == NULL)
       continue;
 

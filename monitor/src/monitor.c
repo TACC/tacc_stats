@@ -268,7 +268,7 @@ int main(int argc, char *argv[])
   ///////////////////////
   // START OF MAIN LOOP//
   ///////////////////////
-  struct timespec timeout = {.tv_sec = frequency, .tv_nsec = 0};    
+  struct timespec timeout = {.tv_sec = (time_t)3600, .tv_nsec = 0};    
   fd_set descriptors;
   while(1) {
     // Block rotate until sample is complete
@@ -303,10 +303,14 @@ int main(int argc, char *argv[])
 	syslog(LOG_INFO, "Loading jobid %s from %s\n", new_jobid, JOBID_FILE_PATH);	
 	stats_buffer_mark(&sf, "begin %s", new_jobid);
 	strcpy(current_jobid, new_jobid);
+	timeout.tv_sec = frequency; 
+	timeout.tv_nsec = 0;    
       }
       else {
 	syslog(LOG_INFO, "Unloading jobid %s from %s\n", current_jobid, JOBID_FILE_PATH);	
 	stats_buffer_mark(&sf, "end %s", current_jobid);
+	timeout.tv_sec = 3600; 
+	timeout.tv_nsec = 0;    
       }
       cmd = cmd_reset;
     }

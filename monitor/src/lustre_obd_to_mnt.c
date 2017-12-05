@@ -22,11 +22,7 @@ struct dict sb_dict;
 __attribute__((constructor))
 static void sb_dict_init(void)
 {
-  char path[80];
-  FILE *file= NULL;
-  char file_buf[4096];
-  char *line = NULL;
-  size_t line_size = 0;
+  const char *lov_dir_path = "/proc/fs/lustre/lov";
 
   if (dict_init(&sb_dict, 8) < 0) {
     ERROR("cannot create sb_dict: %m\n");
@@ -35,27 +31,21 @@ static void sb_dict_init(void)
 
   char lov_name[128] = "";
   char *sb_mnt = NULL;
-  
-  snprintf(path, sizeof(path), "/proc/fs/lustre/devices");
-  file = fopen(path,"r");
-  if (file == NULL) {
-    ERROR("cannot open `%s': %m\n", path);
+  DIR *lov_dir = NULL;
+
+  lov_dir = opendir(lov_dir_path);
+  if (lov_dir == NULL) {
+    ERROR("cannot open `%s': %m\n", lov_dir_path);
     goto out;
   }
-  setvbuf(file, file_buf, _IOFBF, sizeof(file_buf));
+
+  struct dirent *de;
+  while ((de = readdir(lov_dir)) != NULL) {
     
-  /* Get lov name and use super block address as dict hash */
-  while (getline(&line, &line_size, file) >= 0) {
-    int num;
-    char status[24];
-    char type[24];
-    
-    sscanf(line,"%d %s %s %s",&num,status,type,lov_name);
-    
-    if (strcmp(type,"lov") != 0)
+    if (de->d_type != DT_DIR || *de->d_name == '.')
       continue;
     
-    TRACE("num %d status %s type %s name %s\n",num,status,type,lov_name);
+    snprintf(lov_name, sizeof(lov_name), de->d_name);
     
     /* lov_name is of the form `work-clilov-ffff8102658ec800'. */
     if (strlen(lov_name) < 16) {
@@ -97,11 +87,9 @@ static void sb_dict_init(void)
   }
 
  out:
+  if (lov_dir != NULL)
+    closedir(lov_dir);
 
-  free(line);
-  if(file != NULL)
-    fclose(file);
-  
   TRACE("found %zu lustre filesystems\n", sb_dict.d_count);
 
 #ifdef DEBUG
@@ -131,6 +119,9 @@ char *lustre_obd_to_mnt(const char *name)
     sb_dict_init();
     sb_mnt = dict_ref(&sb_dict, name + strlen(name) - 16);
   }
+
+  if (sb_mnt == NULL)
+    return NULL;
 
   return sb_mnt + 16 + 1;
 }
