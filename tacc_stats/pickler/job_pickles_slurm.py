@@ -34,7 +34,7 @@ def job_pickle(reader_inst,
     except: pass
 
     pickle_file = os.path.join(date_dir, reader_inst['id'])
-
+    print (reader_inst['id'])
     validated = False
     if os.path.exists(pickle_file):
         try:
@@ -91,7 +91,7 @@ class JobPickles:
                 with open(val_file, 'r') as fd:
                     val_jids = fd.read().splitlines()
 
-            acct_jids = [x['id'] for x in acct]
+            acct_jids = [x['id'] for x in acct if int(x['id']) > 376922]
             ntot = len(acct_jids)
             print(len(acct_jids),'Job records in accounting file')
 
@@ -100,9 +100,11 @@ class JobPickles:
             ntod = len(run_jids)
 
             acct = [job for job in acct if job['id'] in run_jids]
+            
+            #acct = [job for job in acct if job['queue'] in ['test1', 'test2']]
 
             ctr = 0
-            with open(val_file, "w") as fd:
+            with open(val_file, "a") as fd:
                 for result in self.pool.imap(self.partial_pickle, acct):
                     if result[1]:
                         fd.write("%s\n" % result[0])

@@ -2,7 +2,7 @@
 <html>
   <head>
     <title>TACC Stats</title>
-    <link rel="stylesheet" href="https://bootswatch.com/spacelab/bootstrap.min.css">
+    <link rel="stylesheet" href="https://bootswatch.com/3/spacelab/bootstrap.min.css">
     <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.11.3/jquery.min.js"></script>
     <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.1/js/bootstrap.min.js"></script>
 
@@ -23,7 +23,7 @@
   <body>
     <div class ="container-fluid">
       <nav class="navbar navbar-default" role="navigation">
-	<div class="navbar-header"><a href="https://www.tacc.utexas.edu"> <img src="/media/TACC_logo.png" style="max-width:50%;"/></a></div>
+	<div class="navbar-header"><a href="https://www.tacc.utexas.edu"> <img src="{{ MEDIA_URL }}/TACC_logo.png" style="max-width:50%;"/></a></div>
 	<center>{{ machine_name }}</center>
 	<a>
 	  <form class="navbar-form navbar-right" action="{% url 'machine:search' %}" method="get" role="search">

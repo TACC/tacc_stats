@@ -239,10 +239,10 @@ class Host(object):
                 if re.match('^[0-9]{4}[0-1][0-9][0-3][0-9]$', base):
                     base = (datetime.datetime.strptime(base,"%Y%m%d") - datetime.datetime(1970,1,1)).total_seconds()
                 # Prune to files that might overlap with job.
-                ent_start = long(base) - 3*RAW_STATS_TIME_MAX
-                ent_end   = long(base) + 2*RAW_STATS_TIME_MAX
+                ent_start = long(base) - 2*RAW_STATS_TIME_MAX
+                ent_end   = long(base) + 5*RAW_STATS_TIME_MAX
 
-                if ((ent_start <= job_start) and (job_start <= ent_end)) or ((ent_start <= job_end) and (job_end <= ent_end)) or (max(job_start, ent_start) <= min(job_end, ent_end)) :
+                if ((ent_start <= job_start) and (job_start <= ent_end)) or ((ent_start <= job_end) and (job_end <= ent_end)) or (max(job_start, ent_start) <= min(job_end, ent_end)):
                     full_path = os.path.join(raw_host_stats_dir, ent)
                     path_list.append((full_path, ent_start))
                     self.trace("path `%s', start %d\n", full_path, ent_start)
@@ -252,17 +252,15 @@ class Host(object):
         path_list.sort(key=lambda tup: tup[1])
         return path_list
 
-    def read_stats_file_header(self, file):
+    def read_stats_file_header(self, lines):
         file_schemas = {}
 
-        for line in file:
+        for line in lines:
+
             try:
                 c = line[0]
                 if c == SF_SCHEMA_CHAR:
                     type_name, schema_desc = line[1:].split(None, 1)
-                    if type_name == "intel_hsw_ht": type_name = "intel_hsw"
-                    if type_name == "intel_hsw_cbo_ht": type_name = "intel_hsw_cbo"
-
                     schema = self.job.get_schema(type_name, schema_desc)
                     if schema:
                         file_schemas[type_name] = schema
@@ -285,6 +283,7 @@ class Host(object):
         type_name, dev_name, rest = line.split(None, 2)
         if type_name == "intel_hsw_ht": type_name = "intel_hsw"
         if type_name == "intel_hsw_cbo_ht": type_name = "intel_hsw_cbo"
+        #if type_name == "intel_knl": return
         schema = file_schemas.get(type_name)
         if not schema:
             self.error("file `%s', unknown type `%s', discarding line `%s'\n",
@@ -302,13 +301,47 @@ class Host(object):
         dev_stats.append((rec_time, vals))
 
     def read_stats_file(self, file):
-        file_schemas = self.read_stats_file_header(file)
+
+        lines = file.readlines()
+
+        begin_idx = None
+        for line in lines:        
+            if line[0].isdigit():
+                str_time, str_jobid, str_hostname = line.split()
+                if self.job.id in set(str_jobid.split(',')):
+                    begin_idx = lines.index(line)
+                    break
+        if not begin_idx: return
+
+        file_schemas = self.read_stats_file_header(lines)
         if not file_schemas:
             self.trace("file `%s' bad header\n", file.name)
             return
+
+        record = False
+        for line in lines[begin_idx:]:
+            if line[0].isdigit():
+                str_time,str_jobids,hostname = line.split()
+                if self.job.id in set(str_jobids.split(',')):
+                    self.times += [float(str_time)]
+                    record = True
+                else:
+                    record = False
+            elif record and line[0].isalpha():
+                self.parse_stats(float(str_time), line, file_schemas, file)                            
+            elif line.startswith("%begin") or line.startswith("%end"):
+                str_jobid = line.split()[1]
+                if self.job.id == str_jobid:
+                    self.marks[line[1:].strip()] = True
+                    record = True
+                else:
+                    record = False
+        """
+        sys.exit()
         rec_jobid = set()
         # Scan file for records belonging to JOBID.
-        for line in file:
+        begin_idx = 0
+        for line in lines:        
             try:
                 c = line[0]
                 if c.isdigit():
@@ -323,13 +356,16 @@ class Host(object):
                         self.trace("file `%s' rec_time %d, rec_jobid `%s'\n",
                                    file.name, rec_time, rec_jobid)
                         self.times.append(rec_time)
+                        begin_idx = lines.index(line) + 1
                         break
                 elif line.startswith('%begin'):
                     rec_jobid.add(line.split()[2])
                     if self.job.id in rec_jobid:
-                        self.times.append(rec_time)
+                        #self.times.append(rec_time)
                         mark = line[1:].strip()
+                        print self.marks,'first'
                         self.marks[mark] = True
+                        begin_idx = lines.index(line) + 1
                         break
             except Exception as exc:
                 self.trace("file `%s', caught `%s', discarding `%s'\n",
@@ -342,12 +378,12 @@ class Host(object):
             return
         # OK, we found a record belonging to JOBID.
         skip = False
-        for line in file:
+        for line in lines[begin_idx:]:
             try:
                 c = line[0]
                 if c.isdigit():
                     skip = False
-
+                    
                     try:
                         str_time,str_jobid,hostname = line.split()
                     except:
@@ -355,7 +391,7 @@ class Host(object):
 
                     rec_time = float(str_time)
                     rec_jobid = set(str_jobid.split(','))
-
+                    
                     if self.job.id not in rec_jobid:
                         line = file.next()
                         if line.startswith(SF_MARK_CHAR): 
@@ -366,20 +402,24 @@ class Host(object):
                                 self.trace("file '%s' syntax error '%s'\n", file.name, line)
                         if self.job.id not in rec_jobid:
                             return
+                        skip = True
+                        continue
                     self.trace("file `%s' rec_time %d, rec_jobid `%s'\n",
                                file.name, rec_time, rec_jobid)
+                    
                     self.times.append(rec_time)
                 elif c.isalpha():
                     if False == skip:
+                        print line
                         self.parse_stats(rec_time, line, file_schemas, file)            
                 elif c == SF_MARK_CHAR:
                     mark = line[1:].strip()
-                    actions = mark.split()
-                    if actions[1].strip() != self.job.id:
+                    if self.job.id not in mark.split()[1]:
                         self.times.pop()
                         skip = True
+                        continue
                     else:
-                        if actions[0] == "begin" and len(self.times) > 1:
+                        if mark == "begin %s" % self.job.id and len(self.times) > 1:
                             # this is a 'begin' record for this job, but have already processed a record
                             # for this job. This race condition occurs if the job starts very close to the
                             # normal cron-initiated record.  Tacc_stats resets some performance counters on
@@ -390,6 +430,8 @@ class Host(object):
 
                         skip = False
                     self.marks[mark] = True
+                    if mark == "end %s" % self.job.id:
+                        print self.times,self.marks
                 #elif c == SF_COMMENT_CHAR:
                     #pass        
                 else:
@@ -398,7 +440,7 @@ class Host(object):
                 self.trace("file `%s', caught `%s', discarding `%s'\n",
                            file.name, str(exc), line)
                 stats_file_discard_record(file)
-
+        """
     def gather_stats(self):
         path_list = self.get_stats_paths()
         if len(path_list) == 0:
@@ -426,6 +468,7 @@ class Host(object):
         if not end_mark in self.marks:
             self.error("no end mark found\n")
             return False
+
         return self.raw_stats
 
     def get_stats(self, type_name, dev_name, key_name):
@@ -521,13 +564,16 @@ class Job(object):
             if host.gather_stats():
                 self.hosts[host_name] = host
             else: break
+
         if not self.hosts:
             self.error("no good hosts\n")
             return False
         return True
 
     def munge_times(self):
+
         times_lis = []
+
         for host in self.hosts.itervalues():
             times_lis.append(host.times)
             del host.times
@@ -597,9 +643,9 @@ class Job(object):
                         # Rebase narrow counters and spurious resets.
                         # 64-bit overflows are correctly handled automatically                        
                         fudged = False
-                        if 'intel_' in type_name: 
-                            r = numpy.uint(0) - A[i-1,j]
-                        elif e.width:
+                        #if 'intel_' in type_name: 
+                        #    r = numpy.uint(0) - A[i-1,j]
+                        if e.width:
                             trace("time %d, counter `%s', rollover prev %d, curr %d\n",
                                   self.times[i], e.key, p, v)
                             r -= numpy.uint64(1L << e.width)
@@ -641,6 +687,7 @@ class Job(object):
         self.overflows[type_name][dev_name][key_name].append(host_name)
 
     def process_stats(self):
+        print 'process stats'
         for host in self.hosts.itervalues():
             host.stats = {}
             for type_name, raw_type_stats in host.raw_stats.iteritems():

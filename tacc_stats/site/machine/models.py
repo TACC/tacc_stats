@@ -29,6 +29,7 @@ class Job(models.Model):
     exe_list = models.TextField(null=True)
     cwd = models.CharField(max_length=128, null=True)
     threads = models.BigIntegerField(null=True)
+    validated = models.BooleanField(default=False)
 
     cpi = models.FloatField(null=True)
     cpld = models.FloatField(null=True)

@@ -269,6 +269,7 @@ def heat_map(request, pk):
                            'intel_hsw' : ['intel_hsw','intel_hsw'],
                            'intel_ivb' : ['intel_ivb','intel_ivb'],
                            'intel_knl' : ['intel_knl','intel_knl'],
+                           'intel_skx' : ['intel_skx','intel_skx'],
                            'intel_pmc3' : ['intel_pmc3','intel_pmc3']
                            },
                        k2={'intel_snb' : ['CLOCKS_UNHALTED_REF', 
@@ -276,6 +277,8 @@ def heat_map(request, pk):
                            'intel_ivb' : ['CLOCKS_UNHALTED_REF', 
                                           'INSTRUCTIONS_RETIRED'],
                            'intel_hsw' : ['CLOCKS_UNHALTED_REF', 
+                                          'INSTRUCTIONS_RETIRED'],
+                           'intel_skx' : ['CLOCKS_UNHALTED_REF', 
                                           'INSTRUCTIONS_RETIRED'],
                            'intel_knl' : ['CLOCKS_UNHALTED_REF', 
                                           'INSTRUCTIONS_RETIRED'],
@@ -341,8 +344,8 @@ class JobDetailView(DetailView):
             try:
                 if host.stats.has_key('llite'):
                     schema = data.get_schema('llite')
-                    rd_idx = schema['osc_read'].index
-                    wr_idx = schema['osc_write'].index
+                    rd_idx = schema['read_bytes'].index
+                    wr_idx = schema['write_bytes'].index
 
                     for device, value in host.stats['llite'].iteritems():
                         fsio_dict.setdefault(device, [0.0, 0.0])
@@ -391,12 +394,14 @@ def type_plot(request, pk, type_name):
           'intel_hsw' : [type_name]*len(schema),
           'intel_ivb' : [type_name]*len(schema),
           'intel_knl' : [type_name]*len(schema),
+          'intel_skx' : [type_name]*len(schema),
           'intel_pmc3' : [type_name]*len(schema)
           }
     k2 = {'intel_snb': schema,
           'intel_hsw': schema,
           'intel_ivb' : schema,
           'intel_knl' : schema,
+          'intel_skx' : schema,
           'intel_pmc3': schema
           }
 

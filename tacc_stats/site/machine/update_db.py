@@ -96,7 +96,7 @@ def update_acct(date, rerun = False):
             json['queue_time'] = int(parse(job['Submit']).strftime('%s'))
 
             json['queue']      = job['Partition']
-            json['name']       = job['JobName']
+            json['name']       = job['JobName'][0:128]
             json['status']     = job['State'].split()[0]
 
             json['nodes']      = int(job['NNodes'])
@@ -114,6 +114,7 @@ def update_acct(date, rerun = False):
             del job['NodeList']
 
             Job.objects.filter(id=json['id']).delete()
+            print json
             obj, created = Job.objects.update_or_create(**json)
 
             ### If xalt is available add data to the DB 
@@ -143,6 +144,9 @@ def update_acct(date, rerun = False):
             ctr += 1
             progress(ctr, nrecords, date)
 
+    with open(os.path.join(cfg.pickles_dir, date, "validated")) as fd:
+        for line in fd.readlines():
+            Job.objects.filter(id = int(line)).update(validated = True)
 
 def update(date,rerun=False):
 

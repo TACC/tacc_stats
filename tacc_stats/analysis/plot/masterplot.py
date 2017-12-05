@@ -28,12 +28,19 @@ class MasterPlot(Plot):
       'intel_ivb' : ['intel_ivb_imc', 'intel_ivb_imc', 'intel_ivb', 
                      'lnet', 'lnet', 'ib_sw','ib_sw',
                      'intel_ivb', 'intel_ivb', 'intel_ivb'] + linux_types,
+      'intel_bdw' : ['intel_bdw_imc', 'intel_bdw_imc', 'intel_bdw', 
+                     'lnet', 'lnet', 'ib_sw','ib_sw',
+                     'intel_bdw', 'intel_bdw', 'intel_bdw'] + linux_types,
+      'intel_skx' : ['intel_skx', 'intel_skx', 'intel_skx', 'intel_skx', 
+                     'intel_skx_imc', 'intel_skx_imc', 
+                     'lnet', 'lnet', 'opa', 'opa'] + linux_types,
       'intel_knl' : ['intel_knl_mc_dclk', 'intel_knl_mc_dclk', 
                      'intel_knl_edc_eclk', 'intel_knl_edc_uclk', 
                      'intel_knl_edc_uclk', 'intel_knl_edc_eclk', 
                      'lnet', 'lnet', 'opa','opa'] + linux_types
 
       }
+
   
   k2={'amd64':
       ['SSE_FLOPS','DCSF','DRAM','rx_bytes','tx_bytes',
@@ -62,6 +69,8 @@ class MasterPlot(Plot):
                      'SIMD_DOUBLE_256'] + linux_stats,
       'intel_hsw' : ['CAS_READS', 'CAS_WRITES', 'LOAD_L1D_ALL',
                      'rx_bytes','tx_bytes', 'rx_bytes','tx_bytes'] + linux_stats,
+      'intel_bdw' : ['CAS_READS', 'CAS_WRITES', 'LOAD_L1D_ALL',
+                     'rx_bytes','tx_bytes', 'rx_bytes','tx_bytes'] + linux_stats,
       'intel_ivb' : ['CAS_READS', 'CAS_WRITES', 'LOAD_L1D_ALL',
                      'rx_bytes','tx_bytes', 'rx_bytes','tx_bytes',
                      'SSE_DOUBLE_SCALAR', 'SSE_DOUBLE_PACKED', 
@@ -69,6 +78,11 @@ class MasterPlot(Plot):
       'intel_knl' : ['CAS_READS', 'CAS_WRITES', 'RPQ_INSERTS', 
                      'EDC_MISS_CLEAN', 'EDC_MISS_DIRTY',  'WPQ_INSERTS',
                      'rx_bytes','tx_bytes', 'portRcvData','portXmitData'] + linux_stats,
+      'intel_skx' : ['FP_ARITH_INST_RETIRED_SCALAR_DOUBLE', 'FP_ARITH_INST_RETIRED_128B_PACKED_DOUBLE', 
+                     'FP_ARITH_INST_RETIRED_256B_PACKED_DOUBLE', 'FP_ARITH_INST_RETIRED_512B_PACKED_DOUBLE', 
+                     'CAS_READS', 'CAS_WRITES', 
+                     'rx_bytes','tx_bytes', 'portRcvData','portXmitData'] + linux_stats,
+
       }
 
   fname='master'
@@ -99,39 +113,50 @@ class MasterPlot(Plot):
     k2_tmp=self.k2[self.ts.pmc_type]
     processor_schema = self.ts.j.schemas[self.ts.pmc_type]
     # Plot key 1 for flops
+    print("starting plot")
     plot_ctr = 0
     try:
       if 'SSE_D_ALL' in processor_schema and 'SIMD_D_256' in processor_schema:
         idx0 = k2_tmp.index('SSE_D_ALL')
         idx1 = None
         idx2 = k2_tmp.index('SIMD_D_256')
+        idx3 = None
+      elif 'FP_ARITH_INST_RETIRED_SCALAR_DOUBLE' in processor_schema:
+        idx0 = k2_tmp.index('FP_ARITH_INST_RETIRED_SCALAR_DOUBLE') 
+        idx1 = k2_tmp.index('FP_ARITH_INST_RETIRED_128B_PACKED_DOUBLE')
+        idx2 = k2_tmp.index('FP_ARITH_INST_RETIRED_256B_PACKED_DOUBLE')
+        idx3 = k2_tmp.index('FP_ARITH_INST_RETIRED_512B_PACKED_DOUBLE')
       elif 'SSE_DOUBLE_SCALAR' in processor_schema and 'SSE_DOUBLE_PACKED' in processor_schema and 'SIMD_DOUBLE_256' in processor_schema:
         idx0 = k2_tmp.index('SSE_DOUBLE_SCALAR')
         idx1 = k2_tmp.index('SSE_DOUBLE_PACKED')
         idx2 = k2_tmp.index('SIMD_DOUBLE_256')
+        idx3 = None
       elif 'FP_COMP_OPS_EXE_SSE_PACKED' in processor_schema and 'FP_COMP_OPS_EXE_SSE_SCALAR' in processor_schema:
         idx0 = k2_tmp.index('FP_COMP_OPS_EXE_SSE_SCALAR')
         idx1 = k2_tmp.index('FP_COMP_OPS_EXE_SSE_PACKED')
         idx2 = None
+        idx3 = None
       else: 
         print("FLOP stats not available for JOBID",self.ts.j.id)
         raise
       plot_ctr += 1
       ax = self.fig.add_subplot(6,cols,plot_ctr*shift)      
       for host_name in self.ts.j.hosts.keys():
-        flops = self.ts.assemble([idx0],host_name,0)
+        flops = 0
+        if idx0: flops += 1*self.ts.assemble([idx0],host_name,0)
         if idx1: flops += 2*self.ts.assemble([idx1],host_name,0)
         if idx2: flops += 4*self.ts.assemble([idx2],host_name,0)
-        
+        if idx3: flops += 8*self.ts.assemble([idx3],host_name,0)
+
         flops = numpy.diff(flops)/numpy.diff(self.ts.t)/1.0e9
         ax.step(self.ts.t/3600., numpy.append(flops, [flops[-1]]), 
                 where="post")
-
+        
       ax.set_ylabel('Dbl GFLOPS')
       ax.set_xlim([0.,self.ts.t[-1]/3600.])
       tspl_utils.adjust_yaxis_range(ax,0.1)
     except: 
-      print sys.exc_info()[0]
+      print sys.exc_info()
       print("FLOP plot not available for JOBID",self.ts.j.id)
 
     # Plot MCDRAM BW for KNL
