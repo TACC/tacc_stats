@@ -43,10 +43,12 @@ static int send(struct stats_buffer *sf)
 
   if (!socket) {
     ERROR("socket failed to initialize");
+    return -1;	
   }
   status = amqp_socket_open(socket, sf->sf_host, atoi(sf->sf_port));
   if (status) {
     ERROR("socket failed to open");
+    return -1;	  
   }
 
   amqp_login(conn, "/", 0, 131072, 0, AMQP_SASL_METHOD_PLAIN, 
