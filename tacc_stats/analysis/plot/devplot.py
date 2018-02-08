@@ -22,13 +22,15 @@ class DevPlot(Plot):
     scale = 1.0
     if type_name == 'mem': 
       do_rate = False
-      scale=2.0**10
+      scale=1.0
     if type_name == 'cpu':
-      scale=ts.wayness*100.0
+      scale=100.0
 
     for i in range(n_events):
       self.ax = self.fig.add_subplot(n_events,1,i+1)
       self.plot_lines(self.ax, [i], xscale=3600., yscale=scale, do_rate = do_rate)
+      if events[i].startswith("FP_ARITH_INST_RETIRED"):
+        events[i] = events[i].lstrip("FP_ARITH_INST_RETIRED")
       self.ax.set_ylabel(events[i],size='small')
     self.ax.set_xlabel("Time (hr)")
     self.fig.subplots_adjust(hspace=0.5)

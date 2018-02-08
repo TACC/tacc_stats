@@ -106,6 +106,7 @@ class JobPickles:
             ctr = 0
             with open(val_file, "a") as fd:
                 for result in self.pool.imap(self.partial_pickle, acct):
+                    print (result)
                     if result[1]:
                         fd.write("%s\n" % result[0])
                     fd.flush()

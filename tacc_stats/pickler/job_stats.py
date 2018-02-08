@@ -240,7 +240,7 @@ class Host(object):
                     base = (datetime.datetime.strptime(base,"%Y%m%d") - datetime.datetime(1970,1,1)).total_seconds()
                 # Prune to files that might overlap with job.
                 ent_start = long(base) - 2*RAW_STATS_TIME_MAX
-                ent_end   = long(base) + 5*RAW_STATS_TIME_MAX
+                ent_end   = long(base) + 7*RAW_STATS_TIME_MAX
 
                 if ((ent_start <= job_start) and (job_start <= ent_end)) or ((ent_start <= job_end) and (job_end <= ent_end)) or (max(job_start, ent_start) <= min(job_end, ent_end)):
                     full_path = os.path.join(raw_host_stats_dir, ent)

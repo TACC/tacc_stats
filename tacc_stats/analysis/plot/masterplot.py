@@ -209,11 +209,12 @@ class MasterPlot(Plot):
         plot(self.fig.add_subplot(6,cols,plot_ctr*shift),[idx2,idx3],3600.,2.**20,
              ylabel='IB BW [MB/s]') 
       except: pass
+    FLITS_PER_MB = 125000
     if 'opa' in self.ts.j.hosts.values()[0].stats:
         idx2=k2_tmp.index('portXmitData')
         idx3=k2_tmp.index('portRcvData')
         plot_ctr += 1
-        plot(self.fig.add_subplot(6,cols,plot_ctr*shift),[idx2,idx3],3600.,2.**20,
+        plot(self.fig.add_subplot(6,cols,plot_ctr*shift),[idx2,idx3],3600.,FLITS_PER_MB,
              ylabel='OPA BW [MB/s]') 
 
     #Plot CPU user time

@@ -375,7 +375,7 @@ class JobDetailView(DetailView):
         hoststring=urlstring+"%20host%3D"+host_list[0]
         serverstring=urlstring+"%20mds*%20OR%20%20oss*"
         for host in host_list[1:]:
-            hoststring+="%20OR%20%20host%3D"+host
+            hoststring+="%20OR%20%20host%3D"+host+"*"
 
         hoststring+="&earliest="+str(job.start_epoch)+"&latest="+str(job.end_epoch)+"&display.prefs.events.count=50"
         serverstring+="&earliest="+str(job.start_epoch)+"&latest="+str(job.end_epoch)+"&display.prefs.events.count=50"

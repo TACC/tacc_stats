@@ -2,6 +2,7 @@
 import os,sys, pwd
 from datetime import timedelta, datetime
 from dateutil.parser import parse
+from fcntl import flock, LOCK_EX, LOCK_NB
 os.environ['DJANGO_SETTINGS_MODULE']='tacc_stats.site.tacc_stats_site.settings'
 import django
 django.setup()
@@ -289,7 +290,7 @@ def update_metric_fields(date, rerun = False):
 
     # Use mem to see if job was tested.  It will always exist
     if not rerun:
-        jobs_list = jobs_list.filter(MCDRAMBW = None)
+        jobs_list = jobs_list.filter(mbw = None)
     
     paths = []
     for job in jobs_list:
@@ -311,6 +312,14 @@ def update_metric_fields(date, rerun = False):
 
 
 if __name__ == "__main__":
+
+    with open(os.path.join(os.path.dirname(os.path.realpath(__file__)), "update_db_lock"), "w") as fd:
+        try:
+            flock(fd, LOCK_EX | LOCK_NB)
+        except IOError:
+            print("update_db is already running")
+            sys.exit()
+
     try:
         start = datetime.strptime(sys.argv[1],"%Y-%m-%d")
         try:

@@ -21,7 +21,7 @@ class MemBw(Test):
           'intel_ivb' : 76.*1.e9,
           'intel_hsw' : 104.*1.e9,
           'intel_knl' : 90.*1.e9,
-          'intel_skx' : 190.*1.e9
+          'intel_skx' : 202.*1.e9
           }
 
   def compute_metric(self):
