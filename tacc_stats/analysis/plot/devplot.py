@@ -24,7 +24,7 @@ class DevPlot(Plot):
       do_rate = False
       scale=2.0**10
     if type_name == 'cpu':
-      scale=ts.wayness*100.0
+      scale=100.0
 
     for i in range(n_events):
       self.ax = self.fig.add_subplot(n_events,1,i+1)
