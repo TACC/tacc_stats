@@ -272,17 +272,17 @@ def heat_map(request, pk):
                            'intel_skx' : ['intel_skx','intel_skx'],
                            'intel_pmc3' : ['intel_pmc3','intel_pmc3']
                            },
-                       k2={'intel_snb' : ['CLOCKS_UNHALTED_REF', 
+                       k2={'intel_snb' : ['CLOCKS_UNHALTED_CORE', 
                                           'INSTRUCTIONS_RETIRED'],
-                           'intel_ivb' : ['CLOCKS_UNHALTED_REF', 
+                           'intel_ivb' : ['CLOCKS_UNHALTED_CORE', 
                                           'INSTRUCTIONS_RETIRED'],
-                           'intel_hsw' : ['CLOCKS_UNHALTED_REF', 
+                           'intel_hsw' : ['CLOCKS_UNHALTED_CORE', 
                                           'INSTRUCTIONS_RETIRED'],
-                           'intel_skx' : ['CLOCKS_UNHALTED_REF', 
+                           'intel_skx' : ['CLOCKS_UNHALTED_CORE', 
                                           'INSTRUCTIONS_RETIRED'],
-                           'intel_knl' : ['CLOCKS_UNHALTED_REF', 
+                           'intel_knl' : ['CLOCKS_UNHALTED_CORE', 
                                           'INSTRUCTIONS_RETIRED'],
-                           'intel_pmc3' : ['CLOCKS_UNHALTED_REF', 
+                           'intel_pmc3' : ['CLOCKS_UNHALTED_CORE', 
                                            'INSTRUCTIONS_RETIRED']                           
                            },
                        lariat_data="pass")

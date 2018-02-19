@@ -43,7 +43,7 @@ class HeatMap(Plot):
       var_cpi  = tvar(host_cpi.values())
     else: var_cpi= 0.0
 
-    self.fig = Figure(figsize=(10,12),dpi=110)
+    self.fig = Figure(figsize=(10,15),dpi=110)
     self.ax=self.fig.add_subplot(1,1,1)
 
     ycore = arange(cpi.shape[0]+1)

@@ -22,22 +22,24 @@ class MasterPlot(Plot):
                      'lnet', 'lnet', 'ib_ext','ib_ext','cpu','mem','mem','mem'],
       'intel_snb' : ['intel_snb_imc', 'intel_snb_imc', 'intel_snb', 
                      'lnet', 'lnet', 'ib_sw','ib_sw',
-                     'intel_snb', 'intel_snb', 'intel_snb'] + linux_types,
-      'intel_hsw' : ['intel_hsw_imc', 'intel_hsw_imc', 'intel_hsw', 
+                     'intel_snb', 'intel_snb', 'intel_snb', 'intel_snb', 'intel_snb'] + linux_types,
+      'intel_hsw' : ['intel_hsw_imc', 'intel_hsw_imc', 'intel_hsw', 'intel_hsw', 'intel_hsw', 
                      'lnet', 'lnet', 'ib_sw','ib_sw'] + linux_types,
-      'intel_ivb' : ['intel_ivb_imc', 'intel_ivb_imc', 'intel_ivb', 
+      'intel_ivb' : ['intel_ivb_imc', 'intel_ivb_imc', 'intel_ivb', 'intel_ivb', 'intel_ivb', 
                      'lnet', 'lnet', 'ib_sw','ib_sw',
                      'intel_ivb', 'intel_ivb', 'intel_ivb'] + linux_types,
-      'intel_bdw' : ['intel_bdw_imc', 'intel_bdw_imc', 'intel_bdw', 
+      'intel_bdw' : ['intel_bdw_imc', 'intel_bdw_imc', 'intel_bdw',  'intel_bdw',  'intel_bdw', 
                      'lnet', 'lnet', 'ib_sw','ib_sw',
                      'intel_bdw', 'intel_bdw', 'intel_bdw'] + linux_types,
       'intel_skx' : ['intel_skx', 'intel_skx', 'intel_skx', 'intel_skx', 
                      'intel_skx_imc', 'intel_skx_imc', 
-                     'lnet', 'lnet', 'opa', 'opa'] + linux_types,
+                     'lnet', 'lnet', 'opa', 'opa', 
+                     'intel_skx', 'intel_skx'] + linux_types,
       'intel_knl' : ['intel_knl_mc_dclk', 'intel_knl_mc_dclk', 
                      'intel_knl_edc_eclk', 'intel_knl_edc_uclk', 
                      'intel_knl_edc_uclk', 'intel_knl_edc_eclk', 
-                     'lnet', 'lnet', 'opa','opa'] + linux_types
+                     'lnet', 'lnet', 'opa','opa', 
+                     'intel_knl', 'intel_knl'] + linux_types
 
       }
 
@@ -66,22 +68,28 @@ class MasterPlot(Plot):
       'intel_snb' : ['CAS_READS', 'CAS_WRITES', 'LOAD_L1D_ALL',
                      'rx_bytes','tx_bytes', 'rx_bytes','tx_bytes',
                      'SSE_DOUBLE_SCALAR', 'SSE_DOUBLE_PACKED', 
-                     'SIMD_DOUBLE_256'] + linux_stats,
+                     'SIMD_DOUBLE_256', 
+                     'CLOCKS_UNHALTED_CORE', 'CLOCKS_UNHALTED_REF'] + linux_stats,
       'intel_hsw' : ['CAS_READS', 'CAS_WRITES', 'LOAD_L1D_ALL',
-                     'rx_bytes','tx_bytes', 'rx_bytes','tx_bytes'] + linux_stats,
+                     'rx_bytes','tx_bytes', 'rx_bytes','tx_bytes', 
+                     'CLOCKS_UNHALTED_CORE', 'CLOCKS_UNHALTED_REF'] + linux_stats,
       'intel_bdw' : ['CAS_READS', 'CAS_WRITES', 'LOAD_L1D_ALL',
-                     'rx_bytes','tx_bytes', 'rx_bytes','tx_bytes'] + linux_stats,
+                     'rx_bytes','tx_bytes', 'rx_bytes','tx_bytes', 
+                     'CLOCKS_UNHALTED_CORE', 'CLOCKS_UNHALTED_REF'] + linux_stats,
       'intel_ivb' : ['CAS_READS', 'CAS_WRITES', 'LOAD_L1D_ALL',
                      'rx_bytes','tx_bytes', 'rx_bytes','tx_bytes',
                      'SSE_DOUBLE_SCALAR', 'SSE_DOUBLE_PACKED', 
-                     'SIMD_DOUBLE_256'] + linux_stats,
+                     'SIMD_DOUBLE_256', 
+                     'CLOCKS_UNHALTED_CORE', 'CLOCKS_UNHALTED_REF'] + linux_stats,
       'intel_knl' : ['CAS_READS', 'CAS_WRITES', 'RPQ_INSERTS', 
                      'EDC_MISS_CLEAN', 'EDC_MISS_DIRTY',  'WPQ_INSERTS',
-                     'rx_bytes','tx_bytes', 'portRcvData','portXmitData'] + linux_stats,
+                     'rx_bytes','tx_bytes', 'portRcvData','portXmitData', 
+                     'CLOCKS_UNHALTED_CORE', 'CLOCKS_UNHALTED_REF'] + linux_stats,
       'intel_skx' : ['FP_ARITH_INST_RETIRED_SCALAR_DOUBLE', 'FP_ARITH_INST_RETIRED_128B_PACKED_DOUBLE', 
                      'FP_ARITH_INST_RETIRED_256B_PACKED_DOUBLE', 'FP_ARITH_INST_RETIRED_512B_PACKED_DOUBLE', 
                      'CAS_READS', 'CAS_WRITES', 
-                     'rx_bytes','tx_bytes', 'portRcvData','portXmitData'] + linux_stats,
+                     'rx_bytes','tx_bytes', 'portRcvData','portXmitData', 
+                     'CLOCKS_UNHALTED_CORE', 'CLOCKS_UNHALTED_REF'] + linux_stats,
 
       }
 
@@ -92,12 +100,12 @@ class MasterPlot(Plot):
 
     if self.wide:
       self.fig = Figure(figsize=(15.5,12),dpi=110)
-      self.ax=self.fig.add_subplot(6,2,2)
+      self.ax=self.fig.add_subplot(7,2,2)
       cols = 2
       shift = 2
     else:
-      self.fig = Figure(figsize=(8,12),dpi=110)
-      self.ax=self.fig.add_subplot(6,1,1)
+      self.fig = Figure(figsize=(8,15),dpi=110)
+      self.ax=self.fig.add_subplot(7,1,1)
       cols = 1
       shift = 1
     if self.mode == 'hist':
@@ -108,6 +116,9 @@ class MasterPlot(Plot):
       plot=self.plot_mmm
     else:
       plot=self.plot_lines
+
+    nom_freq = {"intel_snb" : 2.7, "intel_ivb" : 2.8, "intel_hsw" : 2.3, "intel_bdw" : 2.6, "intel_knl" : 1.4, "intel_skx" : 2.1}
+    nom_freq = nom_freq[self.ts.pmc_type]
 
     k1_tmp=self.k1[self.ts.pmc_type]
     k2_tmp=self.k2[self.ts.pmc_type]
@@ -140,7 +151,7 @@ class MasterPlot(Plot):
         print("FLOP stats not available for JOBID",self.ts.j.id)
         raise
       plot_ctr += 1
-      ax = self.fig.add_subplot(6,cols,plot_ctr*shift)      
+      ax = self.fig.add_subplot(7,cols,plot_ctr*shift)      
       for host_name in self.ts.j.hosts.keys():
         flops = 0
         if idx0: flops += 1*self.ts.assemble([idx0],host_name,0)
@@ -167,7 +178,7 @@ class MasterPlot(Plot):
         idxs = [k2_tmp.index('RPQ_INSERTS'), -k2_tmp.index('EDC_MISS_CLEAN'), 
                 -k2_tmp.index('EDC_MISS_DIRTY'), k2_tmp.index('WPQ_INSERTS'), -k2_tmp.index('CAS_READS')]
       plot_ctr += 1
-      plot(self.fig.add_subplot(6,cols,plot_ctr*shift), idxs, 3600., 
+      plot(self.fig.add_subplot(7,cols,plot_ctr*shift), idxs, 3600., 
            (2**30.0)/64., ylabel="MCDRAM BW [GB/s]")
 
     # Plot key 2
@@ -177,7 +188,7 @@ class MasterPlot(Plot):
       elif 'MEM_UNCORE_RETIRED_REMOTE_DRAM' in k2_tmp and 'MEM_UNCORE_RETIRED_LOCAL_DRAM' in k2_tmp:
         idxs = [k2_tmp.index('MEM_UNCORE_RETIRED_REMOTE_DRAM'), k2_tmp.index('MEM_UNCORE_RETIRED_LOCAL_DRAM')]
       plot_ctr += 1
-      plot(self.fig.add_subplot(6,cols,plot_ctr*shift), idxs, 3600., 
+      plot(self.fig.add_subplot(7,cols,plot_ctr*shift), idxs, 3600., 
            1.0/64.0*1024.*1024.*1024., ylabel='DRAM BW [GB/s]')
     except:
       print(self.ts.pmc_type + ' missing Memory Bandwidth plot' + ' for jobid ' + self.ts.j.id )
@@ -187,14 +198,14 @@ class MasterPlot(Plot):
     idx1=k2_tmp.index('FilePages')
     idx2=k2_tmp.index('Slab')
     plot_ctr += 1
-    plot(self.fig.add_subplot(6,cols,plot_ctr*shift), [idx0,-idx1,-idx2], 3600.,2.**30.0, 
+    plot(self.fig.add_subplot(7,cols,plot_ctr*shift), [idx0,-idx1,-idx2], 3600.,2.**30.0, 
          ylabel='Memory Use [GB]',do_rate=False)
 
     # Plot lnet sum rate
     idx0=k1_tmp.index('lnet')
     idx1=idx0 + k1_tmp[idx0+1:].index('lnet') + 1
     plot_ctr += 1
-    plot(self.fig.add_subplot(6,cols,plot_ctr*shift), [idx0,idx1], 3600., 1024.**2, ylabel='Lustre BW [MB/s]')
+    plot(self.fig.add_subplot(7,cols,plot_ctr*shift), [idx0,idx1], 3600., 1024.**2, ylabel='Lustre BW [MB/s]')
 
     # Plot remaining IB sum rate
     if 'ib_ext' in self.ts.j.hosts.values()[0].stats:
@@ -206,7 +217,7 @@ class MasterPlot(Plot):
         idx3=idx2 + k1_tmp[idx2+1:].index('ib_ext') + 1
       try:
         plot_ctr += 1
-        plot(self.fig.add_subplot(6,cols,plot_ctr*shift),[idx2,idx3],3600.,2.**20,
+        plot(self.fig.add_subplot(7,cols,plot_ctr*shift),[idx2,idx3],3600.,2.**20,
              ylabel='IB BW [MB/s]') 
       except: pass
     FLITS_PER_MB = 125000
@@ -214,7 +225,7 @@ class MasterPlot(Plot):
         idx2=k2_tmp.index('portXmitData')
         idx3=k2_tmp.index('portRcvData')
         plot_ctr += 1
-        plot(self.fig.add_subplot(6,cols,plot_ctr*shift),[idx2,idx3],3600.,FLITS_PER_MB,
+        plot(self.fig.add_subplot(7,cols,plot_ctr*shift),[idx2,idx3],3600.,FLITS_PER_MB,
              ylabel='OPA BW [MB/s]') 
 
     #Plot CPU user time
@@ -222,9 +233,17 @@ class MasterPlot(Plot):
     idle = [k2_tmp.index('iowait'), k2_tmp.index('idle'), k2_tmp.index('irq'), k2_tmp.index('softirq')]
     plot_ctr += 1
 
-    self.plot_ratio(self.fig.add_subplot(6,cols,plot_ctr*shift), busy, busy + idle, 3600., 0.01,
-                    xlabel='Time [hrs]',
+    self.plot_ratio(self.fig.add_subplot(7,cols,plot_ctr*shift), busy, busy + idle, 3600., 0.01,
                     ylabel='Logical Core Use %')
-    
+
+    #Plot CPU Frequency
+    cyc = [k2_tmp.index('CLOCKS_UNHALTED_CORE')]
+    cyc_ref = [k2_tmp.index('CLOCKS_UNHALTED_REF')]
+    plot_ctr += 1
+
+    self.plot_ratio(self.fig.add_subplot(7,cols,plot_ctr*shift), cyc, cyc_ref, 3600., 1/nom_freq,
+                    xlabel='Time [hrs]',
+                    ylabel='Active Freq [GHz]')
+   
     self.fig.subplots_adjust(hspace=0.35)
     self.output('master')
