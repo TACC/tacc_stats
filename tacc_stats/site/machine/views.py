@@ -102,9 +102,13 @@ def login(request):
         return HttpResponseRedirect("/")
     
     elif request.method == 'GET':
-        return render(request, 'registration/login.html', {"var1": settings.AGAVE_BASE_URL})
+        return render(request, 'registration/login.html')
 
     return render(request, 'registration/login.html')
+
+def logout(request):
+    request.session.flush()
+    return HttpResponseRedirect("/")
 
 
 
