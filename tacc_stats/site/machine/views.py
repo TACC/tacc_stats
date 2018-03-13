@@ -1,11 +1,12 @@
 from django.http import HttpResponse, HttpResponseRedirect
-from django.shortcuts import render_to_response, render
+from django.shortcuts import render_to_response, render, redirect
 from django.views.generic import DetailView, ListView
 from django.db.models import Q, F, FloatField, ExpressionWrapper
 from django.core.cache import cache 
 from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
+from django.conf import settings
 
-import os,sys,pwd
+import os,sys,pwd,inspect
 import cPickle as pickle 
 import operator
 
@@ -20,6 +21,92 @@ from datetime import datetime, timedelta
 import numpy as np
 from matplotlib.figure import Figure
 from matplotlib.backends.backend_agg import FigureCanvasAgg as FigureCanvas
+
+from agavepy.agave import Agave
+
+# Agave authentication functions (shamelessly stolen from:
+# https://bitbucket.org/jstubbs/ipt-web/src/8b637b9570dd870eef459b953a69c4d18e181c8e/iptweb/iptsite/views.py?at=master&fileviewer=file-view-default#views.py-176)
+
+def get_request():
+    """Walk up the stack, return the nearest first argument named "request"."""
+    frame = None
+    try:
+        for f in inspect.stack()[1:]:
+            frame = f[0]
+            code = frame.f_code
+            if code.co_varnames and code.co_varnames[0] == "request":
+                request = frame.f_locals['request']
+    finally:
+        del frame
+    return request
+
+def check_for_tokens(request):
+    access_token = request.session.get("access_token")
+    if access_token:
+        return True
+    return False
+
+def update_session_tokens(**kwargs):
+    """Update the request's session with the latest tokens since the client may have
+    automatically refreshed them."""
+
+    request = get_request()
+    request.session['access_token'] = kwargs['access_token']
+    request.session['refresh_token'] = kwargs['refresh_token']
+
+def get_agave_client(username, password):
+    client_key = settings.AGAVE_CLIENT_KEY
+    client_secret = settings.AGAVE_CLIENT_SECRET
+    base_url = settings.AGAVE_BASE_URL
+
+    if not client_key or not client_secret:
+        raise Exception("Missing OAuth client credentials.")
+        
+    return Agave(api_server=base_url, username=username, password=password, client_name="tacc-stats",
+     api_key=client_key, api_secret=client_secret, token_callback=update_session_tokens)
+    
+# login view with Agave functionality
+def login(request):
+
+
+    if check_for_tokens(request):
+        return HttpResponseRedirect('/')
+
+    if request.method=='POST':
+        username = request.POST.get('username')
+        password = request.POST.get('password')
+
+        if not username:
+            context = {"error": "Username cannot be blank"}
+            return render(request, 'registration/login.html', context, content_type='text/html')
+            
+        if not password:
+            context = {"error": "Password cannot be blank"}
+            return render(request, 'registration/login.html', context, content_type='text/html')
+
+        try:
+            ag = get_agave_client(username, password)
+        except Exception as e:
+            context = {"error": "Invalid username or password: {}".format(e)}
+            return render(request, 'registration/login.html', context, content_type='text/html')
+            
+        # at this point the Agave client has been generated.
+        access_token = ag.token.token_info['access_token']
+        refresh_token = ag.token.token_info['refresh_token']
+        token_exp = ag.token.token_info['expires_at']
+
+        request.session['username'] = username
+        request.session['access_token'] = access_token
+        request.session['refresh_token'] = refresh_token
+
+        return HttpResponseRedirect("/")
+    
+    elif request.method == 'GET':
+        return render(request, 'registration/login.html', {"var1": settings.AGAVE_BASE_URL})
+
+    return render(request, 'registration/login.html')
+
+
 
 def sys_plot(request, pk):
 
@@ -91,7 +178,7 @@ def search(request):
     if 'jobid' in request.GET:
         try:
             job = Job.objects.get(id = request.GET['jobid'])
-            return HttpResponseRedirect("/machine/job/"+str(job.id)+"/")
+            return HttpResponseRediret("/machine/job/"+str(job.id)+"/")
         except: pass
     try:
         return index(request)
