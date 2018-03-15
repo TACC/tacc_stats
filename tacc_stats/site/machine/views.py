@@ -236,6 +236,7 @@ def dates(request, error = False):
     field['date_list'] = sorted(month_dict.iteritems())[::-1]
     field['error'] = error
     field['username'] = request.session['username']
+    field['is_staff'] = request.session['is_staff']
     return render_to_response("machine/search.html", field)
 
 def search(request):
@@ -399,7 +400,7 @@ def figure_to_response(p):
     p.fig.savefig(response, format='png')
     return response
 
-def get_data(pk):
+def get_data(request, pk):
     if cache.has_key(pk):
         data = cache.get(pk)
     else:
@@ -410,13 +411,13 @@ def get_data(pk):
     return data
 
 def master_plot(request, pk):
-    data = get_data(pk)
+    data = get_data(request, pk)
     mp = plots.MasterPlot()
     mp.plot(pk,job_data=data)
     return figure_to_response(mp)
 
 def heat_map(request, pk):    
-    data = get_data(pk)
+    data = get_data(request, pk)
     hm = plots.HeatMap(k1={'intel_snb' : ['intel_snb','intel_snb'],
                            'intel_hsw' : ['intel_hsw','intel_hsw'],
                            'intel_ivb' : ['intel_ivb','intel_ivb'],
@@ -457,7 +458,7 @@ class JobDetailView(DetailView):
         context = super(JobDetailView, self).get_context_data(**kwargs)
         job = context['job']
 
-        data = get_data(job.id)
+        data = get_data(self.request, job.id)
                 
         testinfo_dict = {}
         for obj in TestInfo.objects.all():
@@ -537,7 +538,7 @@ class JobDetailView(DetailView):
         return context
 
 def type_plot(request, pk, type_name):
-    data = get_data(pk)
+    data = get_data(request, pk)
 
     schema = build_schema(data,type_name)
     schema = [x.split(',')[0] for x in schema]
@@ -562,7 +563,7 @@ def type_plot(request, pk, type_name):
     return figure_to_response(tp)
 
 def type_detail(request, pk, type_name):
-    data = get_data(pk)
+    data = get_data(request, pk)
 
     schema = build_schema(data,type_name)
     raw_stats = data.aggregate_stats(type_name)[0]  
@@ -580,7 +581,7 @@ def type_detail(request, pk, type_name):
 
 def proc_detail(request, pk, proc_name):
 
-    data = get_data(pk)
+    data = get_data(request, pk)
     
     host_map = {}
     schema = data.get_schema('proc')
