@@ -1,5 +1,6 @@
-from django.http import HttpResponse, HttpResponseRedirect
+from django.http import HttpResponse, HttpResponseRedirect, HttpResponseBadRequest
 from django.shortcuts import render_to_response, render, redirect
+from django.core.urlresolvers import reverse
 from django.views.generic import DetailView, ListView
 from django.db.models import Q, F, FloatField, ExpressionWrapper
 from django.core.cache import cache 
@@ -9,6 +10,7 @@ from django.conf import settings
 import os,sys,pwd,inspect
 import cPickle as pickle 
 import operator
+import json, requests
 
 from tacc_stats.analysis import exam
 from tacc_stats.site.machine.models import Job, Host, Libraries, TestInfo
@@ -110,11 +112,65 @@ def logout(request):
     request.session.flush()
     return HttpResponseRedirect("/")
 
+def login_oauth(request):
+    tenant_base_url = settings.AGAVE_BASE_URL
+    client_key = settings.AGAVE_CLIENT_KEY
 
+    session = request.session
+    session['auth_state'] = os.urandom(24).encode('hex')
+
+    redirect_uri = 'http://{}{}'.format(request.get_host(), reverse('agave_oauth_callback'))
+
+    authorization_url = (
+        '%s/authorize?client_id=%s&response_type=code&redirect_uri=%s&state=%s' %(
+            tenant_base_url,
+            client_key,
+            redirect_uri,
+            session['auth_state']
+        )
+    )
+    return HttpResponseRedirect(authorization_url)
+
+
+def agave_oauth_callback(request):
+    state = request.GET.get('state')
+
+    if request.session['auth_state'] != state:
+        return HttpResponseBadRequest('Authorization state failed.')
+
+    if 'code' in request.GET:
+        redirect_uri = 'http://{}{}'.format(request.get_host(),
+            reverse('agave_oauth_callback'))
+        code = request.GET['code']
+        tenant_base_url = settings.AGAVE_BASE_URL
+        client_key = settings.AGAVE_CLIENT_KEY
+        client_secret = settings.AGAVE_CLIENT_SECRET
+        redirect_uri = redirect_uri
+        body = {
+            'grant_type': 'authorization_code',
+            'code': code,
+            'redirect_uri': redirect_uri
+        }
+
+        response = requests.post('%s/token' % tenant_base_url,
+            data=body,
+            auth=(client_key, client_secret))
+        token_data = response.json()
+
+        headers = {'Authorization': 'Bearer %s' % token_data['access_token']}
+        user_response = requests.get('%s/profiles/v2/me?pretty=true' %tenant_base_url, headers=headers)
+        user_data = user_response.json()
+
+        request.session['access_token'] = token_data['access_token']
+        request.session['refresh_token'] = token_data['refresh_token']
+        request.session['username'] = user_data['result']['username']
+        request.session['is_staff'] = user_data['result']['email'].split('@')[-1] == 'tacc.utexas.edu'
+
+        return HttpResponseRedirect("/")
 
 def sys_plot(request, pk):
 
-    job = Job.objects.get(id=pk)
+    job = Job.objects.filter(user = request.session["username"]).uget(id=pk)
     hosts = job.host_set.all().values_list('name',flat=True)
 
     racks = []
@@ -154,8 +210,12 @@ def sys_plot(request, pk):
 
 
 def dates(request, error = False):
+
+    if not check_for_tokens(request):
+        return HttpResponseRedirect("/login")
+
     month_dict ={}
-    date_list = Job.objects.exclude(date = None).exclude(date__lt = datetime.today() - timedelta(days = 90)).values_list('date',flat=True).distinct()
+    date_list = Job.objects.filter(user = request.session["username"]).exclude(date = None).exclude(date__lt = datetime.today() - timedelta(days = 90)).values_list('date',flat=True).distinct()
 
     for date in sorted(date_list):
         y,m,d = date.strftime('%Y-%m-%d').split('-')
@@ -166,7 +226,7 @@ def dates(request, error = False):
     field = {}
     field["machine_name"] = cfg.host_name_ext
 
-    field['md_job_list'] = Job.objects.filter(date__gt = datetime.today() - timedelta(days = 5)).exclude(LLiteOpenClose__isnull = True ).annotate(io = ExpressionWrapper(F('LLiteOpenClose')*F('nodes'), output_field = FloatField())).order_by('-io')
+    field['md_job_list'] = Job.objects.filter(user = request.session["username"]).filter(date__gt = datetime.today() - timedelta(days = 5)).exclude(LLiteOpenClose__isnull = True ).annotate(io = ExpressionWrapper(F('LLiteOpenClose')*F('nodes'), output_field = FloatField())).order_by('-io')
 
     try:
         field['md_job_list'] = field['md_job_list'][0:10]
@@ -175,13 +235,14 @@ def dates(request, error = False):
 
     field['date_list'] = sorted(month_dict.iteritems())[::-1]
     field['error'] = error
+    field['username'] = request.session['username']
     return render_to_response("machine/search.html", field)
 
 def search(request):
 
     if 'jobid' in request.GET:
         try:
-            job = Job.objects.get(id = request.GET['jobid'])
+            job = Job.objects.filter(user = request.session["user"]).get(id = request.GET['jobid'])
             return HttpResponseRediret("/machine/job/"+str(job.id)+"/")
         except: pass
     try:
@@ -225,7 +286,7 @@ def index(request, **kwargs):
             del fields['date']
 
 
-    job_list = Job.objects.filter(**fields).distinct().order_by(order_key)
+    job_list = Job.objects.filter(user = request.session["username"]).filter(**fields).distinct().order_by(order_key)
 
     fields['name'] =  'Query [fields=values] ' + name.rstrip('-')    
 
@@ -342,7 +403,7 @@ def get_data(pk):
     if cache.has_key(pk):
         data = cache.get(pk)
     else:
-        job = Job.objects.get(pk = pk)
+        job = Job.objects.filter(user = request.session["username"]).get(pk = pk)
         with open(os.path.join(cfg.pickles_dir,job.date.strftime('%Y-%m-%d'),str(job.id)),'rb') as f:
             data = pickle.load(f)
             cache.set(job.id, data)

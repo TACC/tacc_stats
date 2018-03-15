@@ -192,6 +192,6 @@ CACHES = {
         },
 }
 
-AGAVE_CLIENT_KEY= 'wuZZkYMvLtnFQjfJz9f4cPAo_lAa'
-AGAVE_CLIENT_SECRET= '1C5Q6eWwixY7NqUgqlegt85WF8ga'
+AGAVE_CLIENT_KEY= '5pGhxBUN3KjJDiufBi2Ar1ex1GEa'
+AGAVE_CLIENT_SECRET= 'wNu9vNHX6recy5Ak6PEFYrq7aJ4a'
 AGAVE_BASE_URL = 'https://api.tacc.utexas.edu/'
