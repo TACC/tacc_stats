@@ -164,13 +164,17 @@ def agave_oauth_callback(request):
         request.session['access_token'] = token_data['access_token']
         request.session['refresh_token'] = token_data['refresh_token']
         request.session['username'] = user_data['result']['username']
+        # For now we determine whether a user is staff by seeing if hey have an @tacc.utexas.edu email.
         request.session['is_staff'] = user_data['result']['email'].split('@')[-1] == 'tacc.utexas.edu'
 
         return HttpResponseRedirect("/")
 
 def sys_plot(request, pk):
 
-    job = Job.objects.filter(user = request.session["username"]).uget(id=pk)
+    job = Job.objects.uget(id=pk)
+    if not request.session["is_staff"]:
+        job = job.filter(user = request.session["username"])
+
     hosts = job.host_set.all().values_list('name',flat=True)
 
     racks = []
@@ -215,7 +219,9 @@ def dates(request, error = False):
         return HttpResponseRedirect("/login")
 
     month_dict ={}
-    date_list = Job.objects.filter(user = request.session["username"]).exclude(date = None).exclude(date__lt = datetime.today() - timedelta(days = 90)).values_list('date',flat=True).distinct()
+    date_list = Job.objects.exclude(date = None).exclude(date__lt = datetime.today() - timedelta(days = 90)).values_list('date',flat=True).distinct()
+    if not request.session["is_staff"]:
+        date_list = date_list.filter(user=request.session["username"])
 
     for date in sorted(date_list):
         y,m,d = date.strftime('%Y-%m-%d').split('-')
@@ -226,7 +232,9 @@ def dates(request, error = False):
     field = {}
     field["machine_name"] = cfg.host_name_ext
 
-    field['md_job_list'] = Job.objects.filter(user = request.session["username"]).filter(date__gt = datetime.today() - timedelta(days = 5)).exclude(LLiteOpenClose__isnull = True ).annotate(io = ExpressionWrapper(F('LLiteOpenClose')*F('nodes'), output_field = FloatField())).order_by('-io')
+    field['md_job_list'] = Job.objects.filter(date__gt = datetime.today() - timedelta(days = 5)).exclude(LLiteOpenClose__isnull = True ).annotate(io = ExpressionWrapper(F('LLiteOpenClose')*F('nodes'), output_field = FloatField())).order_by('-io')
+    if not request.session["is_staff"]:
+        field['md_job_list'] = field['md_job_list'].filter(user=request.session["username"])
 
     try:
         field['md_job_list'] = field['md_job_list'][0:10]
@@ -243,7 +251,10 @@ def search(request):
 
     if 'jobid' in request.GET:
         try:
-            job = Job.objects.filter(user = request.session["user"]).get(id = request.GET['jobid'])
+            job = Job.objects.get(id = request.GET['jobid'])
+            if not request.session["is_staff"]:
+                job = job.filter(user = request.session["username"])
+
             return HttpResponseRediret("/machine/job/"+str(job.id)+"/")
         except: pass
     try:
@@ -287,7 +298,9 @@ def index(request, **kwargs):
             del fields['date']
 
 
-    job_list = Job.objects.filter(user = request.session["username"]).filter(**fields).distinct().order_by(order_key)
+    job_list = Job.objects.filter(**fields).distinct().order_by(order_key)
+    if not request.session["is_staff"]:
+        job_list = job_list.filter(user = request.session["username"])
 
     fields['name'] =  'Query [fields=values] ' + name.rstrip('-')    
 
@@ -404,7 +417,10 @@ def get_data(request, pk):
     if cache.has_key(pk):
         data = cache.get(pk)
     else:
-        job = Job.objects.filter(user = request.session["username"]).get(pk = pk)
+        job = Job.objects.get(pk = pk)
+        if not request.session["is_staff"]:
+            job = job.filter(user = request.session["username"])
+
         with open(os.path.join(cfg.pickles_dir,job.date.strftime('%Y-%m-%d'),str(job.id)),'rb') as f:
             data = pickle.load(f)
             cache.set(job.id, data)
