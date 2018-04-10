@@ -2,6 +2,8 @@
 import os
 import tacc_stats.cfg as cfg
 import tacc_stats.site.tacc_stats_site as tacc_stats_site
+import tacc_stats.site.tacc_stats_site.settings_secret as settings_secret
+
 DIR = os.path.dirname(os.path.abspath(__file__))
 
 DEBUG = True
@@ -192,6 +194,10 @@ CACHES = {
         },
 }
 
-AGAVE_CLIENT_KEY= '5pGhxBUN3KjJDiufBi2Ar1ex1GEa'
-AGAVE_CLIENT_SECRET= 'wNu9vNHX6recy5Ak6PEFYrq7aJ4a'
-AGAVE_BASE_URL = 'https://api.tacc.utexas.edu/'
+#AGAVE_CLIENT_KEY= '5pGhxBUN3KjJDiufBi2Ar1ex1GEa'
+#AGAVE_CLIENT_SECRET= 'wNu9vNHX6recy5Ak6PEFYrq7aJ4a'
+#AGAVE_BASE_URL = 'https://api.tacc.utexas.edu/'
+
+AGAVE_CLIENT_KEY = settings_secret._AGAVE_CLIENT_KEY
+AGAVE_CLIENT_SECRET = settings_secret._AGAVE_CLIENT_SECRET
+AGAVE_BASE_URL = settings_secret._AGAVE_BASE_URL
