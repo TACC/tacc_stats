@@ -104,8 +104,7 @@ class TSPLBase:
     except:
       raise TSPLException('Something is funny with file' + file )
 
-    if isinstance(k1,dict) and isinstance(k2,dict):
-      
+    if isinstance(k1,dict) and isinstance(k2,dict):      
       if self.pmc_type in k1:
         self.k1=k1[self.pmc_type]
         self.k2=k2[self.pmc_type]

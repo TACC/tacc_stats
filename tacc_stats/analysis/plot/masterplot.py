@@ -124,7 +124,6 @@ class MasterPlot(Plot):
     k2_tmp=self.k2[self.ts.pmc_type]
     processor_schema = self.ts.j.schemas[self.ts.pmc_type]
     # Plot key 1 for flops
-    print("starting plot")
     plot_ctr = 0
     try:
       if 'SSE_D_ALL' in processor_schema and 'SIMD_D_256' in processor_schema:

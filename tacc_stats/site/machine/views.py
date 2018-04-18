@@ -1,5 +1,5 @@
 from django.http import HttpResponse, HttpResponseRedirect
-from django.shortcuts import render_to_response, render
+from django.shortcuts import render
 from django.views.generic import DetailView, ListView
 from django.db.models import Q, F, FloatField, ExpressionWrapper
 from django.core.cache import cache 
@@ -84,7 +84,7 @@ def dates(request, error = False):
 
     field['date_list'] = sorted(month_dict.iteritems())[::-1]
     field['error'] = error
-    return render_to_response("machine/search.html", field)
+    return render(request, "machine/search.html", field)
 
 def search(request):
 
@@ -178,10 +178,10 @@ def index(request, **kwargs):
         fields['cpi_job_list'] = list_to_dict(fields['cpi_job_list'],'cpi')
         fields['mem_job_list'] = list_to_dict(fields['mem_job_list'],'mem')
         fields['gigebw_job_list'] = list_to_dict(fields['gigebw_job_list'],'GigEBW')
-
+    
     if '?' in request.get_full_path():
         fields['current_path'] = request.get_full_path()
-    return render_to_response("machine/index.html", fields)
+    return render(request, "machine/index.html", fields)
 
 def list_to_dict(job_list,metric):
     job_dict={}
@@ -315,7 +315,6 @@ class JobDetailView(DetailView):
                 metric = test.test(os.path.join(cfg.pickles_dir, 
                                                 job.date.strftime('%Y-%m-%d'),
                                                 str(job.id)), data)
-                print test,metric
                 if not metric or np.isnan(metric) : continue            
                 setattr(job,obj.field_name,metric)
                 testinfo_dict[obj.test_name] = metric
@@ -331,7 +330,7 @@ class JobDetailView(DetailView):
         for host_name, host in data.hosts.iteritems():
             if host.stats.has_key('proc'):
                 for proc_pid,val in host.stats['proc'].iteritems():
-                    if job.uid == val[0][0]:
+                    if val[0][0]:
 
                         try: 
                             proc = proc_pid.split('/')[0]
@@ -371,8 +370,8 @@ class JobDetailView(DetailView):
         context['host_list'] = host_list
         context['type_list'] = type_list
 
-        urlstring="https://scribe.tacc.utexas.edu:8000/en-US/app/search/search?q=search%20kernel:"
-        hoststring=urlstring+"%20host%3D"+host_list[0]
+        urlstring="https://scribe.tacc.utexas.edu:8000/en-US/app/search/search?q=search%20"
+        hoststring=urlstring+"%20host%3D"+host_list[0]+".stampede2.tacc.utexas.edu"
         serverstring=urlstring+"%20mds*%20OR%20%20oss*"
         for host in host_list[1:]:
             hoststring+="%20OR%20%20host%3D"+host+"*"
@@ -424,7 +423,9 @@ def type_detail(request, pk, type_name):
             temp.append(raw_stats[t,event]*scale)
         stats.append((times[t],temp))
 
-    return render_to_response("machine/type_detail.html",{"type_name" : type_name, "jobid" : pk, "stats_data" : stats, "schema" : schema})
+    return render(request, "machine/type_detail.html",
+                  {"type_name" : type_name, "jobid" : pk, 
+                   "stats_data" : stats, "schema" : schema})
 
 def proc_detail(request, pk, proc_name):
 
@@ -447,4 +448,6 @@ def proc_detail(request, pk, proc_name):
             if  proc_ == proc_name:
                 host_map[host_name][proc_+'/'+pid] = [ val[-1][hwm_idx]/2**20, cpu_aff, val[-1][thr_idx] ]
 
-    return render_to_response("machine/proc_detail.html",{"proc_name" : proc_name, "jobid" : pk, "host_map" : host_map, "hwm_unit" : hwm_unit})
+    return render(request, "machine/proc_detail.html",
+                  {"proc_name" : proc_name, "jobid" : pk, 
+                   "host_map" : host_map, "hwm_unit" : hwm_unit})

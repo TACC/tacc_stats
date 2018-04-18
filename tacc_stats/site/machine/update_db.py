@@ -68,16 +68,21 @@ def update_acct(date, rerun = False):
     with open(os.path.join(cfg.acct_path, date) + '.txt') as fd:
         nrecords = sum(1 for record in csv.DictReader(fd))
         fd.seek(0)
+        
         for job in csv.DictReader(fd, delimiter = '|'):
+            if '+' in job['JobID']: 
+                jid, rid = job['JobID'].split('+')
+                job['JobID'] = int(jid) + int(rid)
+
             if rerun: 
                 pass
             elif Job.objects.filter(id = job['JobID']).exists(): 
                 ctr += 1
                 continue                
             json = {}
-            json['id']         = job['JobID']
-            json['project']    = job['Account']
 
+            json['id']          = job['JobID']
+            json['project']     = job['Account']
             json['start_time']  = tz.localize(parse(job['Start']))
             json['end_time']    = tz.localize(parse(job['End']))
             json['start_epoch'] = calendar.timegm(json['start_time'].utctimetuple())
@@ -99,11 +104,9 @@ def update_acct(date, rerun = False):
             json['queue']      = job['Partition']
             json['name']       = job['JobName'][0:128]
             json['status']     = job['State'].split()[0]
-
             json['nodes']      = int(job['NNodes'])
             json['cores']      = int(job['ReqCPUS'])
-            json['wayness']     = json['cores']/json['nodes']
-
+            json['wayness']    = json['cores']/json['nodes']
             json['date']       = json['end_time'].date()
             json['user']       = job['User']
             if json.has_key('user'):
@@ -248,32 +251,32 @@ def update(date,rerun=False):
 
 def update_metric_fields(date, rerun = False):
     update_comp_info()
-    aud = exam.Auditor(processes=4)
+    aud = exam.Auditor(processes=2)
     
     min_time = 600
     aud.stage(exam.GigEBW, ignore_qs=[], min_time = min_time)
     aud.stage(exam.HighCPI, ignore_qs=[], min_time = min_time)
-    aud.stage(exam.HighCPLD, ignore_qs=[], min_time = min_time)
-    aud.stage(exam.Load_L1Hits, ignore_qs=[], min_time = min_time)
-    aud.stage(exam.Load_L2Hits, ignore_qs=[], min_time = min_time)
-    aud.stage(exam.Load_LLCHits, ignore_qs=[], min_time = min_time)
+    #aud.stage(exam.HighCPLD, ignore_qs=[], min_time = min_time)
+    #aud.stage(exam.Load_L1Hits, ignore_qs=[], min_time = min_time)
+    #aud.stage(exam.Load_L2Hits, ignore_qs=[], min_time = min_time)
+    #aud.stage(exam.Load_LLCHits, ignore_qs=[], min_time = min_time)
     aud.stage(exam.MemBw, ignore_qs=[], min_time = min_time)
     aud.stage(exam.Catastrophe, ignore_qs=[], min_time = min_time)
     aud.stage(exam.MemUsage, ignore_qs=[], min_time = min_time)
-    aud.stage(exam.PacketRate, ignore_qs=[], min_time = min_time)
-    aud.stage(exam.PacketSize, ignore_qs=[], min_time = min_time)
+    #aud.stage(exam.PacketRate, ignore_qs=[], min_time = min_time)
+    #aud.stage(exam.PacketSize, ignore_qs=[], min_time = min_time)
     aud.stage(exam.Idle, ignore_qs=[], min_time = min_time)
-    aud.stage(exam.LowFLOPS, ignore_qs=[], min_time = min_time)
-    aud.stage(exam.VecPercent, ignore_qs=[], min_time = min_time)
+    #aud.stage(exam.LowFLOPS, ignore_qs=[], min_time = min_time)
+    #aud.stage(exam.VecPercent, ignore_qs=[], min_time = min_time)
     aud.stage(exam.CPU_Usage, ignore_qs = [], min_time = min_time)
-    aud.stage(exam.MIC_Usage, ignore_qs = [], min_time = min_time)
-    aud.stage(exam.Load_All, ignore_qs = [], min_time = min_time)
+    #aud.stage(exam.MIC_Usage, ignore_qs = [], min_time = min_time)
+    #aud.stage(exam.Load_All, ignore_qs = [], min_time = min_time)
     aud.stage(exam.MetaDataRate, ignore_qs = [], min_time = min_time)
     aud.stage(exam.LnetAveMsgs, ignore_qs=[], min_time = min_time)
     aud.stage(exam.LnetAveBW, ignore_qs=[], min_time = min_time)
     aud.stage(exam.LnetMaxBW, ignore_qs=[], min_time = min_time)
-    aud.stage(exam.InternodeIBAveBW, ignore_qs=[], min_time = min_time)
-    aud.stage(exam.InternodeIBMaxBW, ignore_qs=[], min_time = min_time)
+    #aud.stage(exam.InternodeIBAveBW, ignore_qs=[], min_time = min_time)
+    #aud.stage(exam.InternodeIBMaxBW, ignore_qs=[], min_time = min_time)
     aud.stage(exam.MDCReqs, ignore_qs=[], min_time = min_time)
     aud.stage(exam.MDCWait, ignore_qs=[], min_time = min_time)
     aud.stage(exam.OSCReqs, ignore_qs=[], min_time = min_time)

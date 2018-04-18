@@ -91,7 +91,8 @@ class JobPickles:
                 with open(val_file, 'r') as fd:
                     val_jids = fd.read().splitlines()
 
-            acct_jids = [x['id'] for x in acct if int(x['id']) > 376922]
+            acct_jids = [x['id'] for x in acct if "+" not in x['id']]
+
             ntot = len(acct_jids)
             print(len(acct_jids),'Job records in accounting file')
 
@@ -101,8 +102,9 @@ class JobPickles:
 
             acct = [job for job in acct if job['id'] in run_jids]
             
-            #acct = [job for job in acct if job['queue'] in ['test1', 'test2']]
+            acct = [job for job in acct if job['nodes']*(job['end_time']-job['start_time']) < 1728000]
 
+            
             ctr = 0
             with open(val_file, "a") as fd:
                 for result in self.pool.imap(self.partial_pickle, acct):

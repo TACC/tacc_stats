@@ -239,10 +239,10 @@ class Host(object):
                 if re.match('^[0-9]{4}[0-1][0-9][0-3][0-9]$', base):
                     base = (datetime.datetime.strptime(base,"%Y%m%d") - datetime.datetime(1970,1,1)).total_seconds()
                 # Prune to files that might overlap with job.
-                ent_start = long(base) - 2*RAW_STATS_TIME_MAX
-                ent_end   = long(base) + 7*RAW_STATS_TIME_MAX
+                ent_start = long(base)
+                ent_end   = long(base) + 2*RAW_STATS_TIME_MAX
 
-                if ((ent_start <= job_start) and (job_start <= ent_end)) or ((ent_start <= job_end) and (job_end <= ent_end)) or (max(job_start, ent_start) <= min(job_end, ent_end)):
+                if (max(job_start, ent_start) <= min(job_end, ent_end)):
                     full_path = os.path.join(raw_host_stats_dir, ent)
                     path_list.append((full_path, ent_start))
                     self.trace("path `%s', start %d\n", full_path, ent_start)
@@ -281,9 +281,6 @@ class Host(object):
 
     def parse_stats(self, rec_time, line, file_schemas, file):
         type_name, dev_name, rest = line.split(None, 2)
-        if type_name == "intel_hsw_ht": type_name = "intel_hsw"
-        if type_name == "intel_hsw_cbo_ht": type_name = "intel_hsw_cbo"
-        #if type_name == "intel_knl": return
         schema = file_schemas.get(type_name)
         if not schema:
             self.error("file `%s', unknown type `%s', discarding line `%s'\n",
@@ -336,111 +333,7 @@ class Host(object):
                     record = True
                 else:
                     record = False
-        """
-        sys.exit()
-        rec_jobid = set()
-        # Scan file for records belonging to JOBID.
-        begin_idx = 0
-        for line in lines:        
-            try:
-                c = line[0]
-                if c.isdigit():
-                    try:
-                        str_time,str_jobid,hostname = line.split()
-                    except:
-                        str_time, str_jobid = line.split()
 
-                    rec_time = float(str_time)
-                    rec_jobid = set(str_jobid.split(','))
-                    if self.job.id in rec_jobid:
-                        self.trace("file `%s' rec_time %d, rec_jobid `%s'\n",
-                                   file.name, rec_time, rec_jobid)
-                        self.times.append(rec_time)
-                        begin_idx = lines.index(line) + 1
-                        break
-                elif line.startswith('%begin'):
-                    rec_jobid.add(line.split()[2])
-                    if self.job.id in rec_jobid:
-                        #self.times.append(rec_time)
-                        mark = line[1:].strip()
-                        print self.marks,'first'
-                        self.marks[mark] = True
-                        begin_idx = lines.index(line) + 1
-                        break
-            except Exception as exc:
-                self.trace("file `%s', caught `%s', discarding `%s'\n",
-                           file.name, str(exc), line)
-                stats_file_discard_record(file)
-        else:
-            # We got to the end of this file wthout finding any
-            # records belonging to JOBID.  Try next path.
-            self.trace("file `%s' has no records belonging to job\n", file.name)
-            return
-        # OK, we found a record belonging to JOBID.
-        skip = False
-        for line in lines[begin_idx:]:
-            try:
-                c = line[0]
-                if c.isdigit():
-                    skip = False
-                    
-                    try:
-                        str_time,str_jobid,hostname = line.split()
-                    except:
-                        str_time, str_jobid = line.split()
-
-                    rec_time = float(str_time)
-                    rec_jobid = set(str_jobid.split(','))
-                    
-                    if self.job.id not in rec_jobid:
-                        line = file.next()
-                        if line.startswith(SF_MARK_CHAR): 
-                            tokens = line[1:].strip().split(" ")
-                            if len(tokens) > 1 and tokens[0].strip() == "end":
-                                rec_jobid.add( tokens[1].strip() )
-                            else:
-                                self.trace("file '%s' syntax error '%s'\n", file.name, line)
-                        if self.job.id not in rec_jobid:
-                            return
-                        skip = True
-                        continue
-                    self.trace("file `%s' rec_time %d, rec_jobid `%s'\n",
-                               file.name, rec_time, rec_jobid)
-                    
-                    self.times.append(rec_time)
-                elif c.isalpha():
-                    if False == skip:
-                        print line
-                        self.parse_stats(rec_time, line, file_schemas, file)            
-                elif c == SF_MARK_CHAR:
-                    mark = line[1:].strip()
-                    if self.job.id not in mark.split()[1]:
-                        self.times.pop()
-                        skip = True
-                        continue
-                    else:
-                        if mark == "begin %s" % self.job.id and len(self.times) > 1:
-                            # this is a 'begin' record for this job, but have already processed a record
-                            # for this job. This race condition occurs if the job starts very close to the
-                            # normal cron-initiated record.  Tacc_stats resets some performance counters on
-                            # a begin, so it is necessary to discard the records before this one.
-                            self.job.errors.add("BEGIN_IN_MIDDLE {} {} {} discard {} previous".format(self.name, file.name, rec_time, len(self.times)-1 ) )
-                            self.raw_stats = {}
-                            self.times = [ rec_time ]
-
-                        skip = False
-                    self.marks[mark] = True
-                    if mark == "end %s" % self.job.id:
-                        print self.times,self.marks
-                #elif c == SF_COMMENT_CHAR:
-                    #pass        
-                else:
-                    pass #...
-            except Exception as exc:
-                self.trace("file `%s', caught `%s', discarding `%s'\n",
-                           file.name, str(exc), line)
-                stats_file_discard_record(file)
-        """
     def gather_stats(self):
         path_list = self.get_stats_paths()
         if len(path_list) == 0:
@@ -507,9 +400,6 @@ class Job(object):
         error('%s: ' + fmt, self.id, *args)
 
     def get_schema(self, type_name, desc=None):
-        if type_name == "intel_hsw_ht": type_name = "intel_hsw"
-        if type_name == "intel_hsw_cbo_ht": type_name = "intel_hsw_cbo"
-
         schema = self.schemas.get(type_name)
         if schema:
             if desc and schema.desc != schema_fixup(type_name,desc):
