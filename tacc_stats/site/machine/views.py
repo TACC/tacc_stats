@@ -6,6 +6,7 @@ from django.db.models import Q, F, FloatField, ExpressionWrapper
 from django.core.cache import cache 
 from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
 from django.conf import settings
+from django.core.exceptions import ObjectDoesNotExist
 
 import os,sys,pwd,inspect
 import cPickle as pickle 
@@ -365,6 +366,8 @@ def hist_summary(job_list):
 
     # Runtimes
     jobs = np.array(job_list.values_list('run_time',flat=True))/3600.
+    if not jobs.size:
+        return None
     ax = fig.add_subplot(221)
     bins = np.linspace(0, max(jobs), max(5, 5*np.log(len(jobs))))
     ax.hist(jobs, bins = bins, log=True, color='#bf0a30')
@@ -427,7 +430,11 @@ def get_data(request, pk):
         #.filter(user=request.session["username"])
         if not request.session["is_staff"]:
             job_objects = job_objects.filter(user=request.session["username"])
-        job = job_objects.get(pk=pk)
+        
+        try:
+            job = job_objects.get(pk=pk)
+        except Job.DoesNotExist:
+            return None
 
         with open(os.path.join(cfg.pickles_dir,job.date.strftime('%Y-%m-%d'),str(job.id)),'rb') as f:
             data = pickle.load(f)
@@ -483,7 +490,10 @@ class JobDetailView(DetailView):
         job = context['job']
 
         data = get_data(self.request, job.id)
-                
+
+        if not data:
+            return None
+
         testinfo_dict = {}
         for obj in TestInfo.objects.all():
             test_type = getattr(sys.modules[exam.__name__],obj.test_name)

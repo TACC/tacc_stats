@@ -140,13 +140,14 @@
 </div>
 </center>
 
-{% else %}
-    <h1>Job not found</h1>
-{% endif %}
-
 <center><h3>System View</h3></center>
 <p>
 <img src="{% url 'machine:sys_plot' job.id %}" alt="sys plot failed" align="left" style="max-width:100%;"/> 
 </p>
+
+{% else %}
+    <h1>Job not found</h1>
+{% endif %}
+
 
 {% endblock %}
