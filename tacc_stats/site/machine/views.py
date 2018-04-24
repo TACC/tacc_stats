@@ -8,6 +8,8 @@ from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
 from django.conf import settings
 from django.core.exceptions import ObjectDoesNotExist
 
+import logging
+
 import os,sys,pwd,inspect
 import cPickle as pickle 
 import operator
@@ -26,6 +28,9 @@ from matplotlib.figure import Figure
 from matplotlib.backends.backend_agg import FigureCanvasAgg as FigureCanvas
 
 from agavepy.agave import Agave
+
+logging.basicConfig()
+logger = logging.getLogger('logger')
 
 # Agave authentication functions (shamelessly stolen from:
 # https://bitbucket.org/jstubbs/ipt-web/src/8b637b9570dd870eef459b953a69c4d18e181c8e/iptweb/iptsite/views.py?at=master&fileviewer=file-view-default#views.py-176)
@@ -110,6 +115,20 @@ def login(request):
     return render(request, 'registration/login.html')
 
 def logout(request):
+
+    tenant_base_url = settings.AGAVE_BASE_URL
+    client_key = settings.AGAVE_CLIENT_KEY
+    client_secret = settings.AGAVE_CLIENT_SECRET
+    redirect_uri = 'http://{}{}'.format(request.get_host(), reverse('agave_oauth_callback'))
+
+    body = {
+        'token': request.session['access_token'],
+        'token_type_hint': 'access_token'
+    }
+
+    response = requests.post('%s/revoke' % tenant_base_url, 
+        data=body, 
+        auth=(client_key, client_secret))
     request.session.flush()
     return HttpResponseRedirect("/")
 
@@ -121,7 +140,6 @@ def login_oauth(request):
     session['auth_state'] = os.urandom(24).encode('hex')
 
     redirect_uri = 'http://{}{}'.format(request.get_host(), reverse('agave_oauth_callback'))
-
     authorization_url = (
         '%s/authorize?client_id=%s&response_type=code&redirect_uri=%s&state=%s' %(
             tenant_base_url,
@@ -158,6 +176,8 @@ def agave_oauth_callback(request):
             auth=(client_key, client_secret))
         token_data = response.json()
 
+        logger.error(token_data.keys())
+
         headers = {'Authorization': 'Bearer %s' % token_data['access_token']}
         user_response = requests.get('%s/profiles/v2/me?pretty=true' %tenant_base_url, headers=headers)
         user_data = user_response.json()
@@ -165,10 +185,11 @@ def agave_oauth_callback(request):
         request.session['access_token'] = token_data['access_token']
         request.session['refresh_token'] = token_data['refresh_token']
         request.session['username'] = user_data['result']['username']
+        logger.error(request.session['access_token'])
         # For now we determine whether a user is staff by seeing if hey have an @tacc.utexas.edu email.
         request.session['email'] = user_data['result']['email']
-        #request.session['is_staff'] = user_data['result']['email'].split('@')[-1] == 'tacc.utexas.edu'
-        request.session['is_staff'] = False
+        request.session['is_staff'] = user_data['result']['email'].split('@')[-1] == 'tacc.utexas.edu'
+        # request.session['is_staff'] = False
         return HttpResponseRedirect("/")
 
 def sys_plot(request, pk):

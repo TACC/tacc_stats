@@ -194,6 +194,66 @@ CACHES = {
         },
 }
 
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'formatters': {
+        'default': {
+            'format': '[DJANGO] %(levelname)s %(asctime)s %(module)s '
+                      '%(name)s.%(funcName)s:%(lineno)s: %(message)s'
+        },
+        'agave': {
+            'format': '[AGAVE] %(levelname)s %(asctime)s %(module)s '
+                      '%(name)s.%(funcName)s:%(lineno)s: %(message)s'
+        },
+        'metrics': {
+            'format': '[METRICS] %(levelname)s %(module)s %(name)s.%(funcName)s:%(lineno)s:'
+                      ' %(message)s user=%(user)s sessionId=%(sessionId)s op=%(operation)s'
+                      ' info=%(info)s'
+        },
+    },
+    'handlers': {
+        'console': {
+            'level': 'DEBUG',
+            'class': 'logging.StreamHandler',
+            'formatter': 'default',
+        },
+        'opbeat': {
+            'level': 'ERROR',
+            'class': 'logging.StreamHandler',
+        },
+        'metrics': {
+            'level': 'INFO',
+            'class': 'logging.StreamHandler',
+            'formatter': 'metrics',
+        },
+    },
+    'loggers': {
+        'django': {
+            'handlers': ['console', 'opbeat'],
+            'level': 'INFO',
+            'propagate': True,
+        },
+        'designsafe': {
+            'handlers': ['console', 'opbeat'],
+            'level': 'DEBUG',
+        },
+        'celery': {
+            'handlers': ['console', 'opbeat'],
+            'level': 'DEBUG',
+            'propagate': True
+        },
+        'opbeat': {
+            'handlers': ['console'],
+            'level': 'INFO',
+        },
+        'metrics': {
+            'handlers': ['metrics'],
+            'level': 'INFO',
+        },
+    },
+}
+
 #AGAVE_CLIENT_KEY= '5pGhxBUN3KjJDiufBi2Ar1ex1GEa'
 #AGAVE_CLIENT_SECRET= 'wNu9vNHX6recy5Ak6PEFYrq7aJ4a'
 #AGAVE_BASE_URL = 'https://api.tacc.utexas.edu/'
