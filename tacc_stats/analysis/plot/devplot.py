@@ -1,39 +1,38 @@
-from plots import Plot
-from matplotlib.figure import Figure
-class DevPlot(Plot):
+import sys
+from tacc_stats.analysis.gen import utils
 
-  def __init__(self,k1={'intel_snb' : ['intel_snb','intel_snb','intel_snb']},k2={'intel_snb':['LOAD_1D_ALL','INSTRUCTIONS_RETIRED','LOAD_OPS_ALL']},processes=1,**kwargs):
-    self.k1 = k1
-    self.k2 = k2
-    super(DevPlot,self).__init__(processes=processes,**kwargs)
+from bokeh.palettes import d3
+from bokeh.layouts import gridplot
+from bokeh.plotting import figure
+import numpy 
 
-  def plot(self,jobid,job_data=None):
-    self.setup(jobid,job_data=job_data)
-    cpu_name = self.ts.pmc_type
-    type_name=self.k1[cpu_name][0]
-    events = self.k2[cpu_name]
+class DevPlot():
 
-    ts=self.ts
+  def plot(self, job, typename):
+    u = utils.utils(job)
 
-    n_events = len(events)
-    self.fig = Figure(figsize=(8,n_events*2+3),dpi=110)
+    colors = d3["Category20"][20]
 
-    do_rate = True
-    scale = 1.0
-    if type_name == 'mem': 
-      do_rate = False
-      scale=1.0
-    if type_name == 'cpu':
-      scale=100.0
+    hc = {}
+    for i, hostname in enumerate(u.hostnames):
+      hc[hostname] = colors[i%20]
+    
+    plots = []
 
-    for i in range(n_events):
-      self.ax = self.fig.add_subplot(n_events,1,i+1)
-      self.plot_lines(self.ax, [i], xscale=3600., yscale=scale, do_rate = do_rate)
-      if events[i].startswith("FP_ARITH_INST_RETIRED"):
-        events[i] = events[i].lstrip("FP_ARITH_INST_RETIRED")
-      self.ax.set_ylabel(events[i],size='small')
-    self.ax.set_xlabel("Time (hr)")
-    self.fig.subplots_adjust(hspace=0.5)
-    self.fig.tight_layout()
-
-    self.output('devices')
+    schema, _stats  = u.get_type(typename)
+    # Plot this type of data
+    for index, event in enumerate(schema):
+      try:
+        p = figure(plot_height = 150, plot_width = 400)
+        p.yaxis.axis_label = event
+    
+        for hostname, stats in _stats.iteritems():               
+          rate = stats[:, index]
+          rate = numpy.diff(rate)/numpy.diff(job.times)
+          p.step(x = u.hours, y = numpy.append(rate, rate[-1]), 
+                 mode = "after", line_color = hc[hostname])
+        plots += [p]
+      except:
+        print(event + ' plot failed for jobid ' + job.id )
+        print sys.exc_info()
+    return gridplot(*plots, ncols = len(plots)/4 + 1)

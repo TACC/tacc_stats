@@ -1,0 +1,29 @@
+class utils():
+  def __init__(self, job):
+    freq_list = {"intel_snb" : 2.7, "intel_ivb" : 2.8, "intel_hsw" : 2.3,
+                 "intel_bdw" : 2.6, "intel_knl" : 1.4, "intel_skx" : 2.1}
+    imc_list  = ["intel_snb_imc", "intel_ivb_imc", "intel_hsw_imc",
+                 "intel_bdw_imc", "intel_knl_mc_dclk", "intel_skx_imc"]
+    self.job = job
+    self.nhosts = len(job.hosts.keys())
+    self.hostnames  = sorted(job.hosts.keys())
+    self.wayness = int(job.acct['cores'])/int(job.acct['nodes'])
+    self.hours = ((job.times[:] - job.times[0])/3600.).astype(float)
+    for typename in  job.schemas.keys():
+      if typename in freq_list:
+          self.pmc  = typename
+          self.freq = freq_list[typename]
+      if typename in imc_list:
+          self.imc = typename
+
+  def get_type(self, typename):
+    if typename == "imc": typename = self.imc
+    if typename == "pmc": typename = self.pmc
+
+    schema = self.job.schemas[typename]
+    stats = {}
+    for hostname, host in self.job.hosts.iteritems():
+      stats[hostname] = 0
+      for devname in host.stats[typename]:
+          stats[hostname] += host.stats[typename][devname].astype(float)
+    return schema, stats

@@ -7,7 +7,6 @@ from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
 
 import os,sys,pwd
 import cPickle as pickle 
-import operator
 
 from tacc_stats.analysis import exam
 from tacc_stats.site.machine.models import Job, Host, Libraries, TestInfo
@@ -18,49 +17,54 @@ import tacc_stats.analysis.plot as plots
 from datetime import datetime, timedelta
 
 import numpy as np
-from matplotlib.figure import Figure
-from matplotlib.backends.backend_agg import FigureCanvasAgg as FigureCanvas
 
-def sys_plot(request, pk):
+from bokeh.embed import components
+from bokeh.layouts import gridplot
+from bokeh.plotting import figure
+from bokeh.models import HoverTool
+
+racks = set()
+nodes = set()
+hosts = set()
+
+for host in Host.objects.values_list('name', flat=True).distinct():
+    try:
+        r, n = host.split('-')
+        racks.update({r})
+        nodes.update({n})
+    except:
+        pass
+    hosts.update({host})
+racks = sorted(list(racks))
+nodes = sorted(list(nodes))
+hosts = sorted(list(hosts))
+
+def sys_plot(pk):
 
     job = Job.objects.get(id=pk)
-    hosts = job.host_set.all().values_list('name',flat=True)
+    jh = job.host_set.all().values_list('name', flat=True).distinct()
 
-    racks = []
-    nodes = []
-    for host in Host.objects.values_list('name',flat=True).distinct():
-        try:
-            r,n=host.split('-')
-            racks.append(r)
-            nodes.append(n)
-        except:
-            pass
-    racks = sorted(set(racks))
-    nodes = sorted(set(nodes))
+    hover = HoverTool(tooltips = [ ("host", "@x-@y") ])
+    plot = figure(title = "System Plot", tools = [hover], toolbar_location = None,
+                  x_range = racks, y_range = nodes, 
+                  plot_height = 800, plot_width = 1000)
+    
+    c = []
 
-    x = np.zeros((len(nodes),len(racks)))
-    for r in range(len(racks)):
-        for n in range(len(nodes)):
-            name = str(racks[r])+'-'+str(nodes[n])
-            if name in hosts: x[n][r] = 1.0
+    for rack in racks:
+        for node in nodes:
+            name = str(rack)+'-'+str(node)
+            if name in jh: 
+                c += ["#bf0a30"] 
+            elif name in hosts: 
+                c += ["#002868"]
+            else:
+                c += ["lavender"]
 
-    fig = Figure(figsize=(17,5))
-    ax=fig.add_subplot(1,1,1)
-    fig.tight_layout()
-    ax.set_yticks(range(len(nodes)))
-    ax.set_yticklabels(nodes,fontsize=6)
-    ax.set_xticks(range(len(racks)))
-    ax.set_xticklabels(racks,fontsize=6,rotation=90)
-
-    pcm = ax.pcolor(np.array(range(len(racks)+1)),np.array(range(len(nodes)+1)),x)
-
-    canvas = FigureCanvas(fig)    
-    response = HttpResponse(content_type='image/png')
-    response['Content-Disposition'] = "attachment; filename="+pk+"-sys.png"
-    fig.savefig(response, format='png')
-
-    return response
-
+    plot.xaxis.major_label_orientation = "vertical"
+    plot.rect([r for rack in racks for r in [rack]*len(nodes)], nodes*len(racks), 
+              color = c, width = 1, height = 1)    
+    return components(plot)
 
 def dates(request, error = False):
     month_dict ={}
@@ -147,7 +151,16 @@ def index(request, **kwargs):
     except EmptyPage:
         jobs = paginator.page(paginator.num_pages)
 
-    fields['histograms'] = hist_summary(job_list)
+    job_list = job_list.annotate(queue_wait = F("start_epoch") - F("queue_time"))
+    fields["script"], fields["div"] = components(gridplot(job_hist(job_list, "run_time", "Hours", 
+                                                                   scale = 3600),
+                                                          job_hist(job_list, "nodes", "# Nodes"),
+                                                          job_hist(job_list, "queue_wait", "Hours", 
+                                                                   scale = 3600),
+                                                          job_hist(job_list, "LLiteOpenClose", "iops"), 
+                                                          ncols = 2, toolbar_options = {"logo" : None},
+                                                          plot_width = 400, plot_height = 200)
+                                             )
     
     fields['job_list'] = jobs
     fields['nj'] = job_list.count()
@@ -189,63 +202,21 @@ def list_to_dict(job_list,metric):
         job_dict.setdefault(job.user,[]).append((job.id,round(job.__dict__[metric],3)))
     return job_dict
     
-def hist_summary(job_list):
+def job_hist(job_list, value, units, scale = 1.0):
+    hover = HoverTool(tooltips = [ ("jobs", "@top"), ("bin", "[@left, @right]") ], point_policy = "snap_to_data")
+    TOOLS = ["pan,wheel_zoom,box_zoom,reset,save,box_select", hover]
+    p1 = figure(title = value, logo = None,
+                toolbar_location = None, plot_height = 400, plot_width = 600, y_axis_type = "log", tools = TOOLS)
+    p1.xaxis.axis_label = units
+    p1.yaxis.axis_label = "# Jobs"
+    job_list = job_list.filter(**{value + "__isnull" : False})
+    values = np.array(job_list.values_list(value, flat=True))/scale
+    if len(values) == 0: return None
 
-    fig = Figure(figsize=(16,6))
-
-    # Runtimes
-    jobs = np.array(job_list.values_list('run_time',flat=True))/3600.
-    ax = fig.add_subplot(221)
-    bins = np.linspace(0, max(jobs), max(5, 5*np.log(len(jobs))))
-    ax.hist(jobs, bins = bins, log=True, color='#bf0a30')
-    ax.set_ylabel('# of jobs')
-    ax.set_xlabel('hrs')
-    ax.set_title('Runtime')
-
-    # Nodes
-    jobs =  np.array(job_list.values_list('nodes',flat=True))
-    ax = fig.add_subplot(222)
-    bins = np.linspace(0, max(jobs), max(5, 5*np.log(len(jobs))))
-    ax.hist(jobs, bins = bins, log=True, color='#bf0a30')
-    ax.set_title('Size')
-    ax.set_xlabel('nodes')
-
-    # Queue Wait Time
-    jobs =  (np.array(job_list.values_list('start_epoch',flat=True))-np.array(job_list.values_list('queue_time',flat=True)))/3600.
-    ax = fig.add_subplot(223)
-    bins = np.linspace(0, max(jobs), max(5, 5*np.log(len(jobs))))
-    ax.hist(jobs, bins = bins, log=True, color='#bf0a30')
-    ax.set_ylabel('# of jobs')
-    ax.set_title('Queue Wait Time')
-    ax.set_xlabel('hrs')
-
-    jobs =  np.array(job_list.filter(LLiteOpenClose__isnull = False).values_list('LLiteOpenClose',flat=True))
-    ax = fig.add_subplot(224)
-
-    try:
-        bins = np.linspace(0, max(jobs), max(5, 5*np.log(len(jobs))))
-        ax.hist(jobs, bins = bins, log=True, color='#bf0a30')
-    except: pass
-    ax.set_title('Metadata Reqs')
-    ax.set_xlabel('<reqs>/s')
-
-
-    fig.subplots_adjust(hspace=0.5)      
-    canvas = FigureCanvas(fig)
-    
-    import StringIO,base64,urllib
-    imgdata = StringIO.StringIO()
-    fig.savefig(imgdata, format='png')
-    imgdata.seek(0)
-    response = "data:image/png;base64,%s" % base64.b64encode(imgdata.buf)
-
-    return response
-
-def figure_to_response(p):
-    response = HttpResponse(content_type='image/png')
-    response['Content-Disposition'] = "attachment; filename="+p.fname+".png"
-    p.fig.savefig(response, format='png')
-    return response
+    hist, edges = np.histogram(values,
+                               bins = np.linspace(0, max(values), max(3, 5*np.log(len(values)))))
+    p1.quad(top = hist, bottom = 1, left = edges[:-1], right = edges[1:])    
+    return p1
 
 def get_data(pk):
     if cache.has_key(pk):
@@ -257,37 +228,20 @@ def get_data(pk):
             cache.set(job.id, data)
     return data
 
-def master_plot(request, pk):
+def master_plot(pk):
     data = get_data(pk)
     mp = plots.MasterPlot()
-    mp.plot(pk,job_data=data)
-    return figure_to_response(mp)
+    return components(mp.plot(data))
 
-def heat_map(request, pk):    
+def heat_map(pk):    
     data = get_data(pk)
-    hm = plots.HeatMap(k1={'intel_snb' : ['intel_snb','intel_snb'],
-                           'intel_hsw' : ['intel_hsw','intel_hsw'],
-                           'intel_ivb' : ['intel_ivb','intel_ivb'],
-                           'intel_knl' : ['intel_knl','intel_knl'],
-                           'intel_skx' : ['intel_skx','intel_skx'],
-                           'intel_pmc3' : ['intel_pmc3','intel_pmc3']
-                           },
-                       k2={'intel_snb' : ['CLOCKS_UNHALTED_CORE', 
-                                          'INSTRUCTIONS_RETIRED'],
-                           'intel_ivb' : ['CLOCKS_UNHALTED_CORE', 
-                                          'INSTRUCTIONS_RETIRED'],
-                           'intel_hsw' : ['CLOCKS_UNHALTED_CORE', 
-                                          'INSTRUCTIONS_RETIRED'],
-                           'intel_skx' : ['CLOCKS_UNHALTED_CORE', 
-                                          'INSTRUCTIONS_RETIRED'],
-                           'intel_knl' : ['CLOCKS_UNHALTED_CORE', 
-                                          'INSTRUCTIONS_RETIRED'],
-                           'intel_pmc3' : ['CLOCKS_UNHALTED_CORE', 
-                                           'INSTRUCTIONS_RETIRED']                           
-                           },
-                       lariat_data="pass")
-    hm.plot(pk,job_data=data)
-    return figure_to_response(hm)
+    hm = plots.HeatMap()
+    return components(hm.plot(data))
+
+def type_plot(pk, typename):    
+    data = get_data(pk)
+    dp = plots.DevPlot()
+    return components(dp.plot(data, typename))
 
 def build_schema(data,name):
     schema = []
@@ -306,7 +260,7 @@ class JobDetailView(DetailView):
         job = context['job']
 
         data = get_data(job.id)
-                
+        
         testinfo_dict = {}
         for obj in TestInfo.objects.all():
             test_type = getattr(sys.modules[exam.__name__],obj.test_name)
@@ -370,6 +324,7 @@ class JobDetailView(DetailView):
         context['host_list'] = host_list
         context['type_list'] = type_list
 
+        ### Specific to Stampede2 Splunk 
         urlstring="https://scribe.tacc.utexas.edu:8000/en-US/app/search/search?q=search%20"
         hoststring=urlstring+"%20host%3D"+host_list[0]+".stampede2.tacc.utexas.edu"
         serverstring=urlstring+"%20mds*%20OR%20%20oss*"
@@ -380,33 +335,21 @@ class JobDetailView(DetailView):
         serverstring+="&earliest="+str(job.start_epoch)+"&latest="+str(job.end_epoch)+"&display.prefs.events.count=50"
         context['client_url'] = hoststring
         context['server_url'] = serverstring
+        ###
 
+        script, div = sys_plot(job.id)
+        context["script"] = script
+        context["div"]    = div
+
+        script, div = master_plot(job.id)
+        context["mscript"] = script
+        context["mdiv"]    = div
+
+        script, div = heat_map(job.id)
+        context["hscript"] = script
+        context["hdiv"]    = div
+        
         return context
-
-def type_plot(request, pk, type_name):
-    data = get_data(pk)
-
-    schema = build_schema(data,type_name)
-    schema = [x.split(',')[0] for x in schema]
-
-    k1 = {'intel_snb' : [type_name]*len(schema),
-          'intel_hsw' : [type_name]*len(schema),
-          'intel_ivb' : [type_name]*len(schema),
-          'intel_knl' : [type_name]*len(schema),
-          'intel_skx' : [type_name]*len(schema),
-          'intel_pmc3' : [type_name]*len(schema)
-          }
-    k2 = {'intel_snb': schema,
-          'intel_hsw': schema,
-          'intel_ivb' : schema,
-          'intel_knl' : schema,
-          'intel_skx' : schema,
-          'intel_pmc3': schema
-          }
-
-    tp = plots.DevPlot(k1=k1,k2=k2,lariat_data='pass')
-    tp.plot(pk,job_data=data)
-    return figure_to_response(tp)
 
 def type_detail(request, pk, type_name):
     data = get_data(pk)
@@ -422,10 +365,13 @@ def type_detail(request, pk, type_name):
         for event in range(len(raw_stats[t])):
             temp.append(raw_stats[t,event]*scale)
         stats.append((times[t],temp))
+        
+    script, div = type_plot(pk, type_name)
 
     return render(request, "machine/type_detail.html",
                   {"type_name" : type_name, "jobid" : pk, 
-                   "stats_data" : stats, "schema" : schema})
+                   "stats_data" : stats, "schema" : schema,
+                   "tscript" : script, "tdiv" : div})
 
 def proc_detail(request, pk, proc_name):
 
@@ -434,7 +380,7 @@ def proc_detail(request, pk, proc_name):
     host_map = {}
     schema = data.get_schema('proc')
     hwm_idx = schema['VmHWM'].index
-    hwm_unit = "gB"#schema['VmHWM'].unit
+    hwm_unit = "gB"
 
     thr_idx = schema['Threads'].index
 

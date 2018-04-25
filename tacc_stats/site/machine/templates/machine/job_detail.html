@@ -116,12 +116,14 @@
 <h3>Snapshot Plots</h3>
 <table>
   <tr>
-    <td><div id="dv01">
-      <img src="{% url 'machine:master_plot' job.id %}" alt="job less than time resolution" style="max-width:100%;"/></div>
+    <td>
+      {{ mdiv|safe }}
+      {{ mscript|safe }}
     </td>
-    <td><div id="dv02">
-    <img src="{% url 'machine:heat_map' job.id %}" alt="heat map failed" style="max-width:100%"/>
-    </td></div>
+    <td>
+      {{ hdiv|safe }}
+      {{ hscript|safe }}
+    </td>
   <tr>
 </table>
 </center></p>
@@ -144,9 +146,10 @@
     <h1>Job not found</h1>
 {% endif %}
 
-<center><h3>System View</h3></center>
-<p>
-<img src="{% url 'machine:sys_plot' job.id %}" alt="sys plot failed" align="left" style="max-width:100%;"/> 
-</p>
+<center>
+     {{ div|safe }}
+     {{ script|safe }}
+</center>
+
 
 {% endblock %}

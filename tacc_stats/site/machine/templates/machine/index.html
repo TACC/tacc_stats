@@ -2,7 +2,12 @@
 {% block content %}
 
 <h4>{{ name }}</h4>
-<img src="{{ histograms }}" style="max-width:100%;"/>
+<center>
+     {{ div|safe }}
+     {{ script|safe }}
+</center>
+
+<!----<img src="{{ histograms }}" style="max-width:100%;"/>---->
 
 <hr>
 

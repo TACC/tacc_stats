@@ -1,73 +1,50 @@
-from plots import Plot
-from matplotlib import cm,colors
-from matplotlib.figure import Figure
-from scipy.stats import tmean, tvar
-from numpy import *
-class HeatMap(Plot):
+from tacc_stats.analysis.gen import utils
+import numpy
+from bokeh.plotting import figure
+from bokeh.palettes import brewer
+from bokeh.models import ColumnDataSource, BasicTicker, ColorBar, LinearColorMapper, PrintfTickFormatter 
+from bokeh.transform import transform
 
-  def __init__(self,k1=['intel_snb','intel_snb'],
-               k2=['CLOCKS_UNHALTED_CORE','INSTRUCTIONS_RETIRED'],
-               processes=1,aggregate=False,**kwargs):
+class HeatMap():
+  
+  def plot(self, job):
+    u = utils.utils(job)
+    schema, _stats = u.get_type("pmc")
 
-    self.k1 = k1
-    self.k2 = k2
-    super(HeatMap,self).__init__(processes=processes,
-                                 aggregate=aggregate,
-                                 **kwargs)
+    host_cpi = []    
+    for hostname, stats in _stats.iteritems():
+      cpi = numpy.diff(stats[:, schema["CLOCKS_UNHALTED_CORE"].index])/numpy.diff(stats[:, schema["INSTRUCTIONS_RETIRED"].index])
+      host_cpi += [numpy.append(cpi, cpi[-1])]      
+    host_cpi = numpy.array(host_cpi).flatten()
+    host_cpi = numpy.nan_to_num(host_cpi)    
+    times = (job.times - job.times[0]).astype(str)
+    data = ColumnDataSource(dict(
+      hostnames = [h for host in u.hostnames for h in [host]*len(times)],
+      times = list(times)*len(u.hostnames),
+      cpi = host_cpi
+    ))
 
-  def plot(self,jobid,job_data=None):    
-    if not self.setup(jobid,job_data=job_data):
-      return
+    mapper = LinearColorMapper(palette = brewer["Spectral"][10][::-1],
+                               low = 0.25, high = 2)  
+    colors = {"field" : "cpi", "transform" : mapper}
+    color_bar = ColorBar(color_mapper = mapper, location = (0,0), 
+                         ticker = BasicTicker(desired_num_ticks = 10))
+    hm = figure(title = "<Cycles/Instruction> = " + "{0:0.2}".format(host_cpi.mean()), 
+                plot_width = 500, plot_height = 600,
+                x_range = times, logo = None,
+                y_range = u.hostnames) 
     
-    ts=self.ts
+    hm.rect("times", "hostnames", source = data, 
+            width = 1, height = 1,            
+            line_color = None, 
+            fill_color = colors)              
 
-    host_cpi = {}
-    host_names = sorted(ts.data[0].keys())
-    for v in host_names:
-        ncores = len(ts.data[0][v])
-        num = 0
-        den = 0
-        for k in range(ncores):
-          ratio = nan_to_num(diff(ts.data[0][v][k]) / diff(ts.data[1][v][k]))
-
-          try: cpi = vstack((cpi,ratio))
-          except: cpi = array([ratio]) 
+    hm.add_layout(color_bar, "right")    
         
-          num += diff(ts.data[0][v][k])
-          den += diff(ts.data[1][v][k])
-
-        host_cpi[v] = tmean(nan_to_num(num/den))
-
-    mean_cpi = tmean(host_cpi.values())
-    if len(host_cpi.values()) > 1:
-      var_cpi  = tvar(host_cpi.values())
-    else: var_cpi= 0.0
-
-    self.fig = Figure(figsize=(10,15),dpi=110)
-    self.ax=self.fig.add_subplot(1,1,1)
-
-    ycore = arange(cpi.shape[0]+1)
-    time = ts.t/3600.
-    yhost=arange(len(host_cpi.keys())+1)*ncores + ncores
-
-    fontsize = 8
-    set_printoptions(precision=4)
-    if len(yhost) > 80:
-        fontsize /= 0.5*log(len(yhost))
-    self.ax.set_ylim(bottom=ycore.min(),top=ycore.max())
-    self.ax.set_yticks(yhost[0:-1]-ncores/2.)
-
-    self.ax.set_yticklabels([key +'(' + "{0:.2f}".format(host_cpi[key]) +')' for key in host_names],fontsize=fontsize)
-
-    self.ax.set_xlim(left=time.min(),right=time.max())
-    
-    pcm = self.ax.pcolor(time, ycore, cpi,vmin=0.0,vmax=5.0)
-    pcm.cmap = cm.get_cmap('jet_r')
-
-    try: self.ax.set_title(self.k2[ts.pmc_type][0] +'/'+self.k2[ts.pmc_type][1] + '\n' + 
-                           r'Mean(Std)='+'{0:.2f}'.format(mean_cpi)+r'({0:.2f})'.format(sqrt(var_cpi)))
-    except: self.ax.set_title(self.k2[0] +'/'+self.k2[1] + '\n'+ 
-                              r'$\bar{Mean}$='+'{0:.2f}'.format(mean_cpi)+r'$\pm$'+'{0:.2f}'.format(sqrt(var_cpi)))
-    self.fig.colorbar(pcm)
-    self.ax.set_xlabel('Time (hrs)')
-    self.output('heatmap')
+    hm.axis.axis_line_color = None
+    hm.axis.major_tick_line_color = None
+    hm.axis.major_label_text_font_size = "5pt"
+    hm.axis.major_label_standoff = 0
+    hm.xaxis.major_label_orientation = 1.0
+          
+    return hm

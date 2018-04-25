@@ -4,7 +4,8 @@
 <div class="container-fluid">
     <h2>Job {{ jobid }} / Type {{ type_name }}</h2>
     <h4>Rates Aggregated over devices</h4>
-<img src="{% url 'machine:type_plot' jobid type_name %}" style="max-width:100%;"/>
+{{ tscript|safe }}
+{{ tdiv|safe }}
 {% if stats_data %}
 <h4>Counts Aggregated over devices and hosts</h4>
 <div class="table-responsive">

@@ -53,7 +53,7 @@ setup(
     include_package_data = True,
     scripts = scripts,
     setup_requires = ['nose'],
-    install_requires = ['argparse','numpy','matplotlib','scipy','django'],
+    install_requires = ['argparse','numpy','matplotlib','scipy','bokeh', 'django'],
     test_suite = 'nose.collector',
     platforms = 'any',
     classifiers = [

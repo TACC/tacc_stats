@@ -14,27 +14,6 @@ urlpatterns = [
                        url(r'^proc/(?P<pk>\d+)/(?P<proc_name>.*)/$',
                            proc_detail, name = 'proc_detail'),
 
-                       url(r'^type_plot/(?P<pk>\d+)/(?P<type_name>\w+)/$', 
-                           type_plot, name = 'type_plot'),
-                       url(r'^sys_plot/(?P<pk>\d+)/$', 
-                           sys_plot, name = 'sys_plot'),
-                       url(r'^master_plot/(?P<pk>\d+)/$', 
-                           master_plot, name = 'master_plot'),
-                       url(r'^heat_map/(?P<pk>\d+)/$', 
-                           heat_map, name = 'heat_map'),
-
-                       url(r'^date_summary/(?P<date>\d{4}-\d{2}-\d{2})/$',
-                           hist_summary, name = 'date_summary', 
-                           ),
-                       url(r'^uid_summary/(?P<uid>\d+)/$', 
-                           hist_summary, name = 'uid_summary' ),
-                       url(r'^user_summary/(?P<user>.*)/$', 
-                           hist_summary, name = 'user_summary' ),
-                       url(r'^project_summary/(?P<project>.*)/$', 
-                           hist_summary, name = 'project_summary' ),
-                       url(r'^exe_summary/(?P<exe__icontains>.*)/$', 
-                           hist_summary, name = 'exe_summary' ),
-
                        url(r'^date/(?P<date>\d{4}-\d{2}-\d{2})/$', 
                            index, name='date_view'),
                        url(r'^date/(?P<date>\d{4}-\d{2})/$', 
@@ -51,3 +30,4 @@ urlpatterns = [
                        
                        url(r'^search/$',search, name='search'),
 ]
+
