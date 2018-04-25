@@ -72,7 +72,7 @@ def get_agave_client(username, password):
         
     return Agave(api_server=base_url, username=username, password=password, client_name="tacc-stats",
      api_key=client_key, api_secret=client_secret, token_callback=update_session_tokens)
-    
+
 # login view with Agave functionality
 def login(request):
 
@@ -131,6 +131,11 @@ def logout(request):
         auth=(client_key, client_secret))
     request.session.flush()
     return HttpResponseRedirect("/")
+    
+def login_prompt(request):
+    if check_for_tokens(request):
+        return HttpResponseRedirect("/")
+    return render_to_response("machine/login_prompt.html", {"logged_in": False})
 
 def login_oauth(request):
     tenant_base_url = settings.AGAVE_BASE_URL
@@ -240,7 +245,7 @@ def sys_plot(request, pk):
 def dates(request, error = False):
 
     if not check_for_tokens(request):
-        return HttpResponseRedirect("/login")
+        return HttpResponseRedirect("/login_prompt")
 
     month_dict ={}
     date_list = Job.objects.exclude(date = None).exclude(date__lt = datetime.today() - timedelta(days = 90)).values_list('date',flat=True).distinct()
@@ -270,6 +275,7 @@ def dates(request, error = False):
     field['username'] = request.session['username']
     field['is_staff'] = request.session['is_staff']
     field['email'] = request.session['email']
+    field['logged_in'] = True
     return render_to_response("machine/search.html", field)
 
 def search(request):
