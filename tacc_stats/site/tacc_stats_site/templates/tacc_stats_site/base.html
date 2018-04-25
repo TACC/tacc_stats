@@ -23,7 +23,7 @@
   <body>
     <div class ="container-fluid">
       <nav class="navbar navbar-default" role="navigation">
-	<div class="navbar-header"><a href="https://www.tacc.utexas.edu"> <img src="{{ MEDIA_URL }}/TACC_logo.png" style="max-width:50%;"/></a></div>
+	<div class="navbar-header"><a href="https://www.tacc.utexas.edu"> <img src="{% url 'media' path='TACC_logo.png' %}" style="max-width:50%;"/></a></div>
 	<center>{{ machine_name }}</center>
 	<a>
     {% if logged_in %}
@@ -42,7 +42,6 @@
       </a>
     {% endif %}
       </nav>
-
     {% block content %}
     {% endblock %}
     </div>

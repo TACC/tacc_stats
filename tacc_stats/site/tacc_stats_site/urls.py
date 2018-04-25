@@ -16,5 +16,5 @@ urlpatterns = [
     url(r'^machine/', include(urls, namespace="machine"), name='machine'),
     url(r'^admin/', include(admin.site.urls)),
     url(r'^media/(?P<path>.*)$', serve,
-        {'document_root': settings.MEDIA_ROOT}),                       
+        {'document_root': settings.MEDIA_ROOT}, name='media'),                       
 ]
