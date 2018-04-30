@@ -26,7 +26,6 @@ from bokeh.models import HoverTool
 racks = set()
 nodes = set()
 hosts = set()
-
 for host in Host.objects.values_list('name', flat=True).distinct():
     try:
         r, n = host.split('-')
@@ -38,32 +37,46 @@ for host in Host.objects.values_list('name', flat=True).distinct():
 racks = sorted(list(racks))
 nodes = sorted(list(nodes))
 hosts = sorted(list(hosts))
-
+"""
+sys_color = []
+import time
+start = time.time()        
+for rack in racks:
+    for node in nodes:
+        name = str(rack)+'-'+str(node)
+        if name in hosts: 
+            sys_color += ["#002868"]
+        else:
+            sys_color += ["lavender"]
+print "sys setup",time.time()-start
+xrack = [r for rack in racks for r in [rack]*len(nodes)]
+yrack = nodes*len(racks)
+ """
 def sys_plot(pk):
 
     job = Job.objects.get(id=pk)
     jh = job.host_set.all().values_list('name', flat=True).distinct()
 
     hover = HoverTool(tooltips = [ ("host", "@x-@y") ])
-    plot = figure(title = "System Plot", tools = [hover], toolbar_location = None,
+    plot = figure(title = "System Plot", tools = [hover], 
+                  toolbar_location = None,
                   x_range = racks, y_range = nodes, 
                   plot_height = 800, plot_width = 1000)
-    
-    c = []
-
+    """
+    import time
+    start = time.time()
+    ctr = 0
     for rack in racks:
         for node in nodes:
             name = str(rack)+'-'+str(node)
             if name in jh: 
-                c += ["#bf0a30"] 
-            elif name in hosts: 
-                c += ["#002868"]
-            else:
-                c += ["lavender"]
-
+                sys_color[ctr] = ["#bf0a30"] 
+            ctr+=1
+    print "sys",time.time()-start
     plot.xaxis.major_label_orientation = "vertical"
-    plot.rect([r for rack in racks for r in [rack]*len(nodes)], nodes*len(racks), 
-              color = c, width = 1, height = 1)    
+    plot.rect(xrack, yrack, 
+              color = sys_color, width = 1, height = 1)    
+    """
     return components(plot)
 
 def dates(request, error = False):
@@ -336,19 +349,21 @@ class JobDetailView(DetailView):
         context['client_url'] = hoststring
         context['server_url'] = serverstring
         ###
-
+        """
         script, div = sys_plot(job.id)
         context["script"] = script
         context["div"]    = div
-
+        """
+        
         script, div = master_plot(job.id)
         context["mscript"] = script
         context["mdiv"]    = div
-
+        
+        """
         script, div = heat_map(job.id)
         context["hscript"] = script
         context["hdiv"]    = div
-        
+        """
         return context
 
 def type_detail(request, pk, type_name):
@@ -358,12 +373,12 @@ def type_detail(request, pk, type_name):
     raw_stats = data.aggregate_stats(type_name)[0]  
 
     stats = []
-    scale = 1.0
+
     for t in range(len(raw_stats)):
         temp = []
         times = data.times-data.times[0]
         for event in range(len(raw_stats[t])):
-            temp.append(raw_stats[t,event]*scale)
+            temp.append(raw_stats[t, event])
         stats.append((times[t],temp))
         
     script, div = type_plot(pk, type_name)

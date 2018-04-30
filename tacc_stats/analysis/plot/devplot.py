@@ -3,10 +3,21 @@ from tacc_stats.analysis.gen import utils
 
 from bokeh.palettes import d3
 from bokeh.layouts import gridplot
-from bokeh.plotting import figure
+from bokeh.models import HoverTool, ColumnDataSource, Plot, Grid, DataRange1d, LinearAxis
+from bokeh.models.glyphs import Step
 import numpy 
 
 class DevPlot():
+
+  def add_axes(self, plot, label):
+    xaxis = LinearAxis()
+    yaxis = LinearAxis()      
+    yaxis.axis_label = label
+    plot.add_layout(xaxis, 'below')        
+    plot.add_layout(yaxis, 'left')
+    plot.add_layout(Grid(dimension=0, ticker=xaxis.ticker))
+    plot.add_layout(Grid(dimension=1, ticker=yaxis.ticker))
+    return plot
 
   def plot(self, job, typename):
     u = utils.utils(job)
@@ -21,18 +32,26 @@ class DevPlot():
 
     schema, _stats  = u.get_type(typename)
     # Plot this type of data
+    import time
     for index, event in enumerate(schema):
+      start = time.time()
       try:
-        p = figure(plot_height = 150, plot_width = 400)
-        p.yaxis.axis_label = event
-    
+        plot = Plot(plot_width=400, plot_height=150, 
+                    x_range = DataRange1d(), y_range = DataRange1d())                  
         for hostname, stats in _stats.iteritems():               
           rate = stats[:, index]
-          rate = numpy.diff(rate)/numpy.diff(job.times)
-          p.step(x = u.hours, y = numpy.append(rate, rate[-1]), 
-                 mode = "after", line_color = hc[hostname])
-        plots += [p]
+          if typename == "mem":
+            source = ColumnDataSource({"x" : u.hours, "y" : rate})
+            plot.add_glyph(source, Step(x = "x", y = "y", mode = "after", 
+                                        line_color = hc[hostname]))
+          else: 
+            rate = numpy.diff(rate)/numpy.diff(job.times)
+            source = ColumnDataSource({"x" : u.hours, "y" : numpy.append(rate, rate[-1])})
+            plot.add_glyph(source, Step(x = "x", y = "y", mode = "after", 
+                                        line_color = hc[hostname]))
+        plots += [self.add_axes(plot, event)]
       except:
         print(event + ' plot failed for jobid ' + job.id )
         print sys.exc_info()
-    return gridplot(*plots, ncols = len(plots)/4 + 1)
+      print event,"time ",time.time()-start
+    return gridplot(*plots, ncols = len(plots)/4 + 1, toolbar_options = {"logo" : None})
