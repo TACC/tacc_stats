@@ -6,7 +6,7 @@ import tacc_stats.site.tacc_stats_site.settings_secret as settings_secret
 
 DIR = os.path.dirname(os.path.abspath(__file__))
 
-DEBUG = True
+DEBUG = False
 
 ADMINS = (
     ('Richard Todd Evans', 'rtevans@tacc.utexas.edu'),
@@ -34,7 +34,6 @@ DATABASES = {
         }        
     }
 
-print '>>>>>>>>>>>>', DATABASES
 
 # Hosts/domain names that are valid for this site; required if DEBUG is False
 # See https://docs.djangoproject.com/en/1.5/ref/settings/#allowed-hosts

@@ -292,7 +292,6 @@ def dates(request, error = False):
     return render(request, "machine/search.html", field)
 
 def search(request):
-
     if 'jobid' in request.GET:
         try:
             job_objects = Job.objects
@@ -300,14 +299,13 @@ def search(request):
                 job_objects = job_objects.filter(user = request.session["username"])
             job = job_objects.get(id = request.GET['jobid'])
 
-            return HttpResponseRediret("/machine/job/"+str(job.id)+"/")
+            return HttpResponseRedirect("/machine/job/"+str(job.id)+"/")
         except: pass
     try:
         return index(request)
     except: pass
 
     return dates(request, error = True)
-    
 
 def index(request, **kwargs):
 
@@ -625,4 +623,4 @@ def proc_detail(request, pk, proc_name):
 
     return render(request, "machine/proc_detail.html",
                   {"proc_name" : proc_name, "jobid" : pk, 
-                   "host_map" : host_map, "hwm_unit" : hwm_unit})
+                   "host_map" : host_map, "hwm_unit" : hwm_unit, "logged_in" : True})
