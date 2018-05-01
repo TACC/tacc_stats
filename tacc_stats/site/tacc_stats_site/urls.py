@@ -1,19 +1,20 @@
 from django.conf.urls import include, url
 from django.views.static import serve
-from django.contrib.auth.views import login, logout
 import settings
 from django.contrib import admin
-from tacc_stats.site.machine.views import dates
+from tacc_stats.site.machine.views import dates, login, logout, login_oauth, agave_oauth_callback, login_prompt
 from tacc_stats.site.machine import urls
 
 admin.autodiscover()
 
 urlpatterns = [
     url(r'^$', dates, name='dates'),
-    url(r'^login/$', login),
-    url(r'^logout/$', logout),
+    url(r'^login/$', login_oauth, name='login'),
+    url(r'^login_prompt/$', login_prompt, name='login_prompt'),
+    url(r'^agave_oauth_callback/$', agave_oauth_callback, name='agave_oauth_callback'),
+    url(r'^logout/$', logout, name='logout'),
     url(r'^machine/', include(urls, namespace="machine"), name='machine'),
     url(r'^admin/', include(admin.site.urls)),
     url(r'^media/(?P<path>.*)$', serve,
-        {'document_root': settings.MEDIA_ROOT}),                       
+        {'document_root': settings.MEDIA_ROOT}, name='media'),                       
 ]

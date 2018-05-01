@@ -387,7 +387,7 @@ class Job(object):
         self.hosts = {}
         self.times = []
         self.stats_home = stats_home
-        self.host_name_ext = '.' + host_name_ext
+        self.host_name_ext = ''#'.' + host_name_ext
         self.host_list_dir = host_list_dir
         self.edit_flags = []
         self.errors = set()

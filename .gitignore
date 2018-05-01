@@ -1,6 +1,7 @@
 dist/
 rabbitmq-c/
 tacc_stats.egg-info/
+.vscode/
 *.pyc
 *.o
 *.sh
@@ -8,6 +9,7 @@ tacc_stats.egg-info/
 *.d
 .project
 .pydevproject
+settings_secret.py
 stats.x
 bin/
 lib/

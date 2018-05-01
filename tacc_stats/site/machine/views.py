@@ -1,12 +1,18 @@
 from django.http import HttpResponse, HttpResponseRedirect
 from django.shortcuts import render
+from django.core.urlresolvers import reverse
 from django.views.generic import DetailView, ListView
 from django.db.models import Q, F, FloatField, ExpressionWrapper
 from django.core.cache import cache 
 from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
+from django.conf import settings
+from django.core.exceptions import ObjectDoesNotExist
 
-import os,sys,pwd
+import logging
+
+import os,sys,pwd,inspect
 import cPickle as pickle 
+import requests
 
 from tacc_stats.analysis import exam
 from tacc_stats.site.machine.models import Job, Host, Libraries, TestInfo
@@ -22,6 +28,8 @@ from bokeh.embed import components
 from bokeh.layouts import gridplot
 from bokeh.plotting import figure
 from bokeh.models import HoverTool
+
+from agavepy.agave import Agave
 
 racks = set()
 nodes = set()
@@ -53,8 +61,10 @@ xrack = [r for rack in racks for r in [rack]*len(nodes)]
 yrack = nodes*len(racks)
  """
 def sys_plot(pk):
+    if not request.session["is_staff"]:
+        job_objects = job_objects.filter(user = request.session["username"])
 
-    job = Job.objects.get(id=pk)
+    job = job_objects.get(id=pk)
     jh = job.host_set.all().values_list('name', flat=True).distinct()
 
     hover = HoverTool(tooltips = [ ("host", "@x-@y") ])
@@ -79,9 +89,181 @@ def sys_plot(pk):
     """
     return components(plot)
 
+
+logging.basicConfig()
+logger = logging.getLogger('logger')
+
+# Agave authentication functions (shamelessly stolen from:
+# https://bitbucket.org/jstubbs/ipt-web/src/8b637b9570dd870eef459b953a69c4d18e181c8e/iptweb/iptsite/views.py?at=master&fileviewer=file-view-default#views.py-176)
+
+def get_request():
+    """Walk up the stack, return the nearest first argument named "request"."""
+    frame = None
+    try:
+        for f in inspect.stack()[1:]:
+            frame = f[0]
+            code = frame.f_code
+            if code.co_varnames and code.co_varnames[0] == "request":
+                request = frame.f_locals['request']
+    finally:
+        del frame
+    return request
+
+def check_for_tokens(request):
+    access_token = request.session.get("access_token")
+    if access_token:
+        return True
+    return False
+
+def update_session_tokens(**kwargs):
+    """Update the request's session with the latest tokens since the client may have
+    automatically refreshed them."""
+
+    request = get_request()
+    request.session['access_token'] = kwargs['access_token']
+    request.session['refresh_token'] = kwargs['refresh_token']
+
+def get_agave_client(username, password):
+    client_key = settings.AGAVE_CLIENT_KEY
+    client_secret = settings.AGAVE_CLIENT_SECRET
+    base_url = settings.AGAVE_BASE_URL
+
+    if not client_key or not client_secret:
+        raise Exception("Missing OAuth client credentials.")
+        
+    return Agave(api_server=base_url, username=username, password=password, client_name="tacc-stats",
+     api_key=client_key, api_secret=client_secret, token_callback=update_session_tokens)
+
+# login view with Agave functionality
+def login(request):
+    if check_for_tokens(request):
+        return HttpResponseRedirect('/')
+
+    if request.method=='POST':
+        username = request.POST.get('username')
+        password = request.POST.get('password')
+
+        if not username:
+            context = {"error": "Username cannot be blank"}
+            return render(request, 'registration/login.html', context, content_type='text/html')
+            
+        if not password:
+            context = {"error": "Password cannot be blank"}
+            return render(request, 'registration/login.html', context, content_type='text/html')
+
+        try:
+            ag = get_agave_client(username, password)
+        except Exception as e:
+            context = {"error": "Invalid username or password: {}".format(e)}
+            return render(request, 'registration/login.html', context, content_type='text/html')
+            
+        # at this point the Agave client has been generated.
+        access_token = ag.token.token_info['access_token']
+        refresh_token = ag.token.token_info['refresh_token']
+        token_exp = ag.token.token_info['expires_at']
+
+        request.session['username'] = username
+        request.session['access_token'] = access_token
+        request.session['refresh_token'] = refresh_token
+
+        return HttpResponseRedirect("/")
+    
+    elif request.method == 'GET':
+        return render(request, 'registration/login.html')
+
+    return render(request, 'registration/login.html')
+
+def logout(request):
+
+    tenant_base_url = settings.AGAVE_BASE_URL
+    client_key = settings.AGAVE_CLIENT_KEY
+    client_secret = settings.AGAVE_CLIENT_SECRET
+    redirect_uri = 'http://{}{}'.format(request.get_host(), reverse('agave_oauth_callback'))
+
+    body = {
+        'token': request.session['access_token'],
+        'token_type_hint': 'access_token'
+    }
+
+    response = requests.post('%s/revoke' % tenant_base_url, 
+        data=body, 
+        auth=(client_key, client_secret))
+    request.session.flush()
+    return HttpResponseRedirect("/")
+    
+def login_prompt(request):
+    if check_for_tokens(request):
+        return HttpResponseRedirect("/")
+    return render(request, "machine/login_prompt.html", {"logged_in": False})
+
+def login_oauth(request):
+    tenant_base_url = settings.AGAVE_BASE_URL
+    client_key = settings.AGAVE_CLIENT_KEY
+
+    session = request.session
+    session['auth_state'] = os.urandom(24).encode('hex')
+
+    redirect_uri = 'http://{}{}'.format(request.get_host(), reverse('agave_oauth_callback'))
+    authorization_url = (
+        '%s/authorize?client_id=%s&response_type=code&redirect_uri=%s&state=%s' %(
+            tenant_base_url,
+            client_key,
+            redirect_uri,
+            session['auth_state']
+        )
+    )
+    return HttpResponseRedirect(authorization_url)
+
+def agave_oauth_callback(request):
+    state = request.GET.get('state')
+
+    if request.session['auth_state'] != state:
+        return HttpResponseBadRequest('Authorization state failed.')
+
+    if 'code' in request.GET:
+        redirect_uri = 'http://{}{}'.format(request.get_host(),
+            reverse('agave_oauth_callback'))
+        code = request.GET['code']
+        tenant_base_url = settings.AGAVE_BASE_URL
+        client_key = settings.AGAVE_CLIENT_KEY
+        client_secret = settings.AGAVE_CLIENT_SECRET
+        redirect_uri = redirect_uri
+        body = {
+            'grant_type': 'authorization_code',
+            'code': code,
+            'redirect_uri': redirect_uri
+        }
+
+        response = requests.post('%s/token' % tenant_base_url,
+            data=body,
+            auth=(client_key, client_secret))
+        token_data = response.json()
+
+        logger.error(token_data.keys())
+
+        headers = {'Authorization': 'Bearer %s' % token_data['access_token']}
+        user_response = requests.get('%s/profiles/v2/me?pretty=true' %tenant_base_url, headers=headers)
+        user_data = user_response.json()
+
+        request.session['access_token'] = token_data['access_token']
+        request.session['refresh_token'] = token_data['refresh_token']
+        request.session['username'] = user_data['result']['username']
+        logger.error(request.session['access_token'])
+        # For now we determine whether a user is staff by seeing if hey have an @tacc.utexas.edu email.
+        request.session['email'] = user_data['result']['email']
+        request.session['is_staff'] = user_data['result']['email'].split('@')[-1] == 'tacc.utexas.edu'
+        #request.session['is_staff'] = False
+        return HttpResponseRedirect("/")
+
 def dates(request, error = False):
+
+    if not check_for_tokens(request):
+        return HttpResponseRedirect("/login_prompt")
+
     month_dict ={}
     date_list = Job.objects.exclude(date = None).exclude(date__lt = datetime.today() - timedelta(days = 90)).values_list('date',flat=True).distinct()
+    if not request.session["is_staff"]:
+        date_list = date_list.filter(user=request.session["username"])
 
     for date in sorted(date_list):
         y,m,d = date.strftime('%Y-%m-%d').split('-')
@@ -93,6 +275,8 @@ def dates(request, error = False):
     field["machine_name"] = cfg.host_name_ext
 
     field['md_job_list'] = Job.objects.filter(date__gt = datetime.today() - timedelta(days = 5)).exclude(LLiteOpenClose__isnull = True ).annotate(io = ExpressionWrapper(F('LLiteOpenClose')*F('nodes'), output_field = FloatField())).order_by('-io')
+    if not request.session["is_staff"]:
+        field['md_job_list'] = field['md_job_list'].filter(user=request.session["username"])
 
     try:
         field['md_job_list'] = field['md_job_list'][0:10]
@@ -101,14 +285,22 @@ def dates(request, error = False):
 
     field['date_list'] = sorted(month_dict.iteritems())[::-1]
     field['error'] = error
+    field['username'] = request.session['username']
+    field['is_staff'] = request.session['is_staff']
+    field['email'] = request.session['email']
+    field['logged_in'] = True
     return render(request, "machine/search.html", field)
 
 def search(request):
 
     if 'jobid' in request.GET:
         try:
-            job = Job.objects.get(id = request.GET['jobid'])
-            return HttpResponseRedirect("/machine/job/"+str(job.id)+"/")
+            job_objects = Job.objects
+            if not request.session["is_staff"]:
+                job_objects = job_objects.filter(user = request.session["username"])
+            job = job_objects.get(id = request.GET['jobid'])
+
+            return HttpResponseRediret("/machine/job/"+str(job.id)+"/")
         except: pass
     try:
         return index(request)
@@ -150,8 +342,10 @@ def index(request, **kwargs):
             fields['date__month'] = date[1]
             del fields['date']
 
-
+    
     job_list = Job.objects.filter(**fields).distinct().order_by(order_key)
+    if not request.session["is_staff"]:
+        job_list = job_list.filter(user = request.session["username"])
 
     fields['name'] =  'Query [fields=values] ' + name.rstrip('-')    
 
@@ -204,7 +398,8 @@ def index(request, **kwargs):
         fields['cpi_job_list'] = list_to_dict(fields['cpi_job_list'],'cpi')
         fields['mem_job_list'] = list_to_dict(fields['mem_job_list'],'mem')
         fields['gigebw_job_list'] = list_to_dict(fields['gigebw_job_list'],'GigEBW')
-    
+
+    fields['logged_in'] = True
     if '?' in request.get_full_path():
         fields['current_path'] = request.get_full_path()
     return render(request, "machine/index.html", fields)
@@ -231,28 +426,39 @@ def job_hist(job_list, value, units, scale = 1.0):
     p1.quad(top = hist, bottom = 1, left = edges[:-1], right = edges[1:])    
     return p1
 
-def get_data(pk):
+def get_data(request, pk):
     if cache.has_key(pk):
         data = cache.get(pk)
     else:
-        job = Job.objects.get(pk = pk)
+
+        job_objects = Job.objects
+
+        #.filter(user=request.session["username"])
+        if not request.session["is_staff"]:
+            job_objects = job_objects.filter(user=request.session["username"])
+        
+        try:
+            job = job_objects.get(pk=pk)
+        except Job.DoesNotExist:
+            return None
+
         with open(os.path.join(cfg.pickles_dir,job.date.strftime('%Y-%m-%d'),str(job.id)),'rb') as f:
             data = pickle.load(f)
             cache.set(job.id, data)
     return data
 
-def master_plot(pk):
-    data = get_data(pk)
+def master_plot(request, pk):
+    data = get_data(request, pk)
     mp = plots.MasterPlot()
     return components(mp.plot(data))
 
-def heat_map(pk):    
-    data = get_data(pk)
+def heat_map(request, pk):    
+    data = get_data(request, pk)
     hm = plots.HeatMap()
     return components(hm.plot(data))
 
-def type_plot(pk, typename):    
-    data = get_data(pk)
+def type_plot(request, pk, typename):    
+    data = get_data(request, pk)
     dp = plots.DevPlot()
     return components(dp.plot(data, typename))
 
@@ -271,9 +477,11 @@ class JobDetailView(DetailView):
     def get_context_data(self, **kwargs):
         context = super(JobDetailView, self).get_context_data(**kwargs)
         job = context['job']
+        data = get_data(self.request, job.id)
 
-        data = get_data(job.id)
-        
+        if not data:
+            return None
+
         testinfo_dict = {}
         for obj in TestInfo.objects.all():
             test_type = getattr(sys.modules[exam.__name__],obj.test_name)
@@ -350,24 +558,25 @@ class JobDetailView(DetailView):
         context['server_url'] = serverstring
         ###
         """
-        script, div = sys_plot(job.id)
+        script, div = sys_plot(self.request, job.id)
         context["script"] = script
         context["div"]    = div
         """
         
-        script, div = master_plot(job.id)
+        script, div = master_plot(self.request, job.id)
         context["mscript"] = script
         context["mdiv"]    = div
         
         """
-        script, div = heat_map(job.id)
+        script, div = heat_map(self.request, job.id)
         context["hscript"] = script
         context["hdiv"]    = div
         """
+        context['logged_in'] = True
         return context
 
 def type_detail(request, pk, type_name):
-    data = get_data(pk)
+    data = get_data(request, pk)
 
     schema = build_schema(data,type_name)
     raw_stats = data.aggregate_stats(type_name)[0]  
@@ -381,33 +590,38 @@ def type_detail(request, pk, type_name):
             temp.append(raw_stats[t, event])
         stats.append((times[t],temp))
         
-    script, div = type_plot(pk, type_name)
+    script, div = type_plot(request, pk, type_name)
 
     return render(request, "machine/type_detail.html",
                   {"type_name" : type_name, "jobid" : pk, 
                    "stats_data" : stats, "schema" : schema,
-                   "tscript" : script, "tdiv" : div})
+                   "tscript" : script, "tdiv" : div, "logged_in" : True})
 
 def proc_detail(request, pk, proc_name):
 
-    data = get_data(pk)
+    data = get_data(request, pk)
     
     host_map = {}
     schema = data.get_schema('proc')
     hwm_idx = schema['VmHWM'].index
+    aff_idx = schema['Cpus_allowed_list'].index
     hwm_unit = "gB"
-
     thr_idx = schema['Threads'].index
-
+                                                    
     for host_name, host in data.hosts.iteritems():
-
         for proc_pid, val in host.stats['proc'].iteritems():
-
             host_map.setdefault(host_name, {})
-            proc_, pid, cpu_aff, mem_aff = proc_pid.split('/') 
-
-            if  proc_ == proc_name:
-                host_map[host_name][proc_+'/'+pid] = [ val[-1][hwm_idx]/2**20, cpu_aff, val[-1][thr_idx] ]
+            try:
+                proc_, pid, cpu_aff, mem_aff = proc_pid.split('/') 
+                if  proc_ == proc_name:
+                    host_map[host_name][proc_+'/'+pid] = [ val[-1][hwm_idx]/2**20, 
+                                                           cpu_aff, val[-1][thr_idx] ]
+            except:
+                proc_ = proc_pid.split('/')[0]
+                if  proc_ == proc_name:
+                    host_map[host_name][proc_pid] = [ val[-1][hwm_idx]/2**20, 
+                                                      format(int(val[-1][aff_idx]), '#018b')[2:], 
+                                                      val[-1][thr_idx] ]
 
     return render(request, "machine/proc_detail.html",
                   {"proc_name" : proc_name, "jobid" : pk, 

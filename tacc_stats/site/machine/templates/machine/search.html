@@ -28,7 +28,10 @@ en: {
     </center>
   </div>
 </div>
-
+Currently signed in as: {{username}}
+{% if is_staff %}
+    (TACC staff)
+{% endif %}
 {% if error %}
    <p style="color: red;">Requested search failed.</p>
 {% endif %}

@@ -2,6 +2,8 @@
 import os
 import tacc_stats.cfg as cfg
 import tacc_stats.site.tacc_stats_site as tacc_stats_site
+import tacc_stats.site.tacc_stats_site.settings_secret as settings_secret
+
 DIR = os.path.dirname(os.path.abspath(__file__))
 
 DEBUG = True
@@ -191,3 +193,71 @@ CACHES = {
         'TIMEOUT' : None,
         },
 }
+
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'formatters': {
+        'default': {
+            'format': '[DJANGO] %(levelname)s %(asctime)s %(module)s '
+                      '%(name)s.%(funcName)s:%(lineno)s: %(message)s'
+        },
+        'agave': {
+            'format': '[AGAVE] %(levelname)s %(asctime)s %(module)s '
+                      '%(name)s.%(funcName)s:%(lineno)s: %(message)s'
+        },
+        'metrics': {
+            'format': '[METRICS] %(levelname)s %(module)s %(name)s.%(funcName)s:%(lineno)s:'
+                      ' %(message)s user=%(user)s sessionId=%(sessionId)s op=%(operation)s'
+                      ' info=%(info)s'
+        },
+    },
+    'handlers': {
+        'console': {
+            'level': 'DEBUG',
+            'class': 'logging.StreamHandler',
+            'formatter': 'default',
+        },
+        'opbeat': {
+            'level': 'ERROR',
+            'class': 'logging.StreamHandler',
+        },
+        'metrics': {
+            'level': 'INFO',
+            'class': 'logging.StreamHandler',
+            'formatter': 'metrics',
+        },
+    },
+    'loggers': {
+        'django': {
+            'handlers': ['console', 'opbeat'],
+            'level': 'INFO',
+            'propagate': True,
+        },
+        'designsafe': {
+            'handlers': ['console', 'opbeat'],
+            'level': 'DEBUG',
+        },
+        'celery': {
+            'handlers': ['console', 'opbeat'],
+            'level': 'DEBUG',
+            'propagate': True
+        },
+        'opbeat': {
+            'handlers': ['console'],
+            'level': 'INFO',
+        },
+        'metrics': {
+            'handlers': ['metrics'],
+            'level': 'INFO',
+        },
+    },
+}
+
+#AGAVE_CLIENT_KEY= '5pGhxBUN3KjJDiufBi2Ar1ex1GEa'
+#AGAVE_CLIENT_SECRET= 'wNu9vNHX6recy5Ak6PEFYrq7aJ4a'
+#AGAVE_BASE_URL = 'https://api.tacc.utexas.edu/'
+
+AGAVE_CLIENT_KEY = settings_secret._AGAVE_CLIENT_KEY
+AGAVE_CLIENT_SECRET = settings_secret._AGAVE_CLIENT_SECRET
+AGAVE_BASE_URL = settings_secret._AGAVE_BASE_URL

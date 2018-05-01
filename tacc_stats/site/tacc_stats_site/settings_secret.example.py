@@ -1,0 +1,3 @@
+_AGAVE_CLIENT_KEY= 'YOUR_KEY_HERE'
+_AGAVE_CLIENT_SECRET= 'YOUR_SECRET_HERE'
+_AGAVE_BASE_URL = 'https://api.tacc.utexas.edu/'
