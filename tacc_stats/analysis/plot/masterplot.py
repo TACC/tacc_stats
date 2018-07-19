@@ -196,7 +196,7 @@ class MasterPlot():
                stats[:, schema["nice"].index]
         idle = stats[:, schema["iowait"].index] + stats[:, schema["idle"].index] + \
                stats[:, schema["irq"].index] + stats[:, schema["softirq"].index]
-        usage = 100*numpy.diff(busy)/numpy.diff(idle)
+        usage = 100*numpy.diff(busy)/numpy.diff(busy+idle)
         source = ColumnDataSource({"x" : u.hours, "y" : numpy.append(usage, usage[-1])})
         plot.add_glyph(source, Step(x = "x",y = "y", mode = "after",
                                     line_color = hc[hostname]))
