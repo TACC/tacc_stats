@@ -24,15 +24,14 @@ DATABASES = {
         },
     # Uncomment this portion if an xalt database exists
     'xalt' : {
-        'ENGINE' : 'django.db.backends.mysql',
-        'NAME' : 'xalt',
+        'ENGINE' : 'mysql.connector.django',
+        'NAME' : 'xalt_' + cfg.machine,
         'USER' : 'xaltUser',
         'PASSWORD' : 'kutwgbh',
         'HOST' : 'xalt'
         }        
     }
 
-print '>>>>>>>>>>>>', DATABASES
 
 # Hosts/domain names that are valid for this site; required if DEBUG is False
 # See https://docs.djangoproject.com/en/1.5/ref/settings/#allowed-hosts

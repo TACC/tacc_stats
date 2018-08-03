@@ -6,66 +6,24 @@ from fcntl import flock, LOCK_EX, LOCK_NB
 os.environ['DJANGO_SETTINGS_MODULE']='tacc_stats.site.tacc_stats_site.settings'
 import django
 django.setup()
-from tacc_stats.site.machine.models import Job, Host, Libraries, TestInfo
+from tacc_stats.site.machine.models import Job, Host, Libraries
 from tacc_stats.site.xalt.models import run, join_run_object, lib
-from tacc_stats.analysis import exam
+from tacc_stats.analysis.metrics import metrics
 import tacc_stats.cfg as cfg
 from tacc_stats.progress import progress
 from tacc_stats.daterange import daterange
 import pytz, calendar
-import cPickle as pickle
+import pickle as p
 import traceback
 import csv
 import hostlist
-
-schema_map = {'HighCPI' : ['cpi','>',1.5], 
-              'HighCPLD' : ['cpld','>',1.5], 
-              'Load_L1Hits' : ['Load_L1Hits','>',1.5], 
-              'Load_L2Hits' : ['Load_L2Hits','>',1.5], 
-              'Load_LLCHits' : ['Load_LLCHits','>',1.5], 
-              'MemBw' : ['mbw', '<', 1.0 ],
-              'Catastrophe' : ['cat', '<',0.01] ,
-              'MemUsage' : ['mem','>',31], 
-              'PacketRate' : ['packetrate','>',0], 
-              'PacketSize' : ['packetsize','>',0],
-              'Idle' : ['idle','>',0.99],
-              'LowFLOPS' : ['flops','<',10],
-              'VecPercent' : ['VecPercent','<',0.05],
-              'GigEBW' : ['GigEBW','>',1e7],
-              'CPU_Usage' : ['CPU_Usage','<',800],
-              'MIC_Usage' : ['MIC_Usage','>',0.0],
-              'Load_All' : ['Load_All','<',1e7],
-              'MetaDataRate' : ['MetaDataRate','>',10000],
-              'InternodeIBAveBW' : ['InternodeIBAveBW', '>', 10000],
-              'InternodeIBMaxBW' : ['InternodeIBMaxBW', '>', 10000],
-              'LnetAveBW'  : ['LnetAveBW', '>', 10000],
-              'LnetAveMsgs'  : ['LnetAveMsgs', '>', 10000],
-              'LnetMaxBW'  : ['LnetMaxBW', '>', 10000],
-              'MDCReqs'  : ['MDCReqs', '>', 10000],
-              'OSCReqs'  : ['OSCReqs', '>', 10000],
-              'OSCWait'  : ['OSCWait', '>', 10000],
-              'MDCWait'  : ['MDCWait', '>', 10000],
-              'LLiteOpenClose'  : ['LLiteOpenClose', '>', 10000],
-              'MCDRAMBW'  : ['MCDRAMBW', '>', 400],
-              'BlockAveBW'  : ['BlockAveBW', '>', 400],
-}
-
-def update_comp_info():
-    for name in schema_map:
-        if TestInfo.objects.filter(test_name = name).exists():
-            TestInfo.objects.filter(test_name = name).delete()
-
-        obj = TestInfo(test_name = name, 
-                       field_name = schema_map[name][0], 
-                       comparator = schema_map[name][1], 
-                       threshold = schema_map[name][2])
-        obj.save()
 
 def update_acct(date, rerun = False):
     ftr = [3600,60,1]
     tz = pytz.timezone('US/Central')
     ctr = 0
-    with open(os.path.join(cfg.acct_path, date) + '.txt') as fd:
+
+    with open(os.path.join(cfg.acct_path, date.strftime("%Y-%m-%d") + '.txt')) as fd:
         nrecords = sum(1 for record in csv.DictReader(fd))
         fd.seek(0)
         
@@ -109,7 +67,7 @@ def update_acct(date, rerun = False):
             json['wayness']    = json['cores']/json['nodes']
             json['date']       = json['end_time'].date()
             json['user']       = job['User']
-            if json.has_key('user'):
+            if "user" in json:
                 try: 
                     json['uid'] = int(pwd.getpwnam(json['user']).pw_uid)
                 except: pass
@@ -118,7 +76,6 @@ def update_acct(date, rerun = False):
             del job['NodeList']
 
             Job.objects.filter(id=json['id']).delete()
-            print json
             obj, created = Job.objects.update_or_create(**json)
 
             ### If xalt is available add data to the DB 
@@ -126,12 +83,13 @@ def update_acct(date, rerun = False):
             try: xd = run.objects.using('xalt').filter(job_id = json['id'])[0]
             except: pass
             
-            if xd:
-                json['exe']     = xd.exec_path.split('/')[-1][0:128]
-                json['exec_path'] = xd.exec_path
-                json['cwd']     = xd.cwd[0:128]
-                json['threads'] = xd.num_threads
-
+            if xd:            
+                obj.exe  = xd.exec_path.split('/')[-1][0:128]
+                print(obj.exe)
+                obj.exec_path = xd.exec_path
+                obj.cwd     = xd.cwd[0:128]
+                obj.threads = xd.num_threads
+                obj.save()
                 for join in join_run_object.objects.using('xalt').filter(run_id = xd.run_id):
                     object_path = lib.objects.using('xalt').get(obj_id = join.obj_id).object_path
                     module_name = lib.objects.using('xalt').get(obj_id = join.obj_id).module_name
@@ -148,7 +106,7 @@ def update_acct(date, rerun = False):
             ctr += 1
             progress(ctr, nrecords, date)
 
-    with open(os.path.join(cfg.pickles_dir, date, "validated")) as fd:
+    with open(os.path.join(cfg.pickles_dir, date.strftime("%Y-%m-%d"), "validated")) as fd:
         for line in fd.readlines():
             Job.objects.filter(id = int(line)).update(validated = True)
 
@@ -156,12 +114,11 @@ def update(date,rerun=False):
 
     tz = pytz.timezone('US/Central')
     pickle_dir = os.path.join(cfg.pickles_dir,date)
-    print pickle_dir
     ctr = 0
     for root, directory, pickle_files in os.walk(pickle_dir):
         num_files = len(pickle_files)
-        print "Number of pickle files in", root,'=',num_files
-        print "Number of database records", Job.objects.filter(date = date).count()
+        print("Number of pickle files in", root,'=',num_files)
+        print("Number of database records", Job.objects.filter(date = date).count())
         for pickle_file in sorted(pickle_files):
 
             ctr += 1
@@ -170,17 +127,17 @@ def update(date,rerun=False):
                 elif Job.objects.filter(id = pickle_file).exists(): 
                     continue                
             except:
-                print pickle_file,"doesn't look like a pickled job"
+                print(pickle_file,"doesn't look like a pickled job")
                 continue
 
             pickle_path = os.path.join(root,str(pickle_file))
             try:
-                with open(pickle_path, 'rb') as f:
-                    data = pickle.load(f)
+                with open(pickle_path, 'rb') as fd:
+                    data = p.load(fd)
                     json = data.acct
                     hosts = data.hosts.keys()
             except EOFError:
-                print pickle_file, "is empty"
+                print(pickle_file, "is empty")
                 continue
 
             if 'yesno' in json: del json['yesno']
@@ -214,7 +171,6 @@ def update(date,rerun=False):
                     json['uid'] = int(pwd.getpwnam(json['user']).pw_uid)
                 except:
                     json['uid'] = None
-            print json
             ### If xalt is available add data to the DB 
             xd = None
             try:
@@ -249,73 +205,45 @@ def update(date,rerun=False):
 
             progress(ctr, num_files, date)
 
-def update_metric_fields(date, rerun = False):
-    update_comp_info()
-    aud = exam.Auditor(processes=2)
-    
-    min_time = 600
-    aud.stage(exam.GigEBW, ignore_qs=[], min_time = min_time)
-    aud.stage(exam.HighCPI, ignore_qs=[], min_time = min_time)
-    #aud.stage(exam.HighCPLD, ignore_qs=[], min_time = min_time)
-    #aud.stage(exam.Load_L1Hits, ignore_qs=[], min_time = min_time)
-    #aud.stage(exam.Load_L2Hits, ignore_qs=[], min_time = min_time)
-    #aud.stage(exam.Load_LLCHits, ignore_qs=[], min_time = min_time)
-    aud.stage(exam.MemBw, ignore_qs=[], min_time = min_time)
-    aud.stage(exam.Catastrophe, ignore_qs=[], min_time = min_time)
-    aud.stage(exam.MemUsage, ignore_qs=[], min_time = min_time)
-    #aud.stage(exam.PacketRate, ignore_qs=[], min_time = min_time)
-    #aud.stage(exam.PacketSize, ignore_qs=[], min_time = min_time)
-    aud.stage(exam.Idle, ignore_qs=[], min_time = min_time)
-    #aud.stage(exam.LowFLOPS, ignore_qs=[], min_time = min_time)
-    #aud.stage(exam.VecPercent, ignore_qs=[], min_time = min_time)
-    aud.stage(exam.CPU_Usage, ignore_qs = [], min_time = min_time)
-    #aud.stage(exam.MIC_Usage, ignore_qs = [], min_time = min_time)
-    #aud.stage(exam.Load_All, ignore_qs = [], min_time = min_time)
-    aud.stage(exam.MetaDataRate, ignore_qs = [], min_time = min_time)
-    aud.stage(exam.LnetAveMsgs, ignore_qs=[], min_time = min_time)
-    aud.stage(exam.LnetAveBW, ignore_qs=[], min_time = min_time)
-    aud.stage(exam.LnetMaxBW, ignore_qs=[], min_time = min_time)
-    #aud.stage(exam.InternodeIBAveBW, ignore_qs=[], min_time = min_time)
-    #aud.stage(exam.InternodeIBMaxBW, ignore_qs=[], min_time = min_time)
-    aud.stage(exam.MDCReqs, ignore_qs=[], min_time = min_time)
-    aud.stage(exam.MDCWait, ignore_qs=[], min_time = min_time)
-    aud.stage(exam.OSCReqs, ignore_qs=[], min_time = min_time)
-    aud.stage(exam.OSCWait, ignore_qs=[], min_time = min_time)
-    aud.stage(exam.LLiteOpenClose, ignore_qs=[], min_time = min_time)
-    aud.stage(exam.MCDRAMBW, ignore_qs=[], min_time = min_time)
-    aud.stage(exam.BlockAveBW, ignore_qs=[], min_time = min_time)
+def update_metric_fields(date, pickles_dir, processes, rerun = False):
 
-    print 'Run the following tests for:',date
-    for name, test in aud.measures.iteritems():
-        print name
+    min_time = 10
+    metric_names = [
+        "avg_ethbw", "avg_cpi", "avg_loads", "avg_l1loadhits", 
+        "avg_l2loadhits", "avg_llcloadhits", "avg_mbw", "time_imbalance",
+        "mem_hwm", "max_packetrate", "avg_packetsize", "node_imbalance",
+        "avg_flops", "vecpercent", "avg_cpuusage", "max_mds",
+        "avg_lnetmsgs", "avg_lnetbw", "max_lnetbw", "avg_fabricbw",
+        "max_fabricbw", "avg_mdcreqs", "avg_mdcwait", "avg_oscreqs",
+        "avg_oscwait", "avg_openclose", "avg_mcdrambw", "avg_blockbw"
+    ]
+    aud = metrics.Metrics(metric_names, processes = processes)
+
+    print("Run the following tests for:",date)
+    for name in aud.metric_list:
+        print(name)
 
     jobs_list = Job.objects.filter(date = date).exclude(run_time__lt = min_time)
 
-    # Use mem to see if job was tested.  It will always exist
+    # Use avg_cpuusage to see if job was tested.  It will always exist
     if not rerun:
-        jobs_list = jobs_list.filter(mbw = None)
-    
+        jobs_list = jobs_list.filter(avg_cpuusage = None)
+
     paths = []
     for job in jobs_list:
-        paths.append(os.path.join(cfg.pickles_dir,
-                                  job.date.strftime('%Y-%m-%d'),
+        paths.append(os.path.join(pickles_dir,
+                                  job.date.strftime("%Y-%m-%d"),
                                   str(job.id)))
         
     num_jobs = jobs_list.count()
-    print '# Jobs to be tested:',num_jobs
+    print("# Jobs to be tested:",num_jobs)
     if num_jobs == 0 : return
 
-    aud.run(paths)
-    print 'finished computing metrics'
-
-    for name, results in aud.metrics.iteritems():
-        print name,len(results.keys())
-        for jobid, result in results.iteritems():            
-            jobs_list.filter(id = jobid).update(**{ schema_map[name][0] : result })
-
+    for jobid, metric_dict in aud.run(paths):
+        if metric_dict: jobs_list.filter(id = jobid).update(**metric_dict)
 
 if __name__ == "__main__":
-
+    import argparse
     with open(os.path.join(os.path.dirname(os.path.realpath(__file__)), "update_db_lock"), "w") as fd:
         try:
             flock(fd, LOCK_EX | LOCK_NB)
@@ -323,17 +251,22 @@ if __name__ == "__main__":
             print("update_db is already running")
             sys.exit()
 
-    try:
-        start = datetime.strptime(sys.argv[1],"%Y-%m-%d")
-        try:
-            end   = datetime.strptime(sys.argv[2],"%Y-%m-%d")
-        except:
-            end = start
-    except:
-        start = datetime.now() - timedelta(days=1)
-        end   = datetime.now()
+    parser = argparse.ArgumentParser(description='Run database update')
+
+    parser.add_argument('start', type = parse, nargs='?', default = datetime.now(), 
+                        help = 'Start (YYYY-mm-dd)')
+    parser.add_argument('end',   type = parse, nargs='?', default = False, 
+                        help = 'End (YYYY-mm-dd)')
+    parser.add_argument('-p', '--processes', type = int, default = 1,
+                        help = 'number of processes')
+    parser.add_argument('-d', '--directory', type = str, 
+                        help='Directory to read data', default = cfg.pickles_dir)
+
+    args = parser.parse_args()    
+    start = args.start
+    end   = args.end
+    if not end: end = start
 
     for date in daterange(start, end):
-        directory = date.strftime("%Y-%m-%d")
-        update_acct(directory, rerun = False)         
-        update_metric_fields(directory, rerun = False)
+        update_acct(date, rerun = False)         
+        update_metric_fields(date, args.directory, args.processes, rerun = True)

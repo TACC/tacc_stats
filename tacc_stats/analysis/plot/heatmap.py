@@ -12,7 +12,7 @@ class HeatMap():
     schema, _stats = u.get_type("pmc")
 
     host_cpi = []    
-    for hostname, stats in _stats.iteritems():
+    for hostname, stats in _stats.items():
       cpi = numpy.diff(stats[:, schema["CLOCKS_UNHALTED_CORE"].index])/numpy.diff(stats[:, schema["INSTRUCTIONS_RETIRED"].index])
       host_cpi += [numpy.append(cpi, cpi[-1])]      
     host_cpi = numpy.array(host_cpi).flatten()
@@ -23,7 +23,7 @@ class HeatMap():
       times = list(times)*len(u.hostnames),
       cpi = host_cpi
     ))
-    print data.data
+
     hover = HoverTool(tooltips = [("cpi", "@cpi")])
 
     mapper = LinearColorMapper(palette = brewer["Spectral"][10][::-1],

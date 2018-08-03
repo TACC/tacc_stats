@@ -1,10 +1,9 @@
 #!/usr/bin/env python
-from __future__ import print_function
 import os, sys
 from tacc_stats.pickler import job_stats
 from datetime import datetime, timedelta
 from dateutil.parser import parse
-import cPickle as pickle
+import pickle as p
 import multiprocessing, functools
 import argparse, csv
 import hostlist
@@ -15,7 +14,7 @@ from fcntl import flock, LOCK_EX, LOCK_NB
 def test_job(job):
     validated = []
     for host in job.hosts.values():
-        if host.marks.has_key('begin %s' % job.id) and host.marks.has_key('end %s' % job.id):
+        if "begin %s" % job.id in host.marks and "end %s" % job.id in host.marks:
             validated += [True]
         else:
             validated += [False]
@@ -34,19 +33,20 @@ def job_pickle(reader_inst,
     except: pass
 
     pickle_file = os.path.join(date_dir, reader_inst['id'])
-    print (reader_inst['id'])
     validated = False
     if os.path.exists(pickle_file):
+        print("Validating", reader_inst['id'])
         try:
-            with open(pickle_file) as fd: job = pickle.load(fd)
+            with open(pickle_file, 'rb') as fd: job = p.load(fd)
             validated = test_job(job)
         except EOFError as e:
             print(e)
             
     if not validated:
+        print("Processing", reader_inst['id'])
         job = job_stats.from_acct(reader_inst, archive_dir, '', host_name_ext) 
         if job and test_job(job):
-            pickle.dump(job, open(pickle_file, 'w'), pickle.HIGHEST_PROTOCOL)
+            with open(pickle_file, 'wb') as fd: p.dump(job, fd, protocol = p.HIGHEST_PROTOCOL)
             validated = True
 
     return (reader_inst['id'], validated)
@@ -66,7 +66,6 @@ class JobPickles:
         self.partial_pickle = functools.partial(job_pickle,
                                                 pickles_dir  = pickles_dir,
                                                 archive_dir = cfg.archive_dir)        
-        print (self.acct_path)
         print("Use", processes, "processes")
         print("Map node-level data from", cfg.archive_dir, "to", pickles_dir)
         print("From dates:", self.start.date(), "to", self.end.date())
@@ -100,15 +99,12 @@ class JobPickles:
             print(len(run_jids),'Jobs to process')
             ntod = len(run_jids)
 
-            acct = [job for job in acct if job['id'] in run_jids]
-            
+            acct = [job for job in acct if job['id'] in run_jids]            
             acct = [job for job in acct if job['nodes']*(job['end_time']-job['start_time']) < 1728000]
-
             
             ctr = 0
             with open(val_file, "a") as fd:
                 for result in self.pool.imap(self.partial_pickle, acct):
-                    print (result)
                     if result[1]:
                         fd.write("%s\n" % result[0])
                     fd.flush()
@@ -118,7 +114,7 @@ class JobPickles:
     def acct_reader(self, filename):
         ftr = [3600,60,1]
         acct = []
-        with open(filename, "rb") as fd:
+        with open(filename) as fd:
             for job in csv.DictReader(fd, delimiter = '|'):
                 if self.jobids and job['JobID'] not in self.jobids: continue
                 if job['NodeList'] == "None assigned": continue

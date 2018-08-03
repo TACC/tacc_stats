@@ -11,7 +11,7 @@ import numpy
 #  )
 
 def perf_event(event_select, unit_mask):
-    return (event_select & 0xFF) | (unit_mask << 8) | (1L << 16) | (1L << 17) | (1L << 22) | ((event_select & 0xF00) << 24)
+    return (event_select & 0xFF) | (unit_mask << 8) | (1 << 16) | (1 << 17) | (1 << 22) | ((event_select & 0xF00) << 24)
 
 #define DRAMaccesses   PERF_EVENT(0xE0, 0x07) /* DCT0 only */
 #define HTlink0Use     PERF_EVENT(0xF6, 0x37) /* Counts all except NOPs */
@@ -25,7 +25,7 @@ dram_accesses = perf_event(0xE0, 0x07)
 ht_link_0_use = perf_event(0xF6, 0x37)
 ht_link_1_use = perf_event(0xF7, 0x37)
 ht_link_2_use = perf_event(0xF8, 0x37)
-user_cycles = perf_event(0x76, 0x00) & ~(1L << 17)
+user_cycles = perf_event(0x76, 0x00) & ~(1 << 17)
 dcache_sys_fills = perf_event(0x42, 0x01)
 sse_flops = perf_event(0x03, 0x7F)
 

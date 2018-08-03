@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 from setuptools import setup, find_packages
 import os
-from ConfigParser import ConfigParser
+from configparser import ConfigParser
 
 DISTNAME = 'tacc_stats'
 LICENSE = 'LGPL'
@@ -33,9 +33,7 @@ config.read("tacc_stats.ini")
 
 with open("tacc_stats/cfg.py", 'w') as fd:
     for s in config.sections():
-        print s
-        for key, val in dict(config.items(s)).iteritems():
-            print key,val
+        for key, val in dict(config.items(s)).items():
             fd.write(key + " = " + "\"" + val + "\"" + '\n')
 
 setup(

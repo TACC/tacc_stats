@@ -31,38 +31,40 @@ class Job(models.Model):
     threads = models.BigIntegerField(null=True)
     validated = models.BooleanField(default=False)
 
-    cpi = models.FloatField(null=True)
-    cpld = models.FloatField(null=True)
-    mbw = models.FloatField(null=True)
-    idle = models.FloatField(null=True)
-    cat = models.FloatField(null=True)
-    mem = models.FloatField(null=True)
-    packetrate = models.FloatField(null=True)
-    packetsize = models.FloatField(null=True)
-    GigEBW = models.FloatField(null=True)
-    flops = models.FloatField(null=True)
-    VecPercent = models.FloatField(null=True)
-    Load_All    = models.BigIntegerField(null=True)
-    Load_L1Hits = models.BigIntegerField(null=True)
-    Load_L2Hits = models.BigIntegerField(null=True)
-    Load_LLCHits = models.BigIntegerField(null=True)
-    CPU_Usage = models.FloatField(null=True)
-    MIC_Usage = models.FloatField(null=True)
-    MetaDataRate = models.FloatField(null=True)
-    LnetAveMsgs = models.FloatField(null=True)
-    LnetAveBW = models.FloatField(null=True)
-    LnetMaxBW = models.FloatField(null=True)
-    InternodeIBAveBW = models.FloatField(null=True)
-    InternodeIBMaxBW = models.FloatField(null=True)
+    avg_cpi = models.FloatField(null=True)
+    avg_mcdrambw =  models.FloatField(null=True)
+    avg_mbw = models.FloatField(null=True)
+    avg_flops = models.FloatField(null=True)
+    vecpercent = models.FloatField(null=True)
+    avg_loads    = models.BigIntegerField(null=True)
+    avg_l1loadhits = models.BigIntegerField(null=True)
+    avg_l2loadhits = models.BigIntegerField(null=True)
+    avg_llcloadhits = models.BigIntegerField(null=True)
 
-    MDCReqs          =  models.FloatField(null=True)
-    OSCReqs          =  models.FloatField(null=True)
-    MDCWait          =  models.FloatField(null=True)
-    OSCWait          =  models.FloatField(null=True)
+    node_imbalance = models.FloatField(null=True)
+    time_imbalance = models.FloatField(null=True)
+    mem_hwm = models.FloatField(null=True)
+    avg_cpuusage = models.FloatField(null=True)
+    avg_blockbw = models.FloatField(null=True)
 
-    LLiteOpenClose   =  models.FloatField(null=True)
-    MCDRAMBW   =  models.FloatField(null=True)
-    BlockAveBW = models.FloatField(null=True)
+    max_packetrate = models.FloatField(null=True)
+    avg_packetsize = models.FloatField(null=True)
+    avg_fabricbw = models.FloatField(null=True)
+    max_fabricbw = models.FloatField(null=True)
+    avg_ethbw = models.FloatField(null=True)
+
+    max_mds = models.FloatField(null=True)
+    avg_lnetmsgs = models.FloatField(null=True)
+    avg_lnetbw = models.FloatField(null=True)
+    max_lnetbw = models.FloatField(null=True)
+    avg_mdcreqs =  models.FloatField(null=True)
+    avg_mdcwait =  models.FloatField(null=True)
+    avg_oscreqs =  models.FloatField(null=True)
+    avg_oscwait =  models.FloatField(null=True)
+    avg_openclose =  models.FloatField(null=True)
+
+
+
     
     def __unicode__(self):
         return str(self.id)
@@ -82,7 +84,7 @@ class Job(models.Model):
         return self.nodes * self.run_time * 0.0002777777777777778 * factor
 
 class Proc(models.Model):
-    job  = models.ForeignKey(Job)
+    job  = models.ForeignKey(Job, on_delete = models.CASCADE)
     name = models.CharField(max_length=128)
     host = models.CharField(max_length=128)
     uid  = models.IntegerField(null=True)
@@ -119,15 +121,4 @@ class JobForm(ModelForm):
     class Meta:
         model = Job
         fields = ['id']
-
-class TestInfo(models.Model):
-    test_name = models.CharField(max_length=128)
-    field_name = models.CharField(max_length=128)
-    threshold = models.FloatField(null=True)
-
-    # Computed Metric .op. Threshold
-    comparator = models.CharField(max_length=2)
-
-    def __unicode__(self):
-        return str(self.test_name)
 

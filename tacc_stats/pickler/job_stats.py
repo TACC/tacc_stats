@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 import datetime, errno, glob, numpy, os, sys, time, gzip
-import amd64_pmc, intel_process
+from tacc_stats.pickler import amd64_pmc, intel_process
 import re
 import string
 
@@ -213,7 +213,7 @@ class Host(object):
     def __init__(self, job, name, raw_stats_dir, name_ext = ''):
         self.job = job
         self.name = name
-        self.name_ext=name_ext
+        self.name_ext = name_ext
         self.times = []
         self.marks = {}
         self.raw_stats = {}
@@ -239,15 +239,15 @@ class Host(object):
                 if re.match('^[0-9]{4}[0-1][0-9][0-3][0-9]$', base):
                     base = (datetime.datetime.strptime(base,"%Y%m%d") - datetime.datetime(1970,1,1)).total_seconds()
                 # Prune to files that might overlap with job.
-                ent_start = long(base)
-                ent_end   = long(base) + 2*RAW_STATS_TIME_MAX
+                ent_start = int(base)
+                ent_end   = int(base) + 2*RAW_STATS_TIME_MAX
 
                 if (max(job_start, ent_start) <= min(job_end, ent_end)):
                     full_path = os.path.join(raw_host_stats_dir, ent)
                     path_list.append((full_path, ent_start))
                     self.trace("path `%s', start %d\n", full_path, ent_start)
         except Exception as e:
-            print e
+            print(e)
             pass
         path_list.sort(key=lambda tup: tup[1])
         return path_list
@@ -256,7 +256,7 @@ class Host(object):
         file_schemas = {}
 
         for line in lines:
-
+            line = line.decode()
             try:
                 c = line[0]
                 if c == SF_SCHEMA_CHAR:
@@ -298,15 +298,15 @@ class Host(object):
         dev_stats.append((rec_time, vals))
 
     def read_stats_file(self, file):
-
         lines = file.readlines()
 
         begin_idx = None
         for line in lines:        
+            line = line.decode()
             if line[0].isdigit():
                 str_time, str_jobid, str_hostname = line.split()
-                if self.job.id in set(str_jobid.split(',')):
-                    begin_idx = lines.index(line)
+                if str(self.job.id) in set(str_jobid.split(',')):
+                    begin_idx = lines.index(line.encode())
                     break
         if not begin_idx: return
 
@@ -317,9 +317,10 @@ class Host(object):
 
         record = False
         for line in lines[begin_idx:]:
+            line = line.decode()
             if line[0].isdigit():
                 str_time,str_jobids,hostname = line.split()
-                if self.job.id in set(str_jobids.split(',')):
+                if str(self.job.id) in set(str_jobids.split(',')):
                     self.times += [float(str_time)]
                     record = True
                 else:
@@ -328,7 +329,7 @@ class Host(object):
                 self.parse_stats(float(str_time), line, file_schemas, file)                            
             elif line.startswith("%begin") or line.startswith("%end"):
                 str_jobid = line.split()[1]
-                if self.job.id == str_jobid:
+                if str(self.job.id) == str_jobid:
                     self.marks[line[1:].strip()] = True
                     record = True
                 else:
@@ -345,10 +346,10 @@ class Host(object):
         # converted into numpy arrays below.
         for path, start_time in path_list:
             try:
-                with gzip.open(path) as file:
+                with gzip.open(path, "rb") as file:
                     self.read_stats_file(file)
             except IOError as ioe:
-                with open(path) as file:
+                with open(path, "rb") as file:
                     self.read_stats_file(file)
             except IOError as ioe:
                 self.error("read error for file %s\n", path)
@@ -431,10 +432,10 @@ class Job(object):
                 self.error("no host list found\n")
                 return False
             try:
-                with open(path) as file:
+                with open(path, "rb") as file:
                     host_list = [host for line in file for host in line.split()]
-            except IOError as (err, str):
-                self.error("cannot open host list `%s': %s\n", path, str)
+            except OSError as e:
+                self.error("cannot open host list `%s': %s\n", path, e)
                 return False
         if len(host_list) == 0:
             self.error("empty host list\n")
@@ -464,13 +465,13 @@ class Job(object):
 
         times_lis = []
 
-        for host in self.hosts.itervalues():
+        for host in self.hosts.values():
             times_lis.append(host.times)
             del host.times
 
         times_lis.sort(key=lambda lis: len(lis))
         # Choose times to have median length.
-        times = list(times_lis[len(times_lis) / 2])
+        times = list(times_lis[len(times_lis) // 2])
         if not times:
             return False
         times.sort()
@@ -521,7 +522,7 @@ class Job(object):
 
         # OK, we fit the raw values into A.  Now fixup rollover and
         # convert units.
-        for e in schema.itervalues():
+        for e in schema.values():
             j = e.index
             if e.is_event:
                 p = r = A[0, j] # Previous raw, rollover/baseline.
@@ -538,7 +539,7 @@ class Job(object):
                         if e.width:
                             trace("time %d, counter `%s', rollover prev %d, curr %d\n",
                                   self.times[i], e.key, p, v)
-                            r -= numpy.uint64(1L << e.width)
+                            r -= numpy.uint64(1 << e.width)
                         elif v == 0 or (type_name == 'ib_ext' or type_name == 'ib_sw') or \
                                 (type_name == 'cpu' and e.key == 'iowait'):
                             # We will assume a spurious reset, 
@@ -577,20 +578,19 @@ class Job(object):
         self.overflows[type_name][dev_name][key_name].append(host_name)
 
     def process_stats(self):
-        print 'process stats'
-        for host in self.hosts.itervalues():
+        for host in self.hosts.values():
             host.stats = {}
-            for type_name, raw_type_stats in host.raw_stats.iteritems():
+            for type_name, raw_type_stats in host.raw_stats.items():
                 stats = host.stats[type_name] = {}
                 schema = self.schemas[type_name]
-                for dev_name, raw_dev_stats in raw_type_stats.iteritems():
+                for dev_name, raw_dev_stats in raw_type_stats.items():
                     stats[dev_name] = self.process_dev_stats(host, type_name, schema,
                                                              dev_name, raw_dev_stats)
             del host.raw_stats
         amd64_pmc.process_job(self)
         intel_process.process_job(self)
         # Clear mult, width from schemas. XXX
-        for schema in self.schemas.itervalues():
+        for schema in self.schemas.values():
             for e in schema.itervalues():
                 e.width = None
                 e.mult = None
@@ -610,7 +610,7 @@ class Job(object):
         if host_names:
             host_list = [self.hosts[name] for name in host_names]
         else:
-            host_list = self.hosts.itervalues()
+            host_list = self.hosts.values()
         for host in host_list:
             type_stats = host.stats.get(type_name)
             if not type_stats:
@@ -619,7 +619,7 @@ class Job(object):
             if dev_names:
                 dev_list = [type_stats[name] for name in dev_names]
             else:
-                dev_list = type_stats.itervalues()
+                dev_list = type_stats.values()
             for dev_stats in dev_list:
                 A += dev_stats
                 nr_devs += 1
@@ -633,7 +633,7 @@ class Job(object):
         schema = self.get_schema(type_name)
         index = schema[key_name].index
         host_stats = {}
-        for host_name, host in self.hosts.iteritems():
+        for host_name, host in self.hosts.items():
             host_stats[host_name] = host.stats[type_name][dev_name][:, index]
         return host_stats
 
