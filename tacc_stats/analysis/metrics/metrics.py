@@ -30,7 +30,12 @@ class Metrics():
   # Compute metric
   def compute_metrics(self, jobpath):
     try:
-      with open(jobpath, 'rb') as fd: job = p.load(fd)
+      with open(jobpath, 'rb') as fd: 
+        try: job = p.load(fd)
+        except: job = p.load(fd, encoding = "latin1") # Python2 Compatibility
+    except MemoryError as e:
+      print('File ' + jobpath + ' to large to load')
+      return jobpath, None
     except IOError as e:
       print('File ' + jobpath + ' not found')
       return jobpath, None
@@ -397,7 +402,7 @@ class time_imbalance():
       for i in [x + 2 for x in range(len(u.t) - 4)]:
         r1=range(i)
         r2=[x + i for x in range(len(dt) - i)]
-        rate = stats[:, schema["user"].index]
+        rate = diff(stats[:, schema["user"].index])/diff(u.t)
         # integral before time slice 
         a = trapz(rate[r1], tmid[r1])/(tmid[i] - tmid[0])
         # integral after time slice

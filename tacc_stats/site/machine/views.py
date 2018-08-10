@@ -121,7 +121,7 @@ def search(request):
 def index(request, **kwargs):
 
     fields = request.GET.dict()
-    fields = {k:v for k,v in fields.items() if v}
+    fields = { k:v for k, v in fields.items() if v }
     fields.update(kwargs)
 
     if 'page' in fields: del fields['page']
@@ -151,9 +151,7 @@ def index(request, **kwargs):
             fields['date__month'] = date[1]
             del fields['date']
 
-
     job_list = Job.objects.filter(**fields).distinct().order_by(order_key)
-
     fields['name'] =  'Query [fields=values] ' + name.rstrip('-')    
 
     paginator = Paginator(job_list,100)
@@ -191,20 +189,18 @@ def index(request, **kwargs):
         except: pass
 
         fields['idle_job_list'] = completed_list.filter(node_imbalance__gte = 0.99)
-        fields['mem_job_list'] = completed_list.filter(mem_hwm__lte = 30, queue = 'largemem')
 
-        fields['cpi_thresh'] = 1.5
+        fields['cpi_thresh'] = 3.0
         fields['cpi_job_list']  = completed_list.exclude(avg_cpi = float('nan')).filter(avg_cpi__gte = fields['cpi_thresh'])
         fields['cpi_per'] = 100*fields['cpi_job_list'].count()/float(completed_list.count())
 
-        fields['gigebw_thresh'] = 2**20
+        fields['gigebw_thresh'] = 1
         fields['gigebw_job_list']  = completed_list.exclude(avg_ethbw = float('nan')).filter(avg_ethbw__gte = fields['gigebw_thresh'])
 
         fields['md_job_list'] = list_to_dict(fields['md_job_list'],'avg_openclose')
         fields['idle_job_list'] = list_to_dict(fields['idle_job_list'],'node_imbalance')
         fields['cat_job_list'] = list_to_dict(fields['cat_job_list'],'time_imbalance')
         fields['cpi_job_list'] = list_to_dict(fields['cpi_job_list'],'avg_cpi')
-        fields['mem_job_list'] = list_to_dict(fields['mem_job_list'],'mem_hwm')
         fields['gigebw_job_list'] = list_to_dict(fields['gigebw_job_list'],'avg_ethbw')
     
     if '?' in request.get_full_path():
@@ -238,8 +234,11 @@ def get_data(pk):
         data = cache.get(pk)
     else:
         job = Job.objects.get(pk = pk)
-        with open(os.path.join(cfg.pickles_dir, job.date.strftime('%Y-%m-%d'), str(job.id)), 'rb') as fd:
-            data = p.load(fd)
+        with open(os.path.join(cfg.pickles_dir, 
+                               job.date.strftime('%Y-%m-%d'), 
+                               str(job.id)), 'rb') as fd:
+            try: data = p.load(fd)
+            except: data = p.load(fd, encoding = 'latin1') # Python2 compatibility
             cache.set(job.id, data)
     return data
 

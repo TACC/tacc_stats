@@ -279,30 +279,33 @@ class Host(object):
                 break
         return file_schemas
 
-    def parse_stats(self, rec_time, line, file_schemas, file):
+    def parse_stats(self, rec_time, line, file_schemas, fd):
         type_name, dev_name, rest = line.split(None, 2)
         schema = file_schemas.get(type_name)
         if not schema:
             self.error("file `%s', unknown type `%s', discarding line `%s'\n",
-                       file.name, type_name, line)
+                       fd.name, type_name, line)
             return
         # TODO stats_dtype = numpy.uint64
         # XXX count = ?
         vals = numpy.fromstring(rest, dtype=numpy.uint64, sep=' ')
         if vals.shape[0] != len(schema):
             self.error("file `%s', type `%s', expected %d values, read %d, discarding line `%s'\n",
-                       file.name, type_name, len(schema), vals.shape[0], line)
+                       fd.name, type_name, len(schema), vals.shape[0], line)
             return
         type_stats = self.raw_stats.setdefault(type_name, {})
         dev_stats = type_stats.setdefault(dev_name, [])
         dev_stats.append((rec_time, vals))
 
-    def read_stats_file(self, file):
-        lines = file.readlines()
+    def read_stats_file(self, fd):
+        lines = fd.readlines()
 
         begin_idx = None
-        for line in lines:        
-            line = line.decode()
+        for line in lines:    
+            try:
+                line = line.decode()
+            except:
+                continue
             if line[0].isdigit():
                 str_time, str_jobid, str_hostname = line.split()
                 if str(self.job.id) in set(str_jobid.split(',')):
@@ -312,12 +315,15 @@ class Host(object):
 
         file_schemas = self.read_stats_file_header(lines)
         if not file_schemas:
-            self.trace("file `%s' bad header\n", file.name)
+            self.trace("file `%s' bad header\n", fd.name)
             return
 
         record = False
-        for line in lines[begin_idx:]:
-            line = line.decode()
+        for line in lines[begin_idx:]:            
+            try:
+                line = line.decode()
+            except:
+                continue
             if line[0].isdigit():
                 str_time,str_jobids,hostname = line.split()
                 if str(self.job.id) in set(str_jobids.split(',')):
@@ -326,7 +332,7 @@ class Host(object):
                 else:
                     record = False
             elif record and line[0].isalpha():
-                self.parse_stats(float(str_time), line, file_schemas, file)                            
+                self.parse_stats(float(str_time), line, file_schemas, fd)                            
             elif line.startswith("%begin") or line.startswith("%end"):
                 str_jobid = line.split()[1]
                 if str(self.job.id) == str_jobid:
@@ -346,11 +352,11 @@ class Host(object):
         # converted into numpy arrays below.
         for path, start_time in path_list:
             try:
-                with gzip.open(path, "rb") as file:
-                    self.read_stats_file(file)
+                with gzip.open(path, "rb") as fd:
+                    self.read_stats_file(fd)
             except IOError as ioe:
-                with open(path, "rb") as file:
-                    self.read_stats_file(file)
+                with open(path, "rb") as fd:
+                    self.read_stats_file(fd)
             except IOError as ioe:
                 self.error("read error for file %s\n", path)
 

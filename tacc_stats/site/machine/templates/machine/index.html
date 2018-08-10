@@ -48,23 +48,6 @@
 
     {% endif %}
 
-    
-    {% if mem_job_list %}
-
-    <tr>
-      <th>Memory HWM less than 30 GB on a Largemem</th>
-    </tr>
-    {% for key,values in mem_job_list.items %} 
-    <tr><td><a href="{% url 'machine:user_view' key %}"> {{ key }}</a> </td>
-      {% for v,d in values %} 
-      <td><a href="{% url 'machine:job' v %}">{{ v }}</a>({{ d }})</td>
-      {% endfor %}
-    </tr>
-    {% endfor %}
-
-    {% endif %}
-    
-
     {% if idle_job_list %}
 
     <tr>

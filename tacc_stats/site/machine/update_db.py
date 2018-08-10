@@ -217,6 +217,7 @@ def update_metric_fields(date, pickles_dir, processes, rerun = False):
         "max_fabricbw", "avg_mdcreqs", "avg_mdcwait", "avg_oscreqs",
         "avg_oscwait", "avg_openclose", "avg_mcdrambw", "avg_blockbw"
     ]
+    #metric_names = ["time_imbalance"]
     aud = metrics.Metrics(metric_names, processes = processes)
 
     print("Run the following tests for:",date)
@@ -227,7 +228,7 @@ def update_metric_fields(date, pickles_dir, processes, rerun = False):
 
     # Use avg_cpuusage to see if job was tested.  It will always exist
     if not rerun:
-        jobs_list = jobs_list.filter(avg_cpuusage = None)
+        jobs_list = jobs_list.filter(avg_packetsize = None)
 
     paths = []
     for job in jobs_list:
@@ -269,4 +270,4 @@ if __name__ == "__main__":
 
     for date in daterange(start, end):
         update_acct(date, rerun = False)         
-        update_metric_fields(date, args.directory, args.processes, rerun = True)
+        update_metric_fields(date, args.directory, args.processes, rerun = False)

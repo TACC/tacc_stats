@@ -1,135 +1,171 @@
 #!/usr/bin/env python
-from __future__ import print_function
-
-import os,sys
-import tacc_stats.cfg as cfg
-
-from tacc_stats.pickler import batch_acct,job_stats
-from datetime import datetime,timedelta
-import time
-import cPickle as pickle
+import os, sys
+from tacc_stats.pickler import job_stats
+from datetime import datetime, timedelta
+from dateutil.parser import parse
+import pickle as p
 import multiprocessing, functools
-import argparse, traceback
+import argparse, csv
+import hostlist
+from tacc_stats.daterange import daterange
+from tacc_stats import cfg
+from tacc_stats.progress import progress
 from fcntl import flock, LOCK_EX, LOCK_NB
 
-def job_pickle(reader_inst, 
-               pickle_dir = cfg.pickles_dir, 
-               archive_dir = cfg.archive_dir,
-               host_list_dir = cfg.host_list_dir,
+def test_job(job):
+    validated = []
+    for host in job.hosts.values():
+        if "begin %s" % job.id in host.marks and "end %s" % job.id in host.marks:
+            validated += [True]
+        else:
+            validated += [False]
+    validated = all(validated)
+    return validated
+
+def job_pickle(reader_inst,
+               pickles_dir, 
+               archive_dir,
                host_name_ext = cfg.host_name_ext):
 
-    if reader_inst['end_time'] == 0:
-        return
-
-    date_dir = os.path.join(pickle_dir,
+    date_dir = os.path.join(pickles_dir,
                             datetime.fromtimestamp(reader_inst['end_time']).strftime('%Y-%m-%d'))
 
     try: os.makedirs(date_dir)
     except: pass
-    
-    pickle_file = os.path.join(date_dir, reader_inst['id'])
 
+    pickle_file = os.path.join(date_dir, reader_inst['id'])
     validated = False
     if os.path.exists(pickle_file):
-        validated = True
-        with open(pickle_file) as fd:
-            try:
-                job = pickle.load(fd)
-                for host in job.hosts.values():
-                    if not host.marks.has_key('begin %s' % job.id) or not host.marks.has_key('end %s' % job.id):
-                        validated = False
-                        break
-            except: 
-                validated = False
-
+        #print("Validating", reader_inst['id'])
+        try:
+            with open(pickle_file, 'rb') as fd: job = p.load(fd)
+            validated = test_job(job)
+        except EOFError as e:
+            print(e)
+            
     if not validated:
-        print(reader_inst['id'] + " is not validated: process")
-        with open(pickle_file,'w') as fd:
-            job = job_stats.from_acct(reader_inst, archive_dir, 
-                                      host_list_dir, host_name_ext)            
-            if job: pickle.dump(job, fd, pickle.HIGHEST_PROTOCOL)
-    else:
-        print(reader_inst['id'] + " is validated: do not process")
+        #print("Processing", reader_inst['id'])
+        job = job_stats.from_acct(reader_inst, archive_dir, '', host_name_ext) 
+        if job and test_job(job):
+            with open(pickle_file, 'wb') as fd: p.dump(job, fd, protocol = p.HIGHEST_PROTOCOL)
+            validated = True
+
+    return (reader_inst['id'], validated)
 
 class JobPickles:
 
-    def __init__(self,**kwargs):
-        self.processes=kwargs.get('processes',1)
-        self.pickles_dir = kwargs.get('pickle_dir',cfg.pickles_dir)
-        self.start = kwargs.get('start',None)
-        self.end = kwargs.get('end',None)
-        if not self.start: self.start = (datetime.now()-timedelta(days=1))
-        if not self.end:   self.end   = (datetime.now()+timedelta(days=1))
+    def __init__(self, pickles_dir, processes, jobids):
 
-        self.archive_dir = kwargs.get('archive_dir',cfg.archive_dir)
-        self.host_list_dir = kwargs.get('host_list_dir',cfg.host_list_dir)
+        self.pool   = multiprocessing.Pool(processes = processes)        
+        self.jobids = jobids
 
-        self.batch_system = kwargs.get('batch_system',cfg.batch_system)
-        self.acct_path = kwargs.get('acct_path',cfg.acct_path)
-        self.host_name_ext = kwargs.get('host_name_ext',cfg.host_name_ext)
+        self.acct_path = cfg.acct_path
+        self.pickles_dir = pickles_dir
+        self.partial_pickle = functools.partial(job_pickle,
+                                                pickles_dir  = pickles_dir,
+                                                archive_dir = cfg.archive_dir)        
+        print("Use", processes, "processes")
+        print("Map node-level data from", cfg.archive_dir, "to", pickles_dir)
 
-        print(self.batch_system,self.acct_path,self.host_name_ext)
-        self.acct = batch_acct.factory(self.batch_system,
-                                       self.acct_path)
+    def run(self, date):
+        print("Processing for ", date)
+        if not os.path.exists(os.path.join(self.acct_path, date.strftime("%Y-%m-%d") + ".txt")): 
+            print("No accounting file for ", date)
+            return
 
-        try:
-            self.start = datetime.strptime(self.start,'%Y-%m-%d')
-            self.end = datetime.strptime(self.end,'%Y-%m-%d')
+        acct = self.acct_reader(os.path.join(self.acct_path, date.strftime("%Y-%m-%d") + ".txt"))
+        try: 
+            os.makedirs(os.path.join(self.pickles_dir, date.strftime("%Y-%m-%d")))
         except: pass
 
-        self.start = time.mktime(self.start.date().timetuple())
-        self.end = time.mktime(self.end.date().timetuple())
-        self.pool = multiprocessing.Pool(processes = self.processes)
+        val_file = os.path.join(self.pickles_dir, date.strftime("%Y-%m-%d"), "validated")            
+        val_jids = []
+        if os.path.exists(val_file):
+            with open(val_file, 'r') as fd:
+                val_jids = fd.read().splitlines()
 
-        self.partial_pickle = functools.partial(job_pickle, 
-                                                pickle_dir = self.pickles_dir, 
-                                                archive_dir = self.archive_dir,
-                                                host_list_dir = self.host_list_dir,
-                                                host_name_ext = self.host_name_ext)
+        acct_jids = [x['id'] for x in acct if "+" not in x['id']]
 
-        print("Use",self.processes,"processes")
-        print("Gather node-level data from",self.archive_dir+"/archive/")
-        print("Write pickle files to",self.pickles_dir)
+        ntot = len(acct_jids)
+        print(len(acct_jids),'Job records in accounting file')
 
-    def run(self,jobids = None):
-        if jobids:
-            print("Pickle following jobs:",jobids)            
-            reader = self.acct.find_jobids(jobids)
-        else:
-            print("Pickle jobs between",
-                  datetime.fromtimestamp(self.start),
-                  "and",datetime.fromtimestamp(self.end))
-            reader = self.acct.reader(start_time=self.start,
-                                      end_time=self.end)
-        #map(self.partial_pickle,reader)
-        self.pool.map(self.partial_pickle,reader)
+        run_jids = sorted(list(set(acct_jids) - set(val_jids)))
+        print(len(run_jids),'Jobs to process')
+        ntod = len(run_jids)
+
+        acct = [job for job in acct if job['id'] in run_jids]            
+        acct = [job for job in acct if job['nodes']*(job['end_time']-job['start_time']) < 1728000]
+        ctr = 0
+        with open(val_file, "a") as fd:
+            for result in self.pool.imap(self.partial_pickle, acct):
+            #for result in map(self.partial_pickle, acct):
+                if result[1]:
+                    fd.write("%s\n" % result[0])
+                fd.flush()
+                ctr += 1.0
+                progress(ctr + (ntot - ntod), ntot, date.strftime("%Y-%m-%d"))
+        print("Completed ", date)
+
+    def acct_reader(self, filename):
+        ftr = [3600,60,1]
+        acct = []
+        with open(filename) as fd:
+            for job in csv.DictReader(fd, delimiter = '|'):
+                if self.jobids and job['JobID'] not in self.jobids: continue
+                if job['NodeList'] == "None assigned": continue
+
+                jent = {}
+                jent['id']         = job['JobID']
+                jent['user']       = job['User']
+                jent['project']    = job['Account']
+                jent['start_time'] = int(parse(job['Start']).strftime('%s'))
+                jent['end_time']   = int(parse(job['End']).strftime('%s'))
+                jent['queue_time'] = int(parse(job['Submit']).strftime('%s'))
+                jent['queue']      = job['Partition']
+                jent['name']       = job['JobName']
+                jent['status']     = job['State'].split()[0]
+                jent['nodes']      = int(job['NNodes'])
+                jent['cores']      = int(job['ReqCPUS'])
+                jent['host_list']  = hostlist.expand_hostlist(job['NodeList'])
+
+                if '-' in job['Timelimit']:
+                    days, time = job['Timelimit'].split('-')
+                else:
+                    time = job['Timelimit']
+                    days = 0
+                jent['requested_time'] = (int(days) * 86400 + 
+                                          sum([a*b for a,b in zip(ftr, [int(i) for i in time.split(":")])]))/60
+                acct += [jent]
+            return acct
 
 if __name__ == '__main__':
-    parser = argparse.ArgumentParser(description='Run pickler for jobs')
 
-    parser.add_argument('-dir', help='Directory to store data',type=str,default=cfg.pickles_dir)
-    parser.add_argument('-start', help='Start date',type=str)
-    parser.add_argument('-end', help='End date',type=str)
-    parser.add_argument('-p', help='Set number of processes',
-                        type=int, default=1)
-    parser.add_argument('-jobids', help='Set number of processes',
-                        type=str,nargs='+')
-
-    args = parser.parse_args()
-
-    with open(os.path.join(os.path.dirname(os.path.realpath(__file__)), "job_pickles_lock"), "w") as fd:
+    with open(os.path.join(os.path.dirname(os.path.realpath(__file__)), 
+                           "job_pickles_lock"), "w") as fd:
         try:
             flock(fd, LOCK_EX | LOCK_NB)
         except IOError:
             print("job_pickles is already running")
             sys.exit()
-
-        pickle_options = { 'processes'       : args.p,
-                           'start'           : args.start,
-                           'end'             : args.end,
-                           'pickle_dir'      : args.dir,
-                           }
-        pickler = JobPickles(**pickle_options)
-        pickler.run(jobids = args.jobids)
         
-    
+
+    parser = argparse.ArgumentParser(description='Run pickler for jobs')
+    parser.add_argument('start', type = parse, nargs='?', default = datetime.now(), 
+                        help = 'Start (YYYY-mm-dd)')
+    parser.add_argument('end',   type = parse, nargs='?', default = False, 
+                        help = 'End (YYYY-mm-dd)')
+    parser.add_argument('-p', '--processes', type = int, default = 1,
+                        help = 'number of processes')
+    parser.add_argument('-d', '--directory', type = str, 
+                        help='Directory to store data', default = cfg.pickles_dir)
+    parser.add_argument('-jobids', help = 'Pickle this list of jobs', 
+                        type = str, nargs = '+')
+
+    args = parser.parse_args()
+    start = args.start
+    end   = args.end
+    if not end: end = start
+
+    for date in daterange(start, end):
+        pickler = JobPickles(args.directory, args.processes, args.jobids)
+        pickler.run(date)
