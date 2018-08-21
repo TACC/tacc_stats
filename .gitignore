@@ -50,3 +50,4 @@ Makefile.in
 /stamp-h1
 /ltmain.sh
 /texinfo.tex
+tacc_stats/pickler/*lock

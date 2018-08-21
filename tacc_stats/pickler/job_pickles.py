@@ -32,19 +32,24 @@ def job_pickle(reader_inst,
 
     try: os.makedirs(date_dir)
     except: pass
-
+    print(reader_inst['id'])
     pickle_file = os.path.join(date_dir, reader_inst['id'])
     validated = False
     if os.path.exists(pickle_file):
-        #print("Validating", reader_inst['id'])
         try:
-            with open(pickle_file, 'rb') as fd: job = p.load(fd)
+            with open(pickle_file, 'rb') as fd: 
+                try: job = p.load(fd)
+                except UnicodeDecodeError as e: 
+                    try:
+                        job = p.load(fd, encoding = "latin1") # Python2 Compatibility
+                    except: 
+                        print(e)
+                        return (reader_inst['id'], validated)
             validated = test_job(job)
         except EOFError as e:
             print(e)
             
     if not validated:
-        #print("Processing", reader_inst['id'])
         job = job_stats.from_acct(reader_inst, archive_dir, '', host_name_ext) 
         if job and test_job(job):
             with open(pickle_file, 'wb') as fd: p.dump(job, fd, protocol = p.HIGHEST_PROTOCOL)

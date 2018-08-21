@@ -85,7 +85,6 @@ def update_acct(date, rerun = False):
             
             if xd:            
                 obj.exe  = xd.exec_path.split('/')[-1][0:128]
-                print(obj.exe)
                 obj.exec_path = xd.exec_path
                 obj.cwd     = xd.cwd[0:128]
                 obj.threads = xd.num_threads
@@ -98,6 +97,7 @@ def update_acct(date, rerun = False):
                     library.save()
                     library.jobs.add(obj)
 
+            ### Build host table
             for host_name in host_list:
                 h = Host(name=host_name)
                 h.save()
@@ -110,102 +110,7 @@ def update_acct(date, rerun = False):
         for line in fd.readlines():
             Job.objects.filter(id = int(line)).update(validated = True)
 
-def update(date,rerun=False):
-
-    tz = pytz.timezone('US/Central')
-    pickle_dir = os.path.join(cfg.pickles_dir,date)
-    ctr = 0
-    for root, directory, pickle_files in os.walk(pickle_dir):
-        num_files = len(pickle_files)
-        print("Number of pickle files in", root,'=',num_files)
-        print("Number of database records", Job.objects.filter(date = date).count())
-        for pickle_file in sorted(pickle_files):
-
-            ctr += 1
-            try:
-                if rerun: pass
-                elif Job.objects.filter(id = pickle_file).exists(): 
-                    continue                
-            except:
-                print(pickle_file,"doesn't look like a pickled job")
-                continue
-
-            pickle_path = os.path.join(root,str(pickle_file))
-            try:
-                with open(pickle_path, 'rb') as fd:
-                    data = p.load(fd)
-                    json = data.acct
-                    hosts = data.hosts.keys()
-            except EOFError:
-                print(pickle_file, "is empty")
-                continue
-
-            if 'yesno' in json: del json['yesno']
-            utc_start = datetime.utcfromtimestamp(
-                json['start_time']).replace(tzinfo=pytz.utc)
-            utc_end = datetime.utcfromtimestamp(
-                json['end_time']).replace(tzinfo=pytz.utc)
-            json['run_time'] = json['end_time'] - json['start_time']
-
-            if json.has_key('unknown'):
-                json['requested_time'] = json['unknown']*60
-                del json['unknown']
-            elif json.has_key('requested_time'): 
-                json['requested_time'] = json['requested_time']*60
-            else:
-                json['requested_time'] = 0
-            json['start_epoch'] = json['start_time']
-            json['end_epoch'] = json['end_time']
-            json['start_time'] = utc_start.astimezone(tz)
-            json['end_time'] =  utc_end.astimezone(tz)
-            json['date'] = json['end_time'].date()
-            json['name'] = json['name'][0:128]
-            json['wayness'] = json['cores']/json['nodes']
-            if json.has_key('state'): 
-                json['status'] = json['state']
-                del json['state']
-            json['status'] = json['status'].split()[0]
-            
-            if json.has_key('user'):
-                try:
-                    json['uid'] = int(pwd.getpwnam(json['user']).pw_uid)
-                except:
-                    json['uid'] = None
-            ### If xalt is available add data to the DB 
-            xd = None
-            try:
-                xd = run.objects.using('xalt').filter(job_id = json['id'])[0]                
-                json['user']    = xd.user
-                json['exe']     = xd.exec_path.split('/')[-1][0:128]
-                json['exec_path'] = xd.exec_path
-                json['cwd']     = xd.cwd[0:128]
-                json['threads'] = xd.num_threads
-            except: xd = False 
-                
-            if json.has_key('host_list'):
-                del json['host_list']
-
-            Job.objects.filter(id=json['id']).delete()
-            obj, created = Job.objects.update_or_create(**json)
-            for host_name in hosts:
-                h = Host(name=host_name)
-                h.save()
-                h.jobs.add(obj)
-                
-            if xd:
-                for join in join_run_object.objects.using('xalt').filter(run_id = xd.run_id):
-                    try:
-                        object_path = lib.objects.using('xalt').get(obj_id = join.obj_id).object_path
-                        module_name = lib.objects.using('xalt').get(obj_id = join.obj_id).module_name
-                        if not module_name: module_name = 'none'
-                        library = Libraries(object_path = object_path, module_name = module_name)
-                        library.save()
-                        library.jobs.add(obj)
-                    except: pass
-
-            progress(ctr, num_files, date)
-
-def update_metric_fields(date, pickles_dir, processes, rerun = False):
+def update_metrics(date, pickles_dir, processes, rerun = False):
 
     min_time = 10
     metric_names = [
@@ -217,7 +122,7 @@ def update_metric_fields(date, pickles_dir, processes, rerun = False):
         "max_fabricbw", "avg_mdcreqs", "avg_mdcwait", "avg_oscreqs",
         "avg_oscwait", "avg_openclose", "avg_mcdrambw", "avg_blockbw"
     ]
-    #metric_names = ["time_imbalance"]
+
     aud = metrics.Metrics(metric_names, processes = processes)
 
     print("Run the following tests for:",date)
@@ -270,4 +175,4 @@ if __name__ == "__main__":
 
     for date in daterange(start, end):
         update_acct(date, rerun = False)         
-        update_metric_fields(date, args.directory, args.processes, rerun = False)
+        update_metrics(date, args.directory, args.processes, rerun = False)

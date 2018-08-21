@@ -16,7 +16,7 @@ import tacc_stats.analysis.plot as plots
 
 from datetime import datetime, timedelta
 
-import numpy as np
+from numpy import array, histogram, log, linspace
 
 from bokeh.embed import components
 from bokeh.layouts import gridplot
@@ -221,11 +221,11 @@ def job_hist(job_list, value, units, scale = 1.0):
     p1.xaxis.axis_label = units
     p1.yaxis.axis_label = "# Jobs"
     job_list = job_list.filter(**{value + "__isnull" : False})
-    values = np.array(job_list.values_list(value, flat=True))/scale
+    values = array(job_list.values_list(value, flat=True))/scale
     if len(values) == 0: return None
 
-    hist, edges = np.histogram(values,
-                               bins = np.linspace(0, max(values), max(3, 5*np.log(len(values)))))
+    hist, edges = histogram(values,
+                            bins = linspace(0, max(values), max(3, 5*log(len(values)))))
     p1.quad(top = hist, bottom = 1, left = edges[:-1], right = edges[1:])    
     return p1
 

@@ -32,7 +32,10 @@ class Metrics():
     try:
       with open(jobpath, 'rb') as fd: 
         try: job = p.load(fd)
-        except: job = p.load(fd, encoding = "latin1") # Python2 Compatibility
+        except UnicodeDecodeError as e: 
+          try: 
+            job = p.load(fd, encoding = "latin1") # Python2 Compatibility
+          except: return jobpath, None
     except MemoryError as e:
       print('File ' + jobpath + ' to large to load')
       return jobpath, None

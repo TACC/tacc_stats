@@ -1,7 +1,6 @@
 from django.conf.urls import include
 from django.urls import path
 from django.views.static import serve
-from django.contrib.auth.views import login, logout
 from tacc_stats.site.tacc_stats_site import settings
 from django.contrib import admin
 from tacc_stats.site.machine.views import dates

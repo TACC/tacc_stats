@@ -48,9 +48,8 @@ setup(
     package_data = {'tacc_stats' : ['cfg.py']},
     include_package_data = True,
     scripts = scripts,
-    setup_requires = ['nose'],
-    install_requires = ['argparse','numpy','matplotlib',
-                        'scipy','bokeh', 'django', 'python-hostlist'],
+    install_requires = ['argparse','numpy','matplotlib', 'psycopg2',
+                        'bokeh', 'django', 'python-hostlist'],
     platforms = 'any',
     classifiers = [
         'Development Status :: 5 - Production',
