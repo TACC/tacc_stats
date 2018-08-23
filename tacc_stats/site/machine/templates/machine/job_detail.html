@@ -2,118 +2,148 @@
 {% block content %}
 
 {% if job %}
-   <h2>Job Detail</h2>
-<p>
- <table class="table table-condensed table-bordered">
-  <thead>
-    <th>Job ID</th><th>UID</th><th>user</th><th>project</th><th>executable</th><th>start time</th><th>end time</th>
-
+<div>
+  <h2>Job Detail</h2>
+  <table class="table table-condensed table-bordered">
+    <thead>
+      <th>Job ID</th><th>UID</th><th>user</th><th>project</th><th>executable</th><th>start time</th><th>end time</th>
       <th>run time (s)</th><th>requested time (m)</th><th>queue</th><th>name</th><th>status</th><th>wayness</th><th>cores</th><th>nodes</th><th>threads</th>
-  </thead>
-  <tbody>
-    <tr bgcolor="{{job.color}}"><td><a href="{% url 'machine:job'  job.id %}">{{ job.id }}</a></td>
+    </thead>
+    <tbody>
+      <tr bgcolor="{{job.color}}"><td><a href="{% url 'machine:job'  job.id %}">{{ job.id }}</a></td>
 
-      {% if job.uid %}
-      <td><a href="{% url 'machine:uid_view' job.uid %}" >{{ job.uid }}</td>           
-      {% else %}
-      <td>Unknown</td>
-      {% endif %}
+	{% if job.uid %}
+	<td><a href="{% url 'machine:uid_view' job.uid %}" >{{ job.uid }}</td>           
+	{% else %}
+	<td>Unknown</td>
+	{% endif %}
+	
+	{% if job.user %}
+	<td><a href="{% url 'machine:user_view' job.user %}" >{{ job.user }}</td>
+	{% else %}
+	<td>Unknown</td>
+	{% endif %}
 
-      {% if job.user %}
-      <td><a href="{% url 'machine:user_view' job.user %}" >{{ job.user }}</td>
-      {% else %}
-      <td>Unknown</td>
-      {% endif %}
+	{% if job.project %}
+	<td><a href="{% url 'machine:project_view' job.project %}">{{ job.project }}</td>
+	{% else %}
+	<td>None</td>
+	{% endif %}
 
-      {% if job.project %}
-      <td><a href="{% url 'machine:project_view' job.project %}">{{ job.project }}</td>
-      {% else %}
-      <td>None</td>
-      {% endif %}
-
-      <td><a href="{% url 'machine:exe_view' job.exe %}" >{{ job.exe }}</td>
-      <td align=right>{{ job.start_time }}</td>
-      <td align=right>{{ job.end_time }}</td>
-      <td align=right>{{ job.run_time }}</td>
-      <td align=right>{{ job.requested_time }}</td>
-      <td align=right>{{ job.queue }}</td>
-      <td align=right>{{ job.name }}</td>
-      <td align=right>{{ job.status }}</td>
-      <td align=right>{{ job.wayness }}</td>
-      <td align=right>{{ job.cores }}</td>
-      <td align=right>{{ job.nodes }}</td>
-      <td align=right>{{ job.threads }}</td></tr>
-  </tbody>
- </table>
-
-<table class="table table-condensed table-bordered" style="max-width:30%;">
-  <thead><th>File System</th><th>MB Read</th><th>MB Written</th><thead>
-    {% for key,val in fsio.items %}
-    <tr align=left><td>{{ key }}</td><td>{{ val.0|stringformat:"0.1e" }}</td><td>{{ val.1|stringformat:"0.1e" }}</td></tr>
-    {% endfor %}	
-</table>
-
-<div class="row">
-  <div class="col-sm-2">Executable Path</div><div class="col-sm-10">{{job.exec_path}}</div>      
-  <div class="col-sm-2">Working Directory</div><div class="col-sm-10">{{job.cwd}}</div>
-  <div class="col-sm-2">Links to Splunk Logs</div><div class="col-sm-10"><a href={{ client_url }}>Client Logs</a> <a href={{ server_url }}>Server Logs</a></div>
+	<td><a href="{% url 'machine:exe_view' job.exe %}" >{{ job.exe }}</td>
+	<td align=right>{{ job.start_time }}</td>
+	<td align=right>{{ job.end_time }}</td>
+	<td align=right>{{ job.run_time }}</td>
+	<td align=right>{{ job.requested_time }}</td>
+	<td align=right>{{ job.queue }}</td>
+	<td align=right>{{ job.name }}</td>
+	<td align=right>{{ job.status }}</td>
+	<td align=right>{{ job.wayness }}</td>
+	<td align=right>{{ job.cores }}</td>
+	<td align=right>{{ job.nodes }}</td>
+	<td align=right>{{ job.threads }}</td></tr>
+    </tbody>
+  </table>
 </div>
 
-</br>
-<p>
 <div class="row">
-
   <div class="col-md-3">
-    <button type="button" class="btn btn-primary" data-toggle="collapse" data-target="#procs">
-      Processes Alive During Job
-    </button>
-    <div id="procs" class="collapse">
-      {% for proc in proc_list %} 
-      <a href="{% url 'machine:proc_detail' job.id proc %}">{{proc}}</a>
-      {% endfor %}
-    </div>
+    <table class="table table-condensed table-bordered" style="max-width:100%;">
+      <thead><th>File System</th><th>MB Read</th><th>MB Written</th><thead>
+	{% for key,val in fsio.items %}
+	<tr align=left><td>{{ key }}</td><td>{{ val.0|stringformat:"0.1e" }}</td><td>{{ val.1|stringformat:"0.1e" }}</td></tr>
+	{% endfor %}	
+    </table>
   </div>
 
   <div class="col-md-3">
-  <button type="button" class="btn btn-primary" data-toggle="collapse" data-target="#tests">
-    Open Metrics Summary
-  </button>
-    <div id="tests" class="collapse">
-      <table class="table table-condensed table-bordered" style="max-width:10px;">
-	<thead><th>Metric</th><th>Value</th></thead>
+    <table class="table table-condensed" style="max-width:100%;">
+    <tr><td>Executable Path  </td><td>{{ job.exec_path }}</td></tr>      
+    <tr><td>Working Directory</td><td>{{ job.cwd }}</td></tr>
+    </table>
+  </div>
+</div>
+
+<div class="col-sm-20"><a href={{ client_url }}>Client Logs</a> <a href={{ server_url }}>Server Logs</a></div>
+
+</br>
+
+<p>
+<div class="row">
+
+  <div class="col-md-1">
+    <button type="button" class="btn btn-primary" data-toggle="collapse" data-target="#procs">
+      Processes
+    </button>
+    <div id="procs" class="collapse">
+      <table class="table table-condensed table-bordered">
 	<tbody>
-	  {% for key,val in testinfo_dict.items %}
-	  <tr align=center><th>{{ key }}</th><td>{{ val|stringformat:"0.1e" }}</td></tr>
-	  {% endfor %}	
+	  {% for proc in proc_list %} 
+	  <tr><td><a href="{% url 'machine:proc_detail' job.id proc %}">{{proc}}</a></td></tr>
+	  {% endfor %}
 	</tbody>
       </table>
     </div>
   </div>
 
-  <div class="col-md-6">
+  <div class="col-md-3">
+  <button type="button" class="btn btn-primary" data-toggle="collapse" data-target="#tests">
+    Job-level Metrics
+  </button>
+    <div id="tests" class="collapse">
+      <table class="table table-condensed table-bordered"><!--- style="max-width:100px;">--->
+	<tbody>
+	  {% for key, val in metric_dict.items %}
+	  <tr align=center><th>{{ key|ljust:"10" }}</th><td>{{ val|floatformat:"1" }}</td></tr>
+	  {% endfor %}	
+	</tbody>
+      </table>
+    </div>
+  </div>
+  
+  <div class="col-md-3">
   <button type="button" class="btn btn-primary" data-toggle="collapse" data-target="#libs">
-    Click for Modules and Libraries
+    Modules and Libraries
   </button>
     <div id="libs" class="collapse">
-      <table style="max-width:30%;">
-	<tr><th>Module</th><th>Library</th></tr>
-	{% for obj in job.libraries_set.all %}
-	{% if obj.module_name != "none" %}
-	<tr><td align=left>{{ obj.module_name }}</td><td align=left> {{ obj }}</td></tr>
-	{% endif %}
-	{% if obj.module_name == "none" %}
-	<tr><td align=left>system</td><td align=left> {{ obj }}</td></tr>
-	{% endif %}
-	{% endfor %}
+      <table class="table table-condensed table-bordered" style="max-width:30%;">
+	<thead><th>Module</th><th>Library</th></thead>
+	<tbody>
+	  {% for obj in job.libraries_set.all %}
+	  {% if obj.module_name != "none" %}
+	  <tr><td align=left>{{ obj.module_name }}</td><td align=left>{{ obj.object_path }}</td></tr>
+	  {% endif %}
+	  {% if obj.module_name == "none" %}
+	  <tr><td align=left>system</td><td align=left>{{ obj.object_path }}</td></tr>
+	  {% endif %}
+	  {% endfor %}
+	</tbody>
       </table>
+    </div>
+  </div>
+
+  <div class="col-md-1">
+  <button type="button" class="btn btn-primary" data-toggle="collapse" data-target="#hosts">
+    Hosts
+  </button>
+    <div id="hosts" class="collapse">
+      <table class="table table-condensed table-bordered"><!--- style="max-width:100px;">--->
+	<tbody>
+	  {% for host in host_list %}
+	  <tr align=center><td>{{ host }}</td></tr>
+	  {% endfor %}	
+	</tbody>
+      </table>
+    </div>
   </div>
 </div>  
-</p>
+
+
 </br>
 
 <hr>
 <p><center>
-<h3>Snapshot Plots</h3>
+<h3>Host-level Plots</h3>
 <table>
   <tr>
     <td>
@@ -131,7 +161,7 @@
 
 <center>
 <button type="button" class="btn btn-primary btn-lg" data-toggle="collapse" data-target="#dev">
-  Click for Raw Device Data and Plots
+  Device Data and Plots
 </button>
 <div id="dev" class="collapse">
     <table class="table table-condensed table-bordered" style="margin-right:30px;width:100%;">
@@ -146,11 +176,11 @@
 {% else %}
     <h1>Job not found</h1>
 {% endif %}
-
+<div><p>
 <center>
      {{ div|safe }}
      {{ script|safe }}
 </center>
-
-
+</div>
+</p>
 {% endblock %}

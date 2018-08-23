@@ -12,11 +12,11 @@ import numpy
 
 ## Processor events
 def CORE_PERF_EVENT(event_select, unit_mask):
-    return event_select | (unit_mask << 8) | (1L << 16) | (1L << 17) | (0L << 21) | (1L << 22)
+    return event_select | (unit_mask << 8) | (1 << 16) | (1 << 17) | (0 << 21) | (1 << 22)
 
 # bit 21 is any thread (every hardware thread on a core increments on event)
 def CORE_PERF_EVENT1(event_select, unit_mask):
-    return event_select | (unit_mask << 8) | (1L << 16) | (1L << 17) | (1L << 21) | (1L << 22)
+    return event_select | (unit_mask << 8) | (1 << 16) | (1 << 17) | (1 << 21) | (1 << 22)
 ## Processor event map
 cpu_event_map = {
     CORE_PERF_EVENT(0xC7,0x01) : 'FP_ARITH_INST_RETIRED_SCALAR_DOUBLE,E',
@@ -66,7 +66,7 @@ cpu_event_map = {
 
 ## CBo events
 def CBOX_PERF_EVENT(event, umask):
-    return (event) | (umask << 8) | (0L << 17) | (0L << 18) | (0L << 19) | (1L << 22) | (0L << 23) | (1L << 24)
+    return (event) | (umask << 8) | (0 << 17) | (0 << 18) | (0 << 19) | (1 << 22) | (0 << 23) | (1 << 24)
 ## CBo event map
 cbo_event_map = {
     CBOX_PERF_EVENT(0x00, 0x00) : 'CLOCK_TICKS,E',
@@ -80,7 +80,7 @@ cbo_event_map = {
 
 ## Home Agent Unit events
 def HAU_PERF_EVENT(event, umask):
-    return (event) | (umask << 8) | (0L << 18) | (1L << 22) | (0L << 23) | (1L << 24)
+    return (event) | (umask << 8) | (0 << 18) | (1 << 22) | (0 << 23) | (1 << 24)
 ## Home Agent map
 hau_event_map = {
     HAU_PERF_EVENT(0x01, 0x03) : 'READ_REQUESTS,E',
@@ -91,9 +91,9 @@ hau_event_map = {
 
 ## Integrated Memory events
 def IMC_PERF_EVENT(event, umask):
-    return (event) | (umask << 8) | (0L << 18) | (1L << 22) | (0L <<23) | (1L << 24)
+    return (event) | (umask << 8) | (0 << 18) | (1 << 22) | (0 <<23) | (1 << 24)
 def IMC_PERF_EVENT_SKX(event, umask):
-    return (event) | (umask << 8) | (0L << 18) | (1L << 22) | (0L <<23) | (0L << 24)
+    return (event) | (umask << 8) | (0 << 18) | (1 << 22) | (0 <<23) | (0 << 24)
 ## Integrated Memory Controller map
 imc_event_map = {
     IMC_PERF_EVENT(0x04, 0x03) : 'CAS_READS,E',
@@ -111,7 +111,7 @@ imc_event_map = {
 
 ## Power Control Unit events
 def PCU_PERF_EVENT(event):
-    return (event) | (0L << 14) | (0L << 17) | (0L << 18) | (1L << 22) | (0L <<23) | (1L << 24) | (0L << 31)
+    return (event) | (0 << 14) | (0 << 17) | (0 << 18) | (1 << 22) | (0 <<23) | (1 << 24) | (0 << 31)
 ## Power Control map
 pcu_event_map = {
     PCU_PERF_EVENT(0x06) : 'MAX_OS_CYCLES,E',
@@ -126,7 +126,7 @@ pcu_event_map = {
 
 ## QPI Unit events
 def QPI_PERF_EVENT(event, umask):
-    return (event) | (umask << 8) | (0L << 18) | (1L << 21) | (1L << 22) | (0L <<23)
+    return (event) | (umask << 8) | (0 << 18) | (1 << 21) | (1 << 22) | (0 << 23)
 ## QPI map
 qpi_event_map = {
     QPI_PERF_EVENT(0x00, 0x01) : 'TxL_FLITS_G1_SNP,E',
@@ -137,7 +137,7 @@ qpi_event_map = {
 
 ## R2PCI Unit events
 def R2PCI_PERF_EVENT(event, umask):
-    return (event) | (umask << 8) | (0L << 18) | (1L << 22) | (0L <<23) | (1L << 24)
+    return (event) | (umask << 8) | (0 << 18) | (1 << 22) | (0 <<23) | (1 << 24)
 ## R2PCI map
 r2pci_event_map = {
     R2PCI_PERF_EVENT(0x24, 0x04) : 'TRANSMITS,E',
@@ -149,7 +149,7 @@ r2pci_event_map = {
 
 ## WESTMERE events
 def WTM_PERF_EVENT(event, umask):
-    return (event) | (umask << 8) | (1L << 16) | (1L << 17) | (1L <<21) | (1L << 22)
+    return (event) | (umask << 8) | (1 << 16) | (1 << 17) | (1 <<21) | (1 << 22)
 ## WTM map
 wtm_event_map = {
     WTM_PERF_EVENT(0x0F, 0x10) : 'MEM_UNCORE_RETIRED_REMOTE_DRAM,E',
@@ -164,7 +164,7 @@ wtm_event_map = {
     }
 ## WESTMERE UNCORE events
 def WTMUNC_PERF_EVENT(event, umask):
-    return (event) | (umask << 8) | (1L << 22)
+    return (event) | (umask << 8) | (1 << 22)
 ## WTM map
 wtmunc_event_map = {
     WTMUNC_PERF_EVENT(0x08, 0x01) : 'L3_HITS_READ,E',
@@ -180,7 +180,7 @@ wtmunc_event_map = {
 
 ## KNL EDC UCLK events (func 0 dev 0x0f, 0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16)
 def KNL_EDC_UCLK_PERF_EVENT(event, umask):
-    return (event) | (umask << 8) | (1L << 22)
+    return (event) | (umask << 8) | (1 << 22)
 knl_edc_uclk_event_map = {
     KNL_EDC_UCLK_PERF_EVENT(0x02, 0x01) : 'EDC_HIT_CLEAN,E',
     KNL_EDC_UCLK_PERF_EVENT(0x02, 0x02) : 'EDC_HIT_DIRTY,E',
@@ -190,7 +190,7 @@ knl_edc_uclk_event_map = {
 
 ## KNL EDC ECLK events (func 2 dev 0x18, 0x19, 0x1a, 0x1b, 0x1c, 0x1d, 0x1e, 0x1f)
 def KNL_EDC_ECLK_PERF_EVENT(event, umask):
-    return (event) | (umask << 8) | (1L << 22)
+    return (event) | (umask << 8) | (1 << 22)
 knl_edc_eclk_event_map = {
     KNL_EDC_ECLK_PERF_EVENT(0x01, 0x01) : 'RPQ_INSERTS,E',
     KNL_EDC_ECLK_PERF_EVENT(0x02, 0x01) : 'WPQ_INSERTS,E',
@@ -199,14 +199,14 @@ knl_edc_eclk_event_map = {
 
 ## KNL MC UCLK events (func 0 dev 0x0a, 0x0b)
 def KNL_MC_UCLK_PERF_EVENT(event, umask):
-    return (event) | (umask << 8) | (1L << 22)
+    return (event) | (umask << 8) | (1 << 22)
 knl_mc_uclk_event_map = {
     KNL_MC_UCLK_PERF_EVENT(0x00, 0x00) : 'UCLK_CYCLES,E',
 }
 
 ## KNL MC DCLK events (func 2, 3, 4 dev 0x08, 0x09)
 def KNL_MC_DCLK_PERF_EVENT(event, umask):
-    return (event) | (umask << 8) | (1L << 22)
+    return (event) | (umask << 8) | (1 << 22)
 knl_mc_dclk_event_map = {
     KNL_MC_DCLK_PERF_EVENT(0x03, 0x01) : 'CAS_READS,E',
     KNL_MC_DCLK_PERF_EVENT(0x03, 0x02) : 'CAS_WRITES,E',
@@ -234,7 +234,7 @@ class reformat_counters:
 
         # Just need the first hosts schema
         stats = None
-        for host in job.hosts.itervalues():
+        for host in job.hosts.values():
             if name not in host.stats: return
             stats = host.stats[name]
             break
@@ -257,7 +257,7 @@ class reformat_counters:
 
         # Build Schema from ctl registers and event maps
         dev_schema = []
-        for dev, array in stats.iteritems():
+        for dev, array in stats.items():
             for j in self.ctl_registers:
                 dev_schema.append(event_map.get(array[0,j], str(array[0,j])))
             break
@@ -265,9 +265,9 @@ class reformat_counters:
         # Now check for all hosts:
         # all devices have the same control settings
         # all devices control setting remain the same during the job
-        for host in job.hosts.itervalues():
+        for host in job.hosts.values():
             if name in host.stats:
-                for dev, array in host.stats[name].iteritems():
+                for dev, array in host.stats[name].items():
                     devidx = 0
                     for j in self.ctl_registers:
                         settings = array[:,j]
@@ -293,7 +293,7 @@ class reformat_counters:
         stats = host.stats[self.name]
         dev_stats = dict((str(i), numpy.zeros((len(self.job.times),len(self.ctr_registers)+len(self.fix_registers)),numpy.uint64)) for i in stats.keys())
 
-        for dev, array in stats.iteritems():
+        for dev, array in stats.items():
             data = dev_stats[dev]
             idx = 0
             for j in self.ctr_registers:                
@@ -320,10 +320,10 @@ def format_knl(job, typename):
         schema_desc = job.schemas.get(typename).desc
         registers = schema_desc.split()
 
-        for host in job.hosts.itervalues():
+        for host in job.hosts.values():
             if typename not in host.stats: return
             stats = host.stats[typename]
-            for device, values in stats.iteritems():
+            for device, values in stats.items():
                 func = device.split('.')[-1]
                 if typename == 'intel_knl_edc' and func == '0': 
                     event_map = knl_edc_uclk_event_map
@@ -338,7 +338,7 @@ def format_knl(job, typename):
                     event_map = knl_mc_dclk_event_map
                     name = "intel_knl_mc_dclk"
                 else:
-                    print typename + " function " + func + " unknown"
+                    print(typename + " function " + func + " unknown")
                     continue
 
                 host.stats.setdefault(name, {device : 0})
@@ -364,10 +364,10 @@ def format_knl(job, typename):
 def process_job(job):
 
     # These events work for SNB,IVB,HSW,BDW,SKX at this time 2015/05/27
-    for device, mapping in intel_xeon.iteritems():
+    for device, mapping in intel_xeon.items():
         if device in job.schemas:
             d = reformat_counters(job, device, mapping)
-            for host in job.hosts.itervalues():
+            for host in job.hosts.values():
                 d.register(host)
 
     format_knl(job, 'intel_knl_edc')
@@ -376,21 +376,21 @@ def process_job(job):
     # Backwards compatibility
     if 'intel_pmc3' in job.schemas:
         wtm = reformat_counters(job, 'intel_pmc3',wtm_event_map)
-        for host in job.hosts.itervalues():
+        for host in job.hosts.values():
             wtm.register(host)
 
     if 'intel_wtm' in job.schemas:
         wtm = reformat_counters(job, 'intel_wtm',wtm_event_map)
-        for host in job.hosts.itervalues():
+        for host in job.hosts.values():
             wtm.register(host)
 
     if 'intel_uncore' in job.schemas:
         wtmunc = reformat_counters(job, 'intel_uncore',wtmunc_event_map)
-        for host in job.hosts.itervalues():
+        for host in job.hosts.values():
             wtmunc.register(host)
 
     # NHM has the same events as WTM (for our purposes)
     if 'intel_nhm' in job.schemas:
         nhm = reformat_counters(job, 'intel_nhm',wtm_event_map)
-        for host in job.hosts.itervalues():
+        for host in job.hosts.values():
             nhm.register(host)

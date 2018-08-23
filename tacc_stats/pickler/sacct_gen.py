@@ -21,5 +21,5 @@ except:
 for single_date in daterange(start_date, end_date):
 
     file_name = os.path.join(acct_path, single_date.strftime("%Y-%m-%d")) + ".txt"
-    os.system("/opt/slurm/default/bin/sacct -a -s CA,CD,F,NF,TO -P -X -S " + single_date.strftime("%Y-%m-%d") + " -E " + (single_date + timedelta(1)).strftime("%Y-%m-%d") +" -o JobID,User,Account,Start,End,Submit,Partition,TimeLimit,JobName,State,NNodes,ReqCPUS,NodeList > " + file_name)
+    os.system("/bin/sacct -a -s CA,CD,F,NF,TO -P -X -S " + single_date.strftime("%Y-%m-%d") + " -E " + (single_date + timedelta(1)).strftime("%Y-%m-%d") +" -o JobID,User,Account,Start,End,Submit,Partition,TimeLimit,JobName,State,NNodes,ReqCPUS,NodeList > " + file_name)
 

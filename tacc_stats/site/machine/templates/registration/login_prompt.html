@@ -1,0 +1,20 @@
+{% extends "tacc_stats_site/base.html" %}
+
+{% block content %}
+
+<div class="row">
+    <div class="col-md-offset-3 col-md-4">
+      <center>
+        <font size="8" color="#002868"> TACC</font> <font size="8" color="#bf0a30"> Stats
+        </font>
+        <p>
+      a job-level resource usage monitoring tool
+        </p>
+      </center>
+    </div>
+  </div>
+  <hr/>
+<div><b>You are not logged in.</b></div>
+Please <a href={% url 'login' %}>log in</a> to continue to Tacc-Stats.
+</div>
+{% endblock %}

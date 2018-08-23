@@ -4,8 +4,10 @@
 <div class="container-fluid">
     <h2>Job {{ jobid }} / Type {{ type_name }}</h2>
     <h4>Rates Aggregated over devices</h4>
-{{ tscript|safe }}
-{{ tdiv|safe }}
+    <div class="graphs">
+      {{ tscript|safe }}
+      {{ tdiv|safe }}
+    </div>
 {% if stats_data %}
 <h4>Counts Aggregated over devices and hosts</h4>
 <div class="table-responsive">

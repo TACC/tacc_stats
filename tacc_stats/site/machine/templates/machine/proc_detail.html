@@ -6,8 +6,8 @@
 <table class="table table-condensed table-bordered">
   <thead><th>host</th><th>proc/pid</th><th>Memory HWM ({{ hwm_unit }})</th><th>Affinity</th><th>Threads</th></thead>
   <tbody>
-    {% for host, procs in host_map.iteritems %}
-    {% for proc, vals in procs.iteritems %} 
+    {% for host, procs in host_map.items %}
+    {% for proc, vals in procs.items %} 
     <tr>
       <td>{{ host }}</td><td>{{ proc }}</td>
       {% for val in vals %} 

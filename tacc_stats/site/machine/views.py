@@ -6,22 +6,27 @@ from django.core.cache import cache
 from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
 
 import os,sys,pwd
-import cPickle as pickle 
+import pickle as p
 
-from tacc_stats.analysis import exam
-from tacc_stats.site.machine.models import Job, Host, Libraries, TestInfo
+from tacc_stats.analysis.metrics import metrics
+from tacc_stats.site.machine.models import Job, Host, Libraries
 from tacc_stats.site.xalt.models import run, join_run_object, lib
 import tacc_stats.cfg as cfg
 import tacc_stats.analysis.plot as plots
 
 from datetime import datetime, timedelta
 
-import numpy as np
+from numpy import array, histogram, log, linspace
 
 from bokeh.embed import components
 from bokeh.layouts import gridplot
 from bokeh.plotting import figure
 from bokeh.models import HoverTool
+
+try:
+    from tacc_stats.site.machine.agave_auth import check_for_tokens
+except:
+    pass
 
 racks = set()
 nodes = set()
@@ -37,6 +42,7 @@ for host in Host.objects.values_list('name', flat=True).distinct():
 racks = sorted(list(racks))
 nodes = sorted(list(nodes))
 hosts = sorted(list(hosts))
+
 """
 sys_color = []
 import time
@@ -62,7 +68,7 @@ def sys_plot(pk):
                   toolbar_location = None,
                   x_range = racks, y_range = nodes, 
                   plot_height = 800, plot_width = 1000)
-    """
+
     import time
     start = time.time()
     ctr = 0
@@ -72,16 +78,30 @@ def sys_plot(pk):
             if name in jh: 
                 sys_color[ctr] = ["#bf0a30"] 
             ctr+=1
-    print "sys",time.time()-start
+    print("sys",time.time()-start)
     plot.xaxis.major_label_orientation = "vertical"
     plot.rect(xrack, yrack, 
               color = sys_color, width = 1, height = 1)    
-    """
+
     return components(plot)
 
 def dates(request, error = False):
+    field = {}
+    try:
+        if not check_for_tokens(request):
+            return HttpResponseRedirect("/login_prompt")
+        field['username'] = request.session['username']
+        field['is_staff'] = request.session['is_staff']
+        field['email'] = request.session['email']
+        field['logged_in'] = True
+    except: pass
+
+    job_objects = Job.objects
+    if "is_staff" in request.session and not request.session["is_staff"]:
+        job_objects = job_objects.filter(user = request.session["username"])
+
     month_dict ={}
-    date_list = Job.objects.exclude(date = None).exclude(date__lt = datetime.today() - timedelta(days = 90)).values_list('date',flat=True).distinct()
+    date_list = job_objects.exclude(date = None).exclude(date__lt = datetime.today() - timedelta(days = 90)).values_list('date',flat=True).distinct()
 
     for date in sorted(date_list):
         y,m,d = date.strftime('%Y-%m-%d').split('-')
@@ -89,17 +109,16 @@ def dates(request, error = False):
         month_dict.setdefault(key, [])
         month_dict[key].append((y+'-'+m+'-'+d, d))
 
-    field = {}
     field["machine_name"] = cfg.host_name_ext
 
-    field['md_job_list'] = Job.objects.filter(date__gt = datetime.today() - timedelta(days = 5)).exclude(LLiteOpenClose__isnull = True ).annotate(io = ExpressionWrapper(F('LLiteOpenClose')*F('nodes'), output_field = FloatField())).order_by('-io')
+    field['md_job_list'] = job_objects.filter(date__gt = datetime.today() - timedelta(days = 5)).exclude(avg_openclose__isnull = True ).annotate(io = ExpressionWrapper(F('avg_openclose')*F('nodes'), output_field = FloatField())).order_by('-io')
 
     try:
         field['md_job_list'] = field['md_job_list'][0:10]
     except: pass    
     field['md_job_list'] = list_to_dict(field['md_job_list'],'io')
 
-    field['date_list'] = sorted(month_dict.iteritems())[::-1]
+    field['date_list'] = sorted(month_dict.items())[::-1]
     field['error'] = error
     return render(request, "machine/search.html", field)
 
@@ -107,7 +126,10 @@ def search(request):
 
     if 'jobid' in request.GET:
         try:
-            job = Job.objects.get(id = request.GET['jobid'])
+            job_objects = Job.objects
+            if "is_staff" in request.session and not request.session["is_staff"]:
+                job_objects = job_objects.filter(user = request.session["username"])
+            job = job_objects.get(id = request.GET['jobid'])
             return HttpResponseRedirect("/machine/job/"+str(job.id)+"/")
         except: pass
     try:
@@ -120,7 +142,7 @@ def search(request):
 def index(request, **kwargs):
 
     fields = request.GET.dict()
-    fields = {k:v for k,v in fields.items() if v}
+    fields = { k:v for k, v in fields.items() if v }
     fields.update(kwargs)
 
     if 'page' in fields: del fields['page']
@@ -135,7 +157,7 @@ def index(request, **kwargs):
         del fields['opt_field3'], fields['value3']
 
     name = ''
-    for key, val in fields.iteritems():
+    for key, val in fields.items():
         name += key+'='+val+'\n'
 
     order_key = '-id'
@@ -143,16 +165,18 @@ def index(request, **kwargs):
         order_key = fields['order_key']
         del fields['order_key']
         
-    if fields.has_key('date'): 
+    if "date" in fields: 
         date = fields['date'].split('-')
         if len(date) == 2:
             fields['date__year'] = date[0]
             fields['date__month'] = date[1]
             del fields['date']
 
+    job_objects = Job.objects
+    if "is_staff" in request.session and not request.session["is_staff"]:
+        job_objects = job_objects.filter(user = request.session["username"])
 
-    job_list = Job.objects.filter(**fields).distinct().order_by(order_key)
-
+    job_list = job_objects.filter(**fields).distinct().order_by(order_key)
     fields['name'] =  'Query [fields=values] ' + name.rstrip('-')    
 
     paginator = Paginator(job_list,100)
@@ -170,7 +194,7 @@ def index(request, **kwargs):
                                                           job_hist(job_list, "nodes", "# Nodes"),
                                                           job_hist(job_list, "queue_wait", "Hours", 
                                                                    scale = 3600),
-                                                          job_hist(job_list, "LLiteOpenClose", "iops"), 
+                                                          job_hist(job_list, "avg_openclose", "iops"), 
                                                           ncols = 2, toolbar_options = {"logo" : None},
                                                           plot_width = 400, plot_height = 200)
                                              )
@@ -179,37 +203,36 @@ def index(request, **kwargs):
     fields['nj'] = job_list.count()
 
     # Computed Metrics
-    fields['cat_job_list']  = job_list.filter(Q(cat__lte = 0.001) | Q(cat__gte = 1000)).exclude(cat = float('nan'))
+    fields['cat_job_list']  = job_list.filter(Q(time_imbalance__lte = 0.001) | \
+                                              Q(time_imbalance__gte = 1000)).exclude(time_imbalance = float('nan'))
     
     completed_list = job_list.exclude(status__in=['CANCELLED','FAILED']).order_by('-id')
     if len(completed_list) > 0:
-        fields['md_job_list'] = job_list.exclude(LLiteOpenClose__isnull = True ).order_by('-LLiteOpenClose')
+        fields['md_job_list'] = job_list.exclude(avg_openclose__isnull = True ).order_by('-avg_openclose')
         try:
             fields['md_job_list'] = fields['md_job_list'][0:10]
         except: pass
 
-        fields['idle_job_list'] = completed_list.filter(idle__gte = 0.99)
-        fields['mem_job_list'] = completed_list.filter(mem__lte = 30, queue = 'largemem')
+        fields['idle_job_list'] = completed_list.filter(node_imbalance__gte = 0.99)
 
-        fields['cpi_thresh'] = 1.5
-        fields['cpi_job_list']  = completed_list.exclude(cpi = float('nan')).filter(cpi__gte = fields['cpi_thresh'])
+        fields['cpi_thresh'] = 3.0
+        fields['cpi_job_list']  = completed_list.exclude(avg_cpi = float('nan')).filter(avg_cpi__gte = fields['cpi_thresh'])
         fields['cpi_per'] = 100*fields['cpi_job_list'].count()/float(completed_list.count())
 
-        fields['gigebw_thresh'] = 2**20
-        fields['gigebw_job_list']  = completed_list.exclude(GigEBW = float('nan')).filter(GigEBW__gte = fields['gigebw_thresh'])
+        fields['gigebw_thresh'] = 1
+        fields['gigebw_job_list']  = completed_list.exclude(avg_ethbw = float('nan')).filter(avg_ethbw__gte = fields['gigebw_thresh'])
 
-        fields['md_job_list'] = list_to_dict(fields['md_job_list'],'LLiteOpenClose')
-        fields['idle_job_list'] = list_to_dict(fields['idle_job_list'],'idle')
-        fields['cat_job_list'] = list_to_dict(fields['cat_job_list'],'cat')
-        fields['cpi_job_list'] = list_to_dict(fields['cpi_job_list'],'cpi')
-        fields['mem_job_list'] = list_to_dict(fields['mem_job_list'],'mem')
-        fields['gigebw_job_list'] = list_to_dict(fields['gigebw_job_list'],'GigEBW')
+        fields['md_job_list'] = list_to_dict(fields['md_job_list'],'avg_openclose')
+        fields['idle_job_list'] = list_to_dict(fields['idle_job_list'],'node_imbalance')
+        fields['cat_job_list'] = list_to_dict(fields['cat_job_list'],'time_imbalance')
+        fields['cpi_job_list'] = list_to_dict(fields['cpi_job_list'],'avg_cpi')
+        fields['gigebw_job_list'] = list_to_dict(fields['gigebw_job_list'],'avg_ethbw')
     
     if '?' in request.get_full_path():
         fields['current_path'] = request.get_full_path()
     return render(request, "machine/index.html", fields)
 
-def list_to_dict(job_list,metric):
+def list_to_dict(job_list, metric):
     job_dict={}
     for job in job_list:
         job_dict.setdefault(job.user,[]).append((job.id,round(job.__dict__[metric],3)))
@@ -223,11 +246,11 @@ def job_hist(job_list, value, units, scale = 1.0):
     p1.xaxis.axis_label = units
     p1.yaxis.axis_label = "# Jobs"
     job_list = job_list.filter(**{value + "__isnull" : False})
-    values = np.array(job_list.values_list(value, flat=True))/scale
+    values = array(job_list.values_list(value, flat=True))/scale
     if len(values) == 0: return None
 
-    hist, edges = np.histogram(values,
-                               bins = np.linspace(0, max(values), max(3, 5*np.log(len(values)))))
+    hist, edges = histogram(values,
+                            bins = linspace(0, max(values), max(3, 5*log(len(values)))))
     p1.quad(top = hist, bottom = 1, left = edges[:-1], right = edges[1:])    
     return p1
 
@@ -236,8 +259,11 @@ def get_data(pk):
         data = cache.get(pk)
     else:
         job = Job.objects.get(pk = pk)
-        with open(os.path.join(cfg.pickles_dir,job.date.strftime('%Y-%m-%d'),str(job.id)),'rb') as f:
-            data = pickle.load(f)
+        with open(os.path.join(cfg.pickles_dir, 
+                               job.date.strftime('%Y-%m-%d'), 
+                               str(job.id)), 'rb') as fd:
+            try: data = p.load(fd)
+            except: data = p.load(fd, encoding = 'latin1') # Python2 compatibility
             cache.set(job.id, data)
     return data
 
@@ -258,84 +284,96 @@ def type_plot(pk, typename):
 
 def build_schema(data,name):
     schema = []
-    for key,value in data.get_schema(name).iteritems():
+    for key,value in data.get_schema(name).items():
         if value.unit:
             schema.append(value.key + ','+value.unit)
         else: schema.append(value.key)
     return schema
 
-class JobDetailView(DetailView):
+metric_names = [
+    "avg_cpuusage [#cores]",
+    "mem_hwm [GB]", 
+    "node_imbalance",
+    "time_imbalance",
+    "avg_flops [GF]",
+    "vecpercent [%]",
+    "avg_cpi [cyc/ins]", 
+    "avg_loads [#/s]", 
+    "avg_l1loadhits [#/s]",
+    "avg_l2loadhits [#/s]", 
+    "avg_llcloadhits [#/s]", 
+    "avg_mbw [GB/s]", 
+    "avg_mcdrambw [GB/s]",
+    "avg_fabricbw [MB/s]",
+    "max_fabricbw [MB/s]",
+    "avg_packetsize [MB]",
+    "max_packetrate [#/s]", 
+    "avg_ethbw [MB/s]",  
+    "max_mds [#/s]",
+    "avg_lnetmsgs [#/s]", 
+    "avg_lnetbw [MB/s]", 
+    "max_lnetbw [MB/s]",
+    "avg_mdcreqs [#/s]", 
+    "avg_mdcwait [us]", 
+    "avg_oscreqs [#/s]",
+    "avg_oscwait [us]",
+    "avg_openclose [#/s]", 
+    "avg_blockbw [MB/s]"
+]
 
+class JobDetailView(DetailView):
     model = Job
-    
     def get_context_data(self, **kwargs):
         context = super(JobDetailView, self).get_context_data(**kwargs)
         job = context['job']
-
         data = get_data(job.id)
-        
-        testinfo_dict = {}
-        for obj in TestInfo.objects.all():
-            test_type = getattr(sys.modules[exam.__name__],obj.test_name)
-            test = test_type(min_time=0,ignore_qs=[])
-            try: 
-                metric = test.test(os.path.join(cfg.pickles_dir, 
-                                                job.date.strftime('%Y-%m-%d'),
-                                                str(job.id)), data)
-                if not metric or np.isnan(metric) : continue            
-                setattr(job,obj.field_name,metric)
-                testinfo_dict[obj.test_name] = metric
-            except: continue
-        context['testinfo_dict'] = testinfo_dict
 
+        # Prepare metrics
+        metric_dict = {}
+        for name in metric_names:
+            val = getattr(job, name.split(' ')[0])
+            if val: metric_dict[name] = val
+        context['metric_dict'] = metric_dict
+
+        # Prepare process names
         proc_list = []
-        type_list = []
-        host_list = []
-
-        fsio_dict = {}
-
-        for host_name, host in data.hosts.iteritems():
-            if host.stats.has_key('proc'):
-                for proc_pid,val in host.stats['proc'].iteritems():
+        for host_name, host in data.hosts.items():
+            if "proc" in host.stats:
+                for proc_pid, val in host.stats['proc'].items():
                     if val[0][0]:
-
                         try: 
                             proc = proc_pid.split('/')[0]
                         except:
                             proc = proc_pid
-
                         proc_list += [proc]
                 proc_list = list(set(proc_list))
-            host_list.append(host_name)
-            try:
-                if host.stats.has_key('llite'):
-                    schema = data.get_schema('llite')
-                    rd_idx = schema['read_bytes'].index
-                    wr_idx = schema['write_bytes'].index
+        context['proc_list'] = proc_list
 
-                    for device, value in host.stats['llite'].iteritems():
-                        fsio_dict.setdefault(device, [0.0, 0.0])
-                        fsio_dict[device][0] += value[-1, rd_idx] 
-                        fsio_dict[device][1] += value[-1, wr_idx]
-            except:
-                pass
-        for key, val in fsio_dict.iteritems():
-            val[0] = val[0] * 2.0**(-20)
-            val[1] = val[1] * 2.0**(-20)
+        # Prepare FS IO 
+        fsio_dict = {}
+        schema = data.get_schema('llite')
+        rd_idx = schema['read_bytes'].index
+        wr_idx = schema['write_bytes'].index
+        for host_name, host in data.hosts.items():
+            for device, value in host.stats['llite'].items():
+                fsio_dict.setdefault(device, [0.0, 0.0])
+                fsio_dict[device][0] += value[-1, rd_idx]/(1024*1024) 
+                fsio_dict[device][1] += value[-1, wr_idx]/(1024*1024) 
         context['fsio'] = fsio_dict
 
-        if len(host_list) != job.nodes:
-            job.status = str(job.nodes-len(host_list))+"_NODES_MISSING"
-        host0=data.hosts.values()[0]
-        for type_name, type in host0.stats.iteritems():
+        # Prepare device type list
+        type_list = []
+        host0 = list(data.hosts.values())[0]
+        for type_name, type in host0.stats.items():
             schema = ' '.join(build_schema(data,type_name))
             type_list.append( (type_name, schema[0:200]) )
-
         type_list = sorted(type_list, key = lambda type_name: type_name[0])
-
-        context['proc_list'] = proc_list
-        context['host_list'] = host_list
         context['type_list'] = type_list
+
+        host_list = list(data.hosts.keys())
+        if len(host_list) != job.nodes:
+            job.status = str(job.nodes-len(host_list))+"_NODES_MISSING"
+        context['host_list'] = host_list
 
         ### Specific to Stampede2 Splunk 
         urlstring="https://scribe.tacc.utexas.edu:8000/en-US/app/search/search?q=search%20"
@@ -382,7 +420,6 @@ def type_detail(request, pk, type_name):
         stats.append((times[t],temp))
         
     script, div = type_plot(pk, type_name)
-
     return render(request, "machine/type_detail.html",
                   {"type_name" : type_name, "jobid" : pk, 
                    "stats_data" : stats, "schema" : schema,
@@ -396,12 +433,10 @@ def proc_detail(request, pk, proc_name):
     schema = data.get_schema('proc')
     hwm_idx = schema['VmHWM'].index
     hwm_unit = "gB"
-
     thr_idx = schema['Threads'].index
 
-    for host_name, host in data.hosts.iteritems():
-
-        for proc_pid, val in host.stats['proc'].iteritems():
+    for host_name, host in data.hosts.items():
+        for proc_pid, val in host.stats['proc'].items():
 
             host_map.setdefault(host_name, {})
             proc_, pid, cpu_aff, mem_aff = proc_pid.split('/') 

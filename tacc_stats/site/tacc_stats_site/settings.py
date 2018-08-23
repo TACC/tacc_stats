@@ -24,15 +24,14 @@ DATABASES = {
         },
     # Uncomment this portion if an xalt database exists
     'xalt' : {
-        'ENGINE' : 'django.db.backends.mysql',
-        'NAME' : 'xalt',
+        'ENGINE' : 'mysql.connector.django',
+        'NAME' : 'xalt_' + cfg.machine,
         'USER' : 'xaltUser',
         'PASSWORD' : 'kutwgbh',
         'HOST' : 'xalt'
         }        
     }
 
-print '>>>>>>>>>>>>', DATABASES
 
 # Hosts/domain names that are valid for this site; required if DEBUG is False
 # See https://docs.djangoproject.com/en/1.5/ref/settings/#allowed-hosts
@@ -120,7 +119,7 @@ TEMPLATES = [
     },
 ]
 
-MIDDLEWARE_CLASSES = (
+MIDDLEWARE = (
     'django.middleware.common.CommonMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
@@ -190,4 +189,64 @@ CACHES = {
         'LOCATION': '127.0.0.1:11211',
         'TIMEOUT' : None,
         },
+}
+
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'formatters': {
+        'default': {
+            'format': '[DJANGO] %(levelname)s %(asctime)s %(module)s '
+                      '%(name)s.%(funcName)s:%(lineno)s: %(message)s'
+        },
+        'agave': {
+            'format': '[AGAVE] %(levelname)s %(asctime)s %(module)s '
+                      '%(name)s.%(funcName)s:%(lineno)s: %(message)s'
+        },
+        'metrics': {
+            'format': '[METRICS] %(levelname)s %(module)s %(name)s.%(funcName)s:%(lineno)s:'
+                      ' %(message)s user=%(user)s sessionId=%(sessionId)s op=%(operation)s'
+                      ' info=%(info)s'
+        },
+    },
+    'handlers': {
+        'console': {
+            'level': 'DEBUG',
+            'class': 'logging.StreamHandler',
+            'formatter': 'default',
+        },
+        'opbeat': {
+            'level': 'ERROR',
+            'class': 'logging.StreamHandler',
+        },
+        'metrics': {
+            'level': 'INFO',
+            'class': 'logging.StreamHandler',
+            'formatter': 'metrics',
+        },
+    },
+    'loggers': {
+        'django': {
+            'handlers': ['console', 'opbeat'],
+            'level': 'INFO',
+            'propagate': True,
+        },
+        'designsafe': {
+            'handlers': ['console', 'opbeat'],
+            'level': 'DEBUG',
+        },
+        'celery': {
+            'handlers': ['console', 'opbeat'],
+            'level': 'DEBUG',
+            'propagate': True
+        },
+        'opbeat': {
+            'handlers': ['console'],
+            'level': 'INFO',
+        },
+        'metrics': {
+            'handlers': ['metrics'],
+            'level': 'INFO',
+        },
+    },
 }

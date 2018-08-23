@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 from setuptools import setup, find_packages
 import os
-from ConfigParser import ConfigParser
+from configparser import ConfigParser
 
 DISTNAME = 'tacc_stats'
 LICENSE = 'LGPL'
@@ -9,7 +9,7 @@ AUTHOR = "Texas Advanced Computing Center"
 EMAIL = "rtevans@tacc.utexas.edu"
 URL = "http://www.tacc.utexas.edu"
 DOWNLOAD_URL = 'https://github.com/TACC/tacc_stats'
-VERSION = "2.3.0"
+VERSION = "2.3.3"
 
 DESCRIPTION = ("A job-level performance monitoring and analysis package for \
 High Performance Computing Platforms")
@@ -18,13 +18,11 @@ TACC Stats unifies and extends the measurements taken by Linux monitoring utilit
 """
 
 scripts=[
-    'tacc_stats/analysis/job_sweeper.py',
-    'tacc_stats/analysis/job_plotter.py',
     'tacc_stats/analysis/job_printer.py',
     'tacc_stats/site/manage.py',
     'tacc_stats/site/machine/update_db.py',
     'tacc_stats/pickler/job_pickles.py',
-    'tacc_stats/pickler/job_pickles_slurm.py',
+    'tacc_stats/pickler/sacct_gen.py',
     'tacc_stats/listend.py'
     ]
 
@@ -33,9 +31,7 @@ config.read("tacc_stats.ini")
 
 with open("tacc_stats/cfg.py", 'w') as fd:
     for s in config.sections():
-        print s
-        for key, val in dict(config.items(s)).iteritems():
-            print key,val
+        for key, val in dict(config.items(s)).items():
             fd.write(key + " = " + "\"" + val + "\"" + '\n')
 
 setup(
@@ -52,9 +48,9 @@ setup(
     package_data = {'tacc_stats' : ['cfg.py']},
     include_package_data = True,
     scripts = scripts,
-    setup_requires = ['nose'],
-    install_requires = ['argparse','numpy','matplotlib','scipy','bokeh', 'django'],
-    test_suite = 'nose.collector',
+    install_requires = ['argparse','numpy','matplotlib', 'psycopg2-binary',
+                        'bokeh', 'django', 'python-hostlist', 'PyMySQL',
+                        'mysql-connector-python', 'python-memcached'],
     platforms = 'any',
     classifiers = [
         'Development Status :: 5 - Production',
@@ -62,12 +58,8 @@ setup(
         'Operating System :: Linux',
         'Intended Audience :: Science/Research',
         'Programming Language :: Python',
-        'Programming Language :: Python :: 2',
         'Programming Language :: Python :: 3',
-        'Programming Language :: Python :: 2.6',
-        'Programming Language :: Python :: 2.7',
-        'Programming Language :: Python :: 3.2',
-        'Programming Language :: Python :: 3.3',
+        'Programming Language :: Python :: 3.7',
         'Topic :: Scientific/Engineering',
     ]
 )

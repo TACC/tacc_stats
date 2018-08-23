@@ -49,24 +49,21 @@ class MasterPlot():
                        "SSE_DOUBLE_SCALAR" : 1, 
                        "SSE_DOUBLE_PACKED" : 2, 
                        "SIMD_DOUBLE_256" : 4}
-      for hostname, stats in _stats.iteritems():
+      for hostname, stats in _stats.items():
         flops = 0
         for eventname in schema:
           if eventname in vector_widths:
             index = schema[eventname].index
             flops += stats[:, index]*vector_widths[eventname]
-        rate = numpy.diff(flops)/numpy.diff(job.times)/1.0e9
+        rate = numpy.diff(flops)/numpy.diff(u.t)/1.0e9
         source = ColumnDataSource({"x" : u.hours, "y" : numpy.append(rate, rate[-1])})
         plot.add_glyph(source, Step(x = "x",y = "y", mode = "after", 
                                     line_color = hc[hostname]))
       plots += [self.add_axes(plot, "GFLOPS")]
     except: 
       print("FLOPS plot fails for JOBID", job.id)
-      print sys.exc_info()
+      print(sys.exc_info())
     
-    print "flops time", time.time()-start
-    start = time.time()
-
     # Plot MCDRAM BW for KNL    
     try:
       if u.pmc == 'intel_knl':
@@ -78,19 +75,18 @@ class MasterPlot():
         for hostname in imc_stats.keys():                      
           rate = edce_stats[hostname][:, edce_schema["RPQ_INSERTS"].index] + \
                      edce_stats[hostname][:, edce_schema["WPQ_INSERTS"].index]
-          if not "Flat" in job.acct["queue"]:
+          if not "flat" in job.acct["queue"].lower():
             rate -= edcu_stats[hostname][:, edcu_schema["EDC_MISS_CLEAN"].index] + \
                         edcu_stats[hostname][:, edcu_schema["EDC_MISS_DIRTY"].index] + \
                         imc_stats[hostname][:, imc_schema["CAS_READS"].index]
-          rate = numpy.diff(rate)/numpy.diff(job.times)*64/(2**30)
+          rate = numpy.diff(rate)/numpy.diff(u.t)*64/(2**30)
           source = ColumnDataSource({"x" : u.hours, "y" : numpy.append(rate, rate[-1])})
           plot.add_glyph(source, Step(x = "x",y = "y", mode = "after", 
                                       line_color = hc[hostname]))
         plots += [self.add_axes(plot, "MCDRAM GB/s")]
     except:
-      print('MCDRAM Bandwidth plot failed for jobid ' + job.id )
-      print sys.exc_info()
-    print "mcdram time ", time.time()-start
+      print("MCDRAM Bandwidth plot failed for jobid", job.id)
+      print(sys.exc_info())
 
     start = time.time()
     # Plot DRAM Bandwidth (GB/s)
@@ -98,18 +94,17 @@ class MasterPlot():
       plot = Plot(plot_width=400, plot_height=150, 
                   x_range = DataRange1d(), y_range = DataRange1d())
       schema, _stats  = u.get_type("imc")
-      for hostname, stats in _stats.iteritems():               
+      for hostname, stats in _stats.items():               
         rate = stats[:, schema["CAS_READS"].index] + \
                  stats[:, schema["CAS_WRITES"].index]
-        rate = numpy.diff(rate)/numpy.diff(job.times)*64/(2**30)
+        rate = numpy.diff(rate)/numpy.diff(u.t)*64/(2**30)
         source = ColumnDataSource({"x" : u.hours, "y" : numpy.append(rate, rate[-1])})
         plot.add_glyph(source, Step(x = "x",y = "y", mode = "after", 
                                     line_color = hc[hostname]))
       plots += [self.add_axes(plot,"DRAM GB/s")]
     except:
       print('DRAM Bandwidth plot failed for jobid ' + job.id )
-      print sys.exc_info()
-    print "dram time", time.time()-start
+      print(sys.exc_info())
 
     # Plot Memory Usage (GB)
     try: 
@@ -117,7 +112,7 @@ class MasterPlot():
                   x_range = DataRange1d(), y_range = DataRange1d())
       schema, _stats = u.get_type("mem")
       y = []
-      for hostname, stats in _stats.iteritems():               
+      for hostname, stats in _stats.items():               
         usage = (stats[:, schema["MemUsed"].index] - \
                  stats[:, schema["Slab"].index] - \
                  stats[:, schema["FilePages"].index])/(2.0**30)
@@ -126,92 +121,74 @@ class MasterPlot():
                                     line_color = hc[hostname]))
       plots += [self.add_axes(plot, "Memory Usage GB")]
     except:
-      print("Memory Usage plot failed for jobid ", job.id)
-      print sys.exc_info()
+      print("Memory Usage plot failed for jobid", job.id)
+      print(sys.exc_info())
 
-    start = time.time()
     # Plot LNET Bandwidth
     try:      
       plot = Plot(plot_width=400, plot_height=150, 
                   x_range = DataRange1d(), y_range = DataRange1d())
       schema, _stats  = u.get_type("lnet")
       y = []
-      for hostname, stats in _stats.iteritems():               
+      for hostname, stats in _stats.items():               
         rate = stats[:, schema["rx_bytes"].index] + \
                stats[:, schema["tx_bytes"].index]
-        rate = numpy.diff(rate)/numpy.diff(job.times)/(2**20)
+        rate = numpy.diff(rate)/numpy.diff(u.t)/(2**20)
         source = ColumnDataSource({"x" : u.hours, "y" : numpy.append(rate, rate[-1])})
         plot.add_glyph(source, Step(x = "x",y = "y", mode = "after",
                                     line_color = hc[hostname]))
       plots += [self.add_axes(plot, "LNET MB/s")]
     except:
-      print('LNET Bandwidth plot failed for jobid ' + job.id )
-      print sys.exc_info()
-    print "lnet time", time.time()-start
+      print("LNET Bandwidth plot failed for jobid", job.id )
+      print(sys.exc_info())
 
     # Plot IB Bandwidth
     try:      
       plot = Plot(plot_width=400, plot_height=150, 
-                  x_range = DataRange1d(), y_range = DataRange1d())
-      schema, _stats  = u.get_type("ib_sw")
-      for hostname, stats in _stats.iteritems():               
-        rate = stats[:, schema["rx_bytes"].index] + \
-               stats[:, schema["tx_bytes"].index]
-        rate = numpy.diff(rate)/numpy.diff(job.times)/(2**20)
+                  x_range = DataRange1d(), y_range = DataRange1d())      
+      try:
+        schema, _stats  = u.get_type("ib_ext")
+        rx, tx = stats[:, schema["port_rcv_data"].index], stats[:, schema["port_xmit_data"].index]
+        conv2mb = 2**20
+      except:
+        schema, _stats  = u.get_type("opa")
+        rx, tx = schema["portRcvData"].index, schema["portXmitData"].index
+        conv2mb = 125000
+      for hostname, stats in _stats.items():               
+        rate = numpy.diff(stats[:, rx] + stats[:, tx])/numpy.diff(u.t)/conv2mb
         source = ColumnDataSource({"x" : u.hours, "y" : numpy.append(rate, rate[-1])})
         plot.add_glyph(source, Step(x = "x",y = "y", mode = "after",
                                     line_color = hc[hostname]))
-      plots += [self.add_axes(plot, "IB MB/s")]
+      plots += [self.add_axes(plot, "Fabric MB/s")]
     except:
-      print('IB Bandwidth plot failed for jobid ' + job.id )
-      print sys.exc_info()
+      print("Fabric Bandwidth plot failed for jobid", job.id )
+      print(sys.exc_info())
 
-    start = time.time()
-    # Plot OPA Bandwidth
-    try:      
-      plot = Plot(plot_width=400, plot_height=150, 
-                  x_range = DataRange1d(), y_range = DataRange1d())
-      schema, _stats  = u.get_type("opa")
-      for hostname, stats in _stats.iteritems():               
-        rate = stats[:, schema["portRcvData"].index] + \
-               stats[:, schema["portXmitData"].index]
-        rate = numpy.diff(rate)/numpy.diff(job.times)/125000
-        source = ColumnDataSource({"x" : u.hours, "y" : numpy.append(rate, rate[-1])})
-        plot.add_glyph(source, Step(x = "x",y = "y", mode = "after",
-                                    line_color = hc[hostname]))
-      plots += [self.add_axes(plot, "OPA MB/s")]
-    except:
-      print('OPA Bandwidth plot failed for jobid ' + job.id )
-      print sys.exc_info()
-    print "opa time", time.time()-start
-
-    start = time.time()
     #Plot CPU Usage
     try:      
       plot = Plot(plot_width=400, plot_height=150, 
                   x_range = DataRange1d(), y_range = DataRange1d())
       schema, _stats  = u.get_type("cpu")
-      for hostname, stats in _stats.iteritems():               
+      for hostname, stats in _stats.items():               
         busy = stats[:, schema["user"].index] + stats[:, schema["system"].index] + \
                stats[:, schema["nice"].index]
         idle = stats[:, schema["iowait"].index] + stats[:, schema["idle"].index] + \
                stats[:, schema["irq"].index] + stats[:, schema["softirq"].index]
-        usage = 100*numpy.diff(busy)/numpy.diff(busy+idle)
+        usage = 100*numpy.diff(busy)/numpy.diff(busy + idle)
         source = ColumnDataSource({"x" : u.hours, "y" : numpy.append(usage, usage[-1])})
         plot.add_glyph(source, Step(x = "x",y = "y", mode = "after",
                                     line_color = hc[hostname]))
       plots += [self.add_axes(plot, "CPU Usage %")]
     except:
-      print('CPU Usage plot failed for jobid ' + job.id )
-      print sys.exc_info()
-    print "cpu time", time.time()-start
+      print("CPU Usage plot failed for jobid", job.id )
+      print(sys.exc_info())
 
     # Plot CPU Frequency
     try:      
       plot = Plot(plot_width=400, plot_height=150, 
                   x_range = DataRange1d(), y_range = DataRange1d())
       schema, _stats  = u.get_type("pmc")
-      for hostname, stats in _stats.iteritems():               
+      for hostname, stats in _stats.items():               
         rate = u.freq*(numpy.diff(stats[:, schema["CLOCKS_UNHALTED_CORE"].index]) / \
                           numpy.diff(stats[:, schema["CLOCKS_UNHALTED_REF"].index]))
         source = ColumnDataSource({"x" : u.hours, "y" : numpy.append(rate, rate[-1])})
@@ -219,7 +196,7 @@ class MasterPlot():
                                     line_color = hc[hostname]))
       plots += [self.add_axes(plot, "Freq GHz")]
     except:
-      print('CPU Frequency plot failed for jobid ' + job.id )
-      print sys.exc_info()
+      print("CPU Frequency plot failed for jobid", job.id )
+      print(sys.exc_info())
 
-    return gridplot(*plots, ncols = len(plots)/4 + 1, toolbar_options = {"logo" : None})
+    return gridplot(*plots, ncols = len(plots)//4 + 1, toolbar_options = {"logo" : None})

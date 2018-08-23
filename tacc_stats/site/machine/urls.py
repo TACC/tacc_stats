@@ -1,33 +1,36 @@
 from django.conf.urls import url
+from django.urls import path
 from django.views.generic import DetailView, ListView
 from tacc_stats.site.machine.models import Job
 from tacc_stats.site.machine.views import *
 
-urlpatterns = [
-                       url(r'^$',dates, name='dates'),
+app_name = "tacc_stats"
 
-                       url(r'^job/(?P<pk>\d+)/$',
+urlpatterns = [
+                       path('',dates, name='dates'),
+
+                       path('job/<pk>/',
                            JobDetailView.as_view(), name='job'),
-                       url(r'^job/(?P<pk>\d+)/(?P<type_name>\w+)/$',
+                       path('job/<pk>/<type_name>/',
                            type_detail, name = 'type_detail'),
 
-                       url(r'^proc/(?P<pk>\d+)/(?P<proc_name>.*)/$',
+                       path('proc/<pk>/<proc_name>/',
                            proc_detail, name = 'proc_detail'),
 
-                       url(r'^date/(?P<date>\d{4}-\d{2}-\d{2})/$', 
+                       path('date/<date>', 
                            index, name='date_view'),
-                       url(r'^date/(?P<date>\d{4}-\d{2})/$', 
-                           index, name='date_view'),
+                       #url(r'date/<date>', 
+                       #    index, name='date_view'),
 
-                       url(r'^uid/(?P<uid>\d+?)/$',
+                       path('uid/<uid>/',
                            index, name='uid_view'),
-                       url(r'^user/(?P<user>.+?)/$',
+                       path('user/<user>/',
                            index, name='user_view'),
-                       url(r'^project/(?P<project>.+?)/$',
+                       path('project/<project>/',
                            index, name='project_view'),
-                       url(r'^exe/(?P<exe__icontains>.+?)/$',
+                       path('exe/<exe__icontains>)/',
                            index, name='exe_view'),
                        
-                       url(r'^search/$',search, name='search'),
+                       path('search/',search, name='search'),
 ]
 

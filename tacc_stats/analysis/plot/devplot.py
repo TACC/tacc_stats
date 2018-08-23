@@ -32,13 +32,11 @@ class DevPlot():
 
     schema, _stats  = u.get_type(typename)
     # Plot this type of data
-    import time
     for index, event in enumerate(schema):
-      start = time.time()
       try:
         plot = Plot(plot_width=400, plot_height=150, 
                     x_range = DataRange1d(), y_range = DataRange1d())                  
-        for hostname, stats in _stats.iteritems():               
+        for hostname, stats in _stats.items():               
           rate = stats[:, index]
           if typename == "mem":
             source = ColumnDataSource({"x" : u.hours, "y" : rate})
@@ -52,6 +50,5 @@ class DevPlot():
         plots += [self.add_axes(plot, event)]
       except:
         print(event + ' plot failed for jobid ' + job.id )
-        print sys.exc_info()
-      print event,"time ",time.time()-start
-    return gridplot(*plots, ncols = len(plots)/4 + 1, toolbar_options = {"logo" : None})
+        print(sys.exc_info())
+    return gridplot(*plots, ncols = len(plots)//4 + 1, toolbar_options = {"logo" : None})

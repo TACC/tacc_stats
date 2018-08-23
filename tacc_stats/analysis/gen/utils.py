@@ -9,6 +9,9 @@ class utils():
     self.hostnames  = sorted(job.hosts.keys())
     self.wayness = int(job.acct['cores'])/int(job.acct['nodes'])
     self.hours = ((job.times[:] - job.times[0])/3600.).astype(float)
+    self.t = job.times
+    self.nt = len(job.times)
+    self.dt = (job.times[-1] - job.times[0]).astype(float)
     for typename in  job.schemas.keys():
       if typename in freq_list:
           self.pmc  = typename
@@ -22,7 +25,7 @@ class utils():
 
     schema = self.job.schemas[typename]
     stats = {}
-    for hostname, host in self.job.hosts.iteritems():
+    for hostname, host in self.job.hosts.items():
       stats[hostname] = 0
       for devname in host.stats[typename]:
           stats[hostname] += host.stats[typename][devname].astype(float)
