@@ -82,22 +82,16 @@ and
 `echo - > jobid_file`
 
 To perform the pickling of this data it is also necessary to
-generate an accounting file that contains at least the JOBID and time range
-that the job ran.  The pickling will currently work without modification on
-SGE job schedulers.  It will also work on any accounting file with the format
+generate an accounting file that contains the following information
+in the following format
 
-`Job ID ($JOBID) : User ID ($UID) : Project ID ($ACCOUNT) : Junk ($BATCH) : Start time ($START) : End time ($END) : Time job entered in queue ($SUBMIT) : SLURM partition ($PARTITION) : Requested Time ($LIMIT) : Job name ($JOBNAME) : Job completion status ($JOBSTATE) : Nodes ($NODECNT) : Cores ($PROCS)`
+`JobID|User|Account|Start|End|Submit|Partition|Timelimit|JobName|State|NNodes|ReqCPUS|NodeList`
 
-for each record using the SLURM interface (set by the `batch_system` field in the site-specific configuration file).  In addition to the accounting file, a directory of host-file logs (hosts belonging to a particular job) must be
-generated. The host file directories should have the form
+for example,
 
-`/year/month/day/hostlist.JOBID`
+1837137|rtevans|project140208|2018-08-01T18:18:51|2018-08-02T11:44:51|2018-07-29T08:05:43|normal|1-00:00:00|jobname|COMPLETED|8|104|c420-[024,073],c421-[051-052,063-064,092-093]
 
-with hostlist.JOBID listing the hosts allocated to the job in a single column.
-
-The accounting file and host-file logs will be used to map JOBID's to
-time and node ranges so that the job-level data can be extracted from the
-raw data efficiently.
+If using SLURM the `sacct_gen.py` script that installed with `tacc_stats` may be used.
 
 #### `tacc_stats` subpackage
  To install TACC Stats on the machine where data will be processed, analyzed, and the webserver hosted follow these
@@ -143,7 +137,7 @@ Set these paths as needed.  The raw stats data will be stored in the `archive_di
 anything in the `monitor` subpackage.
 3.  Install `tacc_stats`
 ```
-$ pip install tacc_stats/
+$ pip install -e tacc_stats/
 ```
 4.  Start the RabbitMQ server reader in the background, e.g. 
 ```
@@ -179,17 +173,21 @@ cron file
 7.  Next configure the Apache server (make sure it is installed and the `mod_wsgi` Apache module is installed)
 A sample configuration file, `/etc/httpd/conf.d/ls5.conf`, looks like
 ```
-LoadModule wsgi_module modules/mod_wsgi.so
+LoadModule wsgi_module /stats/stampede2/lib/python3.7/site-packages/mod_wsgi/server/mod_wsgi-py37.cpython-37m-x86_64-linux-gnu.so
 WSGISocketPrefix run/wsgi
+
 <VirtualHost *:80>
+
 ServerAdmin rtevans@tacc.utexas.edu
-ServerName tacc-stats02.tacc.utexas.edu
-ServerAlias ls5-stats.tacc.utexas.edu
-WSGIDaemonProcess ls5 python-path=/usr/lib/python2.7/site-packages:/home/rtevans/tacc_stats
-WSGIProcessGroup ls5
-WSGIScriptAlias / /home/rtevans/tacc_stats/tacc_stats/site/tacc_stats_site/wsgi.py
+ServerName stats.webserver.tacc.utexas.edu
+ServerAlias stats.webserver.tacc.utexas.edu
+
+WSGIDaemonProcess s2-stats python-home=/stats/stampede2 python-path=/stats/stampede2/tacc_stats:/stats/stampede2/lib/python3.7/site-packages user=rtevans
+WSGIProcessGroup s2-stats
+WSGIScriptAlias / /tacc_stats/site/tacc_stats_site/wsgi.py process-group=s2-stats
 WSGIApplicationGroup %{GLOBAL}
-<Directory /home/rtevans/tacc_stats/tacc_stats/site/tacc_stats_site>
+
+<Directory /stats/stampede2/tacc_stats/tacc_stats/site/tacc_stats_site>
 <Files wsgi.py>
 Require all granted
 </Files>
@@ -201,26 +199,21 @@ Require all granted
 ### Running `job_pickles.py`
 `job_pickles.py` can be run manually by:
 
-    $ ./job_pickles.py [-start date_start] [-end date_end] [-dir directory] [-jobids id0 id1 ... idn]
+    $ ./job_pickles.py [start_date] [end_Date] [-dir directory] [-jobids id0 id1 ... idn]
 
 where the 4 optional arguments have the following meaning
 
   - `-dir`       : the directory to store pickled dictionaries
-  - `-start`     : the start of the date range, e.g. `"2013-09-25 00:00:00"`
-  - `-end`       : the end of the date range, e.g. `"2013-09-26   00:00:00"`
+  - `-start`     : the start of the date range, e.g. `"2013-09-25"`
+  - `-end`       : the end of the date range, e.g. `"2013-09-26"`
   - `jobids`     : individual jobids to pickle
   -
 No arguments results in all jobs from the previous day getting pickled and stored in the `pickles_dir`
-defined in `setup.cfg`. On Stampede argumentless `job_pickles.py` is run every 24 hours as a `cron` job
-set-up by the user
+defined in `tacc_stats.ini`. On Stampede argumentless `job_pickles.py` is run every 24 hours as a `cron` job
+set-up by the user.
 
-For pickling data with Intel Sandy Bridge core and uncore counters it is useful to
-modify the event_map dictionaries in `intel_snb.py` to include whatever events you are counting.The dictionaries map a control register value to a Schema name.  
-You can have events in the event_map dictionaries that you are not counting,
-but if missing an event it will be labeled in the Schema with it's control register
-value.
 
-### Pickled stats data: generated `job_pickles.sh`
+### Pickled data format: generated `job_pickles.py`
 
 Pickled stats data will be placed in the directory specified by
 `pickles_dir`.  The pickled data is contained in a nested python
