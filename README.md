@@ -199,15 +199,15 @@ Require all granted
 ### Running `job_pickles.py`
 `job_pickles.py` can be run manually by:
 
-    $ ./job_pickles.py [start_date] [end_Date] [-dir directory] [-jobids id0 id1 ... idn]
+    $ ./job_pickles.py [start_date] [end_date] [-dir directory] [-jobids id0 id1 ... idn]
 
 where the 4 optional arguments have the following meaning
 
+  - `start_date`     : the start of the date range, e.g. `"2013-09-25"`
+  - `end_date`       : the end of the date range, e.g. `"2013-09-26"`
   - `-dir`       : the directory to store pickled dictionaries
-  - `-start`     : the start of the date range, e.g. `"2013-09-25"`
-  - `-end`       : the end of the date range, e.g. `"2013-09-26"`
   - `jobids`     : individual jobids to pickle
-  -
+  
 No arguments results in all jobs from the previous day getting pickled and stored in the `pickles_dir`
 defined in `tacc_stats.ini`. On Stampede argumentless `job_pickles.py` is run every 24 hours as a `cron` job
 set-up by the user.
