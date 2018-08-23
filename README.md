@@ -203,10 +203,10 @@ Require all granted
 
 where the 4 optional arguments have the following meaning
 
-  - `start_date`     : the start of the date range, e.g. `"2013-09-25"`
-  - `end_date`       : the end of the date range, e.g. `"2013-09-26"`
-  - `-dir`       : the directory to store pickled dictionaries
-  - `jobids`     : individual jobids to pickle
+  - `start_date`     : the start of the date range, e.g. `"2013-09-25"` (default is today)
+  - `end_date`       : the end of the date range, e.g. `"2013-09-26"` (default is `start_date`)
+  - `-dir`       : the directory to store pickled dictionaries (default is set in tacc_stats.ini)
+  - `-jobids`     : individual jobids to pickle (default is all jobs)
   
 No arguments results in all jobs from the previous day getting pickled and stored in the `pickles_dir`
 defined in `tacc_stats.ini`. On Stampede argumentless `job_pickles.py` is run every 24 hours as a `cron` job
