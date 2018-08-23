@@ -48,8 +48,9 @@ setup(
     package_data = {'tacc_stats' : ['cfg.py']},
     include_package_data = True,
     scripts = scripts,
-    install_requires = ['argparse','numpy','matplotlib', 'psycopg2',
-                        'bokeh', 'django', 'python-hostlist'],
+    install_requires = ['argparse','numpy','matplotlib', 'psycopg2-binary',
+                        'bokeh', 'django', 'python-hostlist', 'PyMySQL',
+                        'mysql-connector-python', 'python-memcached'],
     platforms = 'any',
     classifiers = [
         'Development Status :: 5 - Production',
