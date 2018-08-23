@@ -23,6 +23,11 @@ from bokeh.layouts import gridplot
 from bokeh.plotting import figure
 from bokeh.models import HoverTool
 
+try:
+    from tacc_stats.site.machine.agave_auth import check_for_tokens
+except:
+    pass
+
 racks = set()
 nodes = set()
 hosts = set()
@@ -81,8 +86,22 @@ def sys_plot(pk):
     return components(plot)
 
 def dates(request, error = False):
+    field = {}
+    try:
+        if not check_for_tokens(request):
+            return HttpResponseRedirect("/login_prompt")
+        field['username'] = request.session['username']
+        field['is_staff'] = request.session['is_staff']
+        field['email'] = request.session['email']
+        field['logged_in'] = True
+    except: pass
+
+    job_objects = Job.objects
+    if "is_staff" in request.session and not request.session["is_staff"]:
+        job_objects = job_objects.filter(user = request.session["username"])
+
     month_dict ={}
-    date_list = Job.objects.exclude(date = None).exclude(date__lt = datetime.today() - timedelta(days = 90)).values_list('date',flat=True).distinct()
+    date_list = job_objects.exclude(date = None).exclude(date__lt = datetime.today() - timedelta(days = 90)).values_list('date',flat=True).distinct()
 
     for date in sorted(date_list):
         y,m,d = date.strftime('%Y-%m-%d').split('-')
@@ -90,10 +109,9 @@ def dates(request, error = False):
         month_dict.setdefault(key, [])
         month_dict[key].append((y+'-'+m+'-'+d, d))
 
-    field = {}
     field["machine_name"] = cfg.host_name_ext
 
-    field['md_job_list'] = Job.objects.filter(date__gt = datetime.today() - timedelta(days = 5)).exclude(avg_openclose__isnull = True ).annotate(io = ExpressionWrapper(F('avg_openclose')*F('nodes'), output_field = FloatField())).order_by('-io')
+    field['md_job_list'] = job_objects.filter(date__gt = datetime.today() - timedelta(days = 5)).exclude(avg_openclose__isnull = True ).annotate(io = ExpressionWrapper(F('avg_openclose')*F('nodes'), output_field = FloatField())).order_by('-io')
 
     try:
         field['md_job_list'] = field['md_job_list'][0:10]
@@ -108,7 +126,10 @@ def search(request):
 
     if 'jobid' in request.GET:
         try:
-            job = Job.objects.get(id = request.GET['jobid'])
+            job_objects = Job.objects
+            if "is_staff" in request.session and not request.session["is_staff"]:
+                job_objects = job_objects.filter(user = request.session["username"])
+            job = job_objects.get(id = request.GET['jobid'])
             return HttpResponseRedirect("/machine/job/"+str(job.id)+"/")
         except: pass
     try:
@@ -151,7 +172,11 @@ def index(request, **kwargs):
             fields['date__month'] = date[1]
             del fields['date']
 
-    job_list = Job.objects.filter(**fields).distinct().order_by(order_key)
+    job_objects = Job.objects
+    if "is_staff" in request.session and not request.session["is_staff"]:
+        job_objects = job_objects.filter(user = request.session["username"])
+
+    job_list = job_objects.filter(**fields).distinct().order_by(order_key)
     fields['name'] =  'Query [fields=values] ' + name.rstrip('-')    
 
     paginator = Paginator(job_list,100)
@@ -207,7 +232,7 @@ def index(request, **kwargs):
         fields['current_path'] = request.get_full_path()
     return render(request, "machine/index.html", fields)
 
-def list_to_dict(job_list,metric):
+def list_to_dict(job_list, metric):
     job_dict={}
     for job in job_list:
         job_dict.setdefault(job.user,[]).append((job.id,round(job.__dict__[metric],3)))
