@@ -545,7 +545,11 @@ class Job(object):
                         if e.width:
                             trace("time %d, counter `%s', rollover prev %d, curr %d\n",
                                   self.times[i], e.key, p, v)
-                            r -= numpy.uint64(1 << e.width)
+                            a = 1.0
+                            if type_name == 'intel_rapl':
+                                a = 0.06104
+                            r -= numpy.uint64(1 << e.width)*a
+
                         elif v == 0 or (type_name == 'ib_ext' or type_name == 'ib_sw') or \
                                 (type_name == 'cpu' and e.key == 'iowait'):
                             # We will assume a spurious reset, 
@@ -571,6 +575,10 @@ class Job(object):
             if e.mult:
                 for i in range(0, m):
                     A[i, j] *= e.mult
+            if "MSR_DRAM_ENERGY_STATUS" == schema.keys()[j]: 
+                for i in range(0, m):
+                    A[i, j] *= 0.0153/0.06104
+
         return A
 
     def logoverflow(self, host_name, type_name, dev_name, key_name):

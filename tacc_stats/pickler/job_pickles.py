@@ -32,27 +32,37 @@ def job_pickle(reader_inst,
 
     try: os.makedirs(date_dir)
     except: pass
-    print(reader_inst['id'])
     pickle_file = os.path.join(date_dir, reader_inst['id'])
     validated = False
     if os.path.exists(pickle_file):
         try:
             with open(pickle_file, 'rb') as fd: 
-                try: job = p.load(fd)
+                try: 
+                    job = p.load(fd)
+                except MemoryError as e:
+                    print(e)
+                    return (reader_inst['id'], validated)
                 except UnicodeDecodeError as e: 
                     try:
                         job = p.load(fd, encoding = "latin1") # Python2 Compatibility
                     except: 
                         print(e)
                         return (reader_inst['id'], validated)
+                except:
+                    return (reader_inst['id'], validated)
             validated = test_job(job)
         except EOFError as e:
             print(e)
             
     if not validated:
         job = job_stats.from_acct(reader_inst, archive_dir, '', host_name_ext) 
+        print("processed jobid ",reader_inst['id'])
         if job and test_job(job):
-            with open(pickle_file, 'wb') as fd: p.dump(job, fd, protocol = p.HIGHEST_PROTOCOL)
+            try:
+                with open(pickle_file, 'wb') as fd: p.dump(job, fd, protocol = p.HIGHEST_PROTOCOL)
+            except MemoryError as e:
+                print(e)
+                return (reader_inst['id'], validated)
             validated = True
 
     return (reader_inst['id'], validated)
