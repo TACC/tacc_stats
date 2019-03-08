@@ -80,6 +80,18 @@ class avg_cpi():
                 stats[0, schema["INSTRUCTIONS_RETIRED"].index] 
     return cycles/instrs
 
+class avg_freq():
+  def compute_metric(self, u):
+    schema, _stats = u.get_type("pmc")
+    cycles = 0
+    cycles_ref = 0
+    for hostname, stats in _stats.items():
+      cycles += stats[-1, schema["CLOCKS_UNHALTED_CORE"].index] - \
+                stats[0, schema["CLOCKS_UNHALTED_CORE"].index]
+      cycles_ref += stats[-1, schema["CLOCKS_UNHALTED_REF"].index] - \
+                    stats[0, schema["CLOCKS_UNHALTED_REF"].index] 
+    return u.freq*cycles/cycles_ref
+
 class avg_cpuusage():
   def compute_metric(self, u):
     schema, _stats = u.get_type("cpu")    
@@ -106,7 +118,7 @@ class avg_fabricbw():
             conv2mb = 1024*1024
         except:
             schema, _stats = u.get_type("opa")  
-            tb, rb = schema["portXmitData"].index, schema["portRcvData"].index
+            tb, rb = schema["PortXmitData"].index, schema["PortRcvData"].index
             conv2mb = 125000
         for hostname, stats in _stats.items():
             avg += stats[-1, tb] + stats[-1, rb] - \
@@ -286,8 +298,8 @@ class avg_packetsize():
       conv2mb = 1024*1024
     except:
       schema, _stats = u.get_type("opa")  
-      tx, rx = schema["portXmitPkts"].index, schema["portRcvPkts"].index
-      tb, rb = schema["portXmitData"].index, schema["portRcvData"].index
+      tx, rx = schema["PortXmitPkts"].index, schema["PortRcvPkts"].index
+      tb, rb = schema["PortXmitData"].index, schema["PortRcvData"].index
       conv2mb = 125000
 
     npacks = 0
@@ -308,7 +320,7 @@ class max_fabricbw():
             conv2mb = 1024*1024
         except:
             schema, _stats = u.get_type("opa")  
-            tx, rx = schema["portXmitData"].index, schema["portRcvData"].index
+            tx, rx = schema["PortXmitData"].index, schema["PortRcvData"].index
             conv2mb = 125000
         for hostname, stats in _stats.items():
             max_bw = max(max_bw, amax(diff(stats[:, tx] + stats[:, rx])/diff(u.t)))
@@ -361,7 +373,7 @@ class max_packetrate():
             tx, rx = schema["port_xmit_pkts"].index, schema["port_rcv_pkts"].index
         except:
             schema, _stats = u.get_type("opa")  
-            tx, rx = schema["portXmitPkts"].index, schema["portRcvPkts"].index
+            tx, rx = schema["PortXmitPkts"].index, schema["PortRcvPkts"].index
 
         for hostname, stats in _stats.items():
             max_pr = max(max_pr, amax(diff(stats[:, tx] + stats[:, rx])/diff(u.t)))
@@ -438,3 +450,48 @@ class vecpercent():
           if vector_widths[eventname] > 1: vector_flops += flops
           else: scalar_flops += flops
     return 100*vector_flops/(scalar_flops + vector_flops)
+
+class avg_sf_evictrate():
+  def compute_metric(self, u):
+    schema, _stats = u.get_type("cha")
+    sf_evictions = 0
+    llc_lookup = 0                  
+    for hostname, stats in _stats.items():
+      sf_evictions += stats[-1, schema["SF_EVICTIONS_MES"].index] - \
+                      stats[0, schema["SF_EVICTIONS_MES"].index]
+      llc_lookup   += stats[-1, schema["LLC_LOOKUP_DATA_READ_LOCAL"].index] - \
+                      stats[0, schema["LLC_LOOKUP_DATA_READ_LOCAL"].index] 
+    return sf_evictions/llc_lookup
+
+class avg_page_hitrate():
+  def compute_metric(self, u):
+    schema, _stats = u.get_type("imc")
+    act = 0
+    cas = 0                  
+    for hostname, stats in _stats.items():
+      act += stats[-1, schema["ACT_COUNT"].index] - \
+             stats[0, schema["ACT_COUNT"].index]
+      cas += stats[-1, schema["CAS_READS"].index] + stats[-1, schema["CAS_WRITES"].index] - \
+             stats[0, schema["CAS_READS"].index] - stats[0, schema["CAS_WRITES"].index]
+    return (cas - act) / cas
+
+class max_sf_evictrate():
+  def compute_metric(self, u):
+    schema, _stats = u.get_type("cha", aggregate = False)
+    max_rate = 0
+    for hostname, dev in _stats.items():    
+      sf_evictions = {}
+      llc_lookup = {}
+      for devname, stats in dev.items():
+        socket = devname.split('/')[0]
+        sf_evictions.setdefault(socket, 0)
+        sf_evictions[socket] += stats[-1, schema["SF_EVICTIONS_MES"].index] - \
+                                stats[0, schema["SF_EVICTIONS_MES"].index]
+        llc_lookup.setdefault(socket, 0)
+        llc_lookup[socket]   += stats[-1, schema["LLC_LOOKUP_DATA_READ_LOCAL"].index] - \
+                                stats[0, schema["LLC_LOOKUP_DATA_READ_LOCAL"].index]
+
+      for socket in set([x.split('/')[0] for x in dev.keys()]):
+        max_rate = max(sf_evictions[socket]/llc_lookup[socket], max_rate)
+    return max_rate
+

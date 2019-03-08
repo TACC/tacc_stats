@@ -181,12 +181,16 @@ def index(request, **kwargs):
 
     paginator = Paginator(job_list,100)
     page = request.GET.get('page')
+    print(page)
     try:
         jobs = paginator.page(page)
     except PageNotAnInteger:
         jobs = paginator.page(1)
     except EmptyPage:
         jobs = paginator.page(paginator.num_pages)
+
+    fields['job_list'] = jobs
+    fields['nj'] = job_list.count()
 
     job_list = job_list.annotate(queue_wait = F("start_epoch") - F("queue_time"))
     fields["script"], fields["div"] = components(gridplot(job_hist(job_list, "run_time", "Hours", 
@@ -198,11 +202,8 @@ def index(request, **kwargs):
                                                           ncols = 2, toolbar_options = {"logo" : None},
                                                           plot_width = 400, plot_height = 200)
                                              )
-    
-    fields['job_list'] = jobs
-    fields['nj'] = job_list.count()
-
-    # Computed Metrics
+    # Computed Metrics    
+    job_list = job_list.filter(run_time__gt = 600).exclude(queue__in = ["development", "skx-dev"])
     fields['cat_job_list']  = job_list.filter(Q(time_imbalance__lte = 0.001) | \
                                               Q(time_imbalance__gte = 1000)).exclude(time_imbalance = float('nan'))
     
@@ -214,7 +215,7 @@ def index(request, **kwargs):
         except: pass
 
         fields['idle_job_list'] = completed_list.filter(node_imbalance__gte = 0.99)
-
+        fields['cpu_job_list'] = completed_list.filter(avg_cpuusage__lte = 10)
         fields['cpi_thresh'] = 3.0
         fields['cpi_job_list']  = completed_list.exclude(avg_cpi = float('nan')).filter(avg_cpi__gte = fields['cpi_thresh'])
         fields['cpi_per'] = 100*fields['cpi_job_list'].count()/float(completed_list.count())
@@ -298,11 +299,15 @@ metric_names = [
     "avg_flops [GF]",
     "vecpercent [%]",
     "avg_cpi [cyc/ins]", 
+    "avg_freq [GHz]", 
     "avg_loads [#/s]", 
     "avg_l1loadhits [#/s]",
     "avg_l2loadhits [#/s]", 
     "avg_llcloadhits [#/s]", 
+    "avg_sf_evictrate [#evicts/#rds]", 
+    "max_sf_evictrate [#evicts/#rds]", 
     "avg_mbw [GB/s]", 
+    "avg_page_hitrate [hits/cas]", 
     "avg_mcdrambw [GB/s]",
     "avg_fabricbw [MB/s]",
     "max_fabricbw [MB/s]",
@@ -334,7 +339,7 @@ class JobDetailView(DetailView):
             val = getattr(job, name.split(' ')[0])
             if val: metric_dict[name] = val
         context['metric_dict'] = metric_dict
-
+        
         # Prepare process names
         proc_list = []
         for host_name, host in data.hosts.items():
@@ -431,6 +436,7 @@ def proc_detail(request, pk, proc_name):
     
     host_map = {}
     schema = data.get_schema('proc')
+    vmp_idx = schema['VmPeak'].index
     hwm_idx = schema['VmHWM'].index
     hwm_unit = "gB"
     thr_idx = schema['Threads'].index
@@ -442,7 +448,7 @@ def proc_detail(request, pk, proc_name):
             proc_, pid, cpu_aff, mem_aff = proc_pid.split('/') 
 
             if  proc_ == proc_name:
-                host_map[host_name][proc_+'/'+pid] = [ val[-1][hwm_idx]/2**20, cpu_aff, val[-1][thr_idx] ]
+                host_map[host_name][proc_+'/'+pid] = [ val[-1][vmp_idx]/2**20, val[-1][hwm_idx]/2**20, cpu_aff, val[-1][thr_idx] ]
 
     return render(request, "machine/proc_detail.html",
                   {"proc_name" : proc_name, "jobid" : pk, 

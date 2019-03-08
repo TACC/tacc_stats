@@ -105,11 +105,14 @@ class JobPickles:
         print(len(acct_jids),'Job records in accounting file')
 
         run_jids = sorted(list(set(acct_jids) - set(val_jids)))
+        run_jids += [self.jobids]
         print(len(run_jids),'Jobs to process')
         ntod = len(run_jids)
 
         acct = [job for job in acct if job['id'] in run_jids]            
-        acct = [job for job in acct if job['nodes']*(job['end_time']-job['start_time']) < 1728000]
+
+        if not self.jobids:
+            acct = [job for job in acct if job['nodes']*(job['end_time']-job['start_time']) < 1728000]
         ctr = 0
         with open(val_file, "a") as fd:
             for result in self.pool.imap(self.partial_pickle, acct):

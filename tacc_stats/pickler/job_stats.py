@@ -265,8 +265,8 @@ class Host(object):
                     if schema:
                         file_schemas[type_name] = schema
                     else:
-                        self.error("file `%s', type `%s', schema mismatch desc\n%s\n",
-                                   file.name, type_name, schema_desc)
+                        self.error("type `%s', schema mismatch desc\n%s\n",
+                                   type_name, schema_desc)
                 elif c == SF_PROPERTY_CHAR:
                     pass
                 elif c == SF_COMMENT_CHAR:
@@ -274,8 +274,8 @@ class Host(object):
                 else:
                     break
             except Exception as exc:
-                self.trace("file `%s', caught `%s' discarding line `%s'\n",
-                           file.name, exc, line)
+                self.trace("caught `%s' discarding line `%s'\n",
+                           exc, line)
                 break
         return file_schemas
 
@@ -507,7 +507,11 @@ class Job(object):
         # numpy array of values.
         m = len(self.times)
         n = len(schema)
-        A = numpy.zeros((m, n), dtype=numpy.uint64) # Output.
+        try:
+            A = numpy.zeros((m, n), dtype=numpy.uint64) # Output.
+        except MemoryError as e:
+            error("cannot allocate A %s\n", e)
+            return None
         # First and last of A are first and last from raw.
         A[0] = raw[0][1]
         A[m - 1] = raw[-1][1]
@@ -598,8 +602,11 @@ class Job(object):
                 stats = host.stats[type_name] = {}
                 schema = self.schemas[type_name]
                 for dev_name, raw_dev_stats in raw_type_stats.items():
-                    stats[dev_name] = self.process_dev_stats(host, type_name, schema,
-                                                             dev_name, raw_dev_stats)
+                    try:
+                        stats[dev_name] = self.process_dev_stats(host, type_name, schema,
+                                                                 dev_name, raw_dev_stats)
+                    except:
+                        continue
             del host.raw_stats
         amd64_pmc.process_job(self)
         intel_process.process_job(self)

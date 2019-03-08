@@ -109,6 +109,15 @@ imc_event_map = {
     'FIXED0'                   : 'CYCLES,E',
     }
 
+## Caching Home Agent Map for SKX
+cha_event_map = {
+    0x0040073d : "SF_EVICTIONS_MES,E",
+    0x00403334 : "LLC_LOOKUP_DATA_READ_LOCAL,E",
+    0x00400757 : "BYPASS_CHA_IMC_ALL,E", 
+    0x00400534 : "LLC_LOOKUP_WRITE"
+    }
+
+
 ## Power Control Unit events
 def PCU_PERF_EVENT(event):
     return (event) | (0 << 14) | (0 << 17) | (0 << 18) | (1 << 22) | (0 <<23) | (1 << 24) | (0 << 31)
@@ -312,7 +321,7 @@ intel_xeon = {'intel_snb' : cpu_event_map, 'intel_snb_cbo' : cbo_event_map, 'int
               'intel_hsw' : cpu_event_map, 'intel_hsw_cbo' : cbo_event_map, 'intel_hsw_hau' : hau_event_map, 
               'intel_hsw_imc' : imc_event_map,  'intel_hsw_qpi' : qpi_event_map, 'intel_hsw_pcu' : pcu_event_map, 'intel_hsw_r2pci' : r2pci_event_map,
               'intel_hsw_ht' : cpu_event_map, 'intel_hsw_cbo_ht' : cbo_event_map,
-              'intel_knl' : cpu_event_map, 'intel_skx' : cpu_event_map, 'intel_skx_imc' : imc_event_map
+              'intel_knl' : cpu_event_map, 'intel_skx' : cpu_event_map, 'intel_skx_imc' : imc_event_map, 'intel_skx_cha' : cha_event_map
 }
 
 def format_knl(job, typename):

@@ -4,6 +4,7 @@ class utils():
                  "intel_bdw" : 2.6, "intel_knl" : 1.4, "intel_skx" : 2.1}
     imc_list  = ["intel_snb_imc", "intel_ivb_imc", "intel_hsw_imc",
                  "intel_bdw_imc", "intel_knl_mc_dclk", "intel_skx_imc"]
+    cha_list = ["intel_knl_cha", "intel_skx_cha"]
     self.job = job
     self.nhosts = len(job.hosts.keys())
     self.hostnames  = sorted(job.hosts.keys())
@@ -18,15 +19,24 @@ class utils():
           self.freq = freq_list[typename]
       if typename in imc_list:
           self.imc = typename
+      if typename in cha_list:
+          self.cha = typename
 
-  def get_type(self, typename):
+  def get_type(self, typename, aggregate = True):
     if typename == "imc": typename = self.imc
     if typename == "pmc": typename = self.pmc
+    if typename == "cha": typename = self.cha
+    if not typename: return
 
     schema = self.job.schemas[typename]
     stats = {}
     for hostname, host in self.job.hosts.items():
-      stats[hostname] = 0
-      for devname in host.stats[typename]:
+      if aggregate:
+        stats[hostname] = 0
+        for devname in host.stats[typename]:
           stats[hostname] += host.stats[typename][devname].astype(float)
+      else:
+        stats[hostname] = {}
+        for devname in host.stats[typename]:
+          stats[hostname][devname] = host.stats[typename][devname].astype(float)
     return schema, stats

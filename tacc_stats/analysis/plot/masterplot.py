@@ -111,7 +111,6 @@ class MasterPlot():
       plot = Plot(plot_width=400, plot_height=150, 
                   x_range = DataRange1d(), y_range = DataRange1d())
       schema, _stats = u.get_type("mem")
-      y = []
       for hostname, stats in _stats.items():               
         usage = (stats[:, schema["MemUsed"].index] - \
                  stats[:, schema["Slab"].index] - \
@@ -124,25 +123,24 @@ class MasterPlot():
       print("Memory Usage plot failed for jobid", job.id)
       print(sys.exc_info())
 
-    # Plot LNET Bandwidth
+      # Plot Lustre Bandwidth
     try:      
       plot = Plot(plot_width=400, plot_height=150, 
                   x_range = DataRange1d(), y_range = DataRange1d())
-      schema, _stats  = u.get_type("lnet")
-      y = []
-      for hostname, stats in _stats.items():               
-        rate = stats[:, schema["rx_bytes"].index] + \
-               stats[:, schema["tx_bytes"].index]
+      schema, _stats  = u.get_type("llite")
+      for hostname, stats in _stats.items():
+        rate = stats[:, schema["read_bytes"].index] + \
+               stats[:, schema["write_bytes"].index]
         rate = numpy.diff(rate)/numpy.diff(u.t)/(2**20)
         source = ColumnDataSource({"x" : u.hours, "y" : numpy.append(rate, rate[-1])})
         plot.add_glyph(source, Step(x = "x",y = "y", mode = "after",
                                     line_color = hc[hostname]))
-      plots += [self.add_axes(plot, "LNET MB/s")]
+      plots += [self.add_axes(plot, "Lustre MB/s")]
     except:
-      print("LNET Bandwidth plot failed for jobid", job.id )
+      print("Lustre Bandwidth plot failed for jobid", job.id )
       print(sys.exc_info())
 
-    # Plot IB Bandwidth
+    # Plot Fabric Bandwidth
     try:      
       plot = Plot(plot_width=400, plot_height=150, 
                   x_range = DataRange1d(), y_range = DataRange1d())      
@@ -152,7 +150,7 @@ class MasterPlot():
         conv2mb = 2**20
       except:
         schema, _stats  = u.get_type("opa")
-        rx, tx = schema["portRcvData"].index, schema["portXmitData"].index
+        rx, tx = schema["PortRcvData"].index, schema["PortXmitData"].index
         conv2mb = 125000
       for hostname, stats in _stats.items():               
         rate = numpy.diff(stats[:, rx] + stats[:, tx])/numpy.diff(u.t)/conv2mb

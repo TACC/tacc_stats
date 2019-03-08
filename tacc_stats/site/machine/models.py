@@ -32,14 +32,18 @@ class Job(models.Model):
     validated = models.BooleanField(default=False)
 
     avg_cpi = models.FloatField(null=True)
+    avg_freq = models.FloatField(null=True)
     avg_mcdrambw =  models.FloatField(null=True)
     avg_mbw = models.FloatField(null=True)
+    avg_page_hitrate =  models.FloatField(null=True)
     avg_flops = models.FloatField(null=True)
     vecpercent = models.FloatField(null=True)
     avg_loads    = models.BigIntegerField(null=True)
     avg_l1loadhits = models.BigIntegerField(null=True)
     avg_l2loadhits = models.BigIntegerField(null=True)
     avg_llcloadhits = models.BigIntegerField(null=True)
+    avg_sf_evictrate = models.FloatField(null=True)
+    max_sf_evictrate = models.FloatField(null=True)
 
     node_imbalance = models.FloatField(null=True)
     time_imbalance = models.FloatField(null=True)

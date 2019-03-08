@@ -23,7 +23,7 @@ def update_acct(date, rerun = False):
     tz = pytz.timezone('US/Central')
     ctr = 0
 
-    with open(os.path.join(cfg.acct_path, date.strftime("%Y-%m-%d") + '.txt')) as fd:
+    with open(os.path.join(cfg.acct_path, date.strftime("%Y-%m-%d") + '.txt'), encoding = "latin1") as fd:
         nrecords = sum(1 for record in csv.DictReader(fd))
         fd.seek(0)
         
@@ -58,15 +58,18 @@ def update_acct(date, rerun = False):
             except: pass
 
             json['queue_time'] = int(parse(job['Submit']).strftime('%s'))
-
-            json['queue']      = job['Partition']
-            json['name']       = job['JobName'][0:128]
-            json['status']     = job['State'].split()[0]
-            json['nodes']      = int(job['NNodes'])
-            json['cores']      = int(job['ReqCPUS'])
-            json['wayness']    = json['cores']/json['nodes']
-            json['date']       = json['end_time'].date()
-            json['user']       = job['User']
+            try:
+                json['queue']      = job['Partition']
+                json['name']       = job['JobName'][0:128]
+                json['status']     = job['State'].split()[0]
+                json['nodes']      = int(job['NNodes'])
+                json['cores']      = int(job['ReqCPUS'])
+                json['wayness']    = json['cores']/json['nodes']
+                json['date']       = json['end_time'].date()
+                json['user']       = job['User']
+            except:
+                print(job)
+                continue
             if "user" in json:
                 try: 
                     json['uid'] = int(pwd.getpwnam(json['user']).pw_uid)
@@ -114,8 +117,9 @@ def update_metrics(date, pickles_dir, processes, rerun = False):
 
     min_time = 10
     metric_names = [
-        "avg_ethbw", "avg_cpi", "avg_loads", "avg_l1loadhits", 
-        "avg_l2loadhits", "avg_llcloadhits", "avg_mbw", "time_imbalance",
+        "avg_ethbw", "avg_cpi", "avg_freq", "avg_loads", "avg_l1loadhits",
+        "avg_l2loadhits", "avg_llcloadhits", "avg_sf_evictrate", "max_sf_evictrate", 
+        "avg_mbw", "avg_page_hitrate", "time_imbalance",
         "mem_hwm", "max_packetrate", "avg_packetsize", "node_imbalance",
         "avg_flops", "vecpercent", "avg_cpuusage", "max_mds",
         "avg_lnetmsgs", "avg_lnetbw", "max_lnetbw", "avg_fabricbw",

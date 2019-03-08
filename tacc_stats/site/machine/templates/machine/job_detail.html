@@ -94,7 +94,7 @@
       <table class="table table-condensed table-bordered"><!--- style="max-width:100px;">--->
 	<tbody>
 	  {% for key, val in metric_dict.items %}
-	  <tr align=center><th>{{ key|ljust:"10" }}</th><td>{{ val|floatformat:"1" }}</td></tr>
+	  <tr align=center><th>{{ key|ljust:"10" }}</th><td>{{ val|floatformat:"2" }}</td></tr>
 	  {% endfor %}	
 	</tbody>
       </table>

@@ -4,7 +4,7 @@ import tacc_stats.cfg as cfg
 import tacc_stats.site.tacc_stats_site as tacc_stats_site
 DIR = os.path.dirname(os.path.abspath(__file__))
 
-DEBUG = True
+DEBUG = False
 
 ADMINS = (
     ('Richard Todd Evans', 'rtevans@tacc.utexas.edu'),
