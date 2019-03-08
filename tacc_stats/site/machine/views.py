@@ -27,7 +27,7 @@ try:
     from tacc_stats.site.machine.agave_auth import check_for_tokens
 except:
     pass
-
+"""
 racks = set()
 nodes = set()
 hosts = set()
@@ -42,7 +42,7 @@ for host in Host.objects.values_list('name', flat=True).distinct():
 racks = sorted(list(racks))
 nodes = sorted(list(nodes))
 hosts = sorted(list(hosts))
-
+"""
 """
 sys_color = []
 import time

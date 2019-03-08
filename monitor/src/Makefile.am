@@ -96,6 +96,7 @@ TYPES 	+= \
 	intel_nhm.c \
 	intel_rapl.c \
 	intel_skx.c \
+	intel_skx_cha.c \
 	intel_skx_imc.c \
 	intel_snb.c \
 	intel_snb_cbo.c \

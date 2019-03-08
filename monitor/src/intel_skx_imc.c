@@ -170,9 +170,10 @@ static int intel_skx_imc_begin(struct stats_type *type)
   int nr_devs;
   int nr_events = 4;
 
-  if (pci_map_create(&dev_paths, &nr_devs, imc_dclk_dids, 3) < 0)
+  if (pci_map_create(&dev_paths, &nr_devs, imc_dclk_dids, 3) < 0) {
     TRACE("Failed to identify pci devices");
-
+    goto out;
+  }
   // MC: DCLK
   // Devices: 0x10 0x10 0x11 (Controllers)
   // Functions: 0x02 0x06 0x02 (Channels)
@@ -186,7 +187,7 @@ static int intel_skx_imc_begin(struct stats_type *type)
       nr++;      
   }
   munmap(mmconfig_ptr, mmconfig_size);
-    
+  //pci_map_destroy(&dev_paths, nr_devs);
 
  out:
   if (fd >= 0)
@@ -215,8 +216,10 @@ static void intel_skx_imc_collect(struct stats_type *type)
 
   char **dev_paths = NULL;
   int nr_devs;
-  if (pci_map_create(&dev_paths, &nr_devs, imc_dclk_dids, 3) < 0)
+  if (pci_map_create(&dev_paths, &nr_devs, imc_dclk_dids, 3) < 0) {
     TRACE("Failed to identify pci devices");
+    goto out;
+  }
 
   int i;
   for (i = 0; i < nr_devs; i++) {
@@ -227,7 +230,7 @@ static void intel_skx_imc_collect(struct stats_type *type)
       intel_skx_imc_collect_dev(type, bus, dev, fun, mmconfig_ptr);
   }  
   munmap(mmconfig_ptr, mmconfig_size);
-
+  //pci_map_destroy(&dev_paths, nr_devs);
  out:
   if (fd >= 0)
     close(fd);

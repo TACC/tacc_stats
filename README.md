@@ -154,6 +154,7 @@ $ psql
 # ALTER ROLE taccstats SET client_encoding TO 'utf8';
 # ALTER ROLE taccstats SET default_transaction_isolation TO 'read committed';
 # ALTER ROLE taccstats SET timezone TO 'UTC';
+# ALTER DATABASE machinename_db OWNER TO taccstats;
 # GRANT ALL PRIVILEGES ON DATABASE machinename_db TO taccstats;
 # \q
 ```
