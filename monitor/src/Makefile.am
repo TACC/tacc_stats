@@ -132,7 +132,6 @@ tacc_stats_SOURCES += \
 TYPES += \
 	mdc.c \
 	llite.c \
-	lnet.c \
 	osc.c
 endif
 

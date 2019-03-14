@@ -93,8 +93,8 @@ static int send(struct stats_buffer *sf)
 		       &props,
 		       amqp_cstring_bytes(sf->sf_data));
   }
-  amqp_channel_close(conn, 1, AMQP_REPLY_SUCCESS);
-  amqp_connection_close(conn, AMQP_REPLY_SUCCESS);
+  //amqp_channel_close(conn, 1, AMQP_REPLY_SUCCESS);
+  //amqp_connection_close(conn, AMQP_REPLY_SUCCESS);
   amqp_destroy_connection(conn); 
 
   return 0;
