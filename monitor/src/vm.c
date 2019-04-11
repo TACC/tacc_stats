@@ -4,6 +4,7 @@
 #include "collect.h"
 
 #define KEYS \
+  X(nr_anon_transparent_hugepages, "", ""), \
   X(pgpgin, "E,U=KB", ""), \
   X(pgpgout, "E,U=KB", ""), \
   X(pswpin, "E", ""), \
@@ -24,7 +25,12 @@
   X(kswapd_inodesteal, "E", ""), \
   X(pageoutrun, "E", ""), \
   X(allocstall, "E", ""), \
-  X(pgrotated, "E", "")
+  X(pgrotated, "E", ""), \
+  X(thp_fault_alloc, "E", ""), \
+  X(thp_fault_fallback, "E", ""), \
+  X(thp_collapse_alloc, "E", ""), \
+  X(thp_collapse_alloc_failed, "E", ""), \
+  X(thp_split, "E", "")
 
 static void vm_collect(struct stats_type *type)
 {

@@ -54,6 +54,7 @@
   X(NFS_Unstable, "U=KB", ""), \
   X(Bounce, "U=KB", ""), \
   X(Slab, "U=KB", ""), \
+  X(AnonHugePages, "U=KB", ""), \
   X(HugePages_Total, "", ""), \
   X(HugePages_Free, "", "")
 

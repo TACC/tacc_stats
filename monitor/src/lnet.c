@@ -5,6 +5,7 @@
 #include "trace.h"
 
 // # cat /proc/sys/lnet/stats
+// # cat /sys/kernel/debug/lnet/stats -> Lustre Client > 2.6
 // 0 1172 0 195805494 204125982 0 16957 216828482753 708781379083 0 3268048
 //
 // See lustre-1.8.5/lnet/lnet/router_proc.c

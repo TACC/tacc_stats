@@ -27,12 +27,10 @@
 #include <malloc.h>
 #include <ctype.h>
 #include <fcntl.h>
-//#include <sys/mman.h>
 #include "stats.h"
 #include "trace.h"
 #include "pscanf.h"
 #include "cpuid.h"
-//#include "string1.h"
 
 /*! \name CHA Performance Monitoring Global Control Registers
    @{
@@ -130,7 +128,7 @@ static int intel_skx_cha_begin_box(char *cpu, int box, uint64_t *events, size_t 
   uint64_t ctl;
   uint64_t filter;
   int offset = 16*box;
-  printf("inside box %d\n",box);
+
   snprintf(msr_path, sizeof(msr_path), "/dev/cpu/%s/msr", cpu);
   msr_fd = open(msr_path, O_RDWR);
   if (msr_fd < 0) {
