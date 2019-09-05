@@ -124,7 +124,7 @@ def update_metrics(date, pickles_dir, processes, rerun = False):
         "avg_flops", "vecpercent", "avg_cpuusage", "max_mds",
         "avg_lnetmsgs", "avg_lnetbw", "max_lnetbw", "avg_fabricbw",
         "max_fabricbw", "avg_mdcreqs", "avg_mdcwait", "avg_oscreqs",
-        "avg_oscwait", "avg_openclose", "avg_mcdrambw", "avg_blockbw"
+        "avg_oscwait", "avg_openclose", "avg_mcdrambw", "avg_blockbw", "max_load15"
     ]
 
     aud = metrics.Metrics(metric_names, processes = processes)

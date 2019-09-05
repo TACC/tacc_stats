@@ -103,10 +103,11 @@ class JobPickles:
 
         ntot = len(acct_jids)
         print(len(acct_jids),'Job records in accounting file')
-
+        if self.jobids:
+            acct_jids += self.jobids
         run_jids = sorted(list(set(acct_jids) - set(val_jids)))
-        run_jids += [self.jobids]
-        print(len(run_jids),'Jobs to process')
+
+        print('Jobs to process: ', len(run_jids), run_jids)
         ntod = len(run_jids)
 
         acct = [job for job in acct if job['id'] in run_jids]            
@@ -131,7 +132,9 @@ class JobPickles:
             for job in csv.DictReader(fd, delimiter = '|'):
                 if self.jobids and job['JobID'] not in self.jobids: continue
                 if job['NodeList'] == "None assigned": continue
-
+                if len(job) != 13: 
+                    print(job['JobID'] + " is not parsed correctly")
+                    continue
                 jent = {}
                 jent['id']         = job['JobID']
                 jent['user']       = job['User']

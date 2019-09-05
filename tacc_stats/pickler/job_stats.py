@@ -239,7 +239,7 @@ class Host(object):
                 if re.match('^[0-9]{4}[0-1][0-9][0-3][0-9]$', base):
                     base = (datetime.datetime.strptime(base,"%Y%m%d") - datetime.datetime(1970,1,1)).total_seconds()
                 # Prune to files that might overlap with job.
-                ent_start = int(base)
+                ent_start = int(base) - 3*RAW_STATS_TIME_MAX
                 ent_end   = int(base) + 2*RAW_STATS_TIME_MAX
 
                 if (max(job_start, ent_start) <= min(job_end, ent_end)):
