@@ -495,3 +495,10 @@ class max_sf_evictrate():
         max_rate = max(sf_evictions[socket]/llc_lookup[socket], max_rate)
     return max_rate
 
+class max_load15():    
+  def compute_metric(self, u):
+    max_load15 = 0.0 
+    schema, _stats = u.get_type("ps")
+    for hostname, stats in _stats.items():
+      max_load15 = max(max_load15, amax(stats[:, schema["load_15"].index]))
+    return max_load15/100
