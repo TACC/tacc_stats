@@ -194,15 +194,14 @@ def index(request, **kwargs):
     fields['nj'] = job_list.count()
 
     job_list = job_list.annotate(queue_wait = F("start_epoch") - F("queue_time"))
-    fields["script"], fields["div"] = components(gridplot(job_hist(job_list, "run_time", "Hours", 
-                                                                   scale = 3600),
-                                                          job_hist(job_list, "nodes", "# Nodes"),
-                                                          job_hist(job_list, "queue_wait", "Hours", 
-                                                                   scale = 3600),
-                                                          job_hist(job_list, "avg_openclose", "iops"), 
-                                                          ncols = 2, toolbar_options = {"logo" : None},
-                                                          plot_width = 400, plot_height = 200)
-                                             )
+    fields["script"], fields["div"] = components(gridplot([job_hist(job_list, "run_time", "Hours", 
+                                                                    scale = 3600),
+                                                           job_hist(job_list, "nodes", "# Nodes"),
+                                                           job_hist(job_list, "queue_wait", "Hours", 
+                                                                    scale = 3600),
+                                                           job_hist(job_list, "avg_openclose", "iops")], 
+                                                  ncols = 2,
+                                                  plot_width = 400, plot_height = 200))
     # Computed Metrics    
     job_list = job_list.filter(run_time__gt = 600).exclude(queue__in = ["development", "skx-dev"])
     fields['cat_job_list']  = job_list.filter(Q(time_imbalance__lte = 0.001) | \
@@ -243,7 +242,7 @@ def list_to_dict(job_list, metric):
 def job_hist(job_list, value, units, scale = 1.0):
     hover = HoverTool(tooltips = [ ("jobs", "@top"), ("bin", "[@left, @right]") ], point_policy = "snap_to_data")
     TOOLS = ["pan,wheel_zoom,box_zoom,reset,save,box_select", hover]
-    p1 = figure(title = value, logo = None,
+    p1 = figure(title = value,
                 toolbar_location = None, plot_height = 400, plot_width = 600, y_axis_type = "log", tools = TOOLS)
     p1.xaxis.axis_label = units
     p1.yaxis.axis_label = "# Jobs"
