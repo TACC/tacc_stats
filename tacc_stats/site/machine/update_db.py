@@ -108,11 +108,11 @@ def update_acct(date, rerun = False):
 
             ctr += 1
             progress(ctr, nrecords, date)
-
-    with open(os.path.join(cfg.pickles_dir, date.strftime("%Y-%m-%d"), "validated")) as fd:
-        for line in fd.readlines():
-            Job.objects.filter(id = int(line)).update(validated = True)
-
+    try:
+        with open(os.path.join(cfg.pickles_dir, date.strftime("%Y-%m-%d"), "validated")) as fd:
+            for line in fd.readlines():
+                Job.objects.filter(id = int(line)).update(validated = True)
+    except: pass
 def update_metrics(date, pickles_dir, processes, rerun = False):
 
     min_time = 10

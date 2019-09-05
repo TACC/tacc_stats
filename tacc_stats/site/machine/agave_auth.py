@@ -1,5 +1,5 @@
 from agavepy.agave import Agave
-from django.http import HttpResponseRedirect
+from django.http import HttpResponseRedirect, HttpResponseBadRequest
 from django.shortcuts import render
 from django.urls import reverse
 import os, json, requests
@@ -122,6 +122,7 @@ def login_oauth(request):
             session['auth_state']
         )
     )
+    print(authorization_url)
     return HttpResponseRedirect(authorization_url)
 
 def agave_oauth_callback(request):

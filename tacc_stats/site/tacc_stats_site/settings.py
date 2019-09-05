@@ -24,7 +24,8 @@ DATABASES = {
         },
     # Uncomment this portion if an xalt database exists
     'xalt' : {
-        'ENGINE' : 'mysql.connector.django',
+        #'ENGINE' : 'mysql.connector.django',
+        'ENGINE' : 'django.db.backends.mysql',
         'NAME' : 'xalt_' + cfg.machine,
         'USER' : 'xaltUser',
         'PASSWORD' : 'kutwgbh',
