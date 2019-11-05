@@ -62,7 +62,7 @@ An RPM can be built for subpackage deployment using  the `tacc_statsd_systemv.sp
 where the `rmqserver` will be the RabbitMQ `SERVER` hostname and `system` will be the RabbitMQ `QUEUE` the data is sent to. 
 Configuration options may have to be changed within the `tacc_statsd_systemv.spec` file.
 
-After installation the executable `/opt/tacc_statsd/tacc_stats`, systemv service file `/etc/systemd/system/taccstats.service`, should exist should exist.  If the rpm was used for installation `taccstats` will be `enable`'d to start at boot time and be restart within 10 seconds if it fails for any reason.
+After installation the executable `/opt/tacc_statsd/tacc_stats` and SystemV service file `/etc/systemd/system/taccstats.service`, should exist.  If the rpm was used for installation `taccstats` will be `enable`'d to start at boot time and be restart within 10 seconds if it fails for any reason.
 `tacc_stats` can be started, stopped, and restarted using `systemctl start taccstats`, `systemctl stop taccstats`, and `systemctl restart taccstats`.
 
 In order to notify `tacc_stats` of a job beginning echo the job id into `/var/run/TACC_jobid`.  It order to notify
