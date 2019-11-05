@@ -91,7 +91,8 @@ for example,
 
 1837137|rtevans|project140208|2018-08-01T18:18:51|2018-08-02T11:44:51|2018-07-29T08:05:43|normal|1-00:00:00|jobname|COMPLETED|8|104|c420-[024,073],c421-[051-052,063-064,092-093]
 
-If using SLURM the `sacct_gen.py` script that installed with `tacc_stats` may be used.
+If using SLURM the `sacct_gen.py` script that will be installed with the `tacc_stats` subpackage may be used. 
+This script generates a file for each date with the name format `year-month-day.txt`, e.g. `2018-11-01.txt`.
 
 #### `tacc_stats` subpackage
  To install TACC Stats on the machine where data will be processed, analyzed, and the webserver hosted follow these
@@ -127,15 +128,13 @@ rmq_queue       = %(machine)s
 
 ## Configuration for Web Portal Support
 [PORTAL]
-acct_path       = %(data_dir)s/accounting/tacc_jobs_completed
-host_list_dir   = %(data_dir)s/hostfile_logs
+acct_path       = %(data_dir)s/accounting
 pickles_dir     = %(data_dir)s/pickles
 archive_dir     = %(data_dir)s/archive
 host_name_ext   = %(machine)s.tacc.utexas.edu
 batch_system    = SLURM
 ```
-Set these paths as needed.  The raw stats data will be stored in the `archive_dir` and processed stats data in the `pickles_dir`.  `machine` should match the system name used in the RabbitMQ server `QUEUE` field.  This is the only field that needs to match 
-anything in the `monitor` subpackage.
+Set these paths as needed. The `accounting_path` will contain an accounting file for each date, e.g. `2018-11-01.txt`. The raw stats data will be stored in the `archive_dir` and processed stats data in the `pickles_dir`.  `machine` should match the system name used in the RabbitMQ server `QUEUE` field and is the RabbitMQ `QUEUE` that the monitoring agent sends the data too.  This is the only field that needs to match settings in the `monitor` subpackage. `host_name_ext` is the extension required to each compute node hostname in order to build a FQDN. This will match to directory names created in the `archive_dir`. 
 3.  Install `tacc_stats`
 ```
 $ pip install -e tacc_stats/
