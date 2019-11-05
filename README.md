@@ -40,7 +40,7 @@ First ensure the RabbitMQ library and header file are installed on the build and
 
 [librabbitmq-devel-0.5.2-1.el6.x86_64](ftp://fr2.rpmfind.net/linux/epel/6/x86_64/librabbitmq-devel-0.5.2-1.el6.x86_64.rpm)
 
-`./configure --enable-rabbitmq; make; make install` will then successfully build the `tacc_stats` executable for many systems.  If Xeon Phi coprocessors are present on your system they can be monitored with the `--enable-mic` flag.  Additionally the configuration options, `--disable-infiniband`, `--disable-lustre`, `--disable-hardware` will disable infiniband, Lustre Filesystem, and Hardware Counter monitoring.  Not enabling RabbitMQ will result in a legacy build of `tacc_stats` that relies on the shared filesystem to transmit data.  This mode is not recommended.  If libraries or header files are not found than add their paths to the include and library paths with the `CPPFLAGS` and/or `LDFLAGS` vars as usual.  
+`./configure --enable-rabbitmq; make; make install` will then successfully build the `tacc_stats` executable for many systems.  If Xeon Phi coprocessors are present on your system they can be monitored with the `--enable-mic` flag.  Additionally the configuration options, `--disable-infiniband`, `--disable-lustre`, `--disable-hardware` will disable infiniband, Lustre Filesystem, and Hardware Counter monitoring which are all enabled by default.  Not enabling RabbitMQ will result in a legacy build of `tacc_stats` that relies on the shared filesystem to transmit data.  This mode is not recommended.  If libraries or header files are not found than add their paths to the include and library paths with the `CPPFLAGS` and/or `LDFLAGS` vars as is standard in autoconf based installations.  
 
 There will be a configuration file, `/etc/tacc_stats.conf`, after installation.  This file contains the fields
 
@@ -55,15 +55,15 @@ There will be a configuration file, `/etc/tacc_stats.conf`, after installation. 
 
 `SERVER` should be set to the RabbitMQ server, `QUEUE` to the system name, `PORT` to the RabbitMQ port (5672 should be ok), and `FREQ` to the desired sampling frequency in seconds.
 
-An RPM can be built for subpackage deployment using  the `tacc_statsd.spec` file.  The most straightforward approach to build this
-is to setup your rpmbuild directory then
+An RPM can be built for subpackage deployment using  the `tacc_statsd_systemv.spec` file.  The most straightforward approach to build this is to setup your rpmbuild directory then run
 
-`rpmbuild -ba tacc_statsd.spec --define 'rmqserver rabbitmqservername' --define 'system systemname'`
+`rpmbuild -ba tacc_statsd_systemv.spec --define 'rmqserver rabbitmqservername' --define 'system systemname'`
 
 where the `rmqserver` will be the RabbitMQ `SERVER` hostname and `system` will be the `QUEUE` in `tacc_stats.conf`. 
+Configuration options may have to be changed within the `tacc_statsd.spec` file.
 
-After installation the executable `/opt/tacc_statsd/tacc_stats`, service `/etc/init.d/taccstats`, and config file `/etc/tacc_stats.conf` should exist.  If the rpm was used for installation `tacc_stats` will be `chkconfig`'d to start at boot time and be running.
-`tacc_stats` can be started, stopped, and restarted using `taccstats start`, `taccstats stop`, and `taccstats restart`.
+After installation the executable `/opt/tacc_statsd/tacc_stats`, systemv service file `/etc/systemd/system/taccstats.service`, should exist should exist.  If the rpm was used for installation `taccstats` will be `enable`'d to start at boot time and be restart within 10 seconds if it fails for any reason.
+`tacc_stats` can be started, stopped, and restarted using `systemctl start taccstats`, `systemctl stop taccstats`, and `systemctl restart taccstats`.
 
 In order to notify `tacc_stats` of a job beginning echo the job id into `/var/run/TACC_jobid`.  It order to notify
 it of a job ending echo `-` into `/var/run/TACC_jobid`.  This can be accomplished in the job scheduler prolog and
@@ -97,14 +97,15 @@ If using SLURM the `sacct_gen.py` script that installed with `tacc_stats` may be
  To install TACC Stats on the machine where data will be processed, analyzed, and the webserver hosted follow these
  steps:
  
-1.  Download the package and setup the Python virtual environment.
+1.  Download the package and setup the Python3 virtual environment. TACC Stats is Python3 dependent.
 ```
 $ virtualenv machinename --system-site-packages
 $ cd machinename; source bin/activate
 $ git clone https://github.com/TACC/tacc_stats
 ```
 `tacc_stats` is a pure Python package.  Dependencies should be automatically downloaded
-and installed when installed via `pip`.  The package must first be configured however.  
+and installed when installed via `pip`.  The package must first be configured however 
+in the `tacc_stats.ini` file.  
 2.  The initialization file, `tacc_stats.ini`, controls all the configuration options and has 
 the following content and descriptions
 ```
