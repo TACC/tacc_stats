@@ -63,8 +63,9 @@ def job_pickle(reader_inst,
             except MemoryError as e:
                 print(e)
                 return (reader_inst['id'], validated)
+            except: return (reader_inst['id'], validated)
             validated = True
-
+    
     return (reader_inst['id'], validated)
 
 class JobPickles:
@@ -113,7 +114,7 @@ class JobPickles:
         acct = [job for job in acct if job['id'] in run_jids]            
 
         if not self.jobids:
-            acct = [job for job in acct if job['nodes']*(job['end_time']-job['start_time']) < 1728000]
+            acct = [job for job in acct if job['nodes']*(job['end_time']-job['start_time']) < 88473600]
         ctr = 0
         with open(val_file, "a") as fd:
             for result in self.pool.imap(self.partial_pickle, acct):

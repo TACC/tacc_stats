@@ -146,15 +146,19 @@ def index(request, **kwargs):
     fields = { k:v for k, v in fields.items() if v }
     fields.update(kwargs)
 
+    metrics = []
     if 'page' in fields: del fields['page']
     if 'opt_field1' in fields.keys() and 'value1' in fields.keys():
         fields[fields['opt_field1']] = fields['value1']
+        metrics += [fields['opt_field1']]
         del fields['opt_field1'], fields['value1']
     if 'opt_field2' in fields.keys() and 'value2' in fields.keys():
         fields[fields['opt_field2']] = fields['value2']
+        metrics += [fields['opt_field2']]
         del fields['opt_field2'], fields['value2']
     if 'opt_field3' in fields.keys() and 'value3' in fields.keys():
         fields[fields['opt_field3']] = fields['value3']
+        metrics += [fields['opt_field3']]
         del fields['opt_field3'], fields['value3']
 
     name = ''
@@ -192,22 +196,26 @@ def index(request, **kwargs):
 
     fields['job_list'] = jobs
     fields['nj'] = job_list.count()
+    if metrics:
+        hists = []
+        for m in metrics: hists += [job_hist(job_list, m.split('__')[0], "")]
+        fields["script"], fields["div"] = components(gridplot(hists, ncols = len(metrics), plot_height=200, plot_width=400))
+    else:
+        job_list = job_list.annotate(queue_wait = F("start_epoch") - F("queue_time"))
+        fields["script"], fields["div"] = components(gridplot([job_hist(job_list, "run_time", "Hours", 
+                                                                        scale = 3600),
+                                                               job_hist(job_list, "nodes", "# Nodes"),
+                                                               job_hist(job_list, "queue_wait", "Hours", 
+                                                                        scale = 3600),
+                                                               job_hist(job_list, "avg_openclose", "iops")], 
+                                                            ncols = 2,
+                                                              plot_width = 400, plot_height = 200))
 
-    job_list = job_list.annotate(queue_wait = F("start_epoch") - F("queue_time"))
-    fields["script"], fields["div"] = components(gridplot(job_hist(job_list, "run_time", "Hours", 
-                                                                   scale = 3600),
-                                                          job_hist(job_list, "nodes", "# Nodes"),
-                                                          job_hist(job_list, "queue_wait", "Hours", 
-                                                                   scale = 3600),
-                                                          job_hist(job_list, "avg_openclose", "iops"), 
-                                                          ncols = 2, toolbar_options = {"logo" : None},
-                                                          plot_width = 400, plot_height = 200)
-                                             )
     # Computed Metrics    
-    job_list = job_list.filter(run_time__gt = 600).exclude(queue__in = ["development", "skx-dev"])
+    job_list = job_list.filter(run_time__gt = 600).exclude(queue__in = ["development"])
     fields['cat_job_list']  = job_list.filter(Q(time_imbalance__lte = 0.001) | \
                                               Q(time_imbalance__gte = 1000)).exclude(time_imbalance = float('nan'))
-    
+
     completed_list = job_list.exclude(status__in=['CANCELLED','FAILED']).order_by('-id')
     if len(completed_list) > 0:
         fields['md_job_list'] = job_list.exclude(avg_openclose__isnull = True ).order_by('-avg_openclose')
@@ -243,7 +251,7 @@ def list_to_dict(job_list, metric):
 def job_hist(job_list, value, units, scale = 1.0):
     hover = HoverTool(tooltips = [ ("jobs", "@top"), ("bin", "[@left, @right]") ], point_policy = "snap_to_data")
     TOOLS = ["pan,wheel_zoom,box_zoom,reset,save,box_select", hover]
-    p1 = figure(title = value, logo = None,
+    p1 = figure(title = value,
                 toolbar_location = None, plot_height = 400, plot_width = 600, y_axis_type = "log", tools = TOOLS)
     p1.xaxis.axis_label = units
     p1.yaxis.axis_label = "# Jobs"
@@ -297,8 +305,12 @@ metric_names = [
     "mem_hwm [GB]", 
     "node_imbalance",
     "time_imbalance",
-    "avg_flops [GF]",
-    "vecpercent [%]",
+    "avg_flops_32b [GF]",
+    "avg_vector_width_32b [#]",
+    "vecpercent_32b [%]",
+    "avg_flops_64b [GF]",
+    "avg_vector_width_64b [#]",
+    "vecpercent_64b [%]",
     "avg_cpi [cyc/ins]", 
     "avg_freq [GHz]", 
     "avg_loads [#/s]", 
@@ -404,7 +416,7 @@ class JobDetailView(DetailView):
 
         ### Specific to Stampede2 Splunk 
         urlstring="https://scribe.tacc.utexas.edu:8000/en-US/app/search/search?q=search%20"
-        hoststring=urlstring+"%20host%3D"+acct_host_list[0]+".stampede2.tacc.utexas.edu"
+        hoststring=urlstring+"%20host%3D"+acct_host_list[0]+".frontera.tacc.utexas.edu"
         serverstring=urlstring+"%20mds*%20OR%20%20oss*"
         for host in acct_host_list[1:]:
             hoststring+="%20OR%20%20host%3D"+host+"*"

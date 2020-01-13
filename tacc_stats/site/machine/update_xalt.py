@@ -27,13 +27,17 @@ for date in daterange(start, end):
     directory = date.strftime("%Y-%m-%d")
     print (directory)
     ### If xalt is available add data to the DB
-    for job in Job.objects.filter(date = directory):
+    #for job in Job.objects.filter(date = directory).filter(exe = None):
+    for job in Job.objects.filter(date = directory).filter(exe = None):
         obj = Job.objects.get(id = job.id)
-        print(obj.exec_path)
-        if obj.exec_path: continue
-        if not run.objects.using('xalt').filter(job_id = job.id): continue
-        xd = run.objects.using('xalt').filter(job_id = job.id)[0]
+        xd = None
 
+        if not run.objects.using('xalt').filter(job_id = job.id): continue
+        for r in run.objects.using('xalt').filter(job_id = job.id):
+            if "usr" in r.exec_path.split('/'): continue
+            print (r.exec_path)
+            xd = r
+        if not xd: continue
         obj.exe  = xd.exec_path.split('/')[-1][0:128]
         obj.exec_path = xd.exec_path
         obj.cwd     = xd.cwd[0:128]

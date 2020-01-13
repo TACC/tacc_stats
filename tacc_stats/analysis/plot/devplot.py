@@ -38,7 +38,7 @@ class DevPlot():
                     x_range = DataRange1d(), y_range = DataRange1d())                  
         for hostname, stats in _stats.items():               
           rate = stats[:, index]
-          if typename == "mem":
+          if typename == "mem" or typename == "proc":
             source = ColumnDataSource({"x" : u.hours, "y" : rate})
             plot.add_glyph(source, Step(x = "x", y = "y", mode = "after", 
                                         line_color = hc[hostname]))
@@ -47,8 +47,9 @@ class DevPlot():
             source = ColumnDataSource({"x" : u.hours, "y" : numpy.append(rate, rate[-1])})
             plot.add_glyph(source, Step(x = "x", y = "y", mode = "after", 
                                         line_color = hc[hostname]))
+        if "FP_ARITH_INST_RETIRED" in event: event = event.split("FP_ARITH_INST_RETIRED_")[1]
         plots += [self.add_axes(plot, event)]
       except:
         print(event + ' plot failed for jobid ' + job.id )
         print(sys.exc_info())
-    return gridplot(*plots, ncols = len(plots)//4 + 1, toolbar_options = {"logo" : None})
+    return gridplot(plots, ncols = len(plots)//4 + 1)
