@@ -79,11 +79,17 @@ def update_acct(date, rerun = False):
             del job['NodeList']
 
             Job.objects.filter(id=json['id']).delete()
-            obj, created = Job.objects.update_or_create(**json)
-
+            try:
+                obj, created = Job.objects.update_or_create(**json)
+            except:
+                continue
             ### If xalt is available add data to the DB 
             xd = None
-            try: xd = run.objects.using('xalt').filter(job_id = json['id'])[0]
+            try: 
+                #xd = run.objects.using('xalt').filter(job_id = json['id'])[0]
+                for r in run.objects.using('xalt').filter(job_id = json['id']):
+                    if "usr" in r.exec_path.split('/'): continue
+                    xd = r
             except: pass
             
             if xd:            
@@ -108,23 +114,23 @@ def update_acct(date, rerun = False):
 
             ctr += 1
             progress(ctr, nrecords, date)
-
-    with open(os.path.join(cfg.pickles_dir, date.strftime("%Y-%m-%d"), "validated")) as fd:
-        for line in fd.readlines():
-            Job.objects.filter(id = int(line)).update(validated = True)
-
+    try:
+        with open(os.path.join(cfg.pickles_dir, date.strftime("%Y-%m-%d"), "validated")) as fd:
+            for line in fd.readlines():
+                Job.objects.filter(id = int(line)).update(validated = True)
+    except: pass
 def update_metrics(date, pickles_dir, processes, rerun = False):
 
-    min_time = 10
+    min_time = 60
     metric_names = [
         "avg_ethbw", "avg_cpi", "avg_freq", "avg_loads", "avg_l1loadhits",
         "avg_l2loadhits", "avg_llcloadhits", "avg_sf_evictrate", "max_sf_evictrate", 
         "avg_mbw", "avg_page_hitrate", "time_imbalance",
         "mem_hwm", "max_packetrate", "avg_packetsize", "node_imbalance",
-        "avg_flops", "vecpercent", "avg_cpuusage", "max_mds",
-        "avg_lnetmsgs", "avg_lnetbw", "max_lnetbw", "avg_fabricbw",
+        "avg_flops_32b", "avg_flops_64b", "avg_vector_width_32b", "vecpercent_32b", "avg_vector_width_64b", "vecpercent_64b", 
+        "avg_cpuusage", "max_mds", "avg_lnetmsgs", "avg_lnetbw", "max_lnetbw", "avg_fabricbw",
         "max_fabricbw", "avg_mdcreqs", "avg_mdcwait", "avg_oscreqs",
-        "avg_oscwait", "avg_openclose", "avg_mcdrambw", "avg_blockbw"
+        "avg_oscwait", "avg_openclose", "avg_mcdrambw", "avg_blockbw", "max_load15"
     ]
 
     aud = metrics.Metrics(metric_names, processes = processes)
@@ -137,7 +143,7 @@ def update_metrics(date, pickles_dir, processes, rerun = False):
 
     # Use avg_cpuusage to see if job was tested.  It will always exist
     if not rerun:
-        jobs_list = jobs_list.filter(avg_packetsize = None)
+        jobs_list = jobs_list.filter(avg_vector_width_32b = None)
 
     paths = []
     for job in jobs_list:
@@ -150,7 +156,9 @@ def update_metrics(date, pickles_dir, processes, rerun = False):
     if num_jobs == 0 : return
 
     for jobid, metric_dict in aud.run(paths):
-        if metric_dict: jobs_list.filter(id = jobid).update(**metric_dict)
+        try:
+            if metric_dict: jobs_list.filter(id = jobid).update(**metric_dict)
+        except: pass
 
 if __name__ == "__main__":
     import argparse

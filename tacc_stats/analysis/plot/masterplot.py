@@ -59,7 +59,7 @@ class MasterPlot():
         source = ColumnDataSource({"x" : u.hours, "y" : numpy.append(rate, rate[-1])})
         plot.add_glyph(source, Step(x = "x",y = "y", mode = "after", 
                                     line_color = hc[hostname]))
-      plots += [self.add_axes(plot, "GFLOPS")]
+      plots += [self.add_axes(plot, "64b GFLOPS")]
     except: 
       print("FLOPS plot fails for JOBID", job.id)
       print(sys.exc_info())
@@ -146,8 +146,8 @@ class MasterPlot():
                   x_range = DataRange1d(), y_range = DataRange1d())      
       try:
         schema, _stats  = u.get_type("ib_ext")
-        rx, tx = stats[:, schema["port_rcv_data"].index], stats[:, schema["port_xmit_data"].index]
-        conv2mb = 2**20
+        rx, tx = schema["port_rcv_data"].index, schema["port_xmit_data"].index
+        conv2mb = 1024*1024
       except:
         schema, _stats  = u.get_type("opa")
         rx, tx = schema["PortRcvData"].index, schema["PortXmitData"].index
@@ -197,4 +197,4 @@ class MasterPlot():
       print("CPU Frequency plot failed for jobid", job.id )
       print(sys.exc_info())
 
-    return gridplot(*plots, ncols = len(plots)//4 + 1, toolbar_options = {"logo" : None})
+    return gridplot(plots, ncols = len(plots)//4 + 1)

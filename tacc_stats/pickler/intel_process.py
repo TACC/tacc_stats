@@ -20,9 +20,13 @@ def CORE_PERF_EVENT1(event_select, unit_mask):
 ## Processor event map
 cpu_event_map = {
     CORE_PERF_EVENT(0xC7,0x01) : 'FP_ARITH_INST_RETIRED_SCALAR_DOUBLE,E',
+    CORE_PERF_EVENT(0xC7,0x02) : 'FP_ARITH_INST_RETIRED_SCALAR_SINGLE,E',
     CORE_PERF_EVENT(0xC7,0x04) : 'FP_ARITH_INST_RETIRED_128B_PACKED_DOUBLE,E',
+    CORE_PERF_EVENT(0xC7,0x08) : 'FP_ARITH_INST_RETIRED_128B_PACKED_SINGLE,E',
     CORE_PERF_EVENT(0xC7,0x10) : 'FP_ARITH_INST_RETIRED_256B_PACKED_DOUBLE,E',
+    CORE_PERF_EVENT(0xC7,0x20) : 'FP_ARITH_INST_RETIRED_256B_PACKED_SINGLE,E',
     CORE_PERF_EVENT(0xC7,0x40) : 'FP_ARITH_INST_RETIRED_512B_PACKED_DOUBLE,E',
+    CORE_PERF_EVENT(0xC7,0x80) : 'FP_ARITH_INST_RETIRED_512B_PACKED_SINGLE,E',
     CORE_PERF_EVENT(0xD0,0x81) : 'LOAD_OPS_ALL,E',
     CORE_PERF_EVENT(0xD1,0x01) : 'LOAD_OPS_L1_HIT,E', 
     CORE_PERF_EVENT(0xD1,0x02) : 'LOAD_OPS_L2_HIT,E', 
@@ -321,7 +325,7 @@ intel_xeon = {'intel_snb' : cpu_event_map, 'intel_snb_cbo' : cbo_event_map, 'int
               'intel_hsw' : cpu_event_map, 'intel_hsw_cbo' : cbo_event_map, 'intel_hsw_hau' : hau_event_map, 
               'intel_hsw_imc' : imc_event_map,  'intel_hsw_qpi' : qpi_event_map, 'intel_hsw_pcu' : pcu_event_map, 'intel_hsw_r2pci' : r2pci_event_map,
               'intel_hsw_ht' : cpu_event_map, 'intel_hsw_cbo_ht' : cbo_event_map,
-              'intel_knl' : cpu_event_map, 'intel_skx' : cpu_event_map, 'intel_skx_imc' : imc_event_map, 'intel_skx_cha' : cha_event_map
+              'intel_knl' : cpu_event_map, 'intel_skx' : cpu_event_map, 'intel_8pmc3' : cpu_event_map,'intel_4pmc3' : cpu_event_map, 'intel_skx_imc' : imc_event_map, 'intel_skx_cha' : cha_event_map
 }
 
 def format_knl(job, typename):

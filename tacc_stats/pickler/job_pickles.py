@@ -63,8 +63,9 @@ def job_pickle(reader_inst,
             except MemoryError as e:
                 print(e)
                 return (reader_inst['id'], validated)
+            except: return (reader_inst['id'], validated)
             validated = True
-
+    
     return (reader_inst['id'], validated)
 
 class JobPickles:
@@ -103,16 +104,17 @@ class JobPickles:
 
         ntot = len(acct_jids)
         print(len(acct_jids),'Job records in accounting file')
-
+        if self.jobids:
+            acct_jids += self.jobids
         run_jids = sorted(list(set(acct_jids) - set(val_jids)))
-        run_jids += [self.jobids]
-        print(len(run_jids),'Jobs to process')
+
+        print('Jobs to process: ', len(run_jids), run_jids)
         ntod = len(run_jids)
 
         acct = [job for job in acct if job['id'] in run_jids]            
 
         if not self.jobids:
-            acct = [job for job in acct if job['nodes']*(job['end_time']-job['start_time']) < 1728000]
+            acct = [job for job in acct if job['nodes']*(job['end_time']-job['start_time']) < 88473600]
         ctr = 0
         with open(val_file, "a") as fd:
             for result in self.pool.imap(self.partial_pickle, acct):
@@ -131,7 +133,9 @@ class JobPickles:
             for job in csv.DictReader(fd, delimiter = '|'):
                 if self.jobids and job['JobID'] not in self.jobids: continue
                 if job['NodeList'] == "None assigned": continue
-
+                if len(job) != 13: 
+                    print(job['JobID'] + " is not parsed correctly")
+                    continue
                 jent = {}
                 jent['id']         = job['JobID']
                 jent['user']       = job['User']

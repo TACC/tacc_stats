@@ -4,7 +4,7 @@ import tacc_stats.cfg as cfg
 import tacc_stats.site.tacc_stats_site as tacc_stats_site
 DIR = os.path.dirname(os.path.abspath(__file__))
 
-DEBUG = False
+DEBUG = True
 
 ADMINS = (
     ('Richard Todd Evans', 'rtevans@tacc.utexas.edu'),
@@ -24,7 +24,8 @@ DATABASES = {
         },
     # Uncomment this portion if an xalt database exists
     'xalt' : {
-        'ENGINE' : 'mysql.connector.django',
+        #'ENGINE' : 'mysql.connector.django',
+        'ENGINE' : 'django.db.backends.mysql',
         'NAME' : 'xalt_' + cfg.machine,
         'USER' : 'xaltUser',
         'PASSWORD' : 'kutwgbh',
@@ -155,30 +156,6 @@ INTERNAL_IPS = ['127.0.0.1']
 SESSION_SERIALIZER = 'django.contrib.sessions.serializers.JSONSerializer'
 SESSION_ENGINE = 'django.contrib.sessions.backends.file'
 
-LOGGING = {
-    'version': 1,
-    'disable_existing_loggers': False,
-    'filters': {
-        'require_debug_false': {
-            '()': 'django.utils.log.RequireDebugFalse'
-        }
-    },
-    'handlers': {
-        'mail_admins': {
-            'level': 'ERROR',
-            'filters': ['require_debug_false'],
-            'class': 'django.utils.log.AdminEmailHandler'
-        }
-    },
-    'loggers': {
-        'django.request': {
-            'handlers': ['mail_admins'],
-            'level': 'ERROR',
-            'propagate': True,
-        },
-    }
-}
-
 CACHES = {
     'normal': {
         'BACKEND': 'django.core.cache.backends.memcached.MemcachedCache',
@@ -224,16 +201,24 @@ LOGGING = {
             'class': 'logging.StreamHandler',
             'formatter': 'metrics',
         },
+        'logfile': {
+            'level':'INFO',
+            'class':'logging.handlers.RotatingFileHandler',
+            'filename': os.path.join('/stats', 'tacc_stats_site.log'),
+            'maxBytes': 1024*1024*15, # 15MB
+            'backupCount': 10,
+        },
+
     },
     'loggers': {
+        'tacc_stats_site': {
+            'handlers': ['logfile',],
+            'level': 'INFO',
+        },
         'django': {
             'handlers': ['console', 'opbeat'],
             'level': 'INFO',
             'propagate': True,
-        },
-        'designsafe': {
-            'handlers': ['console', 'opbeat'],
-            'level': 'DEBUG',
         },
         'celery': {
             'handlers': ['console', 'opbeat'],

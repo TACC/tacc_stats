@@ -8,20 +8,14 @@ app_name = "tacc_stats"
 
 urlpatterns = [
                        path('',dates, name='dates'),
-
                        path('job/<pk>/',
                            JobDetailView.as_view(), name='job'),
                        path('job/<pk>/<type_name>/',
                            type_detail, name = 'type_detail'),
-
                        path('proc/<pk>/<proc_name>/',
                            proc_detail, name = 'proc_detail'),
-
                        path('date/<date>', 
                            index, name='date_view'),
-                       #url(r'date/<date>', 
-                       #    index, name='date_view'),
-
                        path('uid/<uid>/',
                            index, name='uid_view'),
                        path('user/<user>/',
@@ -29,8 +23,7 @@ urlpatterns = [
                        path('project/<project>/',
                            index, name='project_view'),
                        path('exe/<exe__icontains>)/',
-                           index, name='exe_view'),
-                       
+                           index, name='exe_view'),                       
                        path('search/',search, name='search'),
 ]
 

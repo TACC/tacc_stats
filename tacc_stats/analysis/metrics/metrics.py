@@ -10,6 +10,7 @@ def _unwrap(args):
     return args[0].compute_metrics(args[1])
   except Exception as e:
     print(traceback.format_exc())    
+    return
 
 class Metrics():
 
@@ -23,6 +24,7 @@ class Metrics():
       print("Please specify a job file list.")
       sys.exit()
     pool = multiprocessing.Pool(processes = self.processes) 
+
     metrics = pool.map(_unwrap, zip([self]*len(filelist), filelist))
     #metrics = map(_unwrap, zip([self]*len(filelist), filelist))
     return metrics
@@ -45,7 +47,8 @@ class Metrics():
     except EOFError as e:
       print('End of file error for: ' + jobpath)
       return jobpath, None
-
+    except:
+      return jobpath, None
     u = utils.utils(job)
     _metrics = {}
     for name in self.metric_list:
@@ -125,7 +128,7 @@ class avg_fabricbw():
                    stats[0, tb] - stats[0, rb]
         return avg/(u.dt*u.nhosts*conv2mb)
 
-class avg_flops():
+class avg_flops_64b():
   def compute_metric(self, u):
     schema, _stats = u.get_type("pmc")
     vector_widths = {"SSE_D_ALL" : 1, "SIMD_D_256" : 2, 
@@ -143,6 +146,22 @@ class avg_flops():
           index = schema[eventname].index
           flops += (stats[-1, index] - stats[0, index])*vector_widths[eventname]
     return flops/(u.dt*u.nhosts*1e9)
+
+class avg_flops_32b():
+  def compute_metric(self, u):
+    schema, _stats = u.get_type("pmc")
+    vector_widths = {"FP_ARITH_INST_RETIRED_SCALAR_SINGLE" : 1, 
+                     "FP_ARITH_INST_RETIRED_128B_PACKED_SINGLE" : 4, 
+                     "FP_ARITH_INST_RETIRED_256B_PACKED_SINGLE" : 8, 
+                     "FP_ARITH_INST_RETIRED_512B_PACKED_SINGLE" : 16}
+    flops = 0
+    for hostname, stats in _stats.items():
+      for eventname in schema:
+        if eventname in vector_widths:
+          index = schema[eventname].index
+          flops += (stats[-1, index] - stats[0, index])*vector_widths[eventname]
+    return flops/(u.dt*u.nhosts*1e9)
+
 
 class avg_l1loadhits():
   def compute_metric(self, u):
@@ -429,7 +448,7 @@ class time_imbalance():
     else:
       return None
 
-class vecpercent():
+class vecpercent_64b():
   def compute_metric(self, u):
     schema, _stats = u.get_type("pmc")
     vector_widths = {"SSE_D_ALL" : 1, "SIMD_D_256" : 2, 
@@ -450,6 +469,63 @@ class vecpercent():
           if vector_widths[eventname] > 1: vector_flops += flops
           else: scalar_flops += flops
     return 100*vector_flops/(scalar_flops + vector_flops)
+
+class avg_vector_width_64b():
+  def compute_metric(self, u):
+    schema, _stats = u.get_type("pmc")
+    vector_widths = {"SSE_D_ALL" : 1, "SIMD_D_256" : 2, 
+                    "FP_ARITH_INST_RETIRED_SCALAR_DOUBLE" : 1, 
+                     "FP_ARITH_INST_RETIRED_128B_PACKED_DOUBLE" : 2, 
+                     "FP_ARITH_INST_RETIRED_256B_PACKED_DOUBLE" : 4, 
+                     "FP_ARITH_INST_RETIRED_512B_PACKED_DOUBLE" : 8, 
+                     "SSE_DOUBLE_SCALAR" : 1, 
+                     "SSE_DOUBLE_PACKED" : 2, 
+                     "SIMD_DOUBLE_256" : 4}
+    flops = 0.0
+    instr = 0.0
+    for hostname, stats in _stats.items():
+      for eventname in schema:
+        if eventname in vector_widths.keys():
+          index = schema[eventname].index
+          instr += (stats[-1, index] - stats[0, index])
+          flops += (stats[-1, index] - stats[0, index])*vector_widths[eventname]
+    return flops/instr
+
+class vecpercent_32b():
+  def compute_metric(self, u):
+    schema, _stats = u.get_type("pmc")
+    vector_widths = {"FP_ARITH_INST_RETIRED_SCALAR_SINGLE" : 1, 
+                     "FP_ARITH_INST_RETIRED_128B_PACKED_SINGLE" : 4, 
+                     "FP_ARITH_INST_RETIRED_256B_PACKED_SINGLE" : 8, 
+                     "FP_ARITH_INST_RETIRED_512B_PACKED_SINGLE" : 16}
+    vector_flops = 0.0
+    scalar_flops = 0.0
+    for hostname, stats in _stats.items():
+      for eventname in schema:
+        if eventname in vector_widths.keys():
+          index = schema[eventname].index
+          flops = (stats[-1, index] - stats[0, index])*vector_widths[eventname]
+          if vector_widths[eventname] > 1: vector_flops += flops
+          else: scalar_flops += flops
+    return 100*vector_flops/(scalar_flops + vector_flops)
+
+class avg_vector_width_32b():
+  def compute_metric(self, u):
+    schema, _stats = u.get_type("pmc")
+    vector_widths = {"FP_ARITH_INST_RETIRED_SCALAR_SINGLE" : 1, 
+                     "FP_ARITH_INST_RETIRED_128B_PACKED_SINGLE" : 4, 
+                     "FP_ARITH_INST_RETIRED_256B_PACKED_SINGLE" : 8, 
+                     "FP_ARITH_INST_RETIRED_512B_PACKED_SINGLE" : 16}
+    flops = 0.0
+    instr = 0.0
+    for hostname, stats in _stats.items():
+      for eventname in schema:
+        if eventname in vector_widths.keys():
+          index = schema[eventname].index
+          instr += (stats[-1, index] - stats[0, index])
+          flops += (stats[-1, index] - stats[0, index])*vector_widths[eventname]
+    return flops/instr
+
 
 class avg_sf_evictrate():
   def compute_metric(self, u):
@@ -495,3 +571,10 @@ class max_sf_evictrate():
         max_rate = max(sf_evictions[socket]/llc_lookup[socket], max_rate)
     return max_rate
 
+class max_load15():    
+  def compute_metric(self, u):
+    max_load15 = 0.0 
+    schema, _stats = u.get_type("ps")
+    for hostname, stats in _stats.items():
+      max_load15 = max(max_load15, amax(stats[:, schema["load_15"].index]))
+    return max_load15/100
