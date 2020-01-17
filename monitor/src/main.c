@@ -14,11 +14,15 @@
 #include "stats_file.h"
 #include "trace.h"
 #include "pscanf.h"
+#include "cpuid.h"
 
 struct timeval tp;
 double current_time;
 char current_jobid[80] = "0";
 int nr_cpus;
+
+int n_pmcs = 0;
+processor_t processor = 0;
 
 static void alarm_handler(int sig)
 {
@@ -153,6 +157,7 @@ int main(int argc, char *argv[])
   current_time = tp.tv_sec+tp.tv_usec/1000000.0;
   pscanf(JOBID_FILE_PATH, "%79s", current_jobid);
   nr_cpus = sysconf(_SC_NPROCESSORS_ONLN);
+  processor = signature(&n_pmcs);
 
   if (mkdir(STATS_DIR_PATH, 0777) < 0) {
     if (errno != EEXIST)

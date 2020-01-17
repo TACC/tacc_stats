@@ -178,19 +178,33 @@ static void intel_knl_mc_dclk_collect_dev(struct stats_type *type, uint32_t func
 #undef X
 }
 
+int nr_mc_devs = 2;
+// MC: UCLK
+// Devices: 0x0a 0x0b (Controllers)
+// Functions: 0x00
+uint32_t mc_uclk_events[] = { UCLK_CYCLES };
+int nr_mc_uclk_events = 1;
+uint32_t mc_uclk_dev[] = {0x0a, 0x0b};
+// MC: DCLK
+// Devices: 0x08 0x09 (Controllers)
+// Functions: 0x02 0x03 0x04 (Channels)
+uint32_t mc_dclk_events[] = { CAS_READS, CAS_WRITES, DCLK_CYCLES };
+int nr_mc_dclk_events = 3;
+uint32_t mc_dclk_dev[] = {0x08, 0x09};
 
 static int intel_knl_mc_begin(struct stats_type *type)
 {
   int nr = 0;
   int n_pmcs = 0;
-  if (signature(KNL, &n_pmcs))
-    { 
+  int fd = -1;
+
+  if (signature(&n_pmcs) != KNL) goto out;
   const char *path = "/dev/mem";
   uint64_t mmconfig_base = 0xc0000000;
   uint64_t mmconfig_size = 0x10000000;
   uint32_t *mmconfig_ptr;
 
-  int fd = open(path, O_RDWR);    // first check to see if file can be opened with read permission
+  fd = open(path, O_RDWR);    // first check to see if file can be opened with read permission
   if (fd < 0) {
     ERROR("cannot open /dev/mem\n");
     goto out;
@@ -201,37 +215,22 @@ static int intel_knl_mc_begin(struct stats_type *type)
     goto out;
   }
 
-  int i;
-  int nr_mc_devs = 2;
-  // MC: UCLK
-  // Devices: 0x0a 0x0b (Controllers)
-  // Functions: 0x00
-  uint32_t mc_uclk_events[] = { UCLK_CYCLES };
-  int nr_mc_uclk_events = 1;
-  uint32_t mc_uclk_dev[] = {0x0a, 0x0b};
-  // MC: DCLK
-  // Devices: 0x08 0x09 (Controllers)
-  // Functions: 0x02 0x03 0x04 (Channels)
-  uint32_t mc_dclk_events[] = { CAS_READS, CAS_WRITES, DCLK_CYCLES };
-  int nr_mc_dclk_events = 3;
-  uint32_t mc_dclk_dev[] = {0x08, 0x09};
-
-    for (i = 0; i < nr_mc_devs; i++) {
-      if (intel_knl_mc_uclk_begin_dev(mc_uclk_dev[i], mmconfig_ptr, mc_uclk_events, nr_mc_uclk_events) == 0)
-	nr++;      
-      if (intel_knl_mc_dclk_begin_dev(mc_dclk_dev[i], 0x02, mmconfig_ptr, mc_dclk_events, nr_mc_dclk_events) == 0)
-	nr++;      
-      if (intel_knl_mc_dclk_begin_dev(mc_dclk_dev[i], 0x03, mmconfig_ptr, mc_dclk_events, nr_mc_dclk_events) == 0)
-	nr++;      
-      if (intel_knl_mc_dclk_begin_dev(mc_dclk_dev[i], 0x04, mmconfig_ptr, mc_dclk_events, nr_mc_dclk_events) == 0)
-	nr++;
-    }
+  int i;  
+  for (i = 0; i < nr_mc_devs; i++) {
+    if (intel_knl_mc_uclk_begin_dev(mc_uclk_dev[i], mmconfig_ptr, mc_uclk_events, nr_mc_uclk_events) == 0)
+      nr++;      
+    if (intel_knl_mc_dclk_begin_dev(mc_dclk_dev[i], 0x02, mmconfig_ptr, mc_dclk_events, nr_mc_dclk_events) == 0)
+      nr++;      
+    if (intel_knl_mc_dclk_begin_dev(mc_dclk_dev[i], 0x03, mmconfig_ptr, mc_dclk_events, nr_mc_dclk_events) == 0)
+      nr++;      
+    if (intel_knl_mc_dclk_begin_dev(mc_dclk_dev[i], 0x04, mmconfig_ptr, mc_dclk_events, nr_mc_dclk_events) == 0)
+      nr++;
+  }
   munmap(mmconfig_ptr, mmconfig_size);
 
  out:
   if (fd >= 0)
     close(fd);
-    }
   if (nr == 0)
     type->st_enabled = 0;
   return nr > 0 ? 0 : -1;  

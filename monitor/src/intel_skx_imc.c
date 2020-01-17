@@ -150,8 +150,7 @@ static int intel_skx_imc_begin(struct stats_type *type)
   int nr = 0;
   int n_pmcs;
 
-  if (signature(SKYLAKE, &n_pmcs))
-    { 
+  if (signature(&n_pmcs) != SKYLAKE) goto out;
 
   uint32_t *mmconfig_ptr;
 
@@ -192,7 +191,6 @@ static int intel_skx_imc_begin(struct stats_type *type)
  out:
   if (fd >= 0)
     close(fd);
-    }
 
   if (nr == 0)
     type->st_enabled = 0;

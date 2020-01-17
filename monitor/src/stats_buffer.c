@@ -29,11 +29,10 @@
 
 static int send(struct stats_buffer *sf)
 {
-  int status;
+  int status = -1;
   char const *exchange;
   amqp_socket_t *socket = NULL;
   amqp_connection_state_t conn;
-  amqp_bytes_t reply_to_queue;
 
   static int queue_declared = 0;
 
@@ -62,10 +61,11 @@ static int send(struct stats_buffer *sf)
 						    0, 1, 0, 0, amqp_empty_table);
     amqp_rpc_reply_t ret = amqp_get_rpc_reply(conn);
     if (ret.reply_type != AMQP_RESPONSE_NORMAL) {
-      ERROR("queue declare failed");
+      syslog(LOG_ERR, "queue declare failed");
       return -1;
     }
     else {
+      amqp_bytes_t reply_to_queue;
       reply_to_queue = amqp_bytes_malloc_dup(r->queue);
       if (reply_to_queue.bytes == NULL) {
         syslog(LOG_ERR, "Out of memory while copying queue name");
@@ -76,6 +76,7 @@ static int send(struct stats_buffer *sf)
 		      amqp_cstring_bytes(sf->sf_queue), amqp_empty_table);
       amqp_get_rpc_reply(conn);
       queue_declared = 1;
+      amqp_bytes_free(reply_to_queue);
     }
   }
 
@@ -93,8 +94,7 @@ static int send(struct stats_buffer *sf)
 		       &props,
 		       amqp_cstring_bytes(sf->sf_data));
   }
-  //amqp_channel_close(conn, 1, AMQP_REPLY_SUCCESS);
-  //amqp_connection_close(conn, AMQP_REPLY_SUCCESS);
+
   amqp_destroy_connection(conn); 
 
   return 0;

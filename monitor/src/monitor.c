@@ -25,6 +25,8 @@ double current_time;
 char current_jobid[80] = "-";
 char new_jobid[80] = "-";
 int nr_cpus;
+int n_pmcs = 0;
+processor_t processor = 0;
 
 static volatile sig_atomic_t g_new_flag = 1;
 
@@ -108,7 +110,7 @@ int main(int argc, char *argv[])
 
   /* Our process ID and Session ID */
   pid_t pid, sid;
-  
+
   /* Fork off the parent process */
   pid = fork();
   if (pid < 0) {
@@ -130,7 +132,7 @@ int main(int argc, char *argv[])
     /* Log the failure */
     exit(EXIT_FAILURE);
   }
-
+  
   // This block will force begin to wait until initialization is complete
   sigset_t mask;
   sigemptyset(&mask);
@@ -203,6 +205,7 @@ int main(int argc, char *argv[])
   } cmd;
 
   nr_cpus = sysconf(_SC_NPROCESSORS_ONLN);
+  processor = signature(&n_pmcs);
 
   /* Close out the standard file descriptors */
   close(STDIN_FILENO);

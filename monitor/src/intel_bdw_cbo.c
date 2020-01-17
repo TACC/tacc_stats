@@ -286,21 +286,22 @@ static int intel_bdw_cbo_begin(struct stats_type *type)
   int nr = 0;
 
   int i,j;
-  if (signature(BROADWELL, &n_pmcs))
-    for (i = 0; i < nr_cpus; i++) {
-      char cpu[80];
-      int pkg_id = -1;
-      int core_id = -1;
-      int smt_id = -1;
-      int nr_cores = 0;
-      snprintf(cpu, sizeof(cpu), "%d", i);    
-      topology(cpu, &pkg_id, &core_id, &smt_id, &nr_cores);
-      if (smt_id == 0 && core_id == 0)
-	for (j = 0; j < nr_cores; j++)
-	  if (intel_bdw_cbo_begin_box(cpu, j, events, 4) == 0)
-	    nr++;      
-    }
+  if (signature(&n_pmcs) != BROADWELL) goto out;
+  for (i = 0; i < nr_cpus; i++) {
+    char cpu[80];
+    int pkg_id = -1;
+    int core_id = -1;
+    int smt_id = -1;
+    int nr_cores = 0;
+    snprintf(cpu, sizeof(cpu), "%d", i);    
+    topology(cpu, &pkg_id, &core_id, &smt_id, &nr_cores);
+    if (smt_id == 0 && core_id == 0)
+      for (j = 0; j < nr_cores; j++)
+	if (intel_bdw_cbo_begin_box(cpu, j, events, 4) == 0)
+	  nr++;      
+  }
   
+ out:
   if (nr == 0)
     type->st_enabled = 0;  
   return nr > 0 ? 0 : -1;

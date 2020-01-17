@@ -182,57 +182,58 @@ static void intel_knl_edc_eclk_collect_dev(struct stats_type *type, uint32_t dev
 #undef X
 }
 
+int nr_edc_devs = 8;
+// EDC: UCLK
+// Devices: 0x0f 0x10 0x11 0x12 0x13 0x14 0x15 0x16 (Controllers)
+// Functions: 0x00
+uint32_t edc_uclk_events[] = { EDC_HIT_CLEAN, EDC_HIT_DIRTY, EDC_MISS_CLEAN, EDC_MISS_DIRTY };
+int nr_edc_uclk_events = 4;
+uint32_t edc_uclk_dev[] = {0x0f, 0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16};
+// EDC: ECLK
+// Devices: 0x18 0x19 0x1a 0x1b 0x1c 0x1d 0x1e 0x1f (Controllers)
+// Functions: 0x02
+uint32_t edc_eclk_events[] = { RPQ_INSERTS, WPQ_INSERTS, ECLK_CYCLES };
+int nr_edc_eclk_events = 3;
+uint32_t edc_eclk_dev[] = {0x18, 0x19, 0x1a, 0x1b, 0x1c, 0x1d, 0x1e, 0x1f};
 
 static int intel_knl_edc_begin(struct stats_type *type)
 {
   int nr = 0;
   int n_pmcs = 0;
-  if (signature(KNL, &n_pmcs))
-    { 
+  processor_t p;
+  int fd = -1;
+
+  if (signature(&n_pmcs) != KNL) goto out; 
+
   const char *path = "/dev/mem";
   uint64_t mmconfig_base = 0xc0000000;
   uint64_t mmconfig_size = 0x10000000;
   uint32_t *mmconfig_ptr;
-
-  int fd = open(path, O_RDWR);    // first check to see if file can be opened with read permission
+  
+  fd = open(path, O_RDWR);    // first check to see if file can be opened with read permission
   if (fd < 0) {
     ERROR("cannot open /dev/mem\n");
     goto out;
   }
+
   mmconfig_ptr = mmap(NULL, mmconfig_size, PROT_READ | PROT_WRITE, MAP_SHARED, fd, mmconfig_base);
   if (mmconfig_ptr == MAP_FAILED) {
     ERROR("cannot mmap `%s': %m\n", path);
     goto out;
   }
-
+  
   int i;
-  int nr_edc_devs = 8;
-  // EDC: UCLK
-  // Devices: 0x0f 0x10 0x11 0x12 0x13 0x14 0x15 0x16 (Controllers)
-  // Functions: 0x00
-  uint32_t edc_uclk_events[] = { EDC_HIT_CLEAN, EDC_HIT_DIRTY, EDC_MISS_CLEAN, EDC_MISS_DIRTY };
-  int nr_edc_uclk_events = 4;
-  uint32_t edc_uclk_dev[] = {0x0f, 0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16};
-  // EDC: ECLK
-  // Devices: 0x18 0x19 0x1a 0x1b 0x1c 0x1d 0x1e 0x1f (Controllers)
-  // Functions: 0x02
-  uint32_t edc_eclk_events[] = { RPQ_INSERTS, WPQ_INSERTS, ECLK_CYCLES };
-  int nr_edc_eclk_events = 3;
-  uint32_t edc_eclk_dev[] = {0x18, 0x19, 0x1a, 0x1b, 0x1c, 0x1d, 0x1e, 0x1f};
-
-
-    for (i = 0; i < nr_edc_devs; i++) {
-      if (intel_knl_edc_uclk_begin_dev(edc_uclk_dev[i], mmconfig_ptr, edc_uclk_events, nr_edc_uclk_events) == 0)
-	nr++;
-      if (intel_knl_edc_eclk_begin_dev(edc_eclk_dev[i], mmconfig_ptr, edc_eclk_events, nr_edc_eclk_events) == 0)
-	nr++;
-    }
-
+  for (i = 0; i < nr_edc_devs; i++) {
+    if (intel_knl_edc_uclk_begin_dev(edc_uclk_dev[i], mmconfig_ptr, edc_uclk_events, nr_edc_uclk_events) == 0)
+      nr++;
+    if (intel_knl_edc_eclk_begin_dev(edc_eclk_dev[i], mmconfig_ptr, edc_eclk_events, nr_edc_eclk_events) == 0)
+      nr++;
+  }
   munmap(mmconfig_ptr, mmconfig_size);
+
  out:
   if (fd >= 0)
     close(fd);
-    }
   if (nr == 0)
     type->st_enabled = 0;
   return nr > 0 ? 0 : -1;  
@@ -257,9 +258,6 @@ static void intel_knl_edc_collect(struct stats_type *type)
   }
 
   int i;
-  int nr_edc_devs = 8;
-  uint32_t edc_uclk_dev[] = {0x0f, 0x10, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16};
-  uint32_t edc_eclk_dev[] = {0x18, 0x19, 0x1a, 0x1b, 0x1c, 0x1d, 0x1e, 0x1f};
   for (i = 0; i < nr_edc_devs; i++) {
     intel_knl_edc_uclk_collect_dev(type, edc_uclk_dev[i], mmconfig_ptr);
     intel_knl_edc_eclk_collect_dev(type, edc_eclk_dev[i], mmconfig_ptr);

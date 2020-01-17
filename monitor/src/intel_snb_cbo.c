@@ -154,6 +154,12 @@ static int intel_snb_cbo_begin_box(char *cpu, int box, uint64_t *events, size_t 
   return rc;
 }
 
+static  uint64_t events[] = {
+  LLC_LOOKUP_DATA_READ, 
+  LLC_LOOKUP_WRITE,
+  RING_IV_USED,
+  COUNTER0_OCCUPANCY
+};
 
 //! Configure and start counters
 static int intel_snb_cbo_begin(struct stats_type *type)
@@ -161,29 +167,24 @@ static int intel_snb_cbo_begin(struct stats_type *type)
   int n_pmcs = 0;
   int nr = 0;
 
-  uint64_t events[] = {
-    LLC_LOOKUP_DATA_READ, 
-    LLC_LOOKUP_WRITE,
-    RING_IV_USED,
-    COUNTER0_OCCUPANCY
-  };
-
   int i,j;
-  if (signature(SANDYBRIDGE, &n_pmcs))
-    for (i = 0; i < nr_cpus; i++) {
-      char cpu[80];
-      int pkg_id = -1;
-      int core_id = -1;
-      int smt_id = -1;
-      int nr_cores = 0;
-      snprintf(cpu, sizeof(cpu), "%d", i);
-      topology(cpu, &pkg_id, &core_id, &smt_id, &nr_cores);
-      if (smt_id == 0 && core_id == 0)
-	for (j = 0; j < nr_cores; j++)
-	  if (intel_snb_cbo_begin_box(cpu, j, events, 4) == 0)
-	    nr++;    
-    }
+  if (signature(&n_pmcs) != SANDYBRIDGE) goto out;
 
+  for (i = 0; i < nr_cpus; i++) {
+    char cpu[80];
+    int pkg_id = -1;
+    int core_id = -1;
+    int smt_id = -1;
+    int nr_cores = 0;
+    snprintf(cpu, sizeof(cpu), "%d", i);
+    topology(cpu, &pkg_id, &core_id, &smt_id, &nr_cores);
+    if (smt_id == 0 && core_id == 0)
+      for (j = 0; j < nr_cores; j++)
+	if (intel_snb_cbo_begin_box(cpu, j, events, 4) == 0)
+	  nr++;    
+  }
+
+ out:
   if (nr == 0)
     type->st_enabled = 0;
 

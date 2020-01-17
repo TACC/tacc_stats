@@ -69,43 +69,35 @@ TYPES 	= \
 if HARDWARE
 TYPES 	+= \
 	amd64_pmc.c \
-	intel_bdw.c \
+	intel_4pmc3.c \
+	intel_8pmc3.c \
 	intel_bdw_cbo.c \
 	intel_bdw_hau.c \
 	intel_bdw_imc.c \
-	intel_bdw_pcu.c \
 	intel_bdw_qpi.c \
 	intel_bdw_r2pci.c \
-	intel_hsw.c \
 	intel_hsw_cbo.c \
 	intel_hsw_hau.c \
 	intel_hsw_imc.c \
-	intel_hsw_pcu.c \
 	intel_hsw_qpi.c \
 	intel_hsw_r2pci.c \
-	intel_ivb.c \
 	intel_ivb_cbo.c \
 	intel_ivb_hau.c \
 	intel_ivb_imc.c \
-	intel_ivb_pcu.c \
 	intel_ivb_qpi.c \
 	intel_ivb_r2pci.c \
 	intel_knl.c \
 	intel_knl_edc.c \
 	intel_knl_mc.c \
-	intel_nhm.c \
+	intel_pcu.c \
 	intel_rapl.c \
-	intel_skx.c \
 	intel_skx_cha.c \
 	intel_skx_imc.c \
-	intel_snb.c \
 	intel_snb_cbo.c \
 	intel_snb_hau.c \
 	intel_snb_imc.c \
-	intel_snb_pcu.c \
 	intel_snb_qpi.c \
-	intel_snb_r2pci.c \
-	intel_wtm.c
+	intel_snb_r2pci.c
 endif
 
 if INFINIBAND

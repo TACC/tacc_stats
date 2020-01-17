@@ -12,11 +12,10 @@
 #define cpuid(func,ax,bx,cx,dx)\
   __asm__ __volatile__ ("cpuid": "=a" (ax), "=b" (bx), "=c" (cx), "=d" (dx) : "a" (func));
 
-int signature(processor_t p, int *n_pmcs) {
-
+processor_t signature(int *n_pmcs) {
   uint32_t eax = 0, ebx = 0, ecx = 0, edx = 0;
   char vendor[13];
-  int rc = 0;
+  int rc = -1;
   cpuid(0, eax, ebx, ecx, edx);
   snprintf(vendor, sizeof(vendor), "%c%c%c%c%c%c%c%c%c%c%c%c",
            ebx & 0xff, (ebx >> 8) & 0xff, (ebx >> 16) & 0xff, (ebx >> 24) & 0xff,
@@ -49,86 +48,62 @@ int signature(processor_t p, int *n_pmcs) {
 
 
   // Determine Processor Type
-  switch(p) {
-  case NEHALEM:
-    if (strncmp(sig, "06_1a", 5) == 0 || 
-	strncmp(sig, "06_1e", 5) == 0 || 
-	strncmp(sig, "06_2e", 5) == 0) {
-      rc = 1;
-      TRACE("Nehalem %s\n", sig);
-    }
-    goto out;
+  if (strncmp(sig, "06_1a", 5) == 0 || 
+      strncmp(sig, "06_1e", 5) == 0 || 
+      strncmp(sig, "06_2e", 5) == 0) {
+    TRACE("Nehalem %s\n", sig);
+    return NEHALEM;
+  }
+
+  if (strncmp(sig, "06_25", 5) == 0 || 
+      strncmp(sig, "06_2c", 5) == 0 || 
+      strncmp(sig, "06_2f", 5) == 0) {
+    TRACE("Westmere %s\n", sig);
+    return WESTMERE;
+  }
       
-  case WESTMERE:
-    if (strncmp(sig, "06_25", 5) == 0 || 
-	strncmp(sig, "06_2c", 5) == 0 || 
-	strncmp(sig, "06_2f", 5) == 0) {
-      rc = 1;
-      TRACE("Westmere %s\n", sig);
-    }
-    goto out;
-      
-  case IVYBRIDGE:
-    if 	(strncmp(sig, "06_3a", 5) == 0 ||
-	 strncmp(sig, "06_3e", 5) == 0) {
-      rc = 1;
-      TRACE("Ivy Bridge %s\n", sig);
-    }
-    goto out;
+  if (strncmp(sig, "06_3a", 5) == 0 ||
+      strncmp(sig, "06_3e", 5) == 0) {
+    TRACE("Ivy Bridge %s\n", sig);
+    return IVYBRIDGE;
+  }
     
-  case SANDYBRIDGE:
-    if (strncmp(sig, "06_2a", 5) == 0 || 
-	strncmp(sig, "06_2d", 5) == 0) {	
-      rc = 1;
-      TRACE("Sandy Bridge %s\n", sig);
-    }
-    goto out;
-      
-  case HASWELL:
-    if (strncmp(sig, "06_3c", 5) == 0 || 
-	strncmp(sig, "06_45", 5) == 0 || 
-	strncmp(sig, "06_46", 5) == 0 || 
-	strncmp(sig, "06_3f", 5) == 0) {
-      rc = 1;
-      TRACE("Haswell %s\n", sig);
-    }
-    goto out;
-    
-  case BROADWELL:
-    if (strncmp(sig, "06_3d", 5) == 0 || 
-	strncmp(sig, "06_47", 5) == 0 ||
-	strncmp(sig, "06_4f", 5) == 0) {
-      rc = 1;
-      TRACE("Broadwell %s %d\n", sig, (int)p);
-    }
-    goto out;
+  if (strncmp(sig, "06_2a", 5) == 0 || 
+      strncmp(sig, "06_2d", 5) == 0) {	
+    TRACE("Sandy Bridge %s\n", sig);
+    return SANDYBRIDGE;
+  }
+
+  if (strncmp(sig, "06_3c", 5) == 0 || 
+      strncmp(sig, "06_45", 5) == 0 || 
+      strncmp(sig, "06_46", 5) == 0 || 
+      strncmp(sig, "06_3f", 5) == 0) {
+    TRACE("Haswell %s\n", sig);
+    return HASWELL;
+  }
+
+  if (strncmp(sig, "06_3d", 5) == 0 || 
+      strncmp(sig, "06_47", 5) == 0 ||
+      strncmp(sig, "06_4f", 5) == 0) {
+    TRACE("Broadwell %s %d\n", sig);
+    return BROADWELL;
+  }
    
-  case KNL:
-    if (strncmp(sig, "06_57", 5) == 0) {
-      rc = 1;
-      TRACE("Knights Landing %s\n", sig);
-    }
-    goto out;
-      
-  case SKYLAKE:
-    if (strncmp(sig, "06_55", 5) == 0 || 
-	strncmp(sig, "06_4e", 5) == 0 || 
-	strncmp(sig, "06_5e", 5) == 0) {
-      rc = 1;
-      TRACE("Skylake %s\n", sig);
-    }
-    goto out;
+  if (strncmp(sig, "06_57", 5) == 0) {
+    TRACE("Knights Landing %s\n", sig);    
+    return KNL;
+  }
 
-  case AMD_10H:
-    if (strncmp(vendor, "AuthenticAMD", 12) == 0) {
-      rc = 1;
-      TRACE("AMD_10h %s\n", sig);
-    }
-    goto out;
+  if (strncmp(sig, "06_55", 5) == 0 || 
+      strncmp(sig, "06_4e", 5) == 0 || 
+      strncmp(sig, "06_5e", 5) == 0) {
+    TRACE("Skylake %s\n", sig);
+    return SKYLAKE;
+  }
 
-  default:
-    ERROR("non-intel processor sig %s %p\n", sig, (int)p);
-    goto out;  
+  if (strncmp(vendor, "AuthenticAMD", 12) == 0) {
+    TRACE("AMD_10h %s\n", sig);
+    return AMD_10H;
   }
 
  out:

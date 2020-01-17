@@ -1,5 +1,5 @@
 /*! 
- \file intel_bdw_pcu.c
+ \file intel_pcu.c
  \author Todd Evans 
  \brief Performance Monitoring Counters for Intel Sandy Bridge Power Control Unit (PCU)
 
@@ -7,12 +7,12 @@
   \par Details such as Tables and Figures can be found in:
   "Intel® Xeon® Processor E5-2600 Product Family Uncore 
   Performance Monitoring Guide" 
-  Reference Number: 331051 September 2014 \n
-  PCU monitoring is described in Section 2.8.
+  Reference Number: 327043-001 March 2012 \n
+  PCU monitoring is described in Section 2.6.
 
   \note
-  Haswell microarchitectures have signatures for EP 06_3f
-
+  Sandy Bridge microarchitectures have signatures 06_2a and 06_2d. 
+  Stampede is 06_2d.
 
 
   \par Location of cpu info and monitoring register files:
@@ -64,7 +64,8 @@
    works.
  */
 
-#define CTL 0x710
+#define V1_CTL 0xC24
+#define V3_CTL 0x710
 
 /*! \name PCU filter register
 
@@ -79,8 +80,8 @@
   ~~~
 
  */
-#define FILTER 0x715
-
+#define V1_FILTER 0xC34
+#define V3_FILTER 0x715
 /*! \name PCU Performance Monitoring Registers
   
   Control register layout in 2-75.  These are used to select events.  There are
@@ -106,15 +107,25 @@
   are only 48 bits wide.
   @{
 */
-#define CTL0 0x711
-#define CTL1 0x712
-#define CTL2 0x713
-#define CTL3 0x714
+#define V1_CTL0 0xC30
+#define V1_CTL1 0xC31
+#define V1_CTL2 0xC32
+#define V1_CTL3 0xC33
 
-#define CTR0 0x717
-#define CTR1 0x718
-#define CTR2 0x719
-#define CTR3 0x71A
+#define V1_CTR0 0xC36
+#define V1_CTR1 0xC37
+#define V1_CTR2 0xC38
+#define V1_CTR3 0xC39
+
+#define V3_CTL0 0x711
+#define V3_CTL1 0x712
+#define V3_CTL2 0x713
+#define V3_CTL3 0x714
+
+#define V3_CTR0 0x717
+#define V3_CTR1 0x718
+#define V3_CTR2 0x719
+#define V3_CTR3 0x71A
 //@}
 
 /*! \name Fixed registers
@@ -143,8 +154,31 @@
     X(CTR1,"E,W=48",""), \
     X(CTR2,"E,W=48",""), \
     X(CTR3,"E,W=48",""), \
-    X(FIXED_CTR0,"E,W=64",""), \
-    X(FIXED_CTR1,"E,W=64","")
+    X(FIXED_CTR0,"E,W=48",""), \
+    X(FIXED_CTR1,"E,W=48","")
+
+#define V1_KEYS \
+    X(V1_CTL0,"C",""),	\
+    X(V1_CTL1,"C",""),	\
+    X(V1_CTL2,"C",""),	\
+    X(V1_CTL3,"C",""),	\
+    X(V1_CTR0,"E,W=48",""), \
+    X(V1_CTR1,"E,W=48",""), \
+    X(V1_CTR2,"E,W=48",""), \
+    X(V1_CTR3,"E,W=48",""), \
+    X(FIXED_CTR0,"E,W=48",""), \
+    X(FIXED_CTR1,"E,W=48","")
+#define V3_KEYS \
+    X(V3_CTL0,"C",""),	\
+    X(V3_CTL1,"C",""),	\
+    X(V3_CTL2,"C",""),	\
+    X(V3_CTL3,"C",""),	\
+    X(V3_CTR0,"E,W=48",""), \
+    X(V3_CTR1,"E,W=48",""), \
+    X(V3_CTR2,"E,W=48",""), \
+    X(V3_CTR3,"E,W=48",""), \
+    X(FIXED_CTR0,"E,W=48",""), \
+    X(FIXED_CTR1,"E,W=48","")
 
 /*! \brief Filter 
   
@@ -164,7 +198,7 @@
   
   To change events to count:
   -# Define event below
-  -# Modify events array in intel_bdw_cbo_begin()
+  -# Modify events array in intel_cbo_begin()
 */
 #define PCU_PERF_EVENT(event)	\
   ( (event) \
@@ -193,14 +227,14 @@
 //@}
 
 //! Configure and start counters for PCU
-static int intel_bdw_pcu_begin_socket(char *cpu, uint64_t *events, size_t nr_events)
+
+static processor_t p = 0;
+static int intel_pcu_begin_socket(char *cpu, uint64_t *events)
 {
   int rc = -1;
   char msr_path[80];
   int msr_fd = -1;
   uint64_t ctl;
-  //uint64_t filter;
-
 
   snprintf(msr_path, sizeof(msr_path), "/dev/cpu/%s/msr", cpu);
   msr_fd = open(msr_path, O_RDWR);
@@ -209,41 +243,38 @@ static int intel_bdw_pcu_begin_socket(char *cpu, uint64_t *events, size_t nr_eve
     goto out;
   }
 
-  ctl = 0x00103ULL; // enable freeze (bit 16), freeze (bit 8)
-  if (pwrite(msr_fd, &ctl, sizeof(ctl), CTL) < 0) {
-    ERROR("cannot enable freeze of PCU counters: %m\n");
-    goto out;
-  }
-
-  /* Ignore PCU filter for now */
-  /* The filters are part of event selection */
-  /*
-  filter = P_FILTER();
-  if (pwrite(msr_fd, &filter, sizeof(filter), P_FILTER) < 0) {
-    ERROR("cannot modify PCU filters: %m\n");
-    goto out;
-  }
-  */
+  ctl = 0x00000ULL; // unfreeze counter
 
   /* Select Events for PCU */
   int i;
-  for (i = 0; i < nr_events; i++) {
-    TRACE("MSR %08X, event %016llX\n", CTL0 + i, (unsigned long long) events[i]);
-    if (pwrite(msr_fd, &events[i], sizeof(events[i]), CTL0 + i) < 0) { 
-      ERROR("cannot write event %016llX to MSR %08X through `%s': %m\n", 
-            (unsigned long long) events[i],
-            (unsigned) CTL0 + i,
-            msr_path);
-      goto out;
+  if (p == SANDYBRIDGE || p == IVYBRIDGE)
+    for (i = 0; i < 4; i++) {
+      TRACE("MSR %08X, event %016llX\n", V1_CTL0 + i, (unsigned long long) events[i]);
+      if (pwrite(msr_fd, &events[i], sizeof(events[i]), V1_CTL0 + i) < 0) { 
+	ERROR("cannot write event %016llX to MSR %08X through `%s': %m\n", 
+	      (unsigned long long) events[i], (unsigned) V1_CTL0 + i, msr_path);
+	goto out;
+      }
+      if (pwrite(msr_fd, &ctl, sizeof(ctl), V1_CTL) < 0) {
+	ERROR("cannot unfreeze PCU counters: %m\n");
+	goto out;
+      }
     }
-  }
-  
-  ctl = 0x00000ULL; // unfreeze counter
-  if (pwrite(msr_fd, &ctl, sizeof(ctl), CTL) < 0) {
-    ERROR("cannot unfreeze PCU counters: %m\n");
-    goto out;
-  }
 
+  if (p == HASWELL || p == BROADWELL)
+    for (i = 0; i < 4; i++) {
+      TRACE("MSR %08X, event %016llX\n", V3_CTL0 + i, (unsigned long long) events[i]);
+      if (pwrite(msr_fd, &events[i], sizeof(events[i]), V3_CTL0 + i) < 0) { 
+	ERROR("cannot write event %016llX to MSR %08X through `%s': %m\n", 
+	      (unsigned long long) events[i], (unsigned) V3_CTL0 + i, msr_path);
+	goto out;
+      }
+      if (pwrite(msr_fd, &ctl, sizeof(ctl), V3_CTL) < 0) {
+	ERROR("cannot unfreeze PCU counters: %m\n");
+	goto out;
+      }
+    }
+  
   rc = 0;
 
  out:
@@ -261,26 +292,28 @@ static uint64_t pcu_events[4] = {
 };
 
 //! Configure and start counters
-static int intel_bdw_pcu_begin(struct stats_type *type)
+static int intel_pcu_begin(struct stats_type *type)
 {
   int n_pmcs = 0;
   int nr = 0;
 
   int i;
-  if (signature(BROADWELL, &n_pmcs))
+  if (p = signature(&n_pmcs) < 0) goto out; 
+  if (p == SANDYBRIDGE || p == IVYBRIDGE || p == HASWELL || p == BROADWELL) 
     for (i = 0; i < nr_cpus; i++) {
       char cpu[80];
       int pkg_id = -1;
       int core_id = -1;
       int smt_id = -1;
       int nr_cores = 0;
-      snprintf(cpu, sizeof(cpu), "%d", i);
+      snprintf(cpu, sizeof(cpu), "%d", i);      
       topology(cpu, &pkg_id, &core_id, &smt_id, &nr_cores);
       if (core_id == 0 && smt_id == 0)
-	if (intel_bdw_pcu_begin_socket(cpu, pcu_events,4) == 0)
+	if (intel_pcu_begin_socket(cpu, pcu_events) == 0)
 	  nr++;
     }
   
+ out:
   if (nr == 0)
     type->st_enabled = 0;
 
@@ -288,11 +321,12 @@ static int intel_bdw_pcu_begin(struct stats_type *type)
 }
 
 //! Collect values of counters for PCU
-static void intel_bdw_pcu_collect_socket(struct stats_type *type, char *cpu, int pkg_id)
+static void intel_pcu_collect_socket(struct stats_type *type, char *cpu, int pkg_id)
 {
   struct stats *stats = NULL;
   char msr_path[80];
   int msr_fd = -1;
+
   char pkg[80];
   snprintf(pkg, sizeof(pkg), "%d", pkg_id);
 
@@ -309,6 +343,7 @@ static void intel_bdw_pcu_collect_socket(struct stats_type *type, char *cpu, int
     goto out;
   }
 
+  if (p == SANDYBRIDGE || p == IVYBRIDGE) {
 #define X(k,r...) \
   ({ \
     uint64_t val = 0; \
@@ -317,8 +352,22 @@ static void intel_bdw_pcu_collect_socket(struct stats_type *type, char *cpu, int
     else \
       stats_set(stats, #k, val); \
   })
-  KEYS;
+  V1_KEYS;
 #undef X
+  }
+
+  if (p == HASWELL || p == BROADWELL) {
+#define X(k,r...) \
+  ({ \
+    uint64_t val = 0; \
+    if (pread(msr_fd, &val, sizeof(val), k) < 0) \
+      ERROR("cannot read `%s' (%08X) through `%s': %m\n", #k, k, msr_path); \
+    else \
+      stats_set(stats, #k, val); \
+  })
+  V3_KEYS;
+#undef X
+  }
 
  out:
   if (msr_fd >= 0)
@@ -326,7 +375,7 @@ static void intel_bdw_pcu_collect_socket(struct stats_type *type, char *cpu, int
 }
 
 //! Collect values of counters
-static void intel_bdw_pcu_collect(struct stats_type *type)
+static void intel_pcu_collect(struct stats_type *type)
 {
   int i;
   for (i = 0; i < nr_cpus; i++) {
@@ -339,15 +388,15 @@ static void intel_bdw_pcu_collect(struct stats_type *type)
     topology(cpu, &pkg_id, &core_id, &smt_id, &nr_cores);
   
     if (core_id == 0 && smt_id == 0)
-      intel_bdw_pcu_collect_socket(type, cpu, pkg_id);
+      intel_pcu_collect_socket(type, cpu, pkg_id);
   }
 }
 
 //! Definition of stats for this type
-struct stats_type intel_bdw_pcu_stats_type = {
-  .st_name = "intel_bdw_pcu",
-  .st_begin = &intel_bdw_pcu_begin,
-  .st_collect = &intel_bdw_pcu_collect,
+struct stats_type intel_pcu_stats_type = {
+  .st_name = "intel_pcu",
+  .st_begin = &intel_pcu_begin,
+  .st_collect = &intel_pcu_collect,
 #define X SCHEMA_DEF
   .st_schema_def = JOIN(KEYS),
 #undef X

@@ -208,7 +208,7 @@ static int intel_skx_cha_begin(struct stats_type *type)
   };
 
   int i,j;
-  if (signature(SKYLAKE, &n_pmcs))
+  if (signature(&n_pmcs) == SKYLAKE)
     for (i = 0; i < nr_cpus; i++) {
       char cpu[80];
       int pkg_id = -1;

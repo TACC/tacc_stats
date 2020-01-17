@@ -170,7 +170,7 @@ static int amd64_pmc_begin(struct stats_type *type)
   };
 
   int i;
-  if (signature(AMD_10H, &n_pmcs))
+  if (signature(&n_pmcs) == AMD_10H)
     for (i = 0; i < nr_cpus; i++) {
       char cpu[80];
       snprintf(cpu, sizeof(cpu), "%d", i);
@@ -223,7 +223,7 @@ static void amd64_pmc_collect(struct stats_type *type)
 {
   int n_pmcs = 0;
   int i;
-  if (signature(AMD_10H, &n_pmcs))
+  if (signature(&n_pmcs) == AMD_10H)
     for (i = 0; i < nr_cpus; i++) {
       char cpu[80];
       snprintf(cpu, sizeof(cpu), "%d", i);

@@ -90,7 +90,7 @@
     X(CTL4, "C", ""), \
     X(CTL5, "C", ""), \
     X(CTL6, "C", ""), \
-    X(CTL7, "C", ""), \
+    X(CTL7, "C", ""),	   \
     X(CTR0, "E,W=48", ""), \
     X(CTR1, "E,W=48", ""), \
     X(CTR2, "E,W=48", ""), \
@@ -98,7 +98,7 @@
     X(CTR4, "E,W=48", ""), \
     X(CTR5, "E,W=48", ""), \
     X(CTR6, "E,W=48", ""), \
-    X(CTR7, "E,W=48", ""), \
+    X(CTR7, "E,W=48", ""),	 \
     X(FIXED_CTR0, "E,W=48", ""), \
     X(FIXED_CTR1, "E,W=48", ""), \
     X(FIXED_CTR2, "E,W=48", "")
@@ -108,16 +108,14 @@
     X(CTL1, "C", ""), \
     X(CTL2, "C", ""), \
     X(CTL3, "C", ""), \
-    X(CTR0, "E,W=48", ""), \
-    X(CTR1, "E,W=48", ""), \
-    X(CTR2, "E,W=48", ""), \
-    X(CTR3, "E,W=48", ""), \
+    X(CTR0, "C", ""), \
+    X(CTR1, "C", ""), \
+    X(CTR2, "C", ""), \
+    X(CTR3, "C", ""), \
     X(FIXED_CTR0, "E,W=48", ""), \
     X(FIXED_CTR1, "E,W=48", ""), \
     X(FIXED_CTR2, "E,W=48", "")
-/* Schema Keys 
-   All counter registers are 48 bits wide. 
-*/
+
 #define KNL_KEYS		 \
   X(CTL0, "C", ""),		 \
     X(CTL1, "C", ""),		 \
@@ -126,8 +124,6 @@
     X(FIXED_CTR0, "E,W=40", ""), \
     X(FIXED_CTR1, "E,W=40", ""), \
     X(FIXED_CTR2, "E,W=40", "")
-
-
 
 /*! \brief Event select */
 // IA32_PERFEVTSELx MSR layout
@@ -152,16 +148,128 @@
     | (1ULL << 22)		 \
     )
 
+/* NHM WTM */
+#define MEM_UNCORE_RETIRED_REMOTE_DRAM PERF_EVENT(0x0F, 0x10) /* CHECKME */
+#define MEM_UNCORE_RETIRED_LOCAL_DRAM  PERF_EVENT(0x0F, 0x20) /* CHECKME */
+#define FP_COMP_OPS_EXE_X87            PERF_EVENT(0x10, 0x01)
+#define MEM_LOAD_RETIRED_L1D_HIT       PERF_EVENT(0xCB, 0x01)
+#define MEM_LOAD_RETIRED_L2_HIT        PERF_EVENT(0xCB, 0x02)
+#define MEM_LOAD_RETIRED_L3_HIT        PERF_EVENT(0xCB, 0x0C)
+#define MEM_LOAD_RETIRED_L3_MISS       PERF_EVENT(0xCB, 0x10) /* May be same as 0x0F/0x10 + 0x0F/0x20. */
+
+/* SNB IVB */
+#define DTLB_LOAD_MISSES_WALK_CYCLES   PERF_EVENT(0x08, 0x04)
+#define FP_COMP_OPS_EXE_SSE_FP_PACKED  PERF_EVENT(0x10, 0x10)
+#define FP_COMP_OPS_EXE_SSE_FP_SCALAR  PERF_EVENT(0x10, 0x80)
+#define SSE_DOUBLE_SCALAR_PACKED       PERF_EVENT(0x10, 0x90)
+#define SIMD_FP_256_PACKED_DOUBLE      PERF_EVENT(0x11, 0x02)
+
+/* KNL */
+#define MEM_UOPS_RETIRED_ALL_LOADS_KNL     PERF_EVENT(0x04, 0x40)
+#define MEM_UOPS_RETIRED_L2_HIT_LOADS_KNL  PERF_EVENT(0x04, 0x02)
+
+/* SKX CLX */
+#define FP_ARITH_INST_RETIRED_SCALAR_DOUBLE      PERF_EVENT(0xC7, 0x01)
+#define FP_ARITH_INST_RETIRED_SCALAR_SINGLE      PERF_EVENT(0xC7, 0x02)
+#define FP_ARITH_INST_RETIRED_128B_PACKED_DOUBLE PERF_EVENT(0xC7, 0x04)
+#define FP_ARITH_INST_RETIRED_128B_PACKED_SINGLE PERF_EVENT(0xC7, 0x08)
+#define FP_ARITH_INST_RETIRED_256B_PACKED_DOUBLE PERF_EVENT(0xC7, 0x10)
+#define FP_ARITH_INST_RETIRED_256B_PACKED_SINGLE PERF_EVENT(0xC7, 0x20)
+#define FP_ARITH_INST_RETIRED_512B_PACKED_DOUBLE PERF_EVENT(0xC7, 0x40)
+#define FP_ARITH_INST_RETIRED_512B_PACKED_SINGLE PERF_EVENT(0xC7, 0x80)
+
+/* HSW and later  */
+#define DTLB_LOAD_MISSES_MISS_CAUSES_A_WALK PERF_EVENT(0x08, 0x01)
+#define DTLB_LOAD_MISSES_WALK_COMPLETED_2M_4M PERF_EVENT(0x08, 0x04)
+#define L1D_REPLACEMENT                PERF_EVENT(0x51, 0x01) 
+#define RESOURCE_STALLS_ANY            PERF_EVENT(0xA2, 0x01) 
+#define MEM_UOPS_RETIRED_ALL_LOADS     PERF_EVENT(0xD0, 0x81) // CTR0-3 Only
+#define MEM_UOPS_RETIRED_ALL_STORES    PERF_EVENT(0xD0, 0x82) // CTR0-3 Only
+#define MEM_LOAD_UOPS_RETIRED_L1_HIT   PERF_EVENT(0xD1, 0x01) // CTR0-3 Only
+#define MEM_LOAD_UOPS_RETIRED_L2_HIT   PERF_EVENT(0xD1, 0x02) // CTR0-3 Only
+#define MEM_LOAD_UOPS_RETIRED_LLC_HIT  PERF_EVENT(0xD1, 0x04) // CTR0-3 Only
+#define MEM_LOAD_UOPS_RETIRED_LLC_MISS PERF_EVENT(0xD1, 0x20) // CTR0-3 Only
+#define MEM_LOAD_UOPS_RETIRED_HIT_LFB  PERF_EVENT(0xD1, 0x40) // CTR0-3 Only
+#define MEM_LOAD_UOPS_RETIRED_L1_MISS  PERF_EVENT(0xD1, 0x08)
+#define MEM_LOAD_UOPS_RETIRED_L2_MISS  PERF_EVENT(0xD1, 0x10)
+#define MEM_LOAD_UOPS_RETIRED_L3_MISS  PERF_EVENT(0xD1, 0x20)
+#define MEM_LOAD_UOPS_RETIRED_HIT_LFB  PERF_EVENT(0xD1, 0x40)
+#define L2_LINES_IN_ALL                PERF_EVENT(0xF1, 0x07)
+
+static uint64_t skx_events[] = {
+  FP_ARITH_INST_RETIRED_SCALAR_DOUBLE,
+  FP_ARITH_INST_RETIRED_128B_PACKED_DOUBLE,
+  FP_ARITH_INST_RETIRED_256B_PACKED_DOUBLE,
+  FP_ARITH_INST_RETIRED_512B_PACKED_DOUBLE,
+  FP_ARITH_INST_RETIRED_SCALAR_SINGLE,
+  FP_ARITH_INST_RETIRED_128B_PACKED_SINGLE,
+  FP_ARITH_INST_RETIRED_256B_PACKED_SINGLE,
+  FP_ARITH_INST_RETIRED_512B_PACKED_SINGLE,
+};
+static  uint64_t knl_events[] = {
+  MEM_UOPS_RETIRED_ALL_LOADS_KNL,
+  MEM_UOPS_RETIRED_L2_HIT_LOADS_KNL,
+};
+static  uint64_t hsw_events[] = {
+  MEM_UOPS_RETIRED_ALL_LOADS,
+  MEM_LOAD_UOPS_RETIRED_L1_HIT,
+  MEM_LOAD_UOPS_RETIRED_L2_HIT,
+  L1D_REPLACEMENT,
+  MEM_LOAD_UOPS_RETIRED_LLC_HIT,
+  DTLB_LOAD_MISSES_MISS_CAUSES_A_WALK,
+  RESOURCE_STALLS_ANY,
+  L2_LINES_IN_ALL,
+};
+static  uint64_t snb_events[] = {
+  MEM_UOPS_RETIRED_ALL_LOADS,
+  MEM_LOAD_UOPS_RETIRED_L1_HIT,
+  MEM_LOAD_UOPS_RETIRED_L2_HIT,
+  MEM_LOAD_UOPS_RETIRED_LLC_HIT,
+  L1D_REPLACEMENT,
+  FP_COMP_OPS_EXE_SSE_FP_SCALAR,
+  FP_COMP_OPS_EXE_SSE_FP_PACKED,
+  SIMD_FP_256_PACKED_DOUBLE,
+};
+static  uint64_t nhm_events[] = {
+  MEM_UNCORE_RETIRED_REMOTE_DRAM,
+  MEM_UNCORE_RETIRED_LOCAL_DRAM,
+  FP_COMP_OPS_EXE_SSE_FP_PACKED,
+  FP_COMP_OPS_EXE_SSE_FP_SCALAR
+};
+
 //! Generate bitmask of n 1s
 #define BIT_MASK(n) (~( ((~0ULL) << ((n)-1)) << 1 ))
 
 //! Configure and start counters for a pmc3 cpu counters
-static int intel_pmc3_begin_cpu(char *cpu, uint64_t *events, size_t nr_events)
+static int intel_pmc3_begin_cpu(char *cpu)
 {
   int rc = -1;
   char msr_path[80];
   int msr_fd = -1;
   uint64_t global_ctr_ctrl, fixed_ctr_ctrl;
+  uint64_t *events;
+  
+  switch(processor) {
+  case NEHALEM:
+    events = nhm_events; break;
+  case WESTMERE:
+    events = nhm_events; break;
+  case SANDYBRIDGE:
+    events = snb_events; break;
+  case IVYBRIDGE:
+    events = snb_events; break;
+  case HASWELL:
+    events = hsw_events; break;
+  case BROADWELL:
+    events = hsw_events; break;
+  case KNL:
+    events = knl_events; break;
+  case SKYLAKE:
+    events = skx_events; break;
+  default:
+    ERROR("Processor model/family not supported: %m\n");
+    goto out;
+  }
 
   snprintf(msr_path, sizeof(msr_path), "/dev/cpu/%s/msr", cpu);
   msr_fd = open(msr_path, O_RDWR);
@@ -178,7 +286,7 @@ static int intel_pmc3_begin_cpu(char *cpu, uint64_t *events, size_t nr_events)
   }
 
   int i;
-  for (i = 0; i < nr_events; i++) {
+  for (i = 0; i < n_pmcs; i++) {
     TRACE("MSR %08X, event %016llX\n", IA32_CTL0 + i, (unsigned long long) events[i]);
     if (pwrite(msr_fd, &events[i], sizeof(events[i]), IA32_CTL0 + i) < 0) {
       ERROR("cannot write event %016llX to MSR %08X through `%s': %m\n",
@@ -190,15 +298,14 @@ static int intel_pmc3_begin_cpu(char *cpu, uint64_t *events, size_t nr_events)
   }
   
   rc = 0;
-
   /* Enable fixed counters.  Three 4 bit blocks, enable OS, User, Turn off any thread. */
   fixed_ctr_ctrl = 0x333UL;
 
   if (pwrite(msr_fd, &fixed_ctr_ctrl, sizeof(fixed_ctr_ctrl), IA32_FIXED_CTR_CTRL) < 0)
     ERROR("cannot enable fixed counters: %m\n");
 
-  /* Enable counters globally, nr_events PMC and 3 fixed. */
-  global_ctr_ctrl = BIT_MASK(nr_events) | (0x7ULL << 32);
+  /* Enable counters globally, n_pmcs PMC and 3 fixed. */
+  global_ctr_ctrl = BIT_MASK(n_pmcs) | (0x7ULL << 32);
   if (pwrite(msr_fd, &global_ctr_ctrl, sizeof(global_ctr_ctrl), IA32_PERF_GLOBAL_CTRL) < 0)
     ERROR("cannot enable performance counters: %m\n");
 
@@ -209,37 +316,17 @@ static int intel_pmc3_begin_cpu(char *cpu, uint64_t *events, size_t nr_events)
   return rc;
 }
 
-//! Collect values in counters for cpu
-static void intel_pmc3_collect_cpu(struct stats_type *type, char *cpu)
+static int intel_pmc3_begin(struct stats_type *type)
 {
-  struct stats *stats = NULL;
-  char msr_path[80];
-  int msr_fd = -1;
-  stats = get_current_stats(type, cpu);
-  if (stats == NULL)
-    goto out;
-
-  TRACE("cpu %s\n", cpu);
-
-  snprintf(msr_path, sizeof(msr_path), "/dev/cpu/%s/msr", cpu);
-  msr_fd = open(msr_path, O_RDONLY);
-  if (msr_fd < 0) {
-    ERROR("cannot open `%s': %m\n", msr_path);
-    goto out;
-  }
-
-#define X(k,r...)							\
-    ({									\
-      uint64_t val = 0;							\
-      if (pread(msr_fd, &val, sizeof(val), IA32_##k) < 0)		\
-	TRACE("cannot read `%s' (%08X) through `%s': %m\n", #k, IA32_##k, msr_path); \
-      else								\
-	stats_set(stats, #k, val);					\
-    })
-    KEYS;
-#undef X
-
- out:
-  if (msr_fd >= 0)
-    close(msr_fd);
+  int nr = 0;
+  int i;
+  for (i = 0; i < nr_cpus; i++) {
+    char cpu[80];
+    snprintf(cpu, sizeof(cpu), "%d", i);    
+    if (intel_pmc3_begin_cpu(cpu) == 0)
+      nr++;
+  }  
+  if (nr == 0) 
+    type->st_enabled = 0;
+  return nr > 0 ? 0 : -1;
 }
