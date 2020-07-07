@@ -72,7 +72,7 @@ class Job(models.Model):
     avg_openclose =  models.FloatField(null=True)
 
     max_load15 =  models.FloatField(null=True)
-
+    avg_gpuutil =  models.FloatField(null=True)
     
     def __unicode__(self):
         return str(self.id)

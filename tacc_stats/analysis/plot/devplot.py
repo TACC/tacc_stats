@@ -38,7 +38,7 @@ class DevPlot():
                     x_range = DataRange1d(), y_range = DataRange1d())                  
         for hostname, stats in _stats.items():               
           rate = stats[:, index]
-          if typename == "mem" or typename == "proc":
+          if typename == "mem" or typename == "proc" or typename == "nvidia_gpu":
             source = ColumnDataSource({"x" : u.hours, "y" : rate})
             plot.add_glyph(source, Step(x = "x", y = "y", mode = "after", 
                                         line_color = hc[hostname]))

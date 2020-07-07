@@ -363,9 +363,9 @@ class Host(object):
             self.error("no begin mark found\n")
             return False
         end_mark = 'end %s' % self.job.id # No '%'.
-        if not end_mark in self.marks:
-            self.error("no end mark found\n")
-            return False
+        #if not end_mark in self.marks:
+        #    self.error("no end mark found\n")
+        #    return False
 
         return self.raw_stats
 
@@ -468,7 +468,7 @@ class Job(object):
     def munge_times(self):
 
         times_lis = []
-
+        
         for host in self.hosts.values():
             times_lis.append(host.times)
             del host.times
@@ -479,6 +479,7 @@ class Job(object):
         if not times:
             return False
         times.sort()
+        
         # Ensure that times is sane and monotonically increasing.
         t_min = 0
         for i in range(0, len(times)): 
@@ -580,7 +581,6 @@ class Job(object):
             if "MSR_DRAM_ENERGY_STATUS" == schema.keys()[j]: 
                 for i in range(0, m):
                     A[i, j] *= 0.0153/0.06104
-
         return A
 
     def logoverflow(self, host_name, type_name, dev_name, key_name):

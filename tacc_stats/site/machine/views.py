@@ -337,7 +337,8 @@ metric_names = [
     "avg_oscwait [us]",
     "avg_openclose [#/s]", 
     "avg_blockbw [MB/s]",
-    "max_load15 [cores]"
+    "max_load15 [cores]",
+    "avg_gpuutil [%/node]"
 ]
 
 class JobDetailView(DetailView):

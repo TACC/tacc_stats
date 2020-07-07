@@ -208,6 +208,14 @@ class avg_lnetbw():
                   - stats[0, schema["rx_bytes"].index] - stats[0, schema["tx_bytes"].index]
         return bw/(1024*1024*u.dt*u.nhosts)
 
+class avg_gpuutil():
+    def compute_metric(self, u):
+        schema, _stats = u.get_type("nvidia_gpu")
+        util = 0
+        for hostname, stats in _stats.items():
+            util += mean(stats[1:-1, schema["utilization"].index])
+        return util/u.nhosts
+
 class avg_lnetmsgs():
     def compute_metric(self, u):
         avg = 0

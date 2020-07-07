@@ -21,6 +21,7 @@ scripts=[
     'tacc_stats/analysis/job_printer.py',
     'tacc_stats/site/manage.py',
     'tacc_stats/site/machine/update_db.py',
+    'tacc_stats/site/machine/update_xalt.py',
     'tacc_stats/pickler/job_pickles.py',
     'tacc_stats/pickler/sacct_gen.py',
     'tacc_stats/listend.py'
@@ -49,8 +50,8 @@ setup(
     include_package_data = True,
     scripts = scripts,
     install_requires = ['argparse','numpy','matplotlib', 'psycopg2-binary',
-                        'bokeh', 'django', 'python-hostlist', 'PyMySQL',
-                        'mysql-connector-python', 'python-memcached'],
+                        'bokeh', 'django', 'python-hostlist', 'PyMySQL', 'mod_wsgi',
+                        'mysql-connector-python', 'python-memcached', 'pika', 'mysqlclient'],
     platforms = 'any',
     classifiers = [
         'Development Status :: 5 - Production',

@@ -57,7 +57,7 @@ def job_pickle(reader_inst,
     if not validated:
         job = job_stats.from_acct(reader_inst, archive_dir, '', host_name_ext) 
         print("processed jobid ",reader_inst['id'])
-        if job and test_job(job):
+        if job:# and test_job(job):
             try:
                 with open(pickle_file, 'wb') as fd: p.dump(job, fd, protocol = p.HIGHEST_PROTOCOL)
             except MemoryError as e:
@@ -114,7 +114,7 @@ class JobPickles:
         acct = [job for job in acct if job['id'] in run_jids]            
 
         if not self.jobids:
-            acct = [job for job in acct if job['nodes']*(job['end_time']-job['start_time']) < 88473600]
+            acct = [job for job in acct if job['nodes']*(job['end_time']-job['start_time']) < 58982400/16.]
         ctr = 0
         with open(val_file, "a") as fd:
             for result in self.pool.imap(self.partial_pickle, acct):

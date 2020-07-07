@@ -31,7 +31,8 @@ def update_acct(date, rerun = False):
             if '+' in job['JobID']: 
                 jid, rid = job['JobID'].split('+')
                 job['JobID'] = int(jid) + int(rid)
-
+            if '_' in job['JobID']:
+                job['JobID'] = job['JobID'].split('_')[0]
             if rerun: 
                 pass
             elif Job.objects.filter(id = job['JobID']).exists(): 
@@ -130,7 +131,7 @@ def update_metrics(date, pickles_dir, processes, rerun = False):
         "avg_flops_32b", "avg_flops_64b", "avg_vector_width_32b", "vecpercent_32b", "avg_vector_width_64b", "vecpercent_64b", 
         "avg_cpuusage", "max_mds", "avg_lnetmsgs", "avg_lnetbw", "max_lnetbw", "avg_fabricbw",
         "max_fabricbw", "avg_mdcreqs", "avg_mdcwait", "avg_oscreqs",
-        "avg_oscwait", "avg_openclose", "avg_mcdrambw", "avg_blockbw", "max_load15"
+        "avg_oscwait", "avg_openclose", "avg_mcdrambw", "avg_blockbw", "max_load15", "avg_gpuutil"
     ]
 
     aud = metrics.Metrics(metric_names, processes = processes)
@@ -140,10 +141,11 @@ def update_metrics(date, pickles_dir, processes, rerun = False):
         print(name)
 
     jobs_list = Job.objects.filter(date = date).exclude(run_time__lt = min_time)
+    #jobs_list = Job.objects.filter(date = date, queue__in = ['rtx', 'rtx-dev']).exclude(run_time__lt = min_time)
 
     # Use avg_cpuusage to see if job was tested.  It will always exist
     if not rerun:
-        jobs_list = jobs_list.filter(avg_vector_width_32b = None)
+        jobs_list = jobs_list.filter(avg_cpuusage = None)
 
     paths = []
     for job in jobs_list:
