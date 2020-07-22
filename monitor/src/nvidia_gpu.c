@@ -16,6 +16,8 @@
   X(memfree, "U=B", ""), \
     X(memused, "U=B", ""), \
     X(power, "U=mW", ""), \
+    X(temperature, "U=C", ""), \
+    X(memutilization, "","") \
     X(utilization, "","")
 
 static int nvidia_gpu_collect_dev(struct stats *stats, int i)
@@ -29,6 +31,7 @@ static int nvidia_gpu_collect_dev(struct stats *stats, int i)
   nvmlMemory_t memory;
   nvmlUtilization_t utilization;
   unsigned int power;
+  unsigned int temp;
 
   ret = nvmlDeviceGetHandleByIndex(i, &device);
   if (NVML_SUCCESS != ret) {
@@ -65,6 +68,13 @@ static int nvidia_gpu_collect_dev(struct stats *stats, int i)
   }
   TRACE("power %d\n", power);
 
+  ret = nvmlDeviceGetTemperature(device, NVML_TEMPERATURE_GPU, &temp);
+  if (NVML_SUCCESS != ret) {
+    ERROR("NVML temperature was not read successfully: %s\n", nvmlErrorString(ret));
+    goto out;
+  }
+  TRACE("temp %d\n", temp);
+
   ret = nvmlDeviceGetMemoryInfo(device, &memory);
   if (NVML_SUCCESS != ret) {
     ERROR("NVML memory was not read successfully: %s\n", nvmlErrorString(ret));
@@ -73,10 +83,12 @@ static int nvidia_gpu_collect_dev(struct stats *stats, int i)
   TRACE("total %llu used %llu free %llu\n", memory.total, memory.used, memory.free);
 
   stats_set(stats, "utilization",  utilization.gpu);  
+  stats_set(stats, "memutilization", utilization.memory);  
   stats_set(stats, "memtotal",     memory.total);
   stats_set(stats, "memfree",      memory.free);
   stats_set(stats, "memused",      memory.used);
   stats_set(stats, "power",        power);
+  stats_set(stats, "temperature",  temp);
 
   rc = 0;
   
