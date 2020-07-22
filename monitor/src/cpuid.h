@@ -10,7 +10,11 @@ typedef enum {
   HASWELL, BROADWELL, KNL,
   SKYLAKE
 } processor_t;
-  
+
+int nr_cpus;
+int n_pmcs;
+processor_t processor;
+ 
 // Return 1 for true and 0 for false
 int percore_signature(processor_t p, char *cpu, int *nr_events);
 processor_t signature(int *n_pmcs);

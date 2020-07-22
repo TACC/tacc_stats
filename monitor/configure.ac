@@ -13,6 +13,16 @@ esac],
 [hardware=true])
 AM_CONDITIONAL([HARDWARE], [test x$hardware = xtrue])
 
+AC_ARG_ENABLE([ppc],
+[  --enable-ppc	Enable ppc power9 support (default is true)],
+[case "${enableval}" in
+  yes) ppc=true ;;
+  no)  ppc=false ;;
+  *) AC_MSG_ERROR([bad value ${enableval} for --enable-ppc]) ;;
+esac],
+[ppc=true])
+AM_CONDITIONAL([PPC], [test x$ppc = xtrue])
+
 AC_ARG_ENABLE([infiniband],
 [  --enable-infiniband	Enable Infiniband support (must be set to true or false)],
 [case "${enableval}" in

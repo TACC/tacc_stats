@@ -157,7 +157,10 @@ int main(int argc, char *argv[])
   current_time = tp.tv_sec+tp.tv_usec/1000000.0;
   pscanf(JOBID_FILE_PATH, "%79s", current_jobid);
   nr_cpus = sysconf(_SC_NPROCESSORS_ONLN);
-  processor = signature(&n_pmcs);
+
+  #ifndef PPC 
+    processor = signature(&n_pmcs);
+  #endif
 
   if (mkdir(STATS_DIR_PATH, 0777) < 0) {
     if (errno != EEXIST)

@@ -23,6 +23,7 @@ static int nvidia_gpu_collect_dev(struct stats *stats, int i)
   int rc = -1;
 
   nvmlDevice_t device;
+  nvmlEnableState_t mode;
   nvmlReturn_t ret;
 
   nvmlMemory_t memory;
@@ -34,11 +35,16 @@ static int nvidia_gpu_collect_dev(struct stats *stats, int i)
     ERROR("NVML device was not read successfully: %s\n", nvmlErrorString(ret));
     goto out;
   }
-  
-  ret = nvmlDeviceSetPersistenceMode(device, 1);
-  if (NVML_SUCCESS != ret)
-    TRACE("NVML persistence mode was not enabled successfully: %s\n", nvmlErrorString(ret));
-  
+
+
+  ret = nvmlDeviceGetPersistenceMode(device, &mode);
+  if (NVML_SUCCESS != ret) goto out;
+    
+  if (mode == NVML_FEATURE_DISABLED) {
+    ret = nvmlDeviceSetPersistenceMode(device, 1);
+    if (NVML_SUCCESS != ret)
+      TRACE("NVML persistence mode was not enabled successfully: %s\n", nvmlErrorString(ret));
+  }
   
   char name[80];
   ret = nvmlDeviceGetName(device, name, 80);

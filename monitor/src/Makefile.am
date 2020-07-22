@@ -22,12 +22,8 @@ endif
 tacc_stats_SOURCES = \
 	collect.h \
 	collect.c \
-	cpuid.h \
-	cpuid.c \
 	dict.h \
 	dict.c \
-	intel_pmc3.h \
-	intel_pmc_uncore.h \
 	JOIN.h \
 	pci.h \
 	pci.c \
@@ -38,6 +34,15 @@ tacc_stats_SOURCES = \
 	stats.c \
 	string1.h \
 	trace.h
+
+if !PPC
+tacc_stats_SOURCES += \
+	cpuid.h \
+	cpuid.c
+else
+tacc_stats_CPPFLAGS += \
+	-DPPC
+endif
 
 if RABBITMQ
 tacc_stats_SOURCES += \
@@ -67,6 +72,12 @@ TYPES 	= \
 	vm.c
 
 if HARDWARE
+
+if !PPC
+tacc_stats_SOURCES += \
+	intel_pmc3.h \
+	intel_pmc_uncore.h
+
 TYPES 	+= \
 	amd64_pmc.c \
 	intel_4pmc3.c \
@@ -98,6 +109,8 @@ TYPES 	+= \
 	intel_snb_imc.c \
 	intel_snb_qpi.c \
 	intel_snb_r2pci.c
+endif
+
 endif
 
 if INFINIBAND

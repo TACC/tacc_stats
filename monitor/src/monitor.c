@@ -24,9 +24,14 @@ struct timeval tp;
 double current_time;
 char current_jobid[80] = "-";
 char new_jobid[80] = "-";
+
+
 int nr_cpus;
+
+/*
 int n_pmcs = 0;
 processor_t processor = 0;
+*/
 
 static volatile sig_atomic_t g_new_flag = 1;
 
@@ -205,7 +210,10 @@ int main(int argc, char *argv[])
   } cmd;
 
   nr_cpus = sysconf(_SC_NPROCESSORS_ONLN);
-  processor = signature(&n_pmcs);
+
+  #ifndef PPC 
+    processor = signature(&n_pmcs);
+  #endif
 
   /* Close out the standard file descriptors */
   close(STDIN_FILENO);
