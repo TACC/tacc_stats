@@ -47,63 +47,69 @@ processor_t signature(int *n_pmcs) {
   TRACE("Number of PMCs = %d\n", *n_pmcs);
 
 
-  // Determine Processor Type
-  if (strncmp(sig, "06_1a", 5) == 0 || 
-      strncmp(sig, "06_1e", 5) == 0 || 
-      strncmp(sig, "06_2e", 5) == 0) {
-    TRACE("Nehalem %s\n", sig);
-    return NEHALEM;
-  }
+  // Determine Processor Family and Model
+  if (strncmp(vendor, "GenuineIntel", 12) == 0) {
+    if (strncmp(sig, "06_1a", 5) == 0 ||
+        strncmp(sig, "06_1e", 5) == 0 ||
+        strncmp(sig, "06_2e", 5) == 0) {
+      TRACE("Nehalem %s\n", sig);
+      return NEHALEM;
+    }
 
-  if (strncmp(sig, "06_25", 5) == 0 || 
-      strncmp(sig, "06_2c", 5) == 0 || 
-      strncmp(sig, "06_2f", 5) == 0) {
-    TRACE("Westmere %s\n", sig);
-    return WESTMERE;
-  }
-      
-  if (strncmp(sig, "06_3a", 5) == 0 ||
-      strncmp(sig, "06_3e", 5) == 0) {
-    TRACE("Ivy Bridge %s\n", sig);
-    return IVYBRIDGE;
-  }
-    
-  if (strncmp(sig, "06_2a", 5) == 0 || 
-      strncmp(sig, "06_2d", 5) == 0) {	
-    TRACE("Sandy Bridge %s\n", sig);
-    return SANDYBRIDGE;
-  }
+    if (strncmp(sig, "06_25", 5) == 0 ||
+        strncmp(sig, "06_2c", 5) == 0 ||
+        strncmp(sig, "06_2f", 5) == 0) {
+      TRACE("Westmere %s\n", sig);
+      return WESTMERE;
+    }
 
-  if (strncmp(sig, "06_3c", 5) == 0 || 
-      strncmp(sig, "06_45", 5) == 0 || 
-      strncmp(sig, "06_46", 5) == 0 || 
-      strncmp(sig, "06_3f", 5) == 0) {
-    TRACE("Haswell %s\n", sig);
-    return HASWELL;
-  }
+    if (strncmp(sig, "06_3a", 5) == 0 ||
+        strncmp(sig, "06_3e", 5) == 0) {
+      TRACE("Ivy Bridge %s\n", sig);
+      return IVYBRIDGE;
+    }
 
-  if (strncmp(sig, "06_3d", 5) == 0 || 
-      strncmp(sig, "06_47", 5) == 0 ||
-      strncmp(sig, "06_4f", 5) == 0) {
-    TRACE("Broadwell %s %d\n", sig);
-    return BROADWELL;
-  }
-   
-  if (strncmp(sig, "06_57", 5) == 0) {
-    TRACE("Knights Landing %s\n", sig);    
-    return KNL;
-  }
+    if (strncmp(sig, "06_2a", 5) == 0 ||
+        strncmp(sig, "06_2d", 5) == 0) {	
+      TRACE("Sandy Bridge %s\n", sig);
+      return SANDYBRIDGE;
+    }
 
-  if (strncmp(sig, "06_55", 5) == 0 || 
-      strncmp(sig, "06_4e", 5) == 0 || 
-      strncmp(sig, "06_5e", 5) == 0) {
-    TRACE("Skylake %s\n", sig);
-    return SKYLAKE;
-  }
+    if (strncmp(sig, "06_3c", 5) == 0 ||
+        strncmp(sig, "06_45", 5) == 0 ||
+        strncmp(sig, "06_46", 5) == 0 ||
+        strncmp(sig, "06_3f", 5) == 0) {
+      TRACE("Haswell %s\n", sig);
+      return HASWELL;
+    }
 
-  if (strncmp(vendor, "AuthenticAMD", 12) == 0) {
-    TRACE("AMD_10h %s\n", sig);
-    return AMD_10H;
+    if (strncmp(sig, "06_3d", 5) == 0 ||
+        strncmp(sig, "06_47", 5) == 0 ||
+        strncmp(sig, "06_4f", 5) == 0) {
+      TRACE("Broadwell %s %d\n", sig);
+      return BROADWELL;
+    }
+
+    if (strncmp(sig, "06_57", 5) == 0) {
+      TRACE("Knights Landing %s\n", sig);
+      return KNL;
+    }
+
+    if (strncmp(sig, "06_55", 5) == 0 ||
+        strncmp(sig, "06_4e", 5) == 0 ||
+        strncmp(sig, "06_5e", 5) == 0) {
+      TRACE("Skylake %s\n", sig);
+      return SKYLAKE;
+    }
+  }
+  else if (strncmp(vendor, "AuthenticAMD", 12) == 0) {
+    if (strncmp(sig, "8f_31", 5) == 0) {
+      TRACE("AMD_17H %s\n", sig);
+      return AMD_17H;
+    } else {
+      TRACE("Proc model unknown. Defaulting to AMD_10H %s\n", sig);
+      return AMD_10H;
+    }
   }
 
  out:

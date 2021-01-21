@@ -4,7 +4,7 @@
 #define _CPUID_H_
 
 typedef enum { 
-  AMD_10H,
+  AMD_10H, AMD_17H,
   NEHALEM, WESTMERE, 
   SANDYBRIDGE, IVYBRIDGE, 
   HASWELL, BROADWELL, KNL,
