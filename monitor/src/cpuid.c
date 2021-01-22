@@ -33,22 +33,12 @@ processor_t signature(int *n_pmcs) {
            extended_family_code | family_code, extended_model | model);
   TRACE("sig %s\n", sig);
 
+  // Determine Processor Family and Model
   if (strncmp(vendor, "GenuineIntel", 12) == 0) {
     cpuid(0x0A, eax, ebx, ecx, edx);
     *n_pmcs = (eax >> 8) & 0xFF;
-  }
-  else if (strncmp(vendor, "AuthenticAMD", 12) == 0) {
-    *n_pmcs = 4;
-  }
-  else {
-    ERROR("Processor Vendor not recognized %s", vendor);
-    goto out;
-  }
-  TRACE("Number of PMCs = %d\n", *n_pmcs);
+    TRACE("Number of PMCs = %d\n", *n_pmcs);
 
-
-  // Determine Processor Family and Model
-  if (strncmp(vendor, "GenuineIntel", 12) == 0) {
     if (strncmp(sig, "06_1a", 5) == 0 ||
         strncmp(sig, "06_1e", 5) == 0 ||
         strncmp(sig, "06_2e", 5) == 0) {
@@ -105,12 +95,14 @@ processor_t signature(int *n_pmcs) {
   else if (strncmp(vendor, "AuthenticAMD", 12) == 0) {
     if (strncmp(sig, "8f_31", 5) == 0) {
       TRACE("AMD_17H %s\n", sig);
+      *n_pmcs = 6;
+      TRACE("Number of PMCs = %d\n", *n_pmcs);
       return AMD_17H;
+    }
   }
-}
 
- out:
-  return rc;
+  out:
+    return rc;
 }
 
 // Determine pkg/core/hyperthread id a logical core belongs too
