@@ -106,11 +106,8 @@ processor_t signature(int *n_pmcs) {
     if (strncmp(sig, "8f_31", 5) == 0) {
       TRACE("AMD_17H %s\n", sig);
       return AMD_17H;
-    } else {
-      TRACE("Proc model unknown. Defaulting to AMD_10H %s\n", sig);
-      return AMD_10H;
-    }
   }
+}
 
  out:
   return rc;
