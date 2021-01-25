@@ -108,9 +108,7 @@ static int amd64_pmc_begin(struct stats_type *type)
   int nr = 0;
 
   // 10H cpus only have 4 counters, 17H has 6.
-  uint64_t events[1][6] = {
-    { SSEFLOPS_SINGLE, SSEFLOPS_DOUBLE, MAX_FREQ, ACTUAL_FREQ, PIPE_STALLS, DRAM_ACCESS }
-  };
+  uint64_t events[1][6] = { EVENT_MIX_17H };
 
   // Determine how many different event mixes we have
   int n_event_mix = sizeof(events)/sizeof(events[0]);
