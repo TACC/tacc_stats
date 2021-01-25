@@ -107,9 +107,9 @@ static int amd64_pmc_begin(struct stats_type *type)
   int n_pmcs = 0;
   int nr = 0;
 
-  // Legacy AMD cpus only have 4 counters, Rome has 6.
+  // 10H cpus only have 4 counters, 17H has 6.
   uint64_t events[1][6] = {
-    { DRAMaccesses, UserCycles, DCacheSysFills, SSEFLOPS, DCacheSysFills, HTlink0Use }
+    { SSEFLOPS_SINGLE, SSEFLOPS_DOUBLE, MAX_FREQ, ACTUAL_FREQ, PIPE_STALLS, DRAM_ACCESS }
   };
 
   // Determine how many different event mixes we have
