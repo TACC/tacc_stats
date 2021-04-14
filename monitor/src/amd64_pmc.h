@@ -23,12 +23,15 @@
 // CTRs p. 138
 // MSRC001_020[1...B] [Performance Event Counter [5:0]] (Core::X86::Msr::PERF_CTR)
 
+// Event
+
 #define MSR_PERF_CTL0 0xC0010200
 #define MSR_PERF_CTL1 0xC0010202
 #define MSR_PERF_CTL2 0xC0010204
 #define MSR_PERF_CTL3 0xC0010206
 #define MSR_PERF_CTL4 0xC0010208
 #define MSR_PERF_CTL5 0xC001020A
+
 #define MSR_PERF_CTR0 0xC0010201
 #define MSR_PERF_CTR1 0xC0010203
 #define MSR_PERF_CTR2 0xC0010205
@@ -36,26 +39,41 @@
 #define MSR_PERF_CTR4 0xC0010209
 #define MSR_PERF_CTR5 0xC001020B
 
+
+// L3 Event Core::X86::Msr::ChL3Pmc
+
+
+//Data Fabric(DF) Event Core::X86::Msr::DF_PERF_CTL
+
+// RAPL Core::X86::Msr::RAPL_PWR_UNIT
+
+#define MSR_HW_CONFIG   0xC0010015
+#define MSR_SYS_CONFIG  0xC0010010
+
+#define MSR_PERF_INST_RETIRED  0xC00000E9
+#define MSR_PERF_APERF         0xC00000E8
+#define MSR_PERF_MPERF         0xC00000E7
+
+#define MSR_FEATURE_ENABLE    0xC0000080
+#define MSR_HW_CONFIG         0xC0010015
+
 // SSE/AVX operations p. 151
 // PMCx003 [Retired SSE/AVX Operations] (Core::X86::Pmc::Core::FpRetSseAvxOps)
-#define SSEFLOPS_SINGLE       PERF_EVENT(0x03, 0x0F) /* Counts single precision, add, multiply, divide & sqrt FLOPs. */
-#define SSEFLOPS_DOUBLE       PERF_EVENT(0x03, 0xF0) /* Counts double precision, add, multiply, divide & sqrt FLOPs. */
+// Cannot separate single or double precision flops in epyc2 even though manual says otherwise
+#define FLOPS_SINGLE             PERF_EVENT(0x03, 0x0F) /* Counts single precision, add, multiply, divide & sqrt FLOPs. */
+#define FLOPS_DOUBLE             PERF_EVENT(0x03, 0xF0) /* Counts double precision, add, multiply, divide & sqrt FLOPs. */
 
-// Frequency Counts p. 78
-// MSR0000_00E7 [Max Performance Frequency Clock Count] (Core::X86::Msr::MPERF)
-// MSR0000_00E8 [Actual Performance Frequency Clock Count] (Core::X86::Msr::APERF)
-#define MAX_FREQ            PERF_EVENT(0xE7, 0x00)
-#define ACTUAL_FREQ         PERF_EVENT(0xE8, 0x00)
+#define FLOPS                    PERF_EVENT(0x03, 0xFF) //0x43FF03
+#define MERGE                    0xF004000FF  // FLOPS need merge because events incr > 16 / cycle
+#define BRANCH_INST_RETIRED      PERF_EVENT(0xC2, 0x00)
+#define BRANCH_INST_RETIRED_MISS PERF_EVENT(0xC3, 0x00)
 
-// Pipeline Stalls p. 157
-// PMCx087 [Instruction Pipe Stall] (Core::X86::Pmc::Core::IcFetchStall)
-#define PIPE_STALLS        PERF_EVENT(0x87, 0x04) 
+//#define STALLS_ALL               PERF_EVENT(0x87, 0x04) 
+//#define STALLS_FRONTEND          PERF_EVENT(0x87, 0x02) 
+//#define STALLS_BACKEND           PERF_EVENT(0x87, 0x01) 
 
-// DRAM Access p.147
-// MSRC001_1036 [IBS Op Data 2] (Core::X86::Msr::IBS_OP_DATA2)
-#define DRAM_ACCESS        PERF_EVENT(0x11036, 0x03)
-
-#define EVENT_MIX_17H { SSEFLOPS_SINGLE, SSEFLOPS_DOUBLE, MAX_FREQ, ACTUAL_FREQ, PIPE_STALLS, DRAM_ACCESS }
+#define STALLS_FRONTEND          PERF_EVENT(0xAF, 0x7F) 
+#define STALLS_BACKEND           PERF_EVENT(0xAE, 0xFF) 
 
 #define KEYS \
   X(CTL0, "C", ""), \
@@ -69,15 +87,19 @@
   X(CTR2, "E,W=48", ""), \
   X(CTR3, "E,W=48", ""), \
   X(CTR4, "E,W=48", ""), \
-  X(CTR5, "E,W=48", "")
+  X(CTR5, "E,W=48", ""), \
+  X(INST_RETIRED, "E,W=48", ""), \
+  X(APERF, "E,W=48", ""), \
+  X(MPERF, "E,W=48", "")
 
 #define PERF_EVENT(event_select, unit_mask) \
   ( (event_select & 0xFF) \
   | (unit_mask << 8) \
   | (1UL << 16) /* Count in user mode (CPL == 0). */ \
   | (1UL << 17) /* Count in OS mode (CPL > 0). */ \
+  | (1UL << 20) /* Enable. */ \
   | (1UL << 22) /* Enable. */ \
-  | ((event_select & 0xF00) << 24) \
+  | (0x000 << 24)		\
   )
 
 
@@ -110,7 +132,7 @@
 */
 
 /* From the 10h BKDG, p. 403, "The performance counter registers can
-   be used to track events in the Northbridge. Northbridge events
+v   be used to track events in the Northbridge. Northbridge events
    include all memory controller events, crossbar events, and
    HyperTransportTM interface events as documented in 3.14.7, 3.14.8,
    and 3.14.9. Monitoring of Northbridge events should only be
