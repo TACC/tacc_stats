@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/fstats/frontera/bin/python3
 import pika
 import os, sys
 import time
@@ -11,11 +11,12 @@ def on_message(channel, method_frame, header_frame, body):
         message = body.decode()    
     except: 
         print("Unexpected error at decode:", sys.exc_info()[0])
+        #print(body)
         return
 
     if message[0] == '$': host = message.split('\n')[1].split()[1]       
     else: host = message.split()[2]
-
+    #if host == "localhost.localdomain": return
     host_dir = os.path.join(cfg.archive_dir, host)
     if not os.path.exists(host_dir):
         os.makedirs(host_dir)
