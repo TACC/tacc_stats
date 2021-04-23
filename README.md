@@ -147,7 +147,7 @@ Raw stats files will now be generated in the `archive_dir`.
 5.  A PostgreSQL database must be setup on the host.  To do this, after installation of PostgreSQL
 and the `tacc_stats` Python module 
 ```
-$ sudo su - postgresql
+$ sudo su - postgres
 $ psql
 # CREATE DATABASE machinename_db;
 # CREATE USER taccstats WITH PASSWORD 'taccstats';
