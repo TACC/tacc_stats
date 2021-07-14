@@ -5,6 +5,7 @@
 #include <signal.h>
 #include <malloc.h>
 #include <errno.h>
+#include <search.h>
 #include <sys/fcntl.h>
 #include <sys/time.h>
 #include <sys/stat.h>
@@ -266,7 +267,14 @@ int main(int argc, char *argv[])
     rc = -1;
     goto out;
   }
-  
+
+  // Requeue list
+
+  struct sf_requeue *sf_q = calloc(1, sizeof(sf_requeue))
+  insqueue(&sf_q, NULL);
+  struct sf_requeue *sf_q_elem_delete
+  int sf_q_count = 0;
+
   char buffer[EVENT_BUF_LEN];
   ///////////////////////
   // START OF MAIN LOOP//
@@ -357,9 +365,28 @@ int main(int argc, char *argv[])
     }
 
     // Write data to buffer and ship off node
-    if (stats_buffer_write(&sf) < 0)
-      ERROR("Buffer write and send failed failed : %m\n");
-    stats_buffer_close(&sf);
+    if (stats_buffer_write(&sf) >= 0) {
+      stats_buffer_close(&sf);
+    } else {
+      ERROR("Buffer write and send failed, queuing for resend: %m\n");
+      struct sf_requeue *sf_q_elem = calloc(1, sizeof(sf_requeue));
+      sf_q_elem->q_sf = &sf;
+      insque(&sf_q_elem, &sf_q);
+      sf_q_count++;
+    }
+    
+    while(1) {
+      if (sf_q.q_forward == NULL) break;
+      if (stats_buffer_write((sf_q.q_forward)->q_sf) >= 0) {
+        stats_buffer_close((sf_q.q_forward)->q_sf);
+        sf_q_elem_delete = sf_q.q_forward
+        remque(sf_q.q_forward);
+        free(&sf_q_elem_delete);
+      } else {
+        ERROR("Buffer write and send failed, queuing for resend: %m\n");
+        break;
+      }
+    }
 
     // Cleanup
     i = 0;
