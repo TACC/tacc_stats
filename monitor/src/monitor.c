@@ -270,9 +270,10 @@ int main(int argc, char *argv[])
 
   // Requeue list
 
-  struct sf_requeue *sf_q = calloc(1, sizeof(sf_requeue))
-  insqueue(&sf_q, NULL);
-  struct sf_requeue *sf_q_elem_delete
+  struct sf_requeue *sf_q = calloc(1, sizeof(struct sf_requeue));
+  insque(&sf_q, NULL);
+  struct sf_requeue *sf_q_elem_delete;
+  struct sf_requeue *sf_q_elem;
   int sf_q_count = 0;
 
   char buffer[EVENT_BUF_LEN];
@@ -369,24 +370,26 @@ int main(int argc, char *argv[])
       stats_buffer_close(&sf);
     } else {
       ERROR("Buffer write and send failed, queuing for resend: %m\n");
-      struct sf_requeue *sf_q_elem = calloc(1, sizeof(sf_requeue));
+      sf_q_elem = calloc(1, sizeof(struct sf_requeue));
       sf_q_elem->q_sf = &sf;
       insque(&sf_q_elem, &sf_q);
       sf_q_count++;
     }
     
-    while(1) {
-      if (sf_q.q_forward == NULL) break;
-      if (stats_buffer_write((sf_q.q_forward)->q_sf) >= 0) {
-        stats_buffer_close((sf_q.q_forward)->q_sf);
-        sf_q_elem_delete = sf_q.q_forward
-        remque(sf_q.q_forward);
+    while(sf_q_count) {
+      if (sf_q->q_forward == NULL) break; // List is empty
+      if (stats_buffer_write((sf_q->q_forward)->q_sf) >= 0) {
+        stats_buffer_close((sf_q->q_forward)->q_sf);
+        sf_q_elem_delete = sf_q->q_forward;
+        remque(sf_q->q_forward);
         free(&sf_q_elem_delete);
+        sf_q_count--;
       } else {
         ERROR("Buffer write and send failed, queuing for resend: %m\n");
         break;
       }
     }
+
 
     // Cleanup
     i = 0;
