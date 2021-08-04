@@ -282,11 +282,10 @@ static uint64_t events[] = {
 //! Configure and start counters
 static int intel_hsw_cbo_begin(struct stats_type *type)
 {
-  int n_pmcs = 0;
   int nr = 0;
 
   int i,j;
-  if (signature(&n_pmcs) != HASWELL) goto out;
+  if (processor != HASWELL) goto out;
 
   for (i = 0; i < nr_cpus; i++) {
     char cpu[80];

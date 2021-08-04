@@ -286,7 +286,7 @@ static int intel_bdw_cbo_begin(struct stats_type *type)
   int nr = 0;
 
   int i,j;
-  if (signature(&n_pmcs) != BROADWELL) goto out;
+  if (processor != BROADWELL) goto out;
   for (i = 0; i < nr_cpus; i++) {
     char cpu[80];
     int pkg_id = -1;

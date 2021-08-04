@@ -294,12 +294,11 @@ static uint64_t pcu_events[4] = {
 //! Configure and start counters
 static int intel_pcu_begin(struct stats_type *type)
 {
-  int n_pmcs = 0;
   int nr = 0;
 
   int i;
-  if (p = signature(&n_pmcs) < 0) goto out; 
-  if (p == SANDYBRIDGE || p == IVYBRIDGE || p == HASWELL || p == BROADWELL) 
+
+  if (processor == SANDYBRIDGE || processor == IVYBRIDGE || processor == HASWELL || processor == BROADWELL) 
     for (i = 0; i < nr_cpus; i++) {
       char cpu[80];
       int pkg_id = -1;

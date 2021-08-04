@@ -14,12 +14,11 @@
 #include "cpuid.h"
 #include "amd64_pmc.h"
 
-
 static  uint64_t amd10h_events[] = {
   FLOPS, 
   MERGE,
-  STALLS_FRONTEND, 
-  STALLS_BACKEND,
+  DISPATCH_STALL_CYCLES1,
+  DISPATCH_STALL_CYCLES0, 
 };
 
 static  uint64_t amd17h_events[] = {
@@ -27,8 +26,17 @@ static  uint64_t amd17h_events[] = {
   MERGE,
   BRANCH_INST_RETIRED,
   BRANCH_INST_RETIRED_MISS,
-  STALLS_FRONTEND,
-  STALLS_BACKEND, 
+  DISPATCH_STALL_CYCLES1,
+  DISPATCH_STALL_CYCLES0, 
+};
+
+static  uint64_t amd19h_events[] = {
+  FLOPS, 
+  MERGE,
+  BRANCH_INST_RETIRED,
+  BRANCH_INST_RETIRED_MISS,
+  DISPATCH_STALL_CYCLES1,
+  DISPATCH_STALL_CYCLES0, 
 };
 
 static int amd64_pmc_begin_cpu(char *cpu)
@@ -38,14 +46,19 @@ static int amd64_pmc_begin_cpu(char *cpu)
   int msr_fd = -1;
   uint64_t *events;
 
-  // 10H cpus only have 4 counters, 17H has 6.
+  // 10H cpus only have 4 counters, 17H and 19H have 6.
   switch(processor) {
+
   case AMD_10H:
     events = amd10h_events; break;
   case AMD_17H:
-    events = amd17h_events; break;
+    events = amd17h_events;
+    break;
+  case AMD_19H:
+    events = amd19h_events;
+    break;
   default:
-    ERROR("Processor model/family not supported: %m\n");
+    ERROR("Processor model/family %d not supported\n", processor);
     goto out;
   }
 

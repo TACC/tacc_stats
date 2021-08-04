@@ -203,7 +203,7 @@ static int intel_knl_edc_begin(struct stats_type *type)
   processor_t p;
   int fd = -1;
 
-  if (signature(&n_pmcs) != KNL) goto out; 
+  if (processor != KNL) goto out; 
 
   const char *path = "/dev/mem";
   uint64_t mmconfig_base = 0xc0000000;

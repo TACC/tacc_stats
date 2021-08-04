@@ -99,6 +99,13 @@ processor_t signature(int *n_pmcs) {
       TRACE("Number of PMCs = %d\n", *n_pmcs);
       return AMD_17H;
     }
+    if (strncmp(sig, "af_1", 5) == 0) {
+      TRACE("AMD_19H %s\n", sig);
+      *n_pmcs = 6;
+      TRACE("Number of PMCs = %d\n", *n_pmcs);
+      return AMD_19H;
+    }
+
   }
 
   out:
@@ -185,7 +192,9 @@ int topology(char *cpu, int *pkg_id, int *core_id, int *smt_id, int *nr_core)
 	}
     }
   TRACE("Number of threads/physical cores %d/%d\n", nr_smt, *nr_core);
+  //printf("Number of threads/physical cores %d/%d\n", nr_smt, *nr_core);
   TRACE("Pkg_ID Core_ID SMT_ID %d %d %d\n", *pkg_id, *core_id, *smt_id);
+  //printf("Pkg_ID Core_ID SMT_ID %d %d %d\n", *pkg_id, *core_id, *smt_id);
  out:
   if (cpuid_fd >= 0)
     close(cpuid_fd);

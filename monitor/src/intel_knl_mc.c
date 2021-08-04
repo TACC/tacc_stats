@@ -198,7 +198,7 @@ static int intel_knl_mc_begin(struct stats_type *type)
   int n_pmcs = 0;
   int fd = -1;
 
-  if (signature(&n_pmcs) != KNL) goto out;
+  if (processor != KNL) goto out;
   const char *path = "/dev/mem";
   uint64_t mmconfig_base = 0xc0000000;
   uint64_t mmconfig_size = 0x10000000;

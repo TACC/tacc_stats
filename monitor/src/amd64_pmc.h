@@ -40,10 +40,6 @@
 #define MSR_PERF_CTR5 0xC001020B
 
 
-// L3 Event Core::X86::Msr::ChL3Pmc
-
-
-//Data Fabric(DF) Event Core::X86::Msr::DF_PERF_CTL
 
 // RAPL Core::X86::Msr::RAPL_PWR_UNIT
 
@@ -67,13 +63,8 @@
 #define MERGE                    0xF004000FF  // FLOPS need merge because events incr > 16 / cycle
 #define BRANCH_INST_RETIRED      PERF_EVENT(0xC2, 0x00)
 #define BRANCH_INST_RETIRED_MISS PERF_EVENT(0xC3, 0x00)
-
-//#define STALLS_ALL               PERF_EVENT(0x87, 0x04) 
-//#define STALLS_FRONTEND          PERF_EVENT(0x87, 0x02) 
-//#define STALLS_BACKEND           PERF_EVENT(0x87, 0x01) 
-
-#define STALLS_FRONTEND          PERF_EVENT(0xAF, 0x7F) 
-#define STALLS_BACKEND           PERF_EVENT(0xAE, 0xFF) 
+#define DISPATCH_STALL_CYCLES1   PERF_EVENT(0xAF, 0x08) 
+#define DISPATCH_STALL_CYCLES0   PERF_EVENT(0xAE, 0xFF) 
 
 #define KEYS \
   X(CTL0, "C", ""), \
@@ -92,14 +83,23 @@
   X(APERF, "E,W=48", ""), \
   X(MPERF, "E,W=48", "")
 
+#define DF_KEYS \
+  X(CTL0, "C", ""), \
+  X(CTL1, "C", ""), \
+  X(CTL2, "C", ""), \
+  X(CTL3, "C", ""), \
+  X(CTR0, "E,W=48", ""), \
+  X(CTR1, "E,W=48", ""), \
+  X(CTR2, "E,W=48", ""), \
+  X(CTR3, "E,W=48", "")
+
+
 #define PERF_EVENT(event_select, unit_mask) \
   ( (event_select & 0xFF) \
   | (unit_mask << 8) \
   | (1UL << 16) /* Count in user mode (CPL == 0). */ \
   | (1UL << 17) /* Count in OS mode (CPL > 0). */ \
-  | (1UL << 20) /* Enable. */ \
   | (1UL << 22) /* Enable. */ \
-  | (0x000 << 24)		\
   )
 
 

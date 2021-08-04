@@ -148,9 +148,8 @@ const uint64_t mmconfig_size = 0x10000000;
 static int intel_skx_imc_begin(struct stats_type *type)
 {
   int nr = 0;
-  int n_pmcs;
 
-  if (signature(&n_pmcs) != SKYLAKE) goto out;
+  if (processor != SKYLAKE) goto out;
 
   uint32_t *mmconfig_ptr;
 

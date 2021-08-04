@@ -168,7 +168,7 @@ static int intel_ivb_cbo_begin(struct stats_type *type)
   int nr = 0;
 
   int i,j;
-  if (signature(&n_pmcs) != IVYBRIDGE) goto out;
+  if (processor != IVYBRIDGE) goto out;
   
   for (i = 0; i < nr_cpus; i++) {
     char cpu[80];
