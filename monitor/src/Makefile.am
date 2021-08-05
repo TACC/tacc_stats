@@ -70,6 +70,7 @@ if HARDWARE
 TYPES 	+= \
 	amd64_pmc.c \
 	amd64_df.c \
+	amd64_rapl.c \
 	intel_4pmc3.c \
 	intel_8pmc3.c \
 	intel_bdw_cbo.c \

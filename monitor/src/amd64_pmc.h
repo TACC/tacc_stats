@@ -39,19 +39,12 @@
 #define MSR_PERF_CTR4 0xC0010209
 #define MSR_PERF_CTR5 0xC001020B
 
-
-
-// RAPL Core::X86::Msr::RAPL_PWR_UNIT
-
-#define MSR_HW_CONFIG   0xC0010015
-#define MSR_SYS_CONFIG  0xC0010010
-
 #define MSR_PERF_INST_RETIRED  0xC00000E9
 #define MSR_PERF_APERF         0xC00000E8
 #define MSR_PERF_MPERF         0xC00000E7
 
-#define MSR_FEATURE_ENABLE    0xC0000080
-#define MSR_HW_CONFIG         0xC0010015
+#define MSR_HW_CONFIG   0xC0010015
+
 
 // SSE/AVX operations p. 151
 // PMCx003 [Retired SSE/AVX Operations] (Core::X86::Pmc::Core::FpRetSseAvxOps)

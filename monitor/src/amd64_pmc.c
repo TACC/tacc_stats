@@ -89,7 +89,7 @@ static int amd64_pmc_begin_cpu(char *cpu)
 	  msr_path);
     goto out;
   }
-  
+  /*
   uint64_t zero = 0x00;
   for (i = 0; i < n_pmcs; i++) {
     TRACE("MSR %08X, event %016llX\n", MSR_PERF_CTR0 + i*2, zero);
@@ -102,7 +102,7 @@ static int amd64_pmc_begin_cpu(char *cpu)
       goto out;
     }
   }
-    
+  */
   rc = 0;
 
  out:

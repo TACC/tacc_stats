@@ -70,6 +70,7 @@ static int amd64_df_begin_cpu(char *cpu)
       goto out;
     }
   }
+  /*
   uint64_t zero = 0x00; 
   for (i = 0; i < 4; i++) {
     TRACE("MSR %08X, event %016llX\n", MSR_DF_CTR0 + i*2, (unsigned long long) 0);
@@ -82,7 +83,7 @@ static int amd64_df_begin_cpu(char *cpu)
       goto out;
     }
   }
-
+  */
 
   rc = 0;
 
