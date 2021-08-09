@@ -35,3 +35,4 @@ stream
 stream.c
 vector
 test.txt
+tacc_statsd

@@ -1,15 +1,13 @@
 [Unit]
-Description=Job-level Tracking and Analysis Service
+Description=Job-level Monitoring Service
 
 [Service]
-Type=forking
-User=root
-PIDFile=/var/lock/tacc_stats
-WorkingDirectory=/opt/tacc_statsd
-ExecStart=/opt/tacc_statsd/tacc_stats -s localhost -q default -p 5672 -f 300
+Type=simple
+ExecStart=/usr/sbin/tacc_statsd -c CONFIGFILE
+ExecReload=/bin/kill -HUP $MAINPID
 Restart=always
 RestartSec=10
-KillSignal=SIGKILL
+KillSignal=SIGINT
 
 [Install]
 WantedBy=multi-user.target

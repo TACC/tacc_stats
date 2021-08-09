@@ -7,6 +7,8 @@
 #include <sys/utsname.h>
 #include <syslog.h>
 #include <amqp.h>
+#include <time.h>
+
 #include "stats.h"
 #include "stats_buffer.h"
 #include "schema.h"
@@ -190,7 +192,14 @@ int stats_buffer_write(struct stats_buffer *sf)
   struct utsname uts_buf;
   uname(&uts_buf);
 
-  sf_printf(sf, "\n%f %s %s\n", current_time, current_jobid, uts_buf.nodename);
+  struct timespec time;
+
+  // Get  time
+  if (clock_gettime(CLOCK_REALTIME, &time) != 0) {
+    fprintf(stderr, "cannot clock_gettime(): %m\n");
+    goto out;
+  }
+  sf_printf(sf, "\n%f %s %s\n", time.tv_sec + 1e-9*time.tv_nsec, jobid, uts_buf.nodename);
 
   /* Write mark. */
   if (sf->sf_mark != NULL) {
@@ -226,6 +235,8 @@ int stats_buffer_write(struct stats_buffer *sf)
     }
   }
 
+
   rc = send(sf);
+ out:
   return rc;
 }

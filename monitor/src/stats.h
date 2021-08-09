@@ -12,7 +12,7 @@
 #define SCHEMA_DEF(k,o,d,r...) " " #k "," o
 
 extern double current_time;
-extern char current_jobid[80];
+extern char jobid[80];
 extern int nr_cpus;
 extern int n_pmcs;
 extern processor_t processor;

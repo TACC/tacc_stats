@@ -1,12 +1,12 @@
 ACLOCAL_AMFLAGS = -I m4
 
-bin_PROGRAMS = tacc_stats
+bin_PROGRAMS = tacc_statsd
 
 STATS_DIR_PATH = /var/log/tacc_stats
 STATS_LOCK_PATH = /var/lock/tacc_stats
 JOBID_FILE_PATH = /var/run/TACC_jobid
 
-tacc_stats_CPPFLAGS = \
+tacc_statsd_CPPFLAGS = \
 	-D_GNU_SOURCE \
 	-DSTATS_PROGRAM=\"@PACKAGE@\" \
 	-DSTATS_VERSION=\"@PACKAGE_VERSION@\" \
@@ -15,15 +15,19 @@ tacc_stats_CPPFLAGS = \
 	-DJOBID_FILE_PATH=\"$(JOBID_FILE_PATH)\"
 
 if DEBUG
-tacc_stats_CPPFLAGS += \
+tacc_statsd_CPPFLAGS += \
 	-DDEBUG
 endif
 
-tacc_stats_SOURCES = \
+tacc_statsd_SOURCES = \
+	amd64_pmc.h \
+	amd64_df.h \
 	collect.h \
 	collect.c \
 	cpuid.h \
 	cpuid.c \
+	daemonize.h \
+	daemonize.c \
 	dict.h \
 	dict.c \
 	intel_pmc3.h \
@@ -40,14 +44,14 @@ tacc_stats_SOURCES = \
 	trace.h
 
 if RABBITMQ
-tacc_stats_SOURCES += \
+tacc_statsd_SOURCES += \
 	monitor.c \
 	stats_buffer.c \
 	stats_buffer.h
-tacc_stats_CPPFLAGS += \
+tacc_statsd_CPPFLAGS += \
 	-DRABBITMQ
 else
-tacc_stats_SOURCES += \
+tacc_statsd_SOURCES += \
 	main.c \
 	stats_file.c \
 	stats_file.h
@@ -109,17 +113,17 @@ TYPES	 += \
 	ib_sw.c
 endif
 
-tacc_stats_LDFLAGS =
+tacc_statsd_LDFLAGS =
 if OPA
 TYPES	+= \
 	opa.c
-tacc_stats_LDFLAGS += \
+tacc_statsd_LDFLAGS += \
 		-lpthread \
 		-lmemusage
 endif
 
 if LUSTRE
-tacc_stats_SOURCES += \
+tacc_statsd_SOURCES += \
 	lustre_obd_to_mnt.c \
 	lustre_obd_to_mnt.h
 
@@ -130,23 +134,23 @@ TYPES += \
 endif
 
 if MIC
-tacc_stats_SOURCES += \
+tacc_statsd_SOURCES += \
 	miclib.h 
 TYPES += \
 	mic.c
 endif
 
-tacc_stats_SOURCES += \
+tacc_statsd_SOURCES += \
 	$(TYPES)
 
-tacc_stats_LDFLAGS += \
+tacc_statsd_LDFLAGS += \
 	-lm
 
-nodist_tacc_stats_SOURCES = \
+nodist_tacc_statsd_SOURCES = \
 	stats.x
 
 if GPU
-nodist_tacc_stats_SOURCES += \
+nodist_tacc_statsd_SOURCES += \
 	nvml.h 
 TYPES += \
 	nvidia_gpu.c
@@ -164,7 +168,7 @@ initd_SCRIPTS = taccstats
 sysconf_DATA = tacc_stats.conf
 sysconf_DATA += taccstats.service
 BUILT_SOURCES += taccstats
-nodist_tacc_stats_SOURCES += \
+nodist_tacc_statsd_SOURCES += \
 	taccstats
 CLEANFILES += $(initd_SCRIPTS) $(sysconfdir_DATA)
 

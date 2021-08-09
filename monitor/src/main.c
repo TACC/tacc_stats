@@ -18,7 +18,7 @@
 
 struct timeval tp;
 double current_time;
-char current_jobid[80] = "0";
+char jobid[80] = "0";
 int nr_cpus;
 
 int n_pmcs = 0;
@@ -155,7 +155,7 @@ int main(int argc, char *argv[])
 
   gettimeofday(&tp,NULL);
   current_time = tp.tv_sec+tp.tv_usec/1000000.0;
-  pscanf(JOBID_FILE_PATH, "%79s", current_jobid);
+  pscanf(JOBID_FILE_PATH, "%79s", jobid);
   nr_cpus = sysconf(_SC_NPROCESSORS_ONLN);
   processor = signature(&n_pmcs);
 

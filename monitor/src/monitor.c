@@ -10,84 +10,223 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <sys/syslog.h>
-#include <sys/inotify.h>
+#include <ev.h>
+#include "daemonize.h"
 #include "string1.h"
 #include "stats.h"
 #include "stats_buffer.h"
 #include "trace.h"
 #include "pscanf.h"
 
-#define EVENT_SIZE  ( sizeof (struct inotify_event) )
-#define EVENT_BUF_LEN     ( 1024 * ( EVENT_SIZE + 16 ) )
+static char *app_name = NULL;
+static char *conf_file_name = NULL;
+static FILE *log_stream = NULL;
 
-struct timeval tp;
-double current_time;
-char current_jobid[80] = "-";
-char new_jobid[80] = "-";
+static char *server = NULL;
+static char *queue  = "default";
+static char *port   = "5672";
+
+static double freq = 300;
+
+static ev_timer sample_timer;
+static ev_timer rotate_timer;
+
+char jobid[80] = "-";
+
 int nr_cpus;
-int n_pmcs = 0;
+int n_pmcs;
 processor_t processor = 0;
 
-static volatile sig_atomic_t g_new_flag = 1;
-
-static void alarm_handler(int sig)
+int read_conf_file()
 {
-}
+  FILE *conf_file_fd = NULL;
+  int ret = -1;
 
-static void alarm_rotate(int sig)
-{
-  g_new_flag = 1;
-}
+  if (conf_file_name == NULL) return 0;
 
-#define BUF_SIZE 8
+  conf_file_fd = fopen(conf_file_name, "r");
 
-static int open_lock_timeout(const char *path, int timeout)
-{
-  int fd = -1;
-  char buf[BUF_SIZE];
-  struct sigaction alarm_action = {
-    .sa_handler = &alarm_handler,
-  };
-  struct flock lock = {
-    .l_type = F_WRLCK,
-    .l_whence = SEEK_SET,
-  };
-
-  fd = open(path, O_CREAT|O_RDWR, 0600);
-  if (fd < 0) {
-    ERROR("cannot open `%s': %m\n", path);
-    goto err;
+  if (conf_file_fd == NULL) {
+    fprintf(log_stream, "Can not open config file: %s, error: %s",
+	    conf_file_name, strerror(errno));
+    return -1;
   }
 
-  if (sigaction(SIGALRM, &alarm_action, NULL) < 0) {
-    ERROR("cannot set alarm handler: %m\n");
-    goto err;
+  char *line_buf = NULL;
+  size_t line_buf_size = 0;
+  while(getline(&line_buf, &line_buf_size, conf_file_fd) >= 0) {
+    char *line = line_buf;
+    char *key = strsep(&line, " :\t=");
+    if (key == NULL || line == NULL)
+      continue;
+    
+    while (*line  == ' ') line++;
+    if (strcmp(key, "server") == 0) { 
+      line[strlen(line) - 1] = '\0';
+      server = strdup(line);
+      fprintf(log_stream, "%s: Setting server to %s based on file %s\n",
+	      app_name, server, conf_file_name);
+    }   
+    if (strcmp(key, "queue") == 0) { 
+      line[strlen(line) - 1] = '\0';
+      queue = strdup(line);
+      fprintf(log_stream, "%s: Setting queue to %s based on file %s\n",
+	      app_name, queue, conf_file_name);
+    }
+    if (strcmp(key, "port") == 0) {
+      line[strlen(line) - 1] = '\0';
+      port = strdup(line);
+      fprintf(log_stream, "%s: Setting server port to %s based on file %s\n",
+	      app_name, port, conf_file_name);
+    }
+    if (strcmp(key, "frequency") == 0) {  
+      if (sscanf(line, "%lf", &freq) == 1)
+	fprintf(log_stream, "%s: Setting frequency to %f based on file %s\n",
+		app_name, freq, conf_file_name);
+    }
   }
 
-  // Set timer to wait until signal SIGALRM is sent
-  alarm(timeout);
+  fclose(conf_file_fd);
 
-  // Wait until any conflicting lock on the file is released. 
-  // If alarm signal (SIGALRM) is caught then go to signal 
-  // handler set in sigaction structure.
-  if (fcntl(fd, F_SETLKW, &lock) < 0) {
-    ERROR("cannot lock `%s': %m\n", path);
-    goto err;
+  return ret;
+}
+
+static void send_stats_buffer(struct stats_buffer *sf) {
+
+  size_t i;
+  struct stats_type *type;
+
+  // collect every enabled type 
+  i = 0;
+  while ((type = stats_type_for_each(&i)) != NULL) {
+    if (stats_type_init(type) < 0) {
+      type->st_enabled = 0;
+      continue;
+    }
+
+    if (type->st_enabled)
+      (*type->st_collect)(type);
+  }
+
+  // Write data to buffer and ship off node
+  if (stats_buffer_write(sf) < 0)
+    ERROR("Buffer write and send failed failed : %m\n");
+
+  // Cleanup
+  i = 0;
+  while ((type = stats_type_for_each(&i)) != NULL)
+    stats_type_destroy(type);    
+}
+
+/* Send header with data based on rotate timer interval */
+static void rotate_timer_cb(struct ev_loop *loop, ev_timer *w, int revents) 
+{
+  struct stats_buffer sf;
+  if (stats_buffer_open(&sf, server, port, queue) < 0)
+    TRACE("Failed opening data buffer : %m\n");
+
+  // test if stats type available 
+  size_t i;
+  struct stats_type *type;    
+  i = 0;
+  while ((type = stats_type_for_each(&i)) != NULL) {
+    type->st_enabled = 1;
+    if (stats_type_init(type) < 0) {
+      type->st_enabled = 0;
+      continue;
+    }    
+    if (type->st_begin != NULL)
+      (*type->st_begin)(type);
+  }
+
+  stats_wr_hdr(&sf);
+  send_stats_buffer(&sf);
+  stats_buffer_close(&sf);  
+}
+
+
+/* Send data based on ev timer interval */
+static void sample_timer_cb(struct ev_loop *loop, ev_timer *w, int revents) 
+{
+  struct stats_buffer sf;
+  if (stats_buffer_open(&sf, server, port, queue) < 0)
+    TRACE("Failed opening data buffer : %m\n");
+
+  send_stats_buffer(&sf);
+  stats_buffer_close(&sf);  
+}
+
+/* Collect and send data based on IO to JOBID file */
+static void fd_cb(EV_P_ ev_io *w, int revents)
+{
+  //fprintf(log_stream, "reading jobid from fd\n");
+
+  struct stats_buffer sf;
+  if (stats_buffer_open(&sf, server, port, queue) < 0)
+    TRACE("Failed opening data buffer : %m\n");
+
+  char new_jobid[80] = "-";
+  pscanf(JOBID_FILE_PATH, "%79s", new_jobid);  
+
+  //printf("newjobid %s oldjobid %s\n", new_jobid, jobid);
+  
+  if (strcmp(jobid, new_jobid) != 0) {               
+    if (strcmp(new_jobid, "-") != 0) {                
+      strcpy(jobid, new_jobid);
+      fprintf(log_stream, "Loading jobid %s from %s\n", jobid, JOBID_FILE_PATH);	
+      stats_buffer_mark(&sf, "begin %s", jobid);
+      sample_timer.repeat = freq; 
+    }
+    else {
+      fprintf(log_stream, "Unloading jobid %s from %s\n", jobid, JOBID_FILE_PATH);	
+      stats_buffer_mark(&sf, "end %s", jobid);
+      sample_timer.repeat = 3600; 
+    }
+    ev_timer_again(EV_DEFAULT, &sample_timer);
   }
   
-  snprintf(buf, BUF_SIZE, "%ld\n", (long) getpid());
-  if (write(fd, buf, strlen(buf)) != strlen(buf))
-    syslog(LOG_INFO,"Writing to PID/lock file failed '%s'", STATS_LOCK_PATH);
-  
-  if (0) {
-  err:
-    if (fd >= 0)
-      close(fd);
-    fd = -1;
+  // test if stats type available 
+  size_t i;
+  struct stats_type *type;    
+  i = 0;
+  while ((type = stats_type_for_each(&i)) != NULL) {
+    type->st_enabled = 1;
+    if (stats_type_init(type) < 0) {
+      type->st_enabled = 0;
+      continue;
+    }
+
+    if (type->st_begin != NULL)
+      (*type->st_begin)(type);
   }
-  alarm(0);
-  return fd;
+  send_stats_buffer(&sf);    
+  stats_buffer_close(&sf);
+
+  strcpy(jobid, new_jobid);
+
 }
+
+/* Signal Callbacks for SIGINT (terminate) and SIGHUP (reload conf file) */
+static void signal_cb_int(EV_P_ ev_signal *sig, int revents)
+{
+  fprintf(log_stream, "Stopping tacc_statsd\n");
+  if (pid_fd != -1) {
+    lockf(pid_fd, F_ULOCK, 0);
+    close(pid_fd);
+  }
+  if (pid_file_name != NULL) {
+    unlink(pid_file_name);
+  }
+  ev_break (EV_A_ EVBREAK_ALL);
+}
+static void signal_cb_hup(EV_P_ ev_signal *sig, int revents) 
+{
+  fprintf(log_stream, "Reloading tacc_statsd config file %s\n", conf_file_name);
+  read_conf_file();    
+  sample_timer.repeat = freq; 
+  ev_timer_again(EV_DEFAULT, &sample_timer);
+}
+
 
 static void usage(void)
 {
@@ -98,6 +237,7 @@ static void usage(void)
           "Mandatory arguments to long options are mandatory for short options too.\n"
           "  -h, --help         display this help and exit\n"
           "  -s [SERVER] or --server [SERVER]       Server to send data.\n"
+          "  -c [CONFIGFILE] or --configfile [CONFIGFILE] Configuration file to use.\n"
           "  -q [QUEUE] or --queue [QUEUE]      Queue to route data to on RMQ server. \n"
           "  -p [PORT] or --port [PORT]         Port to use (5672 is the default).\n"
           "  -f [FREQUENCY] or --frequency [FREQUENCY]  Frequency to sample (600 seconds is the default).\n"
@@ -107,274 +247,118 @@ static void usage(void)
 
 int main(int argc, char *argv[])
 {
+  int daemonmode = 0;
+  char *log_file_name = NULL;
 
-  /* Our process ID and Session ID */
-  pid_t pid, sid;
-
-  /* Fork off the parent process */
-  pid = fork();
-  if (pid < 0) {
-    exit(EXIT_FAILURE);
-  }
-  /* If we got a good PID, then
-     we can exit the parent process. */
-  if (pid > 0) {
-    exit(EXIT_SUCCESS);
-  }
-  /* Create a new SID for the child process */
-  sid = setsid();
-  if (sid < 0) {
-    /* Log the failure */
-    exit(EXIT_FAILURE);
-  }
-  /* Change the current working directory */
-  if ((chdir("/")) < 0) {
-    /* Log the failure */
-    exit(EXIT_FAILURE);
-  }
-  
-  // This block will force begin to wait until initialization is complete
-  sigset_t mask;
-  sigemptyset(&mask);
-  sigaddset(&mask, SIGHUP);
-  sigaddset(&mask, SIGTERM);
-  sigprocmask(SIG_BLOCK, &mask, NULL);
-
-  /* Daemon Specific initialization */
-  int lock_fd = -1;
-  int lock_timeout = 30;
-  char *host = NULL;
-  char *queue = NULL;
-  char *port = "5672";
-  double frequency = 600;
-
-  int rc = 0;
-  
-  // Ensures only one monitord is running at any time on a node
-  lock_fd = open_lock_timeout(STATS_LOCK_PATH, lock_timeout);
-  if (lock_fd < 0) {
-    ERROR("cannot acquire lock\n");
-    exit(EXIT_FAILURE);
-  }
+  app_name = argv[0];
 
   struct option opts[] = {
-    { "help", 0, 0, 'h' },
-    { "server", required_argument, 0, 's' },
-    { "queue", required_argument, 0, 'q' },
-    { "port", required_argument, 0, 'p' },
+    { "help",      no_argument, 0, 'h' },
+    { "daemon",    no_argument, 0, 'd' },
+    { "server",    required_argument, 0, 's' },
+    { "queue",     required_argument, 0, 'q' },
+    { "port",      required_argument, 0, 'p' },
+    { "conf_file", required_argument, 0, 'c'},
     { "frequency", required_argument, 0, 'f' },
     { NULL, 0, 0, 0 },
   };
 
   int c;
-  while ((c = getopt_long(argc, argv, "h:s:q:p:f:", opts, 0)) != -1) {
+  while ((c = getopt_long(argc, argv, "hdc:", opts, 0)) != -1) {
     switch (c) {
+    case 'd':
+      daemonmode = 1;
+      break;     
+    case 's':
+      server = strdup(optarg);
+      break;
+    case 'f':
+      freq = atof(optarg);
+      break;
+    case 'c':    
+      conf_file_name = strdup(optarg);
+      break;
+    case 'q':
+      queue = strdup(optarg);
+      break;
+    case 'p':
+      port = strdup(optarg);
+      break;
     case 'h':
       usage();
       exit(0);
-    case 's':
-      host = optarg;
-      continue;
-    case 'q':
-      queue = optarg;
-      continue;
-    case 'p':
-      port = optarg;
-      continue;
-    case 'f':
-      frequency = atof(optarg);
-      continue;
     case '?':
       fprintf(stderr, "Try `%s --help' for more information.\n", program_invocation_short_name);
+      exit(1);
     }
   }
-  umask(022);
 
-  if (host == NULL || queue == NULL) {
-    if (host == NULL)
-      fprintf(stderr, "Must specify a RMQ server with -s [--server] argument.\n");
-    if (queue == NULL)
-      fprintf(stderr, "Must specify a RMQ queue with -q [--queue] argument.\n");
-    rc = -1;
-    goto out;
+  log_stream = stderr;  
+
+  /* Read configuration from config file */
+  read_conf_file();
+
+  if (daemonmode) {
+    if (pid_file_name == NULL) 
+      pid_file_name = strdup("/var/run/tacc_statsd.pid");
+    daemonize();
   }
 
-  enum {
-    cmd_reset,
-    cmd_collect,
-  } cmd;
+  fprintf(log_stream, "Started %s\n", app_name);
+
+  /* Setup signal callbacks to stop tacc_statsd or reload conf file */
+  signal(SIGPIPE, SIG_IGN);
+  static struct ev_signal sigint;
+  ev_signal_init(&sigint, signal_cb_int, SIGINT);
+  ev_signal_start(EV_DEFAULT, &sigint);
+
+  static struct ev_signal sighup;
+  ev_signal_init(&sighup, signal_cb_hup, SIGHUP);
+  ev_signal_start(EV_DEFAULT, &sighup);
+  
+  if (server == NULL) {
+    fprintf(log_stream, "Must specify a server to send data to with -s [--server] argument or conf file.\n");
+    exit(0);
+  } else {    
+    fprintf(log_stream, "tacc_statsd data to server %s on port %s.\n", server, port);
+  }
+
+  ev_stat fd_watcher;  
+
+  /* Initialize timer routine to rotate file */
+  ev_timer_init(&rotate_timer, rotate_timer_cb, 0.0, 86400);   
+  ev_timer_start(EV_DEFAULT, &rotate_timer);
+  fprintf(log_stream, "Setting tacc_statsd rotate log files every %ds\n", 86400);
+
+  /* Initialize callback to respond to writes to job_fd */
+  ev_stat_init(&fd_watcher, fd_cb, JOBID_FILE_PATH, EV_READ);
+  ev_stat_start(EV_DEFAULT, &fd_watcher);    
+  fprintf(log_stream, "Starting tacc_statsd watching fd %s\n", JOBID_FILE_PATH);
+  
+  /* Initialize timer routine to collect and send data */
+  ev_timer_init(&sample_timer, sample_timer_cb, freq, freq);   
+  ev_timer_start(EV_DEFAULT, &sample_timer);
+  fprintf(log_stream, "Setting tacc_statsd sample frequency to %.1fs\n", freq);
 
   nr_cpus = sysconf(_SC_NPROCESSORS_ONLN);
   processor = signature(&n_pmcs);
 
-  /* Close out the standard file descriptors */
-  close(STDIN_FILENO);
-  close(STDOUT_FILENO);
-  close(STDERR_FILENO);
-
-  int enable_all = 1;
-  
-  /* Collect is default and only
-   changes when HUP signal is received. */
-  cmd = cmd_collect;   
-
-  syslog(LOG_INFO, "Start tacc_stats service. Direct data to host %s in queue %s with frequency %f\n", 
-	 host, queue, frequency);
-
-  // Setup rotation handler alarm_action
-  struct sigaction alarm_action = {
-    .sa_handler = &alarm_rotate,
-  };
-  // SIGALRM for auto rotation
-  if (sigaction(SIGALRM, &alarm_action, NULL) < 0) {
-    ERROR("cannot set alarm rotate handler: %m\n");
-    rc = -1;
-    goto out;
-  }
-  // SIGTERM for manual rotation
-  if (sigaction(SIGTERM, &alarm_action, NULL) < 0) {
-    ERROR("cannot set manual rotation handler: %m\n");
-    rc = -1;
-    goto out;
-  }
-  // Set timer to send SIGALRM  (every 24hrs)
-  alarm(86400);
-  
-  FILE *jobfd = fopen(JOBID_FILE_PATH, "w+");
-  if (jobfd == NULL) {
-    ERROR("cannot open %s: %m\n", JOBID_FILE_PATH);
-    goto out;
-  }
-  char *dash = "-\n";
-  if (fwrite(dash, sizeof(char), 2, jobfd) < 2) {
-    ERROR("cannot write to %s: %m\n", JOBID_FILE_PATH);
-    goto out;
-  }
-  fclose(jobfd);
-
-  int ifd, wd;
-  ifd = inotify_init1(IN_NONBLOCK);
-  if (ifd < 0) {
-    ERROR("inotify_init failed: %m\n");
-    rc = -1;
-    goto out;
-  }
-
-  wd = inotify_add_watch(ifd, JOBID_FILE_PATH, IN_CLOSE_WRITE | IN_DELETE_SELF);
-  if ( wd < 0) {
-    ERROR("inotify failed: %m\n");  
-    rc = -1;
-    goto out;
-  }
-  
-  char buffer[EVENT_BUF_LEN];
-  ///////////////////////
-  // START OF MAIN LOOP//
-  ///////////////////////
-  struct timespec timeout = {.tv_sec = (time_t)3600, .tv_nsec = 0};    
-  fd_set descriptors;
-  while(1) {
-    // Block rotate until sample is complete
-    sigprocmask(SIG_BLOCK, &mask, NULL);
-
-    read(ifd, buffer, EVENT_BUF_LEN);
-
-    // If Job ID file was deleted recreate and watch
-    struct inotify_event *event = ( struct inotify_event * ) &buffer[0];
-    if (event->mask & IN_DELETE_SELF) {
-	syslog(LOG_INFO, "Job ID file was deleted.  Write a new one and watch.");
-	FILE *jobfd = fopen(JOBID_FILE_PATH, "w+");
-	fwrite(current_jobid, sizeof(char), sizeof(current_jobid), jobfd);
-	fclose(jobfd);
-	wd = inotify_add_watch(ifd, JOBID_FILE_PATH, IN_CLOSE_WRITE | IN_DELETE_SELF);
-	if ( wd < 0) {
-	  TRACE("inotify failed: %m\n");  
-	}
-    }
-
-    FD_ZERO(&descriptors);
-    FD_SET(ifd, &descriptors);
-    pscanf(JOBID_FILE_PATH, "%79s", new_jobid);
-
-    // Open the data buffer
-    struct stats_buffer sf;
-    if (stats_buffer_open(&sf, host, port, queue) < 0)
-      TRACE("Failed opening data buffer : %m\n");
-
-    if (strcmp(current_jobid, new_jobid) != 0) {            
-      if (strcmp(new_jobid,"-") != 0) {          
-	syslog(LOG_INFO, "Loading jobid %s from %s\n", new_jobid, JOBID_FILE_PATH);	
-	stats_buffer_mark(&sf, "begin %s", new_jobid);
-	strcpy(current_jobid, new_jobid);
-	timeout.tv_sec = frequency; 
-	timeout.tv_nsec = 0;    
-      }
-      else {
-	syslog(LOG_INFO, "Unloading jobid %s from %s\n", current_jobid, JOBID_FILE_PATH);	
-	stats_buffer_mark(&sf, "end %s", current_jobid);
-	timeout.tv_sec = 3600; 
-	timeout.tv_nsec = 0;    
-      }
-      cmd = cmd_reset;
-    }
-    // Get current time
-    gettimeofday(&tp,NULL);
-    current_time = tp.tv_sec+tp.tv_usec/1000000.0;
-
-    size_t i;
-    struct stats_type *type;
-    
-    // collect every enabled type 
-    i = 0;
-    while ((type = stats_type_for_each(&i)) != NULL) {
-      if (enable_all)
-	type->st_enabled = 1;	
-      if (!type->st_enabled)
-	continue;
-      if (stats_type_init(type) < 0) {
-	type->st_enabled = 0;
-	continue;
-      }
-	
-      if ((g_new_flag || cmd == cmd_reset) && type->st_begin != NULL)
-	(*type->st_begin)(type);
-
-      if (type->st_enabled > 0)
-	(*type->st_collect)(type);
-    }
-
-    enable_all = 0;
-
-    // Send header at start.  Causes receiver to rotate files.
-    if (g_new_flag) {
-      if (stats_wr_hdr(&sf) < 0) {
-	ERROR("Rotate signal failed : %m\n");
-	syslog(LOG_INFO, "Sending signal to rotate stats file on host\n");
-      }
-      g_new_flag = 0;
-      // Set timer to wait until signal SIGALRM is sent (rotate every 24 hrs)
-      alarm(86400);
-    }
-
-    // Write data to buffer and ship off node
-    if (stats_buffer_write(&sf) < 0)
-      ERROR("Buffer write and send failed failed : %m\n");
-    stats_buffer_close(&sf);
-
-    // Cleanup
-    i = 0;
-    while ((type = stats_type_for_each(&i)) != NULL)
-      stats_type_destroy(type);
-    cmd = cmd_collect;
-
-    strcpy(current_jobid, new_jobid);      
-    sigprocmask(SIG_UNBLOCK, &mask, NULL);
-
-    // Sleep for timeout
-    pselect(FD_SETSIZE, &descriptors, NULL, NULL, &timeout, NULL);
-  }
+  ev_run(EV_DEFAULT, 0);
 
  out:
-  inotify_rm_watch(ifd, wd);
-  return rc;   
+
+  /* Close log file, when it is used. */
+  if (log_stream != stderr) {
+    fclose(log_stream);
+  }
+
+  /* Write system log and close it. */
+  fprintf(log_stream, "Stopped %s\n", app_name);
+
+  /* Free up names of files */
+  if (conf_file_name != NULL) free(conf_file_name);
+  if (log_file_name != NULL) free(log_file_name);
+  if (pid_file_name != NULL) free(pid_file_name);
+
+  return EXIT_SUCCESS;
 }

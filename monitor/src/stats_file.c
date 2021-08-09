@@ -203,7 +203,7 @@ int stats_file_close(struct stats_file *sf)
   struct utsname uts_buf;
   uname(&uts_buf);
 
-  sf_printf(sf, "\n%f %s %s\n", current_time, current_jobid, uts_buf.nodename);
+  sf_printf(sf, "\n%f %s %s\n", current_time, jobid, uts_buf.nodename);
 
   /* Write mark. */
   if (sf->sf_mark != NULL) {
