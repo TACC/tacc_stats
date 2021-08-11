@@ -1,5 +1,14 @@
 ACLOCAL_AMFLAGS = -I m4
 
+AM_DISTCHECK_CONFIGURE_FLAGS = \
+  --with-systemduserunitdir=$$dc_install_base/$(systemduserunitdir)
+
+if HAVE_SYSTEMD
+systemduserunit_DATA = \
+	taccstats.service \
+	taccstats.conf
+endif
+
 bin_PROGRAMS = tacc_statsd
 
 STATS_DIR_PATH = /var/log/tacc_stats
@@ -162,24 +171,4 @@ stats.o: stats.x
 stats.x: Makefile
 	echo '$(patsubst %.c, X(%),$(sort $(TYPES)))' > $@
 
-if RABBITMQ
-initddir = $(sysconfdir)/rc.d/init.d
-initd_SCRIPTS = taccstats
-sysconf_DATA = tacc_stats.conf
-sysconf_DATA += taccstats.service
-BUILT_SOURCES += taccstats
-nodist_tacc_statsd_SOURCES += \
-	taccstats
-CLEANFILES += $(initd_SCRIPTS) $(sysconfdir_DATA)
-
-do_subst = sed -e 's,@STATS_LOCK_PATH@,$(STATS_LOCK_PATH),g' \
-	-e 's,@SYSCONFDIR@,$(sysconfdir),g' \
-	-e 's,@PREFIX@,$(bindir),g'
-taccstats: taccstats.in Makefile
-	$(do_subst) < taccstats.in > taccstats
-	chmod +x taccstats
-else
-bin_SCRIPTS = archive
-endif
-
-EXTRA_DIST = taccstats.in tacc_stats.conf archive taccstats.service
+EXTRA_DIST = taccstats.conf taccstats.service

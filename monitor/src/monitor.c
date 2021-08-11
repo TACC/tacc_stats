@@ -99,11 +99,12 @@ static void send_stats_buffer(struct stats_buffer *sf) {
   // collect every enabled type 
   i = 0;
   while ((type = stats_type_for_each(&i)) != NULL) {
+    /*
     if (stats_type_init(type) < 0) {
       type->st_enabled = 0;
       continue;
     }
-
+    */
     if (type->st_enabled)
       (*type->st_collect)(type);
   }
@@ -113,14 +114,18 @@ static void send_stats_buffer(struct stats_buffer *sf) {
     ERROR("Buffer write and send failed failed : %m\n");
 
   // Cleanup
+  /*
   i = 0;
   while ((type = stats_type_for_each(&i)) != NULL)
     stats_type_destroy(type);    
+  */
 }
 
 /* Send header with data based on rotate timer interval */
 static void rotate_timer_cb(struct ev_loop *loop, ev_timer *w, int revents) 
 {
+  pscanf(JOBID_FILE_PATH, "%79s", jobid);  
+
   struct stats_buffer sf;
   if (stats_buffer_open(&sf, server, port, queue) < 0)
     TRACE("Failed opening data buffer : %m\n");
@@ -142,12 +147,19 @@ static void rotate_timer_cb(struct ev_loop *loop, ev_timer *w, int revents)
   stats_wr_hdr(&sf);
   send_stats_buffer(&sf);
   stats_buffer_close(&sf);  
+
+  // Cleanup
+  i = 0;
+  while ((type = stats_type_for_each(&i)) != NULL)
+    stats_type_destroy(type);    
 }
 
 
 /* Send data based on ev timer interval */
 static void sample_timer_cb(struct ev_loop *loop, ev_timer *w, int revents) 
 {
+  pscanf(JOBID_FILE_PATH, "%79s", jobid);  
+
   struct stats_buffer sf;
   if (stats_buffer_open(&sf, server, port, queue) < 0)
     TRACE("Failed opening data buffer : %m\n");
@@ -204,11 +216,25 @@ static void fd_cb(EV_P_ ev_io *w, int revents)
 
   strcpy(jobid, new_jobid);
 
+  // Cleanup
+  i = 0;
+  while ((type = stats_type_for_each(&i)) != NULL)
+    stats_type_destroy(type);    
 }
 
 /* Signal Callbacks for SIGINT (terminate) and SIGHUP (reload conf file) */
 static void signal_cb_int(EV_P_ ev_signal *sig, int revents)
 {
+
+  size_t i;
+  struct stats_type *type;
+
+  // Cleanup
+  /*
+  i = 0;
+  while ((type = stats_type_for_each(&i)) != NULL)
+    stats_type_destroy(type);    
+  */
   fprintf(log_stream, "Stopping tacc_statsd\n");
   if (pid_fd != -1) {
     lockf(pid_fd, F_ULOCK, 0);
@@ -236,11 +262,11 @@ static void usage(void)
           "\n"
           "Mandatory arguments to long options are mandatory for short options too.\n"
           "  -h, --help         display this help and exit\n"
-          "  -s [SERVER] or --server [SERVER]       Server to send data.\n"
           "  -c [CONFIGFILE] or --configfile [CONFIGFILE] Configuration file to use.\n"
-          "  -q [QUEUE] or --queue [QUEUE]      Queue to route data to on RMQ server. \n"
-          "  -p [PORT] or --port [PORT]         Port to use (5672 is the default).\n"
-          "  -f [FREQUENCY] or --frequency [FREQUENCY]  Frequency to sample (600 seconds is the default).\n"
+          "  -s [SERVER]     or --server     [SERVER]     Server to send data.\n"
+          "  -q [QUEUE]      or --queue      [QUEUE]      Queue to route data to on RMQ server. \n"
+          "  -p [PORT]       or --port       [PORT]       Port to use (5672 is the default).\n"
+          "  -f [FREQUENCY]  or --frequency  [FREQUENCY]  Frequency to sample (600 seconds is the default).\n"
           ,
           program_invocation_short_name);
 }
@@ -264,7 +290,7 @@ int main(int argc, char *argv[])
   };
 
   int c;
-  while ((c = getopt_long(argc, argv, "hdc:", opts, 0)) != -1) {
+  while ((c = getopt_long(argc, argv, "hdc:s:q:f:p:", opts, 0)) != -1) {
     switch (c) {
     case 'd':
       daemonmode = 1;
@@ -344,13 +370,6 @@ int main(int argc, char *argv[])
   processor = signature(&n_pmcs);
 
   ev_run(EV_DEFAULT, 0);
-
- out:
-
-  /* Close log file, when it is used. */
-  if (log_stream != stderr) {
-    fclose(log_stream);
-  }
 
   /* Write system log and close it. */
   fprintf(log_stream, "Stopped %s\n", app_name);

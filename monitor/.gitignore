@@ -38,3 +38,5 @@ Makefile.in
 /src/Makefile
 /src/tacc_stats
 /src/.deps
+
+*tar.gz

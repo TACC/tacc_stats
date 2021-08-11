@@ -1,7 +1,29 @@
-AC_INIT([tacc_stats], [2.3.4], [rtevans@tacc.utexas.edu])
+AC_INIT([tacc_stats], [2.3.5], [rtevans@tacc.utexas.edu])
 AM_INIT_AUTOMAKE([-Wall -Werror -Wno-portability])
 AC_PROG_CC
 AM_PROG_CC_C_O
+
+AC_ARG_ENABLE([rabbitmq],
+[  --enable-rabbitmq	Build the rabbitmq version (default is true)],
+[case "${enableval}" in
+  yes) AC_SEARCH_LIBS([amqp_new_connection], [rabbitmq], [have_rabbitmq=yes],
+    [AC_MSG_ERROR([Unable to find librabbitmq.so!])])
+    if test "x${have_rabbitmq}" = xyes; then
+       AC_CHECK_HEADERS([amqp.h], [rabbitmq=true],
+       [AC_MSG_ERROR([Unable to find amqp.h!])])
+    fi
+    ;;
+  no)  rabbitmq=false ;;
+  *) AC_MSG_ERROR([bad value ${enableval} for --enable-rabbitmq]) ;;
+esac],
+[AC_SEARCH_LIBS([amqp_new_connection], [rabbitmq], [have_rabbitmq=yes],
+    [AC_MSG_ERROR([Unable to find librabbitmq.so!])])
+    if test "x${have_rabbitmq}" = xyes; then
+       AC_CHECK_HEADERS([amqp.h], [rabbitmq=true],
+       [AC_MSG_ERROR([Unable to find amqp.h!])])
+    fi
+])
+AM_CONDITIONAL([RABBITMQ], [test x$rabbitmq = xtrue])
 
 AC_ARG_ENABLE([hardware],
 [  --enable-hardware	Enable processor hardware counter support (default is true)],
@@ -14,7 +36,7 @@ esac],
 AM_CONDITIONAL([HARDWARE], [test x$hardware = xtrue])
 
 AC_ARG_ENABLE([infiniband],
-[  --enable-infiniband	Enable Infiniband support (must be set to true or false)],
+[  --enable-infiniband	Enable Infiniband support (default is true)],
 [case "${enableval}" in
   yes) AC_SEARCH_LIBS([mad_rpc_open_port], [ibmad], [have_ib=yes], 
     [AC_MSG_ERROR([Unable to find libibmad.so!])])
@@ -106,29 +128,23 @@ esac],
 [debug=false])
 AM_CONDITIONAL([DEBUG], [test x$debug = xtrue])
 
-AC_ARG_ENABLE([rabbitmq],
-[  --enable-rabbitmq	Build the rabbitmq/daemon version (default is false)],
-[case "${enableval}" in
-  yes) rabbitmq=true 
-  AC_SEARCH_LIBS([amqp_new_connection], [rabbitmq], [have_rabbitmq=yes], [have_rabbitmq=no])
-  if test "x${have_rabbitmq}" = xno; then 
-    AC_MSG_ERROR([Unable to find rabbitmq library on this system.  Stopping...])
-  fi
-  if test "x${have_rabbitmq}" =	 xyes; then 
-     AC_CHECK_HEADERS([amqp.h], [], [have_rabbitmq=no])  
-  fi
-  if test "x${have_rabbitmq}" = xno; then 
-    AC_MSG_ERROR([Unable to find rabbitmq headers on this system.  Stopping...])
-  fi
-  ;;
-  no)  rabbitmq=false ;;
-  *) AC_MSG_ERROR([bad value ${enableval} for --enable-rabbitmq]) ;;
-esac],
-[rabbitmq=false])
-AM_CONDITIONAL([RABBITMQ], [test x$rabbitmq = xtrue])
-
 AC_SEARCH_LIBS([ev_run], [ev], [libev=yes], [AC_MSG_ERROR([Failed to find lib libev.so])])
 AC_CHECK_HEADERS([ev.h], [ev=true], [AC_MSG_ERROR([Failed to find header ev.h])])
+
+PKG_PROG_PKG_CONFIG
+AC_ARG_WITH([systemduserunitdir],
+     [AS_HELP_STRING([--with-systemduserunitdir=DIR], [Directory for systemd user service files])],,
+     [with_systemduserunitdir=auto])
+AS_IF([test "x$with_systemduserunitdir" = "xyes" -o "x$with_systemduserunitdir" = "xauto"], [
+     def_systemduserunitdir=$($PKG_CONFIG --variable=systemduserunitdir systemd)
+     AS_IF([test "x$def_systemduserunitdir" = "x"],
+   [AS_IF([test "x$with_systemduserunitdir" = "xyes"],
+    [AC_MSG_ERROR([systemd support requested but pkg-config unable to query systemd package])])
+    with_systemduserunitdir=no],
+   [with_systemduserunitdir="$def_systemduserunitdir"])])
+AS_IF([test "x$with_systemduserunitdir" != "xno"],
+      [AC_SUBST([systemduserunitdir], [$with_systemduserunitdir])])
+AM_CONDITIONAL([HAVE_SYSTEMD], [test "x$with_systemduserunitdir" != "xno"])
 
 AC_CONFIG_FILES([Makefile src/Makefile])
 AC_OUTPUT
