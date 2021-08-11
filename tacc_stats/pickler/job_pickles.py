@@ -114,7 +114,7 @@ class JobPickles:
         acct = [job for job in acct if job['id'] in run_jids]            
 
         if not self.jobids:
-            acct = [job for job in acct if job['nodes']*(job['end_time']-job['start_time']) < 58982400/16.]
+            acct = [job for job in acct if job['nodes']*(job['end_time']-job['start_time'])/3600 < 3000 ]
         ctr = 0
         with open(val_file, "a") as fd:
             for result in self.pool.imap(self.partial_pickle, acct):

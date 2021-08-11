@@ -28,7 +28,7 @@ from tacc_stats.site.machine.agave_auth import check_for_tokens
 #except:
 #pass
 
-"""
+
 racks = set()
 nodes = set()
 hosts = set()
@@ -43,8 +43,8 @@ for host in Host.objects.values_list('name', flat=True).distinct():
 racks = sorted(list(racks))
 nodes = sorted(list(nodes))
 hosts = sorted(list(hosts))
-"""
-"""
+
+
 sys_color = []
 import time
 start = time.time()        
@@ -55,10 +55,10 @@ for rack in racks:
             sys_color += ["#002868"]
         else:
             sys_color += ["lavender"]
-print "sys setup",time.time()-start
+print("sys setup",time.time()-start)
 xrack = [r for rack in racks for r in [rack]*len(nodes)]
 yrack = nodes*len(racks)
- """
+
 def sys_plot(pk):
 
     job = Job.objects.get(id=pk)
@@ -78,6 +78,10 @@ def sys_plot(pk):
             name = str(rack)+'-'+str(node)
             if name in jh: 
                 sys_color[ctr] = ["#bf0a30"] 
+            elif name in hosts:
+                sys_color[ctr] = ["#002868"] 
+            else:
+                sys_color[ctr] = ["lavender"]
             ctr+=1
     print("sys",time.time()-start)
     plot.xaxis.major_label_orientation = "vertical"
@@ -89,12 +93,15 @@ def sys_plot(pk):
 def dates(request, error = False):
     field = {}
     #try:
+    
     if not check_for_tokens(request):
         return HttpResponseRedirect("/login_prompt")
-    field['username'] = request.session['username']
-    field['is_staff'] = request.session['is_staff']
-    field['email'] = request.session['email']
-    field['logged_in'] = True
+    else:
+        field['username'] = request.session['username']
+        field['is_staff'] = request.session['is_staff']
+        field['email'] = request.session['email']
+        field['logged_in'] = True
+    
     #except: pass
 
     job_objects = Job.objects
@@ -124,6 +131,8 @@ def dates(request, error = False):
     return render(request, "machine/search.html", field)
 
 def search(request):
+    if not check_for_tokens(request):
+        return HttpResponseRedirect("/login_prompt")
 
     if 'jobid' in request.GET:
         try:
@@ -141,6 +150,9 @@ def search(request):
     
 
 def index(request, **kwargs):
+
+    if not check_for_tokens(request):
+        return HttpResponseRedirect("/login_prompt")
 
     fields = request.GET.dict()
     fields = { k:v for k, v in fields.items() if v }
@@ -161,9 +173,9 @@ def index(request, **kwargs):
         metrics += [fields['opt_field3']]
         del fields['opt_field3'], fields['value3']
 
-    name = ''
+    qname = ''
     for key, val in fields.items():
-        name += key+'='+val+'\n'
+        qname += key+'='+val+'\n'
 
     order_key = '-id'
     if 'order_key' in fields: 
@@ -178,15 +190,17 @@ def index(request, **kwargs):
             del fields['date']
 
     job_objects = Job.objects
+
     if "is_staff" in request.session and not request.session["is_staff"]:
         job_objects = job_objects.filter(user = request.session["username"])
 
     job_list = job_objects.filter(**fields).distinct().order_by(order_key)
-    fields['name'] =  'Query [fields=values] ' + name.rstrip('-')    
 
-    paginator = Paginator(job_list,100)
+    fields['qname'] =  'Query [fields=values] ' + qname.rstrip('-')    
+
+    paginator = Paginator(job_list, min(100, len(job_list)))
     page = request.GET.get('page')
-    print(page)
+
     try:
         jobs = paginator.page(page)
     except PageNotAnInteger:
@@ -196,11 +210,15 @@ def index(request, **kwargs):
 
     fields['job_list'] = jobs
     fields['nj'] = job_list.count()
-    if metrics:
-        hists = []
-        for m in metrics: hists += [job_hist(job_list, m.split('__')[0], "")]
+
+    hists = []
+    if len(metrics) > 0:        
+        for m in metrics: 
+            try:
+                hists += [job_hist(job_list, m.split('__')[0], "")]
+            except: pass
         fields["script"], fields["div"] = components(gridplot(hists, ncols = len(metrics), plot_height=200, plot_width=400))
-    else:
+    if len(hists) == 0:
         job_list = job_list.annotate(queue_wait = F("start_epoch") - F("queue_time"))
         fields["script"], fields["div"] = components(gridplot([job_hist(job_list, "run_time", "Hours", 
                                                                         scale = 3600),
@@ -237,7 +255,9 @@ def index(request, **kwargs):
         fields['cat_job_list'] = list_to_dict(fields['cat_job_list'],'time_imbalance')
         fields['cpi_job_list'] = list_to_dict(fields['cpi_job_list'],'avg_cpi')
         fields['gigebw_job_list'] = list_to_dict(fields['gigebw_job_list'],'avg_ethbw')
-    
+
+    fields['logged_in'] = True
+
     if '?' in request.get_full_path():
         fields['current_path'] = request.get_full_path()
     return render(request, "machine/index.html", fields)
@@ -251,17 +271,20 @@ def list_to_dict(job_list, metric):
 def job_hist(job_list, value, units, scale = 1.0):
     hover = HoverTool(tooltips = [ ("jobs", "@top"), ("bin", "[@left, @right]") ], point_policy = "snap_to_data")
     TOOLS = ["pan,wheel_zoom,box_zoom,reset,save,box_select", hover]
-    p1 = figure(title = value,
-                toolbar_location = None, plot_height = 400, plot_width = 600, y_axis_type = "log", tools = TOOLS)
-    p1.xaxis.axis_label = units
-    p1.yaxis.axis_label = "# Jobs"
     job_list = job_list.filter(**{value + "__isnull" : False})
     values = array(job_list.values_list(value, flat=True))/scale
     if len(values) == 0: return None
 
     hist, edges = histogram(values,
                             bins = linspace(0, max(values), max(3, 5*log(len(values)))))
+
+    p1 = figure(title = value,
+                toolbar_location = None, plot_height = 400, plot_width = 600, y_range = (1, max(hist)), y_axis_type = "log", tools = TOOLS)
+    p1.xaxis.axis_label = units
+    p1.yaxis.axis_label = "# Jobs"
+
     p1.quad(top = hist, bottom = 1, left = edges[:-1], right = edges[1:])    
+
     return p1
 
 def get_data(pk):
@@ -343,7 +366,20 @@ metric_names = [
 
 class JobDetailView(DetailView):
     model = Job
+
+    def get_queryset(self):
+        queryset = super(JobDetailView, self).get_queryset()
+        if "is_staff" in self.request.session and self.request.session["is_staff"]:
+            return queryset
+        return queryset.filter(user = self.request.session["username"])
+
+    def get(self, request, *args, **kwargs):
+        if not check_for_tokens(self.request):
+            return HttpResponseRedirect("/login_prompt")
+        return super().get(request, *args, **kwargs)
+
     def get_context_data(self, **kwargs):
+
         context = super(JobDetailView, self).get_context_data(**kwargs)
         job = context['job']
         data_host_list = []
@@ -389,11 +425,11 @@ class JobDetailView(DetailView):
                 type_list = sorted(type_list, key = lambda type_name: type_name[0])
                 context['type_list'] = type_list
             data_host_list = data.hosts.keys()
-            """
+            
             script, div = sys_plot(job.id)
             context["script"] = script
             context["div"]    = div
-            """
+            
 
             script, div = master_plot(job.id)
             context["mscript"] = script
@@ -415,10 +451,10 @@ class JobDetailView(DetailView):
                 job.status += h + " "
         context['host_list'] = acct_host_list
 
-        ### Specific to Stampede2 Splunk 
+        ### Specific to TACC Splunk 
         urlstring="https://scribe.tacc.utexas.edu:8000/en-US/app/search/search?q=search%20"
-        hoststring=urlstring+"%20host%3D"+acct_host_list[0]+".frontera.tacc.utexas.edu"
-        serverstring=urlstring+"%20mds*%20OR%20%20oss*"
+        hoststring=urlstring + "%20host%3D" + acct_host_list[0] + cfg.host_name_ext
+        serverstring=urlstring + "%20mds*%20OR%20%20oss*"
         for host in acct_host_list[1:]:
             hoststring+="%20OR%20%20host%3D"+host+"*"
 
@@ -427,9 +463,14 @@ class JobDetailView(DetailView):
         context['client_url'] = hoststring
         context['server_url'] = serverstring
         ###
+        context['logged_in'] = True
+
         return context
 
 def type_detail(request, pk, type_name):
+    if not check_for_tokens(request):
+        return HttpResponseRedirect("/login_prompt")
+
     data = get_data(pk)
 
     schema = build_schema(data,type_name)
@@ -448,9 +489,11 @@ def type_detail(request, pk, type_name):
     return render(request, "machine/type_detail.html",
                   {"type_name" : type_name, "jobid" : pk, 
                    "stats_data" : stats, "schema" : schema,
-                   "tscript" : script, "tdiv" : div})
+                   "tscript" : script, "tdiv" : div, "logged_in" : True})
 
 def proc_detail(request, pk, proc_name):
+    if not check_for_tokens(request):
+        return HttpResponseRedirect("/login_prompt")
 
     data = get_data(pk)
     
@@ -472,4 +515,4 @@ def proc_detail(request, pk, proc_name):
 
     return render(request, "machine/proc_detail.html",
                   {"proc_name" : proc_name, "jobid" : pk, 
-                   "host_map" : host_map, "hwm_unit" : hwm_unit})
+                   "host_map" : host_map, "hwm_unit" : hwm_unit, "logged_in" : True})
