@@ -19,7 +19,7 @@ The tacc_stats package provides the tools to monitor resource usage of HPC syste
 
 The package is split into an `autotools`-based `monitor` subpackage and a Python `setuptools`-based `tacc_stats` subpackage.  `monitor` performs the online data collection and transmission in a production environment while `tacc_stats` performs the data curation and analysis in an offline environment.
 
-Installing `monitor` will build and install an System V service, `/etc/init.d/taccstats`.  This service launches a daemon with an overhead of 3-9% on a single core when configured to sample at a frequency of 1Hz.  It is typically configured to sample at 10 minute intervals, with samples taken at the start and end of every job as well. `tacc_stats` sends the data directly to a RabbitMQ server over the administrative ethernet network.  RabbitMQ must be installed and running on the server in order for the data to be received.
+Building and installing the `tacc_stats-2.3.5-1.el7.x86_64.rpm` package with the `taccstats.spec` file will build and install a systemd service `taccstats`.  This service launches a daemon with an overhead of 3% on a single core when configured to sample at a frequency of 1Hz.  It is typically configured to sample at 5 minute intervals, with samples taken at the start and end of every job as well. The TACC Stats daemon, `tacc_statsd`, is controlled by the `taccstats` service and sends the data directly to a RabbitMQ server over the administrative ethernet network.  RabbitMQ must be installed and running on the server in order for the data to be received.
 
 Installing the `tacc_stats` module will setup a Django-based web application along with tools for extracting the data from the RabbitMQ server and feeding them into a PostgreSQL database.   
 
@@ -40,33 +40,35 @@ First ensure the RabbitMQ library and header file are installed on the build and
 
 [librabbitmq-devel-0.5.2-1.el6.x86_64](ftp://fr2.rpmfind.net/linux/epel/6/x86_64/librabbitmq-devel-0.5.2-1.el6.x86_64.rpm)
 
-`./configure --enable-rabbitmq; make; make install` will then successfully build the `tacc_stats` executable for many systems.  If Xeon Phi coprocessors are present on your system they can be monitored with the `--enable-mic` flag.  Additionally the configuration options, `--disable-infiniband`, `--disable-lustre`, `--disable-hardware` will disable infiniband, Lustre Filesystem, and Hardware Counter monitoring which are all enabled by default.  Not enabling RabbitMQ will result in a legacy build of `tacc_stats` that relies on the shared filesystem to transmit data.  This mode is not recommended.  If libraries or header files are not found than add their paths to the include and library paths with the `CPPFLAGS` and/or `LDFLAGS` vars as is standard in autoconf based installations.  
+`./configure; make; make install` will then successfully build the `tacc_statsd` executable for many systems.  If Xeon Phi coprocessors are present on your system they can be monitored with the `--enable-mic` flag.  Additionally the configuration options, `--disable-infiniband`, `--disable-lustre`, `--disable-hardware` will disable infiniband, Lustre Filesystem, and Hardware Counter monitoring which are all enabled by default. Disabling RabbitMQ will result in a legacy build of `tacc_statsd` that relies on the shared filesystem to transmit data.  This mode is not recommended and currently used for testing purposes only.  If libraries or header files are not found than add their paths to the include and library paths with the `CPPFLAGS` and/or `LDFLAGS` vars as is standard in autoconf based installations.  
 
-There will be a configuration file, `/etc/tacc_stats.conf`, after installation.  This file contains the fields
+There will be a configuration file, `/etc/taccstats/taccstats.conf`, after installation.  This file contains the fields
 
-`SERVER=localhost`
+`server localhost`
 
-`QUEUE=default`
+`queue default`
 
-`PORT=5672`
+`port 5672`
 
-`FREQ=600`
+`freq 600`
 
 
-`SERVER` should be set to the RabbitMQ server, `QUEUE` to the system name, `PORT` to the RabbitMQ port (5672 should be ok), and `FREQ` to the desired sampling frequency in seconds.
+`server` should be set to the hostname or IP hosting the RabbitMQ server, `queue` to the system/cluster name that is being monitored, `port` to the RabbitMQ port (5672 is default), and `freq` to the desired sampling frequency in seconds. The file and settings can be reloaded into a running `tacc_statsd` daemon with a SIGHUP signal.
 
-An RPM can be built for subpackage deployment using  the `tacc_statsd_systemv.spec` file.  The most straightforward approach to build this is to setup your rpmbuild directory then run
+An RPM can be built for deployment using  the `taccstats.spec` file.  The most straightforward approach to build this is to setup your rpmbuild directory then run
 
-`rpmbuild -ba tacc_statsd_systemv.spec --define 'rmqserver rabbitmqservername' --define 'system systemname'`
+`rpmbuild -bb taccstats.spec`
 
-where the `rmqserver` will be the RabbitMQ `SERVER` hostname and `system` will be the RabbitMQ `QUEUE` the data is sent to. 
-Configuration options may have to be changed within the `tacc_statsd_systemv.spec` file.
+The `taccstats.spec` file `sed`s the `taccstats.conf` file to the correct server and queue. These can be changed by modifying these two lines 
 
-After installation the executable `/opt/tacc_statsd/tacc_stats` and SystemV service file `/etc/systemd/system/taccstats.service`, should exist.  If the rpm was used for installation `taccstats` will be `enable`'d to start at boot time and be restart within 10 seconds if it fails for any reason.
-`tacc_stats` can be started, stopped, and restarted using `systemctl start taccstats`, `systemctl stop taccstats`, and `systemctl restart taccstats`.
+`sed -i 's/localhost/stats.frontera.tacc.utexas.edu/' src/taccstats.conf`
 
-In order to notify `tacc_stats` of a job beginning echo the job id into `/var/run/TACC_jobid`.  It order to notify
-it of a job ending echo `-` into `/var/run/TACC_jobid`.  This can be accomplished in the job scheduler prolog and
+`sed -i 's/default/frontera/' src/taccstats.conf`
+
+`tacc_statsd` can be started, stopped, and restarted using `systemctl start taccstats`, `systemctl stop taccstats`, and `systemctl restart taccstats`.
+
+In order to notify `tacc_stats` of a job beginning, echo the job id into `/var/run/TACC_jobid` on each node where the job is running.  It order to notify
+it of a job ending echo `-` into `/var/run/TACC_jobid` on each node where the job is running.  This can be accomplished in the job scheduler prolog and
 epilog for example.
 
 #### Job Scheduler Configuration
