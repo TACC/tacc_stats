@@ -79,13 +79,14 @@ int read_conf_file()
       fprintf(log_stream, "%s: Setting server port to %s based on file %s\n",
 	      app_name, port, conf_file_name);
     }
-    if (strcmp(key, "frequency") == 0) {  
+    if (strcmp(key, "freq") == 0) {  
       if (sscanf(line, "%lf", &freq) == 1)
 	fprintf(log_stream, "%s: Setting frequency to %f based on file %s\n",
 		app_name, freq, conf_file_name);
     }
   }
-
+  if (line_buf)
+    free (line_buf);
   fclose(conf_file_fd);
 
   return ret;
@@ -99,26 +100,14 @@ static void send_stats_buffer(struct stats_buffer *sf) {
   // collect every enabled type 
   i = 0;
   while ((type = stats_type_for_each(&i)) != NULL) {
-    /*
-    if (stats_type_init(type) < 0) {
-      type->st_enabled = 0;
-      continue;
-    }
-    */
-    if (type->st_enabled)
+    if (type->st_enabled) {    
       (*type->st_collect)(type);
+    }
   }
 
   // Write data to buffer and ship off node
   if (stats_buffer_write(sf) < 0)
     ERROR("Buffer write and send failed failed : %m\n");
-
-  // Cleanup
-  /*
-  i = 0;
-  while ((type = stats_type_for_each(&i)) != NULL)
-    stats_type_destroy(type);    
-  */
 }
 
 /* Send header with data based on rotate timer interval */
@@ -130,9 +119,15 @@ static void rotate_timer_cb(struct ev_loop *loop, ev_timer *w, int revents)
   if (stats_buffer_open(&sf, server, port, queue) < 0)
     TRACE("Failed opening data buffer : %m\n");
 
-  // test if stats type available 
   size_t i;
-  struct stats_type *type;    
+  struct stats_type *type;  
+
+  // Cleanup
+  i = 0;
+  while ((type = stats_type_for_each(&i)) != NULL)
+    stats_type_destroy(type);    
+  
+  // Initialize
   i = 0;
   while ((type = stats_type_for_each(&i)) != NULL) {
     type->st_enabled = 1;
@@ -147,11 +142,6 @@ static void rotate_timer_cb(struct ev_loop *loop, ev_timer *w, int revents)
   stats_wr_hdr(&sf);
   send_stats_buffer(&sf);
   stats_buffer_close(&sf);  
-
-  // Cleanup
-  i = 0;
-  while ((type = stats_type_for_each(&i)) != NULL)
-    stats_type_destroy(type);    
 }
 
 
@@ -196,10 +186,16 @@ static void fd_cb(EV_P_ ev_io *w, int revents)
     }
     ev_timer_again(EV_DEFAULT, &sample_timer);
   }
-  
-  // test if stats type available 
+
   size_t i;
   struct stats_type *type;    
+
+  // Cleanup
+  i = 0;
+  while ((type = stats_type_for_each(&i)) != NULL)
+    stats_type_destroy(type);    
+  
+  // Initialize
   i = 0;
   while ((type = stats_type_for_each(&i)) != NULL) {
     type->st_enabled = 1;
@@ -216,25 +212,21 @@ static void fd_cb(EV_P_ ev_io *w, int revents)
 
   strcpy(jobid, new_jobid);
 
-  // Cleanup
-  i = 0;
-  while ((type = stats_type_for_each(&i)) != NULL)
-    stats_type_destroy(type);    
+
 }
 
 /* Signal Callbacks for SIGINT (terminate) and SIGHUP (reload conf file) */
 static void signal_cb_int(EV_P_ ev_signal *sig, int revents)
 {
-
   size_t i;
-  struct stats_type *type;
+  struct stats_type *type;    
 
   // Cleanup
-  /*
   i = 0;
   while ((type = stats_type_for_each(&i)) != NULL)
     stats_type_destroy(type);    
-  */
+
+
   fprintf(log_stream, "Stopping tacc_statsd\n");
   if (pid_fd != -1) {
     lockf(pid_fd, F_ULOCK, 0);

@@ -99,6 +99,12 @@ processor_t signature(int *n_pmcs) {
       TRACE("Number of PMCs = %d\n", *n_pmcs);
       return AMD_17H;
     }
+    if (strncmp(sig, "8f_49", 5) == 0) {
+      TRACE("AMD_17H %s\n", sig);
+      *n_pmcs = 6;
+      TRACE("Number of PMCs = %d\n", *n_pmcs);
+      return AMD_17H;
+    }
     if (strncmp(sig, "af_1", 5) == 0) {
       TRACE("AMD_19H %s\n", sig);
       *n_pmcs = 6;
