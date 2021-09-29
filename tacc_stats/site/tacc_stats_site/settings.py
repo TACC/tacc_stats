@@ -16,11 +16,11 @@ MANAGERS = ADMINS
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql_psycopg2',
-        'NAME'  : cfg.machine + '_db',
-        'USER': 'taccstats',
+        'NAME'  : 'taccstats',
+        'USER'  : 'postgres',
         'PASSWORD': 'taccstats',
         'HOST': 'localhost',         
-        'PORT': '5432',               
+        'PORT': '5433',               
         },
     # Uncomment this portion if an xalt database exists
     'xalt' : {

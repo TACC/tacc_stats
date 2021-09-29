@@ -9,7 +9,7 @@ import os,sys,pwd
 import pickle as p
 
 from tacc_stats.analysis.metrics import metrics
-from tacc_stats.site.machine.models import Job, Host, Libraries
+from tacc_stats.site.machine.models import job_data
 from tacc_stats.site.xalt.models import run, join_run_object, lib
 import tacc_stats.cfg as cfg
 import tacc_stats.analysis.plot as plots
@@ -17,21 +17,28 @@ import tacc_stats.analysis.plot as plots
 from datetime import datetime, timedelta
 
 from numpy import array, histogram, log, linspace
+from pandas import DataFrame
 
 from bokeh.embed import components
 from bokeh.layouts import gridplot
 from bokeh.plotting import figure
 from bokeh.models import HoverTool
-
+import time
 #try:
 from tacc_stats.site.machine.agave_auth import check_for_tokens
 #except:
 #pass
 
+import psycopg2
+from pandas import DataFrame, read_sql, to_timedelta
+
+CONNECTION = "dbname=taccstats host=localhost user=postgres port=5433"
+conn = psycopg2.connect(CONNECTION)
 
 racks = set()
 nodes = set()
 hosts = set()
+"""
 for host in Host.objects.values_list('name', flat=True).distinct():
     try:
         r, n = host.split('-')
@@ -40,13 +47,13 @@ for host in Host.objects.values_list('name', flat=True).distinct():
     except:
         pass
     hosts.update({host})
+"""
 racks = sorted(list(racks))
 nodes = sorted(list(nodes))
 hosts = sorted(list(hosts))
 
-
 sys_color = []
-import time
+
 start = time.time()        
 for rack in racks:
     for node in nodes:
@@ -59,10 +66,7 @@ print("sys setup",time.time()-start)
 xrack = [r for rack in racks for r in [rack]*len(nodes)]
 yrack = nodes*len(racks)
 
-def sys_plot(pk):
-
-    job = Job.objects.get(id=pk)
-    jh = job.host_set.all().values_list('name', flat=True).distinct()
+def sys_plot(jh):
 
     hover = HoverTool(tooltips = [ ("host", "@x-@y") ])
     plot = figure(title = "System Plot", tools = [hover], 
@@ -70,8 +74,6 @@ def sys_plot(pk):
                   x_range = racks, y_range = nodes, 
                   plot_height = 800, plot_width = 1000)
 
-    import time
-    start = time.time()
     ctr = 0
     for rack in racks:
         for node in nodes:
@@ -82,18 +84,16 @@ def sys_plot(pk):
                 sys_color[ctr] = ["#002868"] 
             else:
                 sys_color[ctr] = ["lavender"]
-            ctr+=1
-    print("sys",time.time()-start)
+            ctr += 1
     plot.xaxis.major_label_orientation = "vertical"
-    plot.rect(xrack, yrack, 
-              color = sys_color, width = 1, height = 1)    
+    plot.rect(xrack, yrack, color = sys_color, width = 1, height = 1)    
 
-    return components(plot)
+    return plot
 
-def dates(request, error = False):
+def home(request, error = False):
     field = {}
     #try:
-    
+    """
     if not check_for_tokens(request):
         return HttpResponseRedirect("/login_prompt")
     else:
@@ -103,42 +103,40 @@ def dates(request, error = False):
         field['logged_in'] = True
     
     #except: pass
-
-    job_objects = Job.objects
+    """
+    """
+    job_objects = job_data.objects
     if "is_staff" in request.session and not request.session["is_staff"]:
         job_objects = job_objects.filter(user = request.session["username"])
+    """
 
     month_dict ={}
-    date_list = job_objects.exclude(date = None).exclude(date__lt = datetime.today() - timedelta(days = 90)).values_list('date',flat=True).distinct()
-
-    for date in sorted(date_list):
-        y,m,d = date.strftime('%Y-%m-%d').split('-')
-        key = y+'-'+m
-        month_dict.setdefault(key, [])
-        month_dict[key].append((y+'-'+m+'-'+d, d))
+    date_list = DataFrame(job_data.objects.values("end_time"))["end_time"].dt.date.drop_duplicates()
+    print(date_list)
+    
+    for date in date_list.sort_values():
+        y, m, d = str(date.year), str(date.month), str(date.day)
+        month_dict.setdefault(y + '-' + m, [])
+        month_dict[y + '-' + m].append((str(date), d))
 
     field["machine_name"] = cfg.host_name_ext
-
-    field['md_job_list'] = job_objects.filter(date__gt = datetime.today() - timedelta(days = 5)).exclude(avg_openclose__isnull = True ).annotate(io = ExpressionWrapper(F('avg_openclose')*F('nodes'), output_field = FloatField())).order_by('-io')
-
-    try:
-        field['md_job_list'] = field['md_job_list'][0:10]
-    except: pass    
-    field['md_job_list'] = list_to_dict(field['md_job_list'],'io')
-
     field['date_list'] = sorted(month_dict.items())[::-1]
     field['error'] = error
     return render(request, "machine/search.html", field)
 
 def search(request):
+    """
     if not check_for_tokens(request):
         return HttpResponseRedirect("/login_prompt")
-
+5B    """
+    print("SEARCH",request.GET)
     if 'jobid' in request.GET:
         try:
-            job_objects = Job.objects
+            job_objects = job_data.objects
+            """
             if "is_staff" in request.session and not request.session["is_staff"]:
                 job_objects = job_objects.filter(user = request.session["username"])
+            """
             job = job_objects.get(id = request.GET['jobid'])
             return HttpResponseRedirect("/machine/job/"+str(job.id)+"/")
         except: pass
@@ -146,14 +144,14 @@ def search(request):
         return index(request)
     except: pass
 
-    return dates(request, error = True)
+    return home(request, error = True)
     
 
 def index(request, **kwargs):
-
+    """
     if not check_for_tokens(request):
         return HttpResponseRedirect("/login_prompt")
-
+    """
     fields = request.GET.dict()
     fields = { k:v for k, v in fields.items() if v }
     fields.update(kwargs)
@@ -181,23 +179,23 @@ def index(request, **kwargs):
     if 'order_key' in fields: 
         order_key = fields['order_key']
         del fields['order_key']
-        
-    if "date" in fields: 
-        date = fields['date'].split('-')
-        if len(date) == 2:
-            fields['date__year'] = date[0]
-            fields['date__month'] = date[1]
-            del fields['date']
 
-    job_objects = Job.objects
+    job_objects = job_data.objects
 
+    """
     if "is_staff" in request.session and not request.session["is_staff"]:
         job_objects = job_objects.filter(user = request.session["username"])
+    """
 
-    job_list = job_objects.filter(**fields).distinct().order_by(order_key)
+    if "date" in fields:
+        fields["end_time__date"] = fields["date"]
+        del fields["date"]
+    print(fields)
+    job_list = job_objects.filter(**fields)
 
     fields['qname'] =  'Query [fields=values] ' + qname.rstrip('-')    
 
+    ### Pagination
     paginator = Paginator(job_list, min(100, len(job_list)))
     page = request.GET.get('page')
 
@@ -210,56 +208,26 @@ def index(request, **kwargs):
 
     fields['job_list'] = jobs
     fields['nj'] = job_list.count()
+    ###
 
-    hists = []
-    if len(metrics) > 0:        
-        for m in metrics: 
-            try:
-                hists += [job_hist(job_list, m.split('__')[0], "")]
-            except: pass
-        fields["script"], fields["div"] = components(gridplot(hists, ncols = len(metrics), plot_height=200, plot_width=400))
-    if len(hists) == 0:
-        job_list = job_list.annotate(queue_wait = F("start_epoch") - F("queue_time"))
-        fields["script"], fields["div"] = components(gridplot([job_hist(job_list, "run_time", "Hours", 
-                                                                        scale = 3600),
-                                                               job_hist(job_list, "nodes", "# Nodes"),
-                                                               job_hist(job_list, "queue_wait", "Hours", 
-                                                                        scale = 3600),
-                                                               job_hist(job_list, "avg_openclose", "iops")], 
-                                                            ncols = 2,
-                                                              plot_width = 400, plot_height = 200))
-
-    # Computed Metrics    
-    job_list = job_list.filter(run_time__gt = 600).exclude(queue__in = ["development"])
-    fields['cat_job_list']  = job_list.filter(Q(time_imbalance__lte = 0.001) | \
-                                              Q(time_imbalance__gte = 1000)).exclude(time_imbalance = float('nan'))
-
-    completed_list = job_list.exclude(status__in=['CANCELLED','FAILED']).order_by('-id')
-    if len(completed_list) > 0:
-        fields['md_job_list'] = job_list.exclude(avg_openclose__isnull = True ).order_by('-avg_openclose')
-        try:
-            fields['md_job_list'] = fields['md_job_list'][0:10]
-        except: pass
-
-        fields['idle_job_list'] = completed_list.filter(node_imbalance__gte = 0.99)
-        fields['cpu_job_list'] = completed_list.filter(avg_cpuusage__lte = 10)
-        fields['cpi_thresh'] = 3.0
-        fields['cpi_job_list']  = completed_list.exclude(avg_cpi = float('nan')).filter(avg_cpi__gte = fields['cpi_thresh'])
-        fields['cpi_per'] = 100*fields['cpi_job_list'].count()/float(completed_list.count())
-
-        fields['gigebw_thresh'] = 1
-        fields['gigebw_job_list']  = completed_list.exclude(avg_ethbw = float('nan')).filter(avg_ethbw__gte = fields['gigebw_thresh'])
-
-        fields['md_job_list'] = list_to_dict(fields['md_job_list'],'avg_openclose')
-        fields['idle_job_list'] = list_to_dict(fields['idle_job_list'],'node_imbalance')
-        fields['cat_job_list'] = list_to_dict(fields['cat_job_list'],'time_imbalance')
-        fields['cpi_job_list'] = list_to_dict(fields['cpi_job_list'],'avg_cpi')
-        fields['gigebw_job_list'] = list_to_dict(fields['gigebw_job_list'],'avg_ethbw')
+    ### Histograms
+    df = DataFrame(job_list.values("start_time", "submit_time", "runtime", "nhosts"))
+    df["queue_wait"] = to_timedelta(df["start_time"] - df["submit_time"]).dt.total_seconds()/3600
+    df["runtime"] = df["runtime"]/3600.  
+    
+    plots = []
+    for metric, label in [("runtime", "hours"), ("nhosts", "#nodes"), ("queue_wait", "hours")]:
+        plots += [job_hist(df, metric, label)]        
+    fields["script"], fields["div"] = components(gridplot(plots, ncols = 2))
+    ###
 
     fields['logged_in'] = True
 
     if '?' in request.get_full_path():
         fields['current_path'] = request.get_full_path()
+
+    print(fields['job_list'])
+        
     return render(request, "machine/index.html", fields)
 
 def list_to_dict(job_list, metric):
@@ -268,42 +236,23 @@ def list_to_dict(job_list, metric):
         job_dict.setdefault(job.user,[]).append((job.id,round(job.__dict__[metric],3)))
     return job_dict
     
-def job_hist(job_list, value, units, scale = 1.0):
+def job_hist(df, metric, label):
     hover = HoverTool(tooltips = [ ("jobs", "@top"), ("bin", "[@left, @right]") ], point_policy = "snap_to_data")
     TOOLS = ["pan,wheel_zoom,box_zoom,reset,save,box_select", hover]
-    job_list = job_list.filter(**{value + "__isnull" : False})
-    values = array(job_list.values_list(value, flat=True))/scale
+
+    values = list(df[metric].values)
     if len(values) == 0: return None
 
-    hist, edges = histogram(values,
-                            bins = linspace(0, max(values), max(3, 5*log(len(values)))))
+    hist, edges = histogram(values, bins = linspace(0, max(values), max(3, 5*log(len(values)))))
 
-    p1 = figure(title = value,
-                toolbar_location = None, plot_height = 400, plot_width = 600, y_range = (1, max(hist)), y_axis_type = "log", tools = TOOLS)
-    p1.xaxis.axis_label = units
-    p1.yaxis.axis_label = "# Jobs"
+    plot = figure(title = metric, toolbar_location = None, plot_height = 400, plot_width = 600, 
+                  y_range = (1, max(hist)), y_axis_type = "log", tools = TOOLS)
+    plot.xaxis.axis_label = label
+    plot.yaxis.axis_label = "# jobs"
 
-    p1.quad(top = hist, bottom = 1, left = edges[:-1], right = edges[1:])    
+    plot.quad(top = hist, bottom = 1, left = edges[:-1], right = edges[1:])    
 
-    return p1
-
-def get_data(pk):
-    if cache.has_key(pk):
-        data = cache.get(pk)
-    else:
-        job = Job.objects.get(pk = pk)
-        with open(os.path.join(cfg.pickles_dir, 
-                               job.date.strftime('%Y-%m-%d'), 
-                               str(job.id)), 'rb') as fd:
-            try: data = p.load(fd)
-            except: data = p.load(fd, encoding = 'latin1') # Python2 compatibility
-            cache.set(job.id, data)
-    return data
-
-def master_plot(pk):
-    data = get_data(pk)
-    mp = plots.MasterPlot()
-    return components(mp.plot(data))
+    return plot
 
 def heat_map(pk):    
     data = get_data(pk)
@@ -364,33 +313,88 @@ metric_names = [
     "avg_gpuutil [%/node]"
 ]
 
-class JobDetailView(DetailView):
-    model = Job
+class job_dataDetailView(DetailView):
+    model = job_data
 
     def get_queryset(self):
-        queryset = super(JobDetailView, self).get_queryset()
+        queryset = super(job_dataDetailView, self).get_queryset()
+        return queryset
+        """
         if "is_staff" in self.request.session and self.request.session["is_staff"]:
             return queryset
         return queryset.filter(user = self.request.session["username"])
-
+        """
     def get(self, request, *args, **kwargs):
+        """
         if not check_for_tokens(self.request):
             return HttpResponseRedirect("/login_prompt")
+        """
         return super().get(request, *args, **kwargs)
 
     def get_context_data(self, **kwargs):
 
-        context = super(JobDetailView, self).get_context_data(**kwargs)
-        job = context['job']
-        data_host_list = []
+        context = super(job_dataDetailView, self).get_context_data(**kwargs)
+        job = context['job_data']
+
+        # Get job accounting data
+        acct_data = read_sql("""select * from job_data where jid = '{0}'""".format(job.jid), conn)
+        # job_data accounting host names must be converted to fqdn
+        acct_host_list = [h + '.' + cfg.host_name_ext for h in acct_data["host_list"].values[0]]
+        
+        start_time = acct_data["start_time"].dt.tz_convert('US/Central').dt.tz_localize(None).values[0]
+        end_time = acct_data["end_time"].dt.tz_convert('US/Central').dt.tz_localize(None).values[0]
+        
+        # Get stats data and use accounting data to narrow down query
+        qtime = time.time()
+        sql = """drop table if exists job_detail; select * into temp job_detail from host_data where time between '{1}' and '{2}' and jid = '{0}'""".format(job.jid, start_time, end_time)
+        print(sql)
+
+        conj = psycopg2.connect(CONNECTION)
+        with conj.cursor() as cur:
+            cur.execute(sql)
+        print("query time: {0:.1f}".format(time.time()-qtime))
+        
+        # Compare accounting host list to stats host list
+        htime = time.time()
+        data_host_list = set(read_sql("select distinct on(host) host from job_detail;", conj)["host"].values)
+        if len(data_host_list) == 0: return context
+        print("host selection time: {0:.1f}".format(time.time()-htime))
+
+        miss_host_list = set(acct_host_list) - data_host_list
+        if len(miss_host_list):
+            job.state += " " + str(len(miss_host_list)) + " hosts' data missing: "
+            for h in miss_host_list: job.state += h + " "
+        context['host_list'] = acct_host_list
+
+        # Build Summary Plot
+        ptime = time.time()
+        sp = plots.SummaryPlot(conj, data_host_list)
+        context["mscript"], context["mdiv"] = components(sp.plot())
+        print("plot time: {0:.1f}".format(time.time()-ptime))
+
+        llite_rw = read_sql("select event, sum(diff)/(1024*1024) as diff from job_detail where type = 'llite' \
+        and event in ('read_bytes', 'write_bytes') group by event", conj)
+        context['fsio'] = { "llite" : [ llite_rw[llite_rw["event"] == "read_bytes"]["diff"].values[0],  
+                                        llite_rw[llite_rw["event"] == "write_bytes"]["diff"].values[0] ] }
+        conj.close()
+
+        #etime = time.time()
+        #schema = list(set(job_df[["type", "event"]].apply(tuple, axis = 1)))
+        #print("schema time: {0:.1f}".format(time.time()-etime))
+        #print(schema)
+
+
         try:
-            data = get_data(job.id)
             # Prepare metrics        
             metric_dict = {}
             for name in metric_names:
                 val = getattr(job, name.split(' ')[0])
                 if val: metric_dict[name] = val
                 context['metric_dict'] = metric_dict                
+        except:
+            print("metrics not computed yet")
+                
+        """
             # Prepare process names
             proc_list = []
             for host_name, host in data.hosts.items():
@@ -426,31 +430,13 @@ class JobDetailView(DetailView):
                 context['type_list'] = type_list
             data_host_list = data.hosts.keys()
             
-            script, div = sys_plot(job.id)
-            context["script"] = script
-            context["div"]    = div
-            
-
-            script, div = master_plot(job.id)
-            context["mscript"] = script
-            context["mdiv"]    = div
-
             """
-            script, div = heat_map(job.id)
-            context["hscript"] = script
-            context["hdiv"]    = div
-            """
-        except:
-            print("data missing for ", job.id)
 
-        acct_host_list = job.host_set.all().values_list('name', flat=True).distinct()
-        hosts_missing = set(acct_host_list) - set(data_host_list)
-        if len(hosts_missing):
-            job.status += " " + str(len(hosts_missing)) + " hosts' data missing: "
-            for h in hosts_missing:
-                job.status += h + " "
-        context['host_list'] = acct_host_list
 
+
+        context["script"], context["div"] = components(sys_plot(data_host_list))
+
+        
         ### Specific to TACC Splunk 
         urlstring="https://scribe.tacc.utexas.edu:8000/en-US/app/search/search?q=search%20"
         hoststring=urlstring + "%20host%3D" + acct_host_list[0] + cfg.host_name_ext
@@ -458,8 +444,8 @@ class JobDetailView(DetailView):
         for host in acct_host_list[1:]:
             hoststring+="%20OR%20%20host%3D"+host+"*"
 
-        hoststring+="&earliest="+str(job.start_epoch)+"&latest="+str(job.end_epoch)+"&display.prefs.events.count=50"
-        serverstring+="&earliest="+str(job.start_epoch)+"&latest="+str(job.end_epoch)+"&display.prefs.events.count=50"
+        hoststring+="&earliest="+str(job.start_time)+"&latest="+str(job.end_time)+"&display.prefs.events.count=50"
+        serverstring+="&earliest="+str(job.start_time)+"&latest="+str(job.end_time)+"&display.prefs.events.count=50"
         context['client_url'] = hoststring
         context['server_url'] = serverstring
         ###
@@ -468,9 +454,10 @@ class JobDetailView(DetailView):
         return context
 
 def type_detail(request, pk, type_name):
+    """
     if not check_for_tokens(request):
         return HttpResponseRedirect("/login_prompt")
-
+    """
     data = get_data(pk)
 
     schema = build_schema(data,type_name)
@@ -492,9 +479,10 @@ def type_detail(request, pk, type_name):
                    "tscript" : script, "tdiv" : div, "logged_in" : True})
 
 def proc_detail(request, pk, proc_name):
+    """
     if not check_for_tokens(request):
         return HttpResponseRedirect("/login_prompt")
-
+    """
     data = get_data(pk)
     
     host_map = {}

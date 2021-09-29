@@ -11,9 +11,9 @@ logger = logging.getLogger('logger')
 
 with open("/home1/02561/rtevans/.agave/current", 'r') as fd:
     data = json.load(fd)
-client_key = data["apikey"]
-client_secret = data["apisecret"]
-tenant_base_url = data["baseurl"]
+client_key = data["result"]["consumerKey"]
+client_secret = data["result"]["consumerSecret"]
+tenant_base_url = "https://api.tacc.utexas.edu"
 
 def get_request():
     """Walk up the stack, return the nearest first argument named "request"."""
@@ -90,7 +90,7 @@ def login(request):
 
 def logout(request):
 
-    redirect_uri = 'http://{}{}'.format(request.get_host(), reverse('agave_oauth_callback'))
+    redirect_uri = 'https://{}{}'.format(request.get_host(), reverse('agave_oauth_callback'))
 
     body = {
         'token': request.session['access_token'],
@@ -113,7 +113,9 @@ def login_oauth(request):
     session = request.session
     session['auth_state'] = os.urandom(24).hex()
 
-    redirect_uri = 'http://{}{}'.format(request.get_host(), reverse('agave_oauth_callback'))
+    host = "stats.frontera.tacc.utexas.edu"
+    redirect_uri = 'https://{}{}'.format(request.get_host(), reverse('agave_oauth_callback'))
+
     authorization_url = (
         '%s/authorize?client_id=%s&response_type=code&redirect_uri=%s&state=%s' %(
             tenant_base_url,
@@ -132,7 +134,7 @@ def agave_oauth_callback(request):
         return HttpResponseBadRequest('Authorization state failed.')
 
     if 'code' in request.GET:
-        redirect_uri = 'http://{}{}'.format(request.get_host(),
+        redirect_uri = 'https://{}{}'.format(request.get_host(),
             reverse('agave_oauth_callback'))
         code = request.GET['code']
         redirect_uri = redirect_uri
