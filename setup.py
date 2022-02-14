@@ -49,7 +49,7 @@ setup(
     package_data = {'tacc_stats' : ['cfg.py']},
     include_package_data = True,
     scripts = scripts,
-    install_requires = ['argparse','numpy','matplotlib', 'psycopg2-binary',
+    install_requires = ['argparse','numpy', 'psycopg2-binary', 'pandas',
                         'bokeh', 'django', 'python-hostlist', 'PyMySQL', 'mod_wsgi',
                         'mysql-connector-python', 'python-memcached', 'pika', 'mysqlclient'],
     platforms = 'any',

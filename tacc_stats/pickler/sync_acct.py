@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 import os,sys,time
 from datetime import timedelta, datetime
 
@@ -8,7 +8,7 @@ from pgcopy import CopyManager
 from pandas import read_sql, read_csv, to_datetime, to_timedelta, concat
 import hostlist
 
-CONNECTION = "dbname=taccstats user=postgres port=5433"
+CONNECTION = "dbname=ls6_db user=postgres port=5432"
 
 query_create_jobdata_table = """CREATE TABLE IF NOT EXISTS job_data (
 jid         VARCHAR(32) NOT NULL,
@@ -157,7 +157,7 @@ if __name__ == "__main__":
 
         # Parse and convert raw stats files to pandas dataframe
         start = time.time()
-        directory = "/scratch1/projects/tacc/tacc_stats/frontera/accounting"
+        directory = "/tacc_stats_site/ls6/accounting"
         
         while startdate <= enddate:            
             for entry in os.scandir(directory):

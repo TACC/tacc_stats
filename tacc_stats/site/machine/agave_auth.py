@@ -8,12 +8,15 @@ import logging
 logging.basicConfig()
 logger = logging.getLogger('logger')
 
+try:
+    with open("/home1/02561/rtevans/.agave/current", 'r') as fd:
+        data = json.load(fd)
 
-with open("/home1/02561/rtevans/.agave/current", 'r') as fd:
-    data = json.load(fd)
-client_key = data["result"]["consumerKey"]
-client_secret = data["result"]["consumerSecret"]
-tenant_base_url = "https://api.tacc.utexas.edu"
+    client_key = data["result"]["consumerKey"]
+    client_secret = data["result"]["consumerSecret"]
+    tenant_base_url = "https://api.tacc.utexas.edu"
+except:
+    pass
 
 def get_request():
     """Walk up the stack, return the nearest first argument named "request"."""

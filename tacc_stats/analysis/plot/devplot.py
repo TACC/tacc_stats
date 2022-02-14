@@ -1,55 +1,71 @@
-import sys
-from tacc_stats.analysis.gen import utils
-
+#!/usr/bin/env python3
+import psycopg2
+import os, sys, stat
+from multiprocessing import Pool
+from datetime import datetime, timedelta
+import time, string
+from pandas import DataFrame, to_datetime, Timedelta, concat, read_sql
+import pandas
 from bokeh.palettes import d3
 from bokeh.layouts import gridplot
-from bokeh.models import HoverTool, ColumnDataSource, Plot, Grid, DataRange1d, LinearAxis
+from bokeh.models import HoverTool, ColumnDataSource, Range1d
 from bokeh.models.glyphs import Step
-import numpy 
+from bokeh.plotting import figure
 
 class DevPlot():
 
-  def add_axes(self, plot, label):
-    xaxis = LinearAxis()
-    yaxis = LinearAxis()      
-    yaxis.axis_label = label
-    plot.add_layout(xaxis, 'below')        
-    plot.add_layout(yaxis, 'left')
-    plot.add_layout(Grid(dimension=0, ticker=xaxis.ticker))
-    plot.add_layout(Grid(dimension=1, ticker=yaxis.ticker))
+  def __init__(self, conn, host_list):
+    self.conn = conn
+    self.host_list = host_list
+
+  def plot_metric(self, df, event, unit = None):
+    s = time.time()
+
+    df = df[["time", "host", event]]
+    plot = figure(plot_width=400, plot_height=150, x_axis_type = "datetime",
+                  y_range = Range1d(-0.1, 1.1*df[event].max()), y_axis_label = event + ' ' + unit)
+
+    for h in self.host_list:
+      source = ColumnDataSource(df[df.host == h])
+      plot.add_glyph(source, Step(x = "time", y = event, mode = "before", line_color = self.hc[h]))
+    print("time to plot {0}: {1}".format(event, time.time() -s))
     return plot
 
-  def plot(self, job, typename):
-    u = utils.utils(job)
+  def plot(self):
 
+    self.hc = {}
     colors = d3["Category20"][20]
+    for i, hostname in enumerate(self.host_list):
+      self.hc[hostname] = colors[i%20]
 
-    hc = {}
-    for i, hostname in enumerate(u.hostnames):
-      hc[hostname] = colors[i%20]
-    
+    print("Host Count:", len(self.host_list))
+
+    df = read_sql("select host, time from type_detail group by host, time order by host, time", self.conn)
+    event_df = read_sql("""select distinct on (event) event,unit from type_detail where host = '{}'""".format(next(iter(self.host_list))), self.conn)
+    event_list = event_df[["event", "unit"]].values
+    #event_list = list(sorted(event_df[["event", "unit"]].values))
+    #unit_list = list(sorted(event_df["unit"].values))
+    #print(event_list,unit_list)
+    type_df = read_sql("""select distinct on (type) type from type_detail where host = '{}'""".format(next(iter(self.host_list))), self.conn)
+    type_list = list(sorted(type_df["type"].values))
+
+    metric = "arc"
+    if "mem" in type_list: metric = "value"
+
+    for event, unit in event_list:
+      s = time.time()
+      df[event] = read_sql("select sum({0}) from type_detail where event = '{1}' \
+      group by host, time order by host, time".format(metric, event), self.conn)
+      if df[event].isnull().values.any():
+        del df[event]
+      print("time to compute events {0}: {1}".format(event, time.time() -s))
+
+    df = df.reset_index()
+    df["time"] = df["time"].dt.tz_convert('US/Central').dt.tz_localize(None)
+
     plots = []
+    for event,unit in event_list:
+      if event not in df.columns: continue
+      plots += [self.plot_metric(df, event, unit)]
 
-    schema, _stats  = u.get_type(typename)
-    # Plot this type of data
-    for index, event in enumerate(schema):
-      try:
-        plot = Plot(plot_width=400, plot_height=150, 
-                    x_range = DataRange1d(), y_range = DataRange1d())                  
-        for hostname, stats in _stats.items():               
-          rate = stats[:, index]
-          if typename == "mem" or typename == "proc" or typename == "nvidia_gpu":
-            source = ColumnDataSource({"x" : u.hours, "y" : rate})
-            plot.add_glyph(source, Step(x = "x", y = "y", mode = "after", 
-                                        line_color = hc[hostname]))
-          else: 
-            rate = numpy.diff(rate)/numpy.diff(job.times)
-            source = ColumnDataSource({"x" : u.hours, "y" : numpy.append(rate, rate[-1])})
-            plot.add_glyph(source, Step(x = "x", y = "y", mode = "after", 
-                                        line_color = hc[hostname]))
-        if "FP_ARITH_INST_RETIRED" in event: event = event.split("FP_ARITH_INST_RETIRED_")[1]
-        plots += [self.add_axes(plot, event)]
-      except:
-        print(event + ' plot failed for jobid ' + job.id )
-        print(sys.exc_info())
     return gridplot(plots, ncols = len(plots)//4 + 1)

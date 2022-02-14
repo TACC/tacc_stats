@@ -9,6 +9,8 @@ from pandas import DataFrame, to_datetime, Timedelta, Timestamp, concat, read_sq
 #import pandas
 #pandas.set_option('display.max_rows', 100)
 
+CONNECTION = "dbname=ls6_db user=postgres port=5432"
+
 amd64_pmc_eventmap = { 0x43ff03 : "FLOPS,W=48", 0x4300c2 : "BRANCH_INST_RETIRED,W=48", 0x4300c3: "BRANCH_INST_RETIRED_MISS,W=48", 
                        0x4308af : "DISPATCH_STALL_CYCLES1,W=48", 0x43ffae :"DISPATCH_STALL_CYCLES0,W=48" }
 
@@ -30,10 +32,7 @@ intel_skx_imc_eventmap = {0x400304 : "CAS_READS,W=48", 0x400c04 : "CAS_WRITES,W=
 """
 
 
-exclude_typs = ["block", "ib", "ib_sw", "intel_skx_cha", "mdc", "numa", "osc", "proc", "ps", "sysv_shm", "tmpfs", "vfs", "vm"]
-
-
-CONNECTION = "dbname=taccstats user=postgres port=5433"
+exclude_typs = ["ib", "ib_sw", "intel_skx_cha", "proc", "ps", "sysv_shm", "tmpfs", "vfs"]
 
 query_create_hostdata_table = """CREATE TABLE IF NOT EXISTS host_data (
                                            time  TIMESTAMPTZ NOT NULL,
@@ -64,7 +63,7 @@ with conn.cursor() as cur:
     #cur.execute(query_create_hostdata_table)
     #cur.execute(query_create_hostdata_hypertable)
     #cur.execute(query_create_compression)
-    cur.execute("SELECT pg_size_pretty(pg_database_size('taccstats'));")
+    cur.execute("SELECT pg_size_pretty(pg_database_size('ls6_db'));")
     for x in cur.fetchall():
         print("Database Size:", x[0])
 
@@ -85,6 +84,11 @@ conn.close()
 def process(stats_file):
     
     sql = "select time from host_data where host = '{0}' order by time desc limit 1;".format(stats_file.split('/')[-2])
+
+    create_time = stats_file.split('/')[-1]
+    fdate = datetime.fromtimestamp(int(create_time))
+
+    #print(stats_file.split('/')[-1],fdate)
 
     conn = psycopg2.connect(CONNECTION)
 
@@ -234,7 +238,7 @@ if __name__ == '__main__':
 
         # Parse and convert raw stats files to pandas dataframe
         start = time.time()
-        directory = "/fstats/archive"
+        directory = "/tacc_stats_site/ls6/archive"
 
         stats_files = []
         for entry in os.scandir(directory):
@@ -250,7 +254,7 @@ if __name__ == '__main__':
 
         print("Number of host stats files to process = ", len(stats_files))
 
-        with Pool(processes = 32) as pool:
+        with Pool(processes = 2) as pool:
             for i in pool.imap_unordered(process, stats_files):
                 print("[{0:.1f}%] completed".format(100*stats_files.index(i)/len(stats_files)), end = "\r")
 

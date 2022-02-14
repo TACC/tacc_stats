@@ -16,11 +16,11 @@ MANAGERS = ADMINS
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql_psycopg2',
-        'NAME'  : 'taccstats',
+        'NAME'  : 'ls6_db',
         'USER'  : 'postgres',
         'PASSWORD': 'taccstats',
         'HOST': 'localhost',         
-        'PORT': '5433',               
+        'PORT': '5432',               
         },
     # Uncomment this portion if an xalt database exists
     'xalt' : {
@@ -204,7 +204,7 @@ LOGGING = {
         'logfile': {
             'level':'INFO',
             'class':'logging.handlers.RotatingFileHandler',
-            'filename': os.path.join('/stats', 'tacc_stats_site.log'),
+            'filename': os.path.join('/tmp', 'tacc_stats_site.log'),
             'maxBytes': 1024*1024*15, # 15MB
             'backupCount': 10,
         },

@@ -1,9 +1,10 @@
 import sys
 import operator, traceback
-import pickle as p
 import multiprocessing
-from tacc_stats.analysis.gen import utils
+from tacc_stats.analysis.gen import jid_table, utils
+#from tacc_stats.site.machine.views import jid_table
 from numpy import diff, amax, zeros, maximum, mean, isnan, trapz
+from pandas import read_sql
 
 def _unwrap(args):
   try:
@@ -19,57 +20,49 @@ class Metrics():
     self.metric_list = metric_list
     
   # Compute metrics in parallel (Shared memory only)
-  def run(self, filelist):
-    if not filelist: 
-      print("Please specify a job file list.")
+  def run(self, job_list):
+    if not job_list: 
+      print("Please specify a job list.")
       sys.exit()
-    pool = multiprocessing.Pool(processes = self.processes) 
+    #pool = multiprocessing.Pool(processes = self.processes) 
 
-    metrics = pool.map(_unwrap, zip([self]*len(filelist), filelist))
-    #metrics = map(_unwrap, zip([self]*len(filelist), filelist))
+    #metrics = pool.map(_unwrap, zip([self]*len(job_list), job_list))
+    metrics = map(_unwrap, zip([self]*len(job_list), job_list))
     return metrics
 
   # Compute metric
-  def compute_metrics(self, jobpath):
-    try:
-      with open(jobpath, 'rb') as fd: 
-        try: job = p.load(fd)
-        except UnicodeDecodeError as e: 
-          try: 
-            job = p.load(fd, encoding = "latin1") # Python2 Compatibility
-          except: return jobpath, None
-    except MemoryError as e:
-      print('File ' + jobpath + ' to large to load')
-      return jobpath, None
-    except IOError as e:
-      print('File ' + jobpath + ' not found')
-      return jobpath, None
-    except EOFError as e:
-      print('End of file error for: ' + jobpath)
-      return jobpath, None
-    except:
-      return jobpath, None
-    u = utils.utils(job)
+  def compute_metrics(self, job):
+    # build temporary job view
+    jt = jid_table.jid_table(job.jid)
+    print(jt.host_list)
+    print(jt.jid)
+    
+    # compute each metric for a jid and store in _metrics dict
     _metrics = {}
+    self.metric_list = ["avg_blockbw"]
     for name in self.metric_list:
-      try:
-        _metrics[name] = getattr(sys.modules[__name__], name)().compute_metric(u)
-      except: 
-        print(name + " failed for job " + job.id)
-    return job.id, _metrics
+      #try:
+      _metrics[name] = getattr(sys.modules[__name__], name)().compute_metric(jt)
+      #except: 
+        #print(name + " failed for job " + job.jid)
+    #return jt.jid, _metrics
 
 ###########
 # Metrics #
 ###########
 
 class avg_blockbw():
-    def compute_metric(self, u):
-      schema, _stats = u.get_type("block")
-      blockbw = 0
-      for hostname, stats in _stats.items():
-        blockbw += stats[-1, schema["rd_sectors"].index] - stats[0, schema["rd_sectors"].index] + \
-                   stats[-1, schema["wr_sectors"].index] - stats[0, schema["wr_sectors"].index]
-      return blockbw/(u.dt*u.nhosts*1024*1024)
+    typ = "block"
+    val = "diff"
+    events = ["rd_sectors", "wr_sectors"]
+    conv = 1/(1024*1024)
+    units = "[GB/s]"
+
+    def compute_metric(self, jt):
+      df = read_sql("select host, time, sum(arc)*{0} as sum from job_{1} where type = '{2}' and event in ('{3}') group by host,time order by host,time".format(self.conv, jt.jid, self.typ, "','".join(self.events)), jt.conj)
+      print(df)
+      sys.exit()
+      
 
 class avg_cpi():
   def compute_metric(self, u):

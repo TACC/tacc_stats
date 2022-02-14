@@ -25,14 +25,14 @@ from bokeh.plotting import figure
 from bokeh.models import HoverTool
 import time
 #try:
-from tacc_stats.site.machine.agave_auth import check_for_tokens
+#from tacc_stats.site.machine.agave_auth import check_for_tokens
 #except:
 #pass
 
 import psycopg2
 from pandas import DataFrame, read_sql, to_timedelta
 
-CONNECTION = "dbname=taccstats host=localhost user=postgres port=5433"
+CONNECTION = "dbname=ls6_db host=localhost user=postgres port=5432"
 conn = psycopg2.connect(CONNECTION)
 
 racks = set()
@@ -130,15 +130,17 @@ def search(request):
         return HttpResponseRedirect("/login_prompt")
 5B    """
     print("SEARCH",request.GET)
-    if 'jobid' in request.GET:
+    if 'jid' in request.GET:
         try:
             job_objects = job_data.objects
+            
             """
             if "is_staff" in request.session and not request.session["is_staff"]:
                 job_objects = job_objects.filter(user = request.session["username"])
             """
-            job = job_objects.get(id = request.GET['jobid'])
-            return HttpResponseRedirect("/machine/job/"+str(job.id)+"/")
+
+            job = job_objects.get(jid = request.GET['jid'])
+            return HttpResponseRedirect("/machine/job/"+str(job.jid)+"/")
         except: pass
     try:
         return index(request)
@@ -191,7 +193,7 @@ def index(request, **kwargs):
         fields["end_time__date"] = fields["date"]
         del fields["date"]
     print(fields)
-    job_list = job_objects.filter(**fields)
+    job_list = job_objects.filter(**fields).order_by('-end_time')
 
     fields['qname'] =  'Query [fields=values] ' + qname.rstrip('-')    
 
@@ -243,7 +245,7 @@ def job_hist(df, metric, label):
     values = list(df[metric].values)
     if len(values) == 0: return None
 
-    hist, edges = histogram(values, bins = linspace(0, max(values), max(3, 5*log(len(values)))))
+    hist, edges = histogram(values, bins = linspace(0, max(values), max(3, int(5*log(len(values))))))
 
     plot = figure(title = metric, toolbar_location = None, plot_height = 400, plot_width = 600, 
                   y_range = (1, max(hist)), y_axis_type = "log", tools = TOOLS)
@@ -263,14 +265,6 @@ def type_plot(pk, typename):
     data = get_data(pk)
     dp = plots.DevPlot()
     return components(dp.plot(data, typename))
-
-def build_schema(data,name):
-    schema = []
-    for key,value in data.get_schema(name).items():
-        if value.unit:
-            schema.append(value.key + ','+value.unit)
-        else: schema.append(value.key)
-    return schema
 
 metric_names = [
     "avg_cpuusage [#cores]",
@@ -313,6 +307,51 @@ metric_names = [
     "avg_gpuutil [%/node]"
 ]
 
+class jid_table:
+
+    def __init__(self, jid):
+        print("Initializing table for job {0}".format(jid))
+
+        self.jid = jid
+        # Get job accounting data
+        acct_data = read_sql("""select * from job_data where jid = '{0}'""".format(jid), conn)
+        # job_data accounting host names must be converted to fqdn
+        acct_host_list = [h + '.' + cfg.host_name_ext for h in acct_data["host_list"].values[0]]
+    
+        self.start_time = acct_data["start_time"].dt.tz_convert('US/Central').dt.tz_localize(None).values[0]
+        self.end_time = acct_data["end_time"].dt.tz_convert('US/Central').dt.tz_localize(None).values[0]
+    
+        # Get stats data and use accounting data to narrow down query
+        qtime = time.time()
+        sql = """drop table if exists job_{0}; select * into temp job_{0} from host_data where time between '{1}' and '{2}' and jid = '{0}'""".format(jid, self.start_time, self.end_time)
+
+        # Open temporary connection
+        self.conj = psycopg2.connect(CONNECTION)
+        with self.conj.cursor() as cur:
+            cur.execute(sql)
+        print("query time: {0:.1f}".format(time.time()-qtime))
+
+        # Compare accounting host list to stats host list
+        htime = time.time()
+        self.host_list = list(set(read_sql("select distinct on(host) host from job_{0};".format(self.jid), self.conj)["host"].values))
+        if len(self.host_list) == 0: return 
+        print("host selection time: {0:.1f}".format(time.time()-htime))
+
+        # Build Schema for navigation to Type Detail view
+        etime = time.time()
+        schema_df = read_sql("""select distinct on (type,event) type,event from job_{0} where host = '{1}'""".format(self.jid, next(iter(self.host_list))), self.conj)
+        types = sorted(list(set(schema_df["type"].values)))
+        self.schema = {}
+        for t in types:
+            self.schema[t] = list(sorted(schema_df[schema_df["type"] == t]["event"].values))
+        print("schema time: {0:.1f}".format(time.time()-etime))
+
+    def __del__(self):
+        sql = """drop table if exists job_{0};""".format(self.jid)
+        with self.conj.cursor() as cur:
+            cur.execute(sql)
+        self.conj.close() 
+
 class job_dataDetailView(DetailView):
     model = job_data
 
@@ -336,53 +375,24 @@ class job_dataDetailView(DetailView):
         context = super(job_dataDetailView, self).get_context_data(**kwargs)
         job = context['job_data']
 
-        # Get job accounting data
-        acct_data = read_sql("""select * from job_data where jid = '{0}'""".format(job.jid), conn)
-        # job_data accounting host names must be converted to fqdn
-        acct_host_list = [h + '.' + cfg.host_name_ext for h in acct_data["host_list"].values[0]]
-        
-        start_time = acct_data["start_time"].dt.tz_convert('US/Central').dt.tz_localize(None).values[0]
-        end_time = acct_data["end_time"].dt.tz_convert('US/Central').dt.tz_localize(None).values[0]
-        
-        # Get stats data and use accounting data to narrow down query
-        qtime = time.time()
-        sql = """drop table if exists job_detail; select * into temp job_detail from host_data where time between '{1}' and '{2}' and jid = '{0}'""".format(job.jid, start_time, end_time)
-        print(sql)
-
-        conj = psycopg2.connect(CONNECTION)
-        with conj.cursor() as cur:
-            cur.execute(sql)
-        print("query time: {0:.1f}".format(time.time()-qtime))
-        
-        # Compare accounting host list to stats host list
-        htime = time.time()
-        data_host_list = set(read_sql("select distinct on(host) host from job_detail;", conj)["host"].values)
-        if len(data_host_list) == 0: return context
-        print("host selection time: {0:.1f}".format(time.time()-htime))
-
-        miss_host_list = set(acct_host_list) - data_host_list
-        if len(miss_host_list):
-            job.state += " " + str(len(miss_host_list)) + " hosts' data missing: "
-            for h in miss_host_list: job.state += h + " "
-        context['host_list'] = acct_host_list
+        j = jid_table(job.jid)
+        print(j.host_list)
 
         # Build Summary Plot
         ptime = time.time()
-        sp = plots.SummaryPlot(conj, data_host_list)
+        sp = plots.SummaryPlot(j)
         context["mscript"], context["mdiv"] = components(sp.plot())
         print("plot time: {0:.1f}".format(time.time()-ptime))
 
-        llite_rw = read_sql("select event, sum(diff)/(1024*1024) as diff from job_detail where type = 'llite' \
-        and event in ('read_bytes', 'write_bytes') group by event", conj)
+        # Compute Lustre Usage
+        llite_rw = read_sql("select event, sum(diff)/(1024*1024) as diff from job_{0} where type = 'llite' \
+        and event in ('read_bytes', 'write_bytes') group by event".format(j.jid), j.conj)
         context['fsio'] = { "llite" : [ llite_rw[llite_rw["event"] == "read_bytes"]["diff"].values[0],  
                                         llite_rw[llite_rw["event"] == "write_bytes"]["diff"].values[0] ] }
-        conj.close()
 
-        #etime = time.time()
-        #schema = list(set(job_df[["type", "event"]].apply(tuple, axis = 1)))
-        #print("schema time: {0:.1f}".format(time.time()-etime))
-        #print(schema)
-
+        print(j.schema)
+        context["schema"] = j.schema
+        context["script"], context["div"] = components(sys_plot(j.host_list))
 
         try:
             # Prepare metrics        
@@ -408,44 +418,19 @@ class job_dataDetailView(DetailView):
                             proc_list += [proc]
                             proc_list = list(set(proc_list))
                             context['proc_list'] = proc_list
-            # Prepare FS IO 
-            fsio_dict = {}
-            schema = data.get_schema('llite')
-            rd_idx = schema['read_bytes'].index
-            wr_idx = schema['write_bytes'].index
-            for host_name, host in data.hosts.items():
-                for device, value in host.stats['llite'].items():
-                    fsio_dict.setdefault(device, [0.0, 0.0])
-                    fsio_dict[device][0] += value[-1, rd_idx]/(1024*1024) 
-                    fsio_dict[device][1] += value[-1, wr_idx]/(1024*1024) 
-                    context['fsio'] = fsio_dict
+        """
 
-            # Prepare device type list
-            type_list = []        
-            host0 = list(data.hosts.values())[0]
-            for type_name, type in host0.stats.items():
-                schema = ' '.join(build_schema(data,type_name))
-                type_list.append( (type_name, schema[0:200]) )
-                type_list = sorted(type_list, key = lambda type_name: type_name[0])
-                context['type_list'] = type_list
-            data_host_list = data.hosts.keys()
-            
-            """
-
-
-
-        context["script"], context["div"] = components(sys_plot(data_host_list))
 
         
         ### Specific to TACC Splunk 
         urlstring="https://scribe.tacc.utexas.edu:8000/en-US/app/search/search?q=search%20"
-        hoststring=urlstring + "%20host%3D" + acct_host_list[0] + cfg.host_name_ext
+        hoststring=urlstring + "%20host%3D" + j.host_list[0] + cfg.host_name_ext
         serverstring=urlstring + "%20mds*%20OR%20%20oss*"
-        for host in acct_host_list[1:]:
+        for host in j.host_list[1:]:
             hoststring+="%20OR%20%20host%3D"+host+"*"
 
-        hoststring+="&earliest="+str(job.start_time)+"&latest="+str(job.end_time)+"&display.prefs.events.count=50"
-        serverstring+="&earliest="+str(job.start_time)+"&latest="+str(job.end_time)+"&display.prefs.events.count=50"
+        hoststring+="&earliest="+str(j.start_time)+"&latest="+str(j.end_time)+"&display.prefs.events.count=50"
+        serverstring+="&earliest="+str(j.start_time)+"&latest="+str(j.end_time)+"&display.prefs.events.count=50"
         context['client_url'] = hoststring
         context['server_url'] = serverstring
         ###
@@ -453,29 +438,44 @@ class job_dataDetailView(DetailView):
 
         return context
 
-def type_detail(request, pk, type_name):
+def type_detail(request, jid, type_name):
     """
     if not check_for_tokens(request):
         return HttpResponseRedirect("/login_prompt")
     """
-    data = get_data(pk)
 
-    schema = build_schema(data,type_name)
-    raw_stats = data.aggregate_stats(type_name)[0]  
+    # Get job accounting data
+    acct_data = read_sql("""select * from job_data where jid = '{0}'""".format(jid), conn)
+    # job_data accounting host names must be converted to fqdn
+    acct_host_list = [h + '.' + cfg.host_name_ext for h in acct_data["host_list"].values[0]]
+    
+    start_time = acct_data["start_time"].dt.tz_convert('US/Central').dt.tz_localize(None).values[0]
+    end_time = acct_data["end_time"].dt.tz_convert('US/Central').dt.tz_localize(None).values[0]
+    
+    # Get stats data and use accounting data to narrow down query
+    qtime = time.time()
+    sql = """drop table if exists type_detail; select * into temp type_detail from host_data where time between '{1}' and '{2}' and jid = '{0}' and type = '{3}'""".format(jid, start_time, end_time, type_name)
 
-    stats = []
+    # Open temporary connection
+    conj = psycopg2.connect(CONNECTION)
+    with conj.cursor() as cur:
+        cur.execute(sql)
+    print("query time: {0:.1f}".format(time.time()-qtime))
 
-    for t in range(len(raw_stats)):
-        temp = []
-        times = data.times-data.times[0]
-        for event in range(len(raw_stats[t])):
-            temp.append(raw_stats[t, event])
-        stats.append((times[t],temp))
-        
-    script, div = type_plot(pk, type_name)
+    # Compare accounting host list to stats host list
+    htime = time.time()
+    data_host_list = set(read_sql("select distinct on(host) host from type_detail;", conj)["host"].values)
+    if len(data_host_list) == 0: return context
+    print("host selection time: {0:.1f}".format(time.time()-htime))
+    
+    # Build Type Plot
+    ptime = time.time()
+    sp = plots.DevPlot(conj, data_host_list)
+    script,div = components(sp.plot())
+    print("type plot time: {0:.1f}".format(time.time()-ptime))
+
     return render(request, "machine/type_detail.html",
-                  {"type_name" : type_name, "jobid" : pk, 
-                   "stats_data" : stats, "schema" : schema,
+                  {"type_name" : type_name, "jobid" : jid, 
                    "tscript" : script, "tdiv" : div, "logged_in" : True})
 
 def proc_detail(request, pk, proc_name):

@@ -14,9 +14,10 @@ from bokeh.plotting import figure
 
 class SummaryPlot():
 
-  def __init__(self, job_df, host_list):
-    self.job_df = job_df
-    self.host_list = host_list
+  def __init__(self, jt):
+    self.jid = jt.jid
+    self.conn = jt.conj
+    self.host_list = jt.host_list
 
   def plot_metric(self, df, metric, label):
     s = time.time()
@@ -41,9 +42,15 @@ class SummaryPlot():
 
     print("Host Count:", len(self.host_list))
 
-    df = read_sql("select host, time from job_detail group by host, time order by host, time", self.job_df)
-
     metrics = [
+      ("amd64_pmc", "arc", ['FLOPS'], "amd_flops", 1e-9, "FLOPS32b+64b[GF]"),
+      ("amd64_df", "arc", ['MBW_CHANNEL_0', 'MBW_CHANNEL_1', 'MBW_CHANNEL_2', 'MBW_CHANNEL_3'], 
+       "amd_mbw", 2/(1024*1024*1024), "DRAMBW[GB/s]"),
+      ("amd64_pmc", "arc", ['INST_RETIRED'], "amd_instr", 1, '[#/s]'),
+      ("amd64_pmc", "arc", ['MPERF'], "amd_mcycles", 1, '[#/s]'),
+      ("amd64_pmc", "arc", ['APERF'], "amd_acycles", 1, '[#/s]'),
+      ("amd64_rapl", "arc", ['MSR_PKG_ENERGY_STATUS'], "amd_watts", 0.001, '[watts]'),
+
       ("intel_8pmc3", "arc", ['FP_ARITH_INST_RETIRED_SCALAR_DOUBLE', 'FP_ARITH_INST_RETIRED_128B_PACKED_DOUBLE', 'FP_ARITH_INST_RETIRED_256B_PACKED_DOUBLE', 'FP_ARITH_INST_RETIRED_512B_PACKED_DOUBLE'], "flops64b", 1e-9, "FLOPS64b[GF]"),
       ("intel_8pmc3", "arc", ['FP_ARITH_INST_RETIRED_SCALAR_SINGLE', 'FP_ARITH_INST_RETIRED_128B_PACKED_SINGLE', 'FP_ARITH_INST_RETIRED_256B_PACKED_SINGLE', 'FP_ARITH_INST_RETIRED_512B_PACKED_SINGLE'], "flops32b", 1e-9, "FLOPS32b[GF]"),
       ("intel_8pmc3", "arc", ['INST_RETIRED'], "instr", 1, '[#/s]'),
@@ -51,6 +58,7 @@ class SummaryPlot():
       ("intel_8pmc3", "arc", ['APERF'], "acycles", 1, '[#/s]'),
       ("intel_rapl", "arc", ['MSR_PKG_ENERGY_STATUS'], "watts", 0.001, '[watts]'),
       ("intel_skx_imc", "arc", ['CAS_READS', 'CAS_WRITES'], "mbw", 64/(1024*1024*1024), "DRAMBW[GB/s]"),
+
       ("ib_ext", "arc", ['port_rcv_data', 'port_xmit_data'], "ibbw", 1/(1024*1024), "FabricBW[MB/s]"),
       ("llite", "arc", ['open', 'close', 'mmap', 'fsync' , 'setattr', 'truncate', 'flock', 'getattr' , 'statfs', 'alloc_inode', 'setxattr', 'listxattr', 'removexattr', 'readdir', 'create', 'lookup', 'link', 'unlink', 'symlink', 'mkdir', 'rmdir', 'mknod', 'rename'], "liops", 1, "LustreIOPS[#/s]"),
       ("llite", "arc", ['read_bytes', 'write_bytes'], "lbw", 1/(1024*1024), "LustreBW[MB/s]"),
@@ -58,23 +66,36 @@ class SummaryPlot():
       ("mem", "value", ['MemUsed'], "mem", 1/(1024*1024), "MemUsed[GB]")
     ]
 
+    df = read_sql("select host, time from job_{0} group by host, time order by host, time".format(self.jid), self.conn)
+
     for typ, val, events, name, conv, label in metrics:
       s = time.time()
-      df[name] = conv*read_sql("select sum({0}) from job_detail where type = '{1}' and event in ('{2}') \
-      group by host, time order by host, time".format(val, typ, "','".join(events)), self.job_df)
-
+      df[name] = conv*read_sql("select sum({0}) from job_{3} where type = '{1}' and event in ('{2}') \
+      group by host, time order by host, time".format(val, typ, "','".join(events), self.jid), self.conn)
+      if df[name].isnull().values.any():
+        del df[name]
       print("time to compute {0}: {1}".format(name, time.time() -s))
 
-    df["freq"]  = 2.7*(df["acycles"]/df["mcycles"])
-    df["cpi"]  = (df["acycles"]/df["instr"])
-    metrics += [("freq", "arc", [], "freq", 1, "[GHz]")]
-    metrics += [("cpi", "arc", [], "cpi", 1, "CPI")]
+    if 'acycles' in df.columns and 'mcycles' in df.columns:
+      df["freq"]  = 2.7*df["acycles"]/df["mcycles"]
+      df["cpi"]  = df["acycles"]/df["instr"]
+      metrics += [("freq", "arc", [], "freq", 1, "[GHz]")]
+      metrics += [("cpi", "arc", [], "cpi", 1, "CPI")]
+      del df["mcycles"], df["acycles"], df["instr"]
 
+    if 'amd_acycles' in df.columns and 'amd_mcycles' in df.columns:
+      df["freq"]  = 2.45*df["amd_acycles"]/df["amd_mcycles"]
+      df["cpi"]  = df["amd_acycles"]/df["amd_instr"]
+      print(df['amd_acycles'])
+      print(df['amd_instr'])
+      metrics += [("freq", "arc", [], "freq", 1, "[GHz]")]
+      metrics += [("cpi", "arc", [], "cpi", 1, "CPI")]
+      del df["amd_mcycles"], df["amd_acycles"], df["amd_instr"]
+      
 
     df = df.reset_index()
     df["time"] = df["time"].dt.tz_convert('US/Central').dt.tz_localize(None)
-    del df["mcycles"], df["acycles"], df["instr"]
-                      
+
     plots = []
     for typ, val, events, name, conv, label in metrics:
       if name not in df.columns: continue
