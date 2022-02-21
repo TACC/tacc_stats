@@ -32,7 +32,7 @@ import time
 import psycopg2
 from pandas import DataFrame, read_sql, to_timedelta
 
-CONNECTION = "dbname=ls6_db host=localhost user=postgres port=5432"
+CONNECTION = "dbname=ls6_db1 host=localhost user=postgres port=5432"
 conn = psycopg2.connect(CONNECTION)
 
 racks = set()
@@ -128,7 +128,7 @@ def search(request):
     """
     if not check_for_tokens(request):
         return HttpResponseRedirect("/login_prompt")
-5B    """
+    """
     print("SEARCH",request.GET)
     if 'jid' in request.GET:
         try:
@@ -142,6 +142,12 @@ def search(request):
             job = job_objects.get(jid = request.GET['jid'])
             return HttpResponseRedirect("/machine/job/"+str(job.jid)+"/")
         except: pass
+    elif 'host' in request.GET:
+        print("try to get host")
+        #try:
+        return host_detail(request)
+        #except: pass
+
     try:
         return index(request)
     except: pass
@@ -385,10 +391,11 @@ class job_dataDetailView(DetailView):
         print("plot time: {0:.1f}".format(time.time()-ptime))
 
         # Compute Lustre Usage
-        llite_rw = read_sql("select event, sum(diff)/(1024*1024) as diff from job_{0} where type = 'llite' \
+        llite_rw = read_sql("select event, sum(delta)/(1024*1024) as delta from job_{0} where type = 'llite' \
         and event in ('read_bytes', 'write_bytes') group by event".format(j.jid), j.conj)
-        context['fsio'] = { "llite" : [ llite_rw[llite_rw["event"] == "read_bytes"]["diff"].values[0],  
-                                        llite_rw[llite_rw["event"] == "write_bytes"]["diff"].values[0] ] }
+
+        context['fsio'] = { "llite" : [ llite_rw[llite_rw["event"] == "read_bytes"]["delta"].values[0],  
+                                        llite_rw[llite_rw["event"] == "write_bytes"]["delta"].values[0] ] }
 
         print(j.schema)
         context["schema"] = j.schema
@@ -403,25 +410,7 @@ class job_dataDetailView(DetailView):
                 context['metric_dict'] = metric_dict                
         except:
             print("metrics not computed yet")
-                
-        """
-            # Prepare process names
-            proc_list = []
-            for host_name, host in data.hosts.items():
-                if "proc" in host.stats:
-                    for proc_pid, val in host.stats['proc'].items():
-                        if val[0][0]:
-                            try: 
-                                proc = proc_pid.split('/')[0]
-                            except:
-                                proc = proc_pid
-                            proc_list += [proc]
-                            proc_list = list(set(proc_list))
-                            context['proc_list'] = proc_list
-        """
-
-
-        
+                        
         ### Specific to TACC Splunk 
         urlstring="https://scribe.tacc.utexas.edu:8000/en-US/app/search/search?q=search%20"
         hoststring=urlstring + "%20host%3D" + j.host_list[0] + cfg.host_name_ext
@@ -477,6 +466,78 @@ def type_detail(request, jid, type_name):
     return render(request, "machine/type_detail.html",
                   {"type_name" : type_name, "jobid" : jid, 
                    "tscript" : script, "tdiv" : div, "logged_in" : True})
+
+
+class host_table:
+
+    def __init__(self, host_fqdn, start_time, end_time):
+        print("Initializing table for host {0}".format(host_fqdn))
+
+
+        # Get stats data and use accounting data to narrow down query
+        qtime = time.time()
+        self.jid = host_fqdn.split('.')[0].replace('-', '_')
+
+        sql = """drop table if exists job_{0}; select * into temp job_{0} from host_data where time between '{1}'::timestamp and '{2}'::timestamp and host = '{3}'""".format(self.jid, start_time, end_time, host_fqdn)
+        print(sql)
+        
+        # Open temporary connection
+        self.conj = psycopg2.connect(CONNECTION)
+        with self.conj.cursor() as cur:
+            cur.execute(sql)
+        print("query time: {0:.1f}".format(time.time()-qtime))
+
+        # Compare accounting host list to stats host list
+        htime = time.time()
+        self.host_list = list(set(read_sql("select distinct on(host) host from job_{0};".format(self.jid), self.conj)["host"].values))
+        if len(self.host_list) == 0: return 
+        print("host selection time: {0:.1f}".format(time.time()-htime))
+
+        # Build Schema for navigation to Type Detail view
+        etime = time.time()
+        schema_df = read_sql("""select distinct on (type,event) type,event from job_{0} where host = '{1}'""".format(self.jid, next(iter(self.host_list))), self.conj)
+        types = sorted(list(set(schema_df["type"].values)))
+        self.schema = {}
+        for t in types:
+            self.schema[t] = list(sorted(schema_df[schema_df["type"] == t]["event"].values))
+        print("schema time: {0:.1f}".format(time.time()-etime))
+
+    def __del__(self):
+        sql = """drop table if exists job_{0};""".format(self.jid)
+        with self.conj.cursor() as cur:
+            cur.execute(sql)
+        self.conj.close() 
+
+
+def host_detail(request):
+    """
+    if not check_for_tokens(request):
+        return HttpResponseRedirect("/login_prompt")
+    """
+
+    fields = request.GET.dict()
+    print(fields)
+    fields = { k:v for k, v in fields.items() if v }
+    print(fields)
+    print("here in host_detail")
+    start_time = fields['end_time__gte']
+    try:
+        end_time = fields['end_time__lte']
+    except:
+        end_time = "now()"
+    
+    ht = host_table(fields['host'], start_time, end_time)
+
+    # Build Summary Plot
+    ptime = time.time()
+    sp = plots.SummaryPlot(ht)
+    script, div = components(sp.plot())
+    print("plot time: {0:.1f}".format(time.time()-ptime))
+
+    return render(request, "machine/type_detail.html",
+                  {"type_name" : fields['host'], "tag" : fields['host'], 
+                   "tscript" : script, "tdiv" : div, "logged_in" : True})
+
 
 def proc_detail(request, pk, proc_name):
     """

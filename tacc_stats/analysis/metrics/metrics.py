@@ -53,7 +53,7 @@ class Metrics():
 
 class avg_blockbw():
     typ = "block"
-    val = "diff"
+    val = "delta"
     events = ["rd_sectors", "wr_sectors"]
     conv = 1/(1024*1024)
     units = "[GB/s]"

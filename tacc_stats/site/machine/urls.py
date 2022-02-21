@@ -10,6 +10,7 @@ urlpatterns = [
                        path(r'', home, name='dates'),
                        path(r'job/<pk>/',
                            job_dataDetailView.as_view(), name='job_data'),
+                       path(r'host/<host>/', host_detail, name='host_view'),
                        path(r'date/<date>', index, name='date_view'),
                        path(r'username/<username>/', index, name = 'username_view'),
                        path(r'account/<account>/'  , index, name = 'account_view'),

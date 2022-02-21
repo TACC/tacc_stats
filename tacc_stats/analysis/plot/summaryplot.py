@@ -67,7 +67,7 @@ class SummaryPlot():
     ]
 
     df = read_sql("select host, time from job_{0} group by host, time order by host, time".format(self.jid), self.conn)
-
+    print(df)
     for typ, val, events, name, conv, label in metrics:
       s = time.time()
       df[name] = conv*read_sql("select sum({0}) from job_{3} where type = '{1}' and event in ('{2}') \

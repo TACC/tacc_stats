@@ -9,7 +9,7 @@ from pandas import DataFrame, to_datetime, Timedelta, Timestamp, concat, read_sq
 #import pandas
 #pandas.set_option('display.max_rows', 100)
 
-CONNECTION = "dbname=ls6_db user=postgres port=5432"
+CONNECTION = "dbname=ls6_db1 user=postgres port=5432"
 
 amd64_pmc_eventmap = { 0x43ff03 : "FLOPS,W=48", 0x4300c2 : "BRANCH_INST_RETIRED,W=48", 0x4300c3: "BRANCH_INST_RETIRED_MISS,W=48", 
                        0x4308af : "DISPATCH_STALL_CYCLES1,W=48", 0x43ffae :"DISPATCH_STALL_CYCLES0,W=48" }
@@ -42,10 +42,11 @@ query_create_hostdata_table = """CREATE TABLE IF NOT EXISTS host_data (
                                            event VARCHAR(64),
                                            unit  VARCHAR(16),                                            
                                            value real,
-                                           diff  real,
-                                           arc   real
+                                           delta real,
+                                           arc   real,  
+                                           UNIQUE (time, host, type, event)
                                            );"""
-#UNIQUE (time, host, type, event)
+
 
 query_create_hostdata_hypertable = """CREATE EXTENSION IF NOT EXISTS timescaledb CASCADE; 
                                       SELECT create_hypertable('host_data', 'time', if_not_exists => TRUE, chunk_time_interval => INTERVAL '1 day');
@@ -63,7 +64,7 @@ with conn.cursor() as cur:
     #cur.execute(query_create_hostdata_table)
     #cur.execute(query_create_hostdata_hypertable)
     #cur.execute(query_create_compression)
-    cur.execute("SELECT pg_size_pretty(pg_database_size('ls6_db'));")
+    cur.execute("SELECT pg_size_pretty(pg_database_size('ls6_db1'));")
     for x in cur.fetchall():
         print("Database Size:", x[0])
 
@@ -80,36 +81,47 @@ with conn.cursor() as cur:
     conn.commit()    
 conn.close()
 
-
+# This routine will read the file until a timestamp is read that is not in the database. It then reads in the rest of the file.
 def process(stats_file):
-    
-    sql = "select time from host_data where host = '{0}' order by time desc limit 1;".format(stats_file.split('/')[-2])
 
-    create_time = stats_file.split('/')[-1]
+    hostname, create_time = stats_file.split('/')[-2:]
     fdate = datetime.fromtimestamp(int(create_time))
-
-    #print(stats_file.split('/')[-1],fdate)
+    
+    sql = "select distinct(time) from host_data where host = '{0}' and time >= '{1}'::timestamp - interval '3h' and time < '{1}'::timestamp + interval '48h' order by time;".format(hostname, fdate)
 
     conn = psycopg2.connect(CONNECTION)
-
-    with conn.cursor() as cur:
-        cur.execute(sql)
-        ltime = cur.fetchall()
-        if len(ltime) > 0: ltime = float(ltime[0][0].timestamp())
-        else: ltime = 0
-
-    if ltime > time.time() - 600: 
-        #print(stats_file, " sync current")
-        return stats_file  
-
+    
+    times = [int(float(t.timestamp())) for t in read_sql(sql, conn)["time"].tolist()]
+    if len(times) > 0 and max(times) > time.time() - 600: return stats_file
+    
     with open(stats_file, 'r') as fd:
         lines = fd.readlines()
+
+    # start reading stats data from file at first - 1 missing time
+    start_idx = -1
+    last_idx  = 0
+
+    first_ts = True
+    for i, line in enumerate(lines): 
+        if not line[0]: continue    
+        if line[0].isdigit():
+            if first_ts:
+                first_ts = False
+                continue
+            t, jid, host = line.split()
+            if int(float(t)) not in times: 
+                start_idx = last_idx
+                #print(host,t,start_idx)
+                break
+            last_idx = i
+    #print(stats_file,start_idx)
+    if start_idx == -1: return stats_file
 
     schema = {}
     stats  = []
     insert = False
     start = time.time()
-    for line in lines: 
+    for i, line in enumerate(lines): 
         if not line[0]: continue
 
         if line[0].isalpha() and insert:
@@ -170,14 +182,9 @@ def process(stats_file):
                 
                 stats += [ { **rec, "event" : eve[0], "value" : float(val), "wid" : width, "mult" : mult, "unit" : unit } ]
             
-        elif line[0].isdigit():
+        elif i >= start_idx and line[0].isdigit():
             t, jid, host = line.split()
-
-            if ltime < float(t): 
-                insert = True
-            else:
-                insert = False
-
+            insert = True
             tags = { "time" : float(t), "host" : host, "jid" : jid }
         elif line[0] == '!':
             label, events = line.split(maxsplit = 1)
@@ -186,27 +193,30 @@ def process(stats_file):
         
     stats = DataFrame.from_records(stats)
     if stats.empty: 
-        #print(stats_file + " completed")
         return(stats_file)
 
-    # compute difference between time adjacent stats
-    stats["diff"] = (stats.groupby(["host", "type", "dev", "event"])["value"].diff())
-    stats = stats.sort_values(by=["host", "type", "dev", "event", "time"]).fillna(method="bfill")
+    # Always drop the first timestamp. For new file this is just first timestamp (at random rotate time). 
+    # For update from existing file this is timestamp already in database.
+    
+    # compute difference between time adjacent stats. if new file first na time diff is backfilled by second time diff
+    stats["delta"] = (stats.groupby(["host", "type", "dev", "event"])["value"].diff())
 
     # correct stats for rollover and units (must be done before aggregation over devices)
-    stats["diff"].mask(stats["diff"] < 0, 2**stats["wid"] + stats["diff"], inplace = True)
-    stats["diff"] = stats["diff"] * stats["mult"]
+    stats["delta"].mask(stats["delta"] < 0, 2**stats["wid"] + stats["delta"], inplace = True)
+    stats["delta"] = stats["delta"] * stats["mult"]
     del stats["wid"], stats["mult"]
 
     # aggregate over devices
     stats = stats.groupby(["host", "jid", "type", "event", "unit", "time"]).sum().reset_index()            
     stats = stats.sort_values(by=["host", "type", "event", "time"])
     
-    # compute average rate of change
-    deltat = stats.groupby(["host", "type", "event"])["time"].diff().fillna(method="bfill")
-    stats["arc"] = stats["diff"]/deltat
+    # compute average rate of change. 
+    deltat = stats.groupby(["host", "type", "event"])["time"].diff()
+    stats["arc"] = stats["delta"]/deltat
     stats["time"] = to_datetime(stats["time"], unit = 's').dt.tz_localize('UTC').dt.tz_convert('US/Central')
-
+    #print(stats)
+    # drop rows from first timestamp
+    stats = stats.dropna()
     #print("processing time for {0} {1:.1f}s".format(stats_file, time.time() - start))
 
     # bulk insertion using pgcopy
@@ -233,7 +243,7 @@ if __name__ == '__main__':
         except:
             enddate = startdate + timedelta(days = 1)
 
-        print("###Date Range of stats files to ingest: {0} -> {1}####".format(startdate - timedelta(days = 2), enddate))
+        print("###Date Range of stats files to ingest: {0} -> {1}####".format(startdate, enddate))
         #################################################################
 
         # Parse and convert raw stats files to pandas dataframe
@@ -249,7 +259,7 @@ if __name__ == '__main__':
                 try:
                     fdate = datetime.fromtimestamp(int(stats_file.name))
                 except: continue
-                if  fdate < startdate - timedelta(days = 2) or fdate > enddate: continue
+                if  fdate <= startdate or fdate > enddate: continue
                 stats_files += [stats_file.path]
 
         print("Number of host stats files to process = ", len(stats_files))

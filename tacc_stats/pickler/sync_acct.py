@@ -8,7 +8,7 @@ from pgcopy import CopyManager
 from pandas import read_sql, read_csv, to_datetime, to_timedelta, concat
 import hostlist
 
-CONNECTION = "dbname=ls6_db user=postgres port=5432"
+CONNECTION = "dbname=ls6_db1 user=postgres port=5432"
 
 query_create_jobdata_table = """CREATE TABLE IF NOT EXISTS job_data (
 jid         VARCHAR(32) NOT NULL,
@@ -41,13 +41,12 @@ print(conn.server_version)
 
 """
 with conn.cursor() as cur:
-    cur.execute("DROP TABLE IF EXISTS job_data;")
+    #cur.execute("DROP TABLE IF EXISTS job_data;")
     cur.execute(query_create_jobdata_table)
     cur.execute(query_create_jobindex)
     conn.commit()
 conn.close()
 """
-
 def sync_acct(acct_file, date_str):
     print(date_str)
     conn = psycopg2.connect(CONNECTION)
