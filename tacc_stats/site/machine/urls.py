@@ -11,7 +11,7 @@ urlpatterns = [
                        path(r'job/<pk>/',
                            job_dataDetailView.as_view(), name='job_data'),
                        path(r'host/<host>/', host_detail, name='host_view'),
-                       path(r'date/<date>', index, name='date_view'),
+                       path(r'date/<end_time__date>', index, name='date_view'),
                        path(r'username/<username>/', index, name = 'username_view'),
                        path(r'account/<account>/'  , index, name = 'account_view'),
                        path(r'job/<jid>/<type_name>/', type_detail, name = 'type_detail'),

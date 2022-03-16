@@ -85,8 +85,8 @@
     <div id="tests" class="collapse">
       <table class="table table-condensed table-bordered"><!--- style="max-width:100px;">--->
 	<tbody>
-	  {% for key, val in metric_dict.items %}
-	  <tr align=center><th>{{ key|ljust:"10" }}</th><td>{{ val|floatformat:"2" }}</td></tr>
+	  {% for obj in job_data.metrics_data_set.all %}
+	  <tr align=center><th>{{ obj.metric|ljust:"10" }}[{{ obj.units}}]</th><td>{{ obj.value|floatformat:"2" }}</td></tr>
 	  {% endfor %}	
 	</tbody>
       </table>

@@ -7,8 +7,6 @@
   {{ div|safe }}
 </center>
 
-<!----<img src="{{ histograms }}" style="max-width:100%;"/>---->
-
 <hr>
 
 <h4>Flagged Jobs:</h4>
@@ -104,10 +102,10 @@
 {% if date %}
 <h3>List of Jobs run on {{ date }}</h3>
 {% endif %}
-<h4> #Jobs = {{nj}} </h4>
+<h4> #Jobs = {{ nj }} </h4>
 
     {% if job_list.has_other_pages %}
-    <ul class="pagination">
+    <div class="pagination">
       {% if job_list.has_previous %}
 
       {% if current_path %}
@@ -143,7 +141,7 @@
       {% else %}
       <li class="disabled"><span>&raquo;</span></li>
       {% endif %}
-    </ul>
+    </div>
     {% endif %}
 
     <table class="table table-condensed table-bordered">
@@ -152,7 +150,7 @@
 	  <th> Job ID </th>
 	  <th> Data   </th>
 	  <th> user </th>
-	  <th> project </th>
+	  <th> Account </th>
 	  <th> start time </th>
 	  <th> end time </th>
 	  <th> run time (s)</th>
@@ -165,12 +163,12 @@
 	</tr>
       </thead>
       <tbody>
-	{% for job in job_list %}
+      {% for job in job_list %}
         <tr bgcolor="{{job.color}}">
           <td><a href="{% url 'machine:job_data' job.jid %}">{{ job.jid }}</a>
 
-	  {% if job.validated %}
-          <td>{{ job.validated }}</td> 
+	  {% if job.metrics_data_set.all %}
+          <td>True</td> 
 	  {% else %} <td align=right> False </td> 
 	  {% endif %}
 
@@ -179,8 +177,8 @@
 	  {% else %} <td align=right> unknown </td> 
 	  {% endif %}
 	  
-	  {% if job.project %}
-          <td align=right><a href="{% url 'machine:project_view' job.account %}" >{{ job.account }}</td>
+	  {% if job.account %}
+          <td align=right><a href="{% url 'machine:account_view' job.account %}" >{{ job.account }}</td>
 	  {% else %} <td align=right> None </td>
 	  {% endif %}
 
@@ -195,47 +193,7 @@
 	  <td align=right>{{ job.node_hrs|stringformat:".2f" }} </td>
         </tr>
 	{% endfor %}
-      <tbody> 
+      </tbody> 
     </table>
-
-    {% if job_list.has_other_pages %}
-    <ul class="pagination">
-      {% if job_list.has_previous %}
-
-      {% if current_path %}
-      <li><a href="{{ current_path }}&page={{ job_list.previous_page_number }}">&laquo;</a></li>
-      {% else %}
-      <li><a href="?page={{ job_list.previous_page_number }}">&laquo;</a></li>
-      {% endif %}
-
-      {% else %}
-      <li class="disabled"><span>&laquo;</span></li>
-      {% endif %}
-      {% for i in job_list.paginator.page_range %}
-      {% if job_list.number == i %}
-      <li class="active"><span>{{ i }} <span class="sr-only">(current)</span></span></li>
-      {% else %}
-
-      {% if current_path %}
-      <li><a href="{{ current_path }}&page={{ i }}">{{ i }}</a></li>
-      {% else %}
-      <li><a href="?page={{ i }}">{{ i }}</a></li>
-      {% endif %}
-
-      {% endif %}
-      {% endfor %}
-      {% if job_list.has_next %}
-
-      {% if current_path %}
-      <li><a href="{{ current_path }}&page={{ job_list.next_page_number }}">&raquo;</a></li>
-      {% else %}
-      <li><a href="?page={{ job_list.next_page_number }}">&raquo;</a></li>
-      {% endif %}
-
-      {% else %}
-      <li class="disabled"><span>&raquo;</span></li>
-      {% endif %}
-    </ul>
-    {% endif %}
 
 {% endblock %}

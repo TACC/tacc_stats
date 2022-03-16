@@ -2,79 +2,75 @@ import sys
 import operator, traceback
 import multiprocessing
 from tacc_stats.analysis.gen import jid_table, utils
-#from tacc_stats.site.machine.views import jid_table
+from tacc_stats.site.machine.models import metrics_data
 from numpy import diff, amax, zeros, maximum, mean, isnan, trapz
 from pandas import read_sql
 
 def _unwrap(args):
-  try:
-    return args[0].compute_metrics(args[1])
-  except Exception as e:
-    print(traceback.format_exc())    
-    return
+  #try:
+  return args[0].compute_metrics(args[1])
+  #except Exception as e:
+  #  print(traceback.format_exc())    
+  #  return
 
 class Metrics():
 
-  def __init__(self, metric_list, processes = 1):
+  def __init__(self, processes = 1):
     self.processes = processes
-    self.metric_list = metric_list
-    
+
+    self.metrics_list = {
+      "avg_blockbw" : { "typename" : "block", "events" : ["rd_sectors", "wr_sectors"], "conv" : 1.0/(1024*1024), "units" : "GB/s"},
+      "avg_cpuusage" : { "typename" : "cpu",   "events" : ["user", "system", "nice"], "conv" : 0.01, "units" : "#cores" },
+      "avg_lustreiops" : { "typename" : "llite", "events" : [
+        "open", "close", "mmap", "fsync" , "setattr", "truncate", "flock", "getattr" , 
+        "statfs", "alloc_inode", "setxattr", "listxattr", "removexattr", "readdir", 
+        "create", "lookup", "link", "unlink", "symlink", "mkdir", "rmdir", "mknod", "rename"], "conv" : 1, "units" : "iops" }, 
+      "avg_lustrebw" : { "typename" : "llite", "events" : ["read_bytes", "write_bytes"], "conv" : 1.0/(1024*1024), "units" : "MB/s"  },
+      "avg_ibbw" : { "typename" : "ib_ext", "events" : ["port_xmit_data", "port_rcv_data"], "conv" : 1.0/(1024*1024), "units" : "MB/s"  },
+      "avg_flops" : { "typename" : "amd64_pmc", "events" : ["FLOPS"], "conv" : 1e-9, "units" : "GF" },
+      "avg_mbw" : { "typename" : "amd64_df", "events" : ["MBW_CHANNEL_0", "MBW_CHANNEL_1", "MBW_CHANNEL_2", "MBW_CHANNEL_3"], "conv" : 2/(1024*1024*1024), "units" : "GB/s" }
+                  }
+
   # Compute metrics in parallel (Shared memory only)
   def run(self, job_list):
     if not job_list: 
       print("Please specify a job list.")
-      sys.exit()
+      return
     #pool = multiprocessing.Pool(processes = self.processes) 
+    #pool.map(_unwrap, zip([self]*len(job_list), job_list))
+    list(map(self.compute_metrics, job_list))
 
-    #metrics = pool.map(_unwrap, zip([self]*len(job_list), job_list))
-    metrics = map(_unwrap, zip([self]*len(job_list), job_list))
-    return metrics
+
+  def job_arc(self, jt, name = None, typename = None, events = None, conv = 0, units = None):
+    df = read_sql("select host, time_bucket('5m', time) as time, sum(arc)*{0} as sum from job_{1} where type = '{2}' and event in ('{3}') group by host, time".format(conv, jt.jid, typename, "','".join(events)), jt.conj)
+    if df.empty: return
+    # Drop first time sample from each host
+    df = df.groupby('host').apply(lambda group: group.iloc[1:])
+    df = df.reset_index(drop = True)
+
+    df_n = df.groupby('host')["sum"].mean()
+    node_mean, node_max, node_min = df_n.mean(), df_n.max(), df_n.min()
+    
+    #df_t = df.groupby('time')["sum"].sum()
+    #print(df)
+    #print(df_t)
+
+    return node_mean
 
   # Compute metric
   def compute_metrics(self, job):
     # build temporary job view
     jt = jid_table.jid_table(job.jid)
-    print(jt.host_list)
-    print(jt.jid)
-    
-    # compute each metric for a jid and store in _metrics dict
-    _metrics = {}
-    self.metric_list = ["avg_blockbw"]
-    for name in self.metric_list:
-      #try:
-      _metrics[name] = getattr(sys.modules[__name__], name)().compute_metric(jt)
-      #except: 
-        #print(name + " failed for job " + job.jid)
-    #return jt.jid, _metrics
 
+    # compute each metric for a jid and update metrics_data table
+    for name, metric in self.metrics_list.items():                                                                    
+      value = self.job_arc(jt, **metric)
+      obj, created = metrics_data.objects.update_or_create(jid = job, type = metric["typename"], metric = name, 
+                                                           defaults = {'units' : metric["units"], 
+                                                                       'value' : value})
 ###########
 # Metrics #
 ###########
-
-class avg_blockbw():
-    typ = "block"
-    val = "delta"
-    events = ["rd_sectors", "wr_sectors"]
-    conv = 1/(1024*1024)
-    units = "[GB/s]"
-
-    def compute_metric(self, jt):
-      df = read_sql("select host, time, sum(arc)*{0} as sum from job_{1} where type = '{2}' and event in ('{3}') group by host,time order by host,time".format(self.conv, jt.jid, self.typ, "','".join(self.events)), jt.conj)
-      print(df)
-      sys.exit()
-      
-
-class avg_cpi():
-  def compute_metric(self, u):
-    schema, _stats = u.get_type("pmc")
-    cycles = 0
-    instrs = 0
-    for hostname, stats in _stats.items():
-      cycles += stats[-1, schema["CLOCKS_UNHALTED_CORE"].index] - \
-                stats[0, schema["CLOCKS_UNHALTED_CORE"].index]
-      instrs += stats[-1, schema["INSTRUCTIONS_RETIRED"].index] - \
-                stats[0, schema["INSTRUCTIONS_RETIRED"].index] 
-    return cycles/instrs
 
 class avg_freq():
   def compute_metric(self, u):
@@ -88,14 +84,6 @@ class avg_freq():
                     stats[0, schema["CLOCKS_UNHALTED_REF"].index] 
     return u.freq*cycles/cycles_ref
 
-class avg_cpuusage():
-  def compute_metric(self, u):
-    schema, _stats = u.get_type("cpu")    
-    cpu = 0
-    for hostname, stats in _stats.items():
-      cpu += stats[-1, schema["user"].index] - stats[0, schema["user"].index]
-    return cpu/(u.dt*u.nhosts*100)
-
 class avg_ethbw():
     def compute_metric(self, u):
         schema, _stats = u.get_type("net")
@@ -105,102 +93,6 @@ class avg_ethbw():
                   stats[-1, schema["tx_bytes"].index] - stats[0, schema["tx_bytes"].index]
         return bw/(u.dt*u.nhosts*1024*1024)
 
-class avg_fabricbw():
-    def compute_metric(self, u):
-        avg = 0
-        try:
-            schema, _stats = u.get_type("ib_ext")              
-            tb, rb = schema["port_xmit_data"].index, schema["port_rcv_data"].index
-            conv2mb = 1024*1024
-        except:
-            schema, _stats = u.get_type("opa")  
-            tb, rb = schema["PortXmitData"].index, schema["PortRcvData"].index
-            conv2mb = 125000
-        for hostname, stats in _stats.items():
-            avg += stats[-1, tb] + stats[-1, rb] - \
-                   stats[0, tb] - stats[0, rb]
-        return avg/(u.dt*u.nhosts*conv2mb)
-
-class avg_flops_64b():
-  def compute_metric(self, u):
-    schema, _stats = u.get_type("pmc")
-    vector_widths = {"SSE_D_ALL" : 1, "SIMD_D_256" : 2, 
-                    "FP_ARITH_INST_RETIRED_SCALAR_DOUBLE" : 1, 
-                     "FP_ARITH_INST_RETIRED_128B_PACKED_DOUBLE" : 2, 
-                     "FP_ARITH_INST_RETIRED_256B_PACKED_DOUBLE" : 4, 
-                     "FP_ARITH_INST_RETIRED_512B_PACKED_DOUBLE" : 8, 
-                     "SSE_DOUBLE_SCALAR" : 1, 
-                     "SSE_DOUBLE_PACKED" : 2, 
-                     "SIMD_DOUBLE_256" : 4}
-    flops = 0
-    for hostname, stats in _stats.items():
-      for eventname in schema:
-        if eventname in vector_widths:
-          index = schema[eventname].index
-          flops += (stats[-1, index] - stats[0, index])*vector_widths[eventname]
-    return flops/(u.dt*u.nhosts*1e9)
-
-class avg_flops_32b():
-  def compute_metric(self, u):
-    schema, _stats = u.get_type("pmc")
-    vector_widths = {"FP_ARITH_INST_RETIRED_SCALAR_SINGLE" : 1, 
-                     "FP_ARITH_INST_RETIRED_128B_PACKED_SINGLE" : 4, 
-                     "FP_ARITH_INST_RETIRED_256B_PACKED_SINGLE" : 8, 
-                     "FP_ARITH_INST_RETIRED_512B_PACKED_SINGLE" : 16}
-    flops = 0
-    for hostname, stats in _stats.items():
-      for eventname in schema:
-        if eventname in vector_widths:
-          index = schema[eventname].index
-          flops += (stats[-1, index] - stats[0, index])*vector_widths[eventname]
-    return flops/(u.dt*u.nhosts*1e9)
-
-
-class avg_l1loadhits():
-  def compute_metric(self, u):
-    schema, _stats = u.get_type("pmc")
-    load_names = ['LOAD_OPS_L1_HIT', 'MEM_UOPS_RETIRED_L1_HIT_LOADS']
-    loads = 0
-    for hostname, stats in _stats.items():
-      for eventname in schema:
-        if eventname in load_names:
-          index = schema[eventname].index
-          loads += stats[-1, index] - stats[0, index]
-    return loads/(u.dt*u.nhosts)
-
-class avg_l2loadhits():
-  def compute_metric(self, u):
-    schema, _stats = u.get_type("pmc")
-    load_names = ['LOAD_OPS_L2_HIT', 'MEM_UOPS_RETIRED_L2_HIT_LOADS']
-    loads = 0
-    for hostname, stats in _stats.items():
-      for eventname in schema:
-        if eventname in load_names:
-          index = schema[eventname].index
-          loads += stats[-1, index] - stats[0, index]
-    return loads/(u.dt*u.nhosts)
-
-class avg_llcloadhits():
-  def compute_metric(self, u):
-    schema, _stats = u.get_type("pmc")
-    load_names = ['LOAD_OPS_LLC_HIT', 'MEM_UOPS_RETIRED_LLC_HIT_LOADS']
-    loads = 0
-    for hostname, stats in _stats.items():
-      for eventname in schema:
-        if eventname in load_names:
-          index = schema[eventname].index
-          loads += stats[-1, index] - stats[0, index]
-    return loads/(u.dt*u.nhosts)
-
-class avg_lnetbw():
-    def compute_metric(self, u):
-        schema, _stats = u.get_type("lnet")
-        bw = 0
-        for hostname, stats in _stats.items():
-            bw += stats[-1, schema["rx_bytes"].index] + stats[-1, schema["tx_bytes"].index] \
-                  - stats[0, schema["rx_bytes"].index] - stats[0, schema["tx_bytes"].index]
-        return bw/(1024*1024*u.dt*u.nhosts)
-
 class avg_gpuutil():
     def compute_metric(self, u):
         schema, _stats = u.get_type("nvidia_gpu")
@@ -209,105 +101,6 @@ class avg_gpuutil():
             util += mean(stats[1:-1, schema["utilization"].index])
         return util/u.nhosts
 
-class avg_lnetmsgs():
-    def compute_metric(self, u):
-        avg = 0
-        schema, _stats = u.get_type("lnet")                  
-        tx, rx = schema["tx_msgs"].index, schema["rx_msgs"].index
-
-        for hostname, stats in _stats.items():
-            avg += stats[-1, tx] + stats[-1, rx] - \
-                   stats[0, tx] - stats[0, rx]
-        return avg/(u.dt*u.nhosts)
-
-class avg_loads():
-  def compute_metric(self, u):
-    schema, _stats = u.get_type("pmc")
-    load_names = ['LOAD_OPS_ALL','MEM_UOPS_RETIRED_ALL_LOADS']
-    loads = 0
-    for hostname, stats in _stats.items():
-      for eventname in schema:
-        if eventname in load_names:
-          index = schema[eventname].index
-          loads += stats[-1, index] - stats[0, index]
-    return loads/(u.dt*u.nhosts)
-
-class avg_mbw():
-  def compute_metric(self, u):
-    schema, _stats = u.get_type("imc")
-    avg = 0
-    for hostname, stats in _stats.items():
-      avg += stats[-1, schema["CAS_READS"].index] + stats[-1, schema["CAS_WRITES"].index] \
-             - stats[0, schema["CAS_READS"].index] - stats[0, schema["CAS_WRITES"].index]
-    return 64.0*avg/(1024*1024*1024*u.dt*u.nhosts)
-
-class avg_mcdrambw():
-  def compute_metric(self, u):      
-    avg = 0
-    schema, _stats = u.get_type("intel_knl_edc_eclk")
-    for hostname, stats in _stats.items():
-      avg += stats[-1, schema["RPQ_INSERTS"].index] + stats[-1, schema["WPQ_INSERTS"].index] \
-             - stats[0, schema["RPQ_INSERTS"].index] - stats[0, schema["WPQ_INSERTS"].index]
-
-    if not "flat" in u.job.acct["queue"].lower():
-      schema, _stats = u.get_type("intel_knl_edc_uclk")
-      for hostname, stats in _stats.items():
-        avg -= stats[-1, schema["EDC_MISS_CLEAN"].index] - stats[0, schema["EDC_MISS_CLEAN"].index] + \
-               stats[-1, schema["EDC_MISS_DIRTY"].index] - stats[0, schema["EDC_MISS_DIRTY"].index]
-
-      schema, _stats = u.get_type("intel_knl_mc_dclk")
-      for hostname, stats in _stats.items():
-        avg -= stats[-1, schema["CAS_READS"].index] - stats[0, schema["CAS_READS"].index]
-
-    return 64.0*avg/(1024*1024*1024*u.dt*u.nhosts)
-
-class avg_mdcreqs():
-  def compute_metric(self, u):
-    schema, _stats = u.get_type("mdc")
-    idx = schema["reqs"].index
-    avg = 0
-    for hostname, stats in _stats.items():
-      avg += stats[-1, idx] - stats[0, idx]
-    return avg/(u.dt*u.nhosts)
-
-class avg_mdcwait():
-  def compute_metric(self, u):
-    schema, _stats = u.get_type("mdc")
-    idx0, idx1 = schema["reqs"].index, schema["wait"].index
-    avg0, avg1 = 0, 0 
-    for hostname, stats in _stats.items():
-      avg0 += stats[-1, idx0] - stats[0, idx0]
-      avg1 += stats[-1, idx1] - stats[0, idx1]
-    return avg1/avg0
-
-class avg_openclose():
-  def compute_metric(self, u):
-    schema, _stats = u.get_type("llite")
-    idx0, idx1 = schema["open"].index, schema["close"].index
-    avg = 0
-    for hostname, stats in _stats.items():
-      avg += stats[-1, idx0] - stats[0, idx0] + \
-             stats[-1, idx1] - stats[0, idx1]
-    return avg/(u.dt*u.nhosts)
-
-class avg_oscreqs():
-  def compute_metric(self, u):
-    schema, _stats = u.get_type("osc")
-    idx = schema["reqs"].index
-    avg = 0
-    for hostname, stats in _stats.items():
-      avg += stats[-1, idx] - stats[0, idx]
-    return avg/(u.dt*u.nhosts)
-
-class avg_oscwait():
-  def compute_metric(self, u):
-    schema, _stats = u.get_type("osc")
-    idx0, idx1 = schema["reqs"].index, schema["wait"].index
-    avg0, avg1 = 0, 0 
-    for hostname, stats in _stats.items():
-      avg0 += stats[-1, idx0] - stats[0, idx0]
-      avg1 += stats[-1, idx1] - stats[0, idx1]
-    return avg1/avg0
 
 class avg_packetsize():
   def compute_metric(self, u):
@@ -528,54 +321,3 @@ class avg_vector_width_32b():
     return flops/instr
 
 
-class avg_sf_evictrate():
-  def compute_metric(self, u):
-    schema, _stats = u.get_type("cha")
-    sf_evictions = 0
-    llc_lookup = 0                  
-    for hostname, stats in _stats.items():
-      sf_evictions += stats[-1, schema["SF_EVICTIONS_MES"].index] - \
-                      stats[0, schema["SF_EVICTIONS_MES"].index]
-      llc_lookup   += stats[-1, schema["LLC_LOOKUP_DATA_READ_LOCAL"].index] - \
-                      stats[0, schema["LLC_LOOKUP_DATA_READ_LOCAL"].index] 
-    return sf_evictions/llc_lookup
-
-class avg_page_hitrate():
-  def compute_metric(self, u):
-    schema, _stats = u.get_type("imc")
-    act = 0
-    cas = 0                  
-    for hostname, stats in _stats.items():
-      act += stats[-1, schema["ACT_COUNT"].index] - \
-             stats[0, schema["ACT_COUNT"].index]
-      cas += stats[-1, schema["CAS_READS"].index] + stats[-1, schema["CAS_WRITES"].index] - \
-             stats[0, schema["CAS_READS"].index] - stats[0, schema["CAS_WRITES"].index]
-    return (cas - act) / cas
-
-class max_sf_evictrate():
-  def compute_metric(self, u):
-    schema, _stats = u.get_type("cha", aggregate = False)
-    max_rate = 0
-    for hostname, dev in _stats.items():    
-      sf_evictions = {}
-      llc_lookup = {}
-      for devname, stats in dev.items():
-        socket = devname.split('/')[0]
-        sf_evictions.setdefault(socket, 0)
-        sf_evictions[socket] += stats[-1, schema["SF_EVICTIONS_MES"].index] - \
-                                stats[0, schema["SF_EVICTIONS_MES"].index]
-        llc_lookup.setdefault(socket, 0)
-        llc_lookup[socket]   += stats[-1, schema["LLC_LOOKUP_DATA_READ_LOCAL"].index] - \
-                                stats[0, schema["LLC_LOOKUP_DATA_READ_LOCAL"].index]
-
-      for socket in set([x.split('/')[0] for x in dev.keys()]):
-        max_rate = max(sf_evictions[socket]/llc_lookup[socket], max_rate)
-    return max_rate
-
-class max_load15():    
-  def compute_metric(self, u):
-    max_load15 = 0.0 
-    schema, _stats = u.get_type("ps")
-    for hostname, stats in _stats.items():
-      max_load15 = max(max_load15, amax(stats[:, schema["load_15"].index]))
-    return max_load15/100

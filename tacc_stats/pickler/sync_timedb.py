@@ -87,13 +87,13 @@ def process(stats_file):
     hostname, create_time = stats_file.split('/')[-2:]
     fdate = datetime.fromtimestamp(int(create_time))
     
-    sql = "select distinct(time) from host_data where host = '{0}' and time >= '{1}'::timestamp - interval '3h' and time < '{1}'::timestamp + interval '48h' order by time;".format(hostname, fdate)
-
+    sql = "select distinct(time) from host_data where host = '{0}' and time >= '{1}'::timestamp - interval '24h' and time < '{1}'::timestamp + interval '48h' order by time;".format(hostname, fdate)
+    #print(hostname)
     conn = psycopg2.connect(CONNECTION)
     
     times = [int(float(t.timestamp())) for t in read_sql(sql, conn)["time"].tolist()]
-    if len(times) > 0 and max(times) > time.time() - 600: return stats_file
-    
+    #if len(times) > 0 and max(times) > time.time() - 600: return stats_file
+    #print(times)
     with open(stats_file, 'r') as fd:
         lines = fd.readlines()
 
@@ -109,7 +109,9 @@ def process(stats_file):
                 first_ts = False
                 continue
             t, jid, host = line.split()
+            #print(int(float(t)))
             if int(float(t)) not in times: 
+                #print(">>>>>>",int(float(t)))
                 start_idx = last_idx
                 #print(host,t,start_idx)
                 break
@@ -259,7 +261,7 @@ if __name__ == '__main__':
                 try:
                     fdate = datetime.fromtimestamp(int(stats_file.name))
                 except: continue
-                if  fdate <= startdate or fdate > enddate: continue
+                if  fdate <= startdate - timedelta(days = 1) or fdate > enddate: continue
                 stats_files += [stats_file.path]
 
         print("Number of host stats files to process = ", len(stats_files))
