@@ -50,7 +50,7 @@ class DevPlot():
     type_list = list(sorted(type_df["type"].values))
 
     metric = "arc"
-    if "mem" in type_list: metric = "value"
+    if "mem" in type_list or "nvidia_gpu" in type_list: metric = "value"
 
     for event, unit in event_list:
       s = time.time()

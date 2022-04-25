@@ -9,21 +9,20 @@ AUTHOR = "Texas Advanced Computing Center"
 EMAIL = "rtevans@tacc.utexas.edu"
 URL = "http://www.tacc.utexas.edu"
 DOWNLOAD_URL = 'https://github.com/TACC/tacc_stats'
-VERSION = "2.3.3"
+VERSION = "2.3.5"
 
-DESCRIPTION = ("A job-level performance monitoring and analysis package for \
+DESCRIPTION = ("A performance monitoring and analysis package for \
 High Performance Computing Platforms")
 LONG_DESCRIPTION = """
 TACC Stats unifies and extends the measurements taken by Linux monitoring utilities such as systat/SAR, iostat, etc.~and resolves measurements by job and hardware device so that individual job/applications can be analyzed separately.  It also provides a set of analysis and reporting tools which analyze TACC Stats resource use data and flags jobs/applications with low resource use efficiency.
 """
 
 scripts=[
-    'tacc_stats/analysis/job_printer.py',
+    'tacc_stats/analysis/metrics/update_metrics.py',
     'tacc_stats/site/manage.py',
-    'tacc_stats/site/machine/update_db.py',
-    'tacc_stats/site/machine/update_xalt.py',
-    'tacc_stats/pickler/job_pickles.py',
-    'tacc_stats/pickler/sacct_gen.py',
+    'tacc_stats/dbload/sacct_gen.py',
+    'tacc_stats/dbload/sync_acct.py',
+    'tacc_stats/dbload/sync_timedb.py',
     'tacc_stats/listend.py'
     ]
 
