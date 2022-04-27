@@ -131,12 +131,11 @@ rmq_queue       = %(machine)s
 ## Configuration for Web Portal Support
 [PORTAL]
 acct_path       = %(data_dir)s/accounting
-pickles_dir     = %(data_dir)s/pickles
 archive_dir     = %(data_dir)s/archive
 host_name_ext   = %(machine)s.tacc.utexas.edu
-batch_system    = SLURM
+dbname          = %(machine)s_db
 ```
-Set these paths as needed. The `accounting_path` will contain an accounting file for each date, e.g. `2018-11-01.txt`. The raw stats data will be stored in the `archive_dir` and processed stats data in the `pickles_dir`.  `machine` should match the system name used in the RabbitMQ server `QUEUE` field and is the RabbitMQ `QUEUE` that the monitoring agent sends the data too.  This is the only field that needs to match settings in the `monitor` subpackage. `host_name_ext` is the extension required to each compute node hostname in order to build a FQDN. This will match to directory names created in the `archive_dir`. 
+Set these paths as needed. The `accounting_path` will contain an accounting file for each date, e.g. `2018-11-01.txt`. The raw stats data will be stored in the `archive_dir` and processed stats data in the TimeScale database `dbname`.  `machine` should match the system name used in the RabbitMQ server `QUEUE` field and is the RabbitMQ `QUEUE` that the monitoring agent sends the data too.  This is the only field that needs to match settings in the `monitor` subpackage. `host_name_ext` is the extension required to each compute node hostname in order to build a FQDN. This will match to directory names created in the `archive_dir`. 
 3.  Install `tacc_stats`
 ```
 $ pip install -e tacc_stats/
