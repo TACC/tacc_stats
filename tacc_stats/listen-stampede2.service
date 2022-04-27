@@ -1,0 +1,12 @@
+[Unit]
+Description=Listen to RabbitMQ server and push incoming stats data to archive.
+
+[Service]
+Type=simple
+User=rtevans
+ExecStart=/home/rtevans/stampede2/bin/listend.py
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target

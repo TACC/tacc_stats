@@ -6,10 +6,12 @@ from multiprocessing import Pool, get_context
 from datetime import datetime, timedelta, date
 import time, string
 from pandas import DataFrame, to_datetime, Timedelta, Timestamp, concat, read_sql
+from tacc_stats import cfg
+
 #import pandas
 #pandas.set_option('display.max_rows', 100)
 
-CONNECTION = "dbname=ls6_db1 user=postgres port=5432"
+CONNECTION = "dbname={0} user=postgres port=5432".format(cfg.dbname)
 
 amd64_pmc_eventmap = { 0x43ff03 : "FLOPS,W=48", 0x4300c2 : "BRANCH_INST_RETIRED,W=48", 0x4300c3: "BRANCH_INST_RETIRED_MISS,W=48", 
                        0x4308af : "DISPATCH_STALL_CYCLES1,W=48", 0x43ffae :"DISPATCH_STALL_CYCLES0,W=48" }
@@ -25,11 +27,6 @@ intel_8pmc3_eventmap = { 0x4301c7 : 'FP_ARITH_INST_RETIRED_SCALAR_DOUBLE,W=48,U=
                          "FIXED_CTR0" : 'INST_RETIRED,W=48', "FIXED_CTR1" : 'APERF,W=48', "FIXED_CTR2" : 'MPERF,W=48' }
 
 intel_skx_imc_eventmap = {0x400304 : "CAS_READS,W=48", 0x400c04 : "CAS_WRITES,W=48", 0x400b01 : "ACT_COUNT,W=48", 0x400102 : "PRE_COUNT_MISS,W=48"}
-
-"""
-{ time : 1628783584.433181, host : amd-1, jobid : 101, type : amd64_rapl, device : 0, event : MSR_CORE_ENERGY_STAT, unit : mJ, width : 32, value : 1668055930 } 
-
-"""
 
 
 exclude_typs = ["ib", "ib_sw", "intel_skx_cha", "proc", "ps", "sysv_shm", "tmpfs", "vfs"]
@@ -55,16 +52,19 @@ query_create_hostdata_hypertable = """CREATE EXTENSION IF NOT EXISTS timescaledb
 
 query_create_compression = """ALTER TABLE host_data SET \
                               (timescaledb.compress, timescaledb.compress_orderby = 'time DESC', timescaledb.compress_segmentby = 'host,jid,type,event');
-                              SELECT add_compression_policy('host_data', INTERVAL '12h');"""
+                              SELECT add_compression_policy('host_data', INTERVAL '12h', if_not_exists => true);"""
 
 conn = psycopg2.connect(CONNECTION)
 print(conn.server_version)
 with conn.cursor() as cur:
+
+    # This should only be used for testing and debugging purposes
     #cur.execute("DROP TABLE IF EXISTS host_data CASCADE;")
-    #cur.execute(query_create_hostdata_table)
-    #cur.execute(query_create_hostdata_hypertable)
-    #cur.execute(query_create_compression)
-    cur.execute("SELECT pg_size_pretty(pg_database_size('ls6_db1'));")
+
+    cur.execute(query_create_hostdata_table)
+    cur.execute(query_create_hostdata_hypertable)
+    cur.execute(query_create_compression)
+    cur.execute("SELECT pg_size_pretty(pg_database_size('{0}'));".format(cfg.dbname))
     for x in cur.fetchall():
         print("Database Size:", x[0])
 
@@ -88,7 +88,6 @@ def process(stats_file):
     fdate = datetime.fromtimestamp(int(create_time))
     
     sql = "select distinct(time) from host_data where host = '{0}' and time >= '{1}'::timestamp - interval '24h' and time < '{1}'::timestamp + interval '48h' order by time;".format(hostname, fdate)
-    #print(hostname)
     conn = psycopg2.connect(CONNECTION)
     
     times = [int(float(t.timestamp())) for t in read_sql(sql, conn)["time"].tolist()]
@@ -109,14 +108,11 @@ def process(stats_file):
                 first_ts = False
                 continue
             t, jid, host = line.split()
-            #print(int(float(t)))
             if int(float(t)) not in times: 
-                #print(">>>>>>",int(float(t)))
                 start_idx = last_idx
-                #print(host,t,start_idx)
                 break
             last_idx = i
-    #print(stats_file,start_idx)
+
     if start_idx == -1: return stats_file
 
     schema = {}
@@ -250,7 +246,7 @@ if __name__ == '__main__':
 
         # Parse and convert raw stats files to pandas dataframe
         start = time.time()
-        directory = "/tacc_stats_site/ls6/archive"
+        directory = cfg.archive_dir
 
         stats_files = []
         for entry in os.scandir(directory):

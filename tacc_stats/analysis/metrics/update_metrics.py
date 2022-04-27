@@ -14,7 +14,7 @@ import tacc_stats.cfg as cfg
 from tacc_stats.progress import progress
 
 
-CONNECTION = "dbname=ls6_db1 user=postgres port=5432"
+CONNECTION = "dbname={0} user=postgres port=5432".format(cfg.dbname)
 query_create_metric_table = """CREATE TABLE IF NOT EXISTS metrics_data (
                                            id     SERIAL PRIMARY KEY,
                                            jid    VARCHAR(32),
@@ -33,8 +33,8 @@ def create_metrics_table(reset = False):
     with conn.cursor() as cur:
         if reset:
             cur.execute("DROP TABLE IF EXISTS metrics_data CASCADE;")
-            cur.execute(query_create_metric_table)
-            cur.execute(query_create_jobindex)
+        cur.execute(query_create_metric_table)
+        cur.execute(query_create_jobindex)
     conn.commit()    
     conn.close()
 

@@ -14,13 +14,13 @@ urlpatterns = [
 ]
 
 #try:
-from tacc_stats.site.machine.agave_auth import login, logout, login_oauth, agave_oauth_callback, login_prompt
-print("starting TACC Stats with agave authentication")
-urlpatterns += [
-    path(r'login/', login_oauth, name='login'),
-path(r'login_prompt', login_prompt, name='login_prompt'),
-    path(r'logout/', logout, name='logout'),
-    path(r'agave_oauth_callback/', agave_oauth_callback, name='agave_oauth_callback')    
-]
+#from tacc_stats.site.machine.agave_auth import login, logout, login_oauth, agave_oauth_callback, login_prompt
+#print("starting TACC Stats with agave authentication")
+#urlpatterns += [
+#    path(r'login/', login_oauth, name='login'),
+#path(r'login_prompt', login_prompt, name='login_prompt'),
+#    path(r'logout/', logout, name='logout'),
+#    path(r'agave_oauth_callback/', agave_oauth_callback, name='agave_oauth_callback')    
+#]
 #except: 
 #    pass

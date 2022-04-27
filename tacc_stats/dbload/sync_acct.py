@@ -8,7 +8,9 @@ from pgcopy import CopyManager
 from pandas import read_sql, read_csv, to_datetime, to_timedelta, concat
 import hostlist
 
-CONNECTION = "dbname=ls6_db1 user=postgres port=5432"
+from tacc_stats import cfg
+
+CONNECTION = "dbname={0} user=postgres port=5432".format(cfg.dbname)
 
 query_create_jobdata_table = """CREATE TABLE IF NOT EXISTS job_data (
 jid         VARCHAR(32) NOT NULL,
@@ -39,14 +41,13 @@ query_create_jobindex = "CREATE INDEX ON job_data (jid);"
 conn = psycopg2.connect(CONNECTION)
 print(conn.server_version)
 
-"""
 with conn.cursor() as cur:
     #cur.execute("DROP TABLE IF EXISTS job_data;")
     cur.execute(query_create_jobdata_table)
     cur.execute(query_create_jobindex)
     conn.commit()
 conn.close()
-"""
+
 def sync_acct(acct_file, date_str):
     print(date_str)
     conn = psycopg2.connect(CONNECTION)
@@ -77,66 +78,6 @@ def sync_acct(acct_file, date_str):
     conn.commit()
     conn.close()
     
-
-
-"""
-if xd:            
-obj.exe  = xd.exec_path.split('/')[-1][0:128]
-obj.exec_path = xd.exec_path
-obj.cwd     = xd.cwd[0:128]
-obj.threads = xd.num_threads
-obj.save()
-for join in join_run_object.objects.using('xalt').filter(run_id = xd.run_id):
-object_path = lib.objects.using('xalt').get(obj_id = join.obj_id).object_path
-module_name = lib.objects.using('xalt').get(obj_id = join.obj_id).module_name
-if not module_name: module_name = 'none'
-library = Libraries(object_path = object_path, module_name = module_name)
-library.save()
-library.jobs.add(obj)
-"""
-"""
-def update_metrics(date, pickles_dir, processes, rerun = False):
-
-    min_time = 60
-    metric_names = [
-        "avg_ethbw", "avg_cpi", "avg_freq", "avg_loads", "avg_l1loadhits",
-        "avg_l2loadhits", "avg_llcloadhits", "avg_sf_evictrate", "max_sf_evictrate", 
-        "avg_mbw", "avg_page_hitrate", "time_imbalance",
-        "mem_hwm", "max_packetrate", "avg_packetsize", "node_imbalance",
-        "avg_flops_32b", "avg_flops_64b", "avg_vector_width_32b", "vecpercent_32b", "avg_vector_width_64b", "vecpercent_64b", 
-        "avg_cpuusage", "max_mds", "avg_lnetmsgs", "avg_lnetbw", "max_lnetbw", "avg_fabricbw",
-        "max_fabricbw", "avg_mdcreqs", "avg_mdcwait", "avg_oscreqs",
-        "avg_oscwait", "avg_openclose", "avg_mcdrambw", "avg_blockbw", "max_load15", "avg_gpuutil"
-    ]
-
-    aud = metrics.Metrics(metric_names, processes = processes)
-
-    print("Run the following tests for:",date)
-    for name in aud.metric_list:
-        print(name)
-
-    jobs_list = Job.objects.filter(date = date).exclude(run_time__lt = min_time)
-    #jobs_list = Job.objects.filter(date = date, queue__in = ['rtx', 'rtx-dev']).exclude(run_time__lt = min_time)
-
-    # Use avg_cpuusage to see if job was tested.  It will always exist
-    if not rerun:
-        jobs_list = jobs_list.filter(avg_cpuusage = None)
-
-    paths = []
-    for job in jobs_list:
-        paths.append(os.path.join(pickles_dir,
-                                  job.date.strftime("%Y-%m-%d"),
-                                  str(job.id)))
-        
-    num_jobs = jobs_list.count()
-    print("# Jobs to be tested:",num_jobs)
-    if num_jobs == 0 : return
-
-    for jobid, metric_dict in aud.run(paths):
-        try:
-            if metric_dict: jobs_list.filter(id = jobid).update(**metric_dict)
-        except: pass
-"""
 if __name__ == "__main__":
 
     while True:
@@ -156,7 +97,7 @@ if __name__ == "__main__":
 
         # Parse and convert raw stats files to pandas dataframe
         start = time.time()
-        directory = "/tacc_stats_site/ls6/accounting"
+        directory = cfg.acct_path
         
         while startdate <= enddate:            
             for entry in os.scandir(directory):

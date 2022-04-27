@@ -34,7 +34,7 @@ import time
 import psycopg2
 from pandas import DataFrame, read_sql, to_timedelta
 
-CONNECTION = "dbname=ls6_db1 host=localhost user=postgres port=5432"
+CONNECTION = "dbname={0} host=localhost user=postgres port=5432".format(cfg.dbname)
 
 def home(request, error = False):
     field = {}
@@ -52,6 +52,7 @@ def home(request, error = False):
     field['error'] = error
 
     field['metrics'] = metrics_data.objects.distinct("metric").values("metric", "units")
+
 
     field["choice"] = ChoiceForm()
     return render(request, "machine/search.html", field)

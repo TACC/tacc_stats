@@ -16,7 +16,7 @@ MANAGERS = ADMINS
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql_psycopg2',
-        'NAME'  : 'ls6_db1',
+        'NAME'  : '{0}'.format(cfg.dbname),
         'USER'  : 'postgres',
         'PASSWORD': 'taccstats',
         'HOST': 'localhost',         
