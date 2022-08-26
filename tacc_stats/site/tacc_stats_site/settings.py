@@ -7,7 +7,7 @@ DIR = os.path.dirname(os.path.abspath(__file__))
 DEBUG = True
 
 ADMINS = (
-    ('Richard Todd Evans', 'rtevans@tacc.utexas.edu'),
+    ('Stephen Lien Harrell', 'sharrell@tacc.utexas.edu'),
 )
 
 MANAGERS = ADMINS

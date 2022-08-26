@@ -6,7 +6,7 @@ from configparser import ConfigParser
 DISTNAME = 'tacc_stats'
 LICENSE = 'LGPL'
 AUTHOR = "Texas Advanced Computing Center"
-EMAIL = "rtevans@tacc.utexas.edu"
+EMAIL = "sharrell@tacc.utexas.edu"
 URL = "http://www.tacc.utexas.edu"
 DOWNLOAD_URL = 'https://github.com/TACC/tacc_stats'
 VERSION = "2.3.5"

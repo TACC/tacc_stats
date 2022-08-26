@@ -5,7 +5,8 @@ tacc_stats Documentation               {#mainpage}
 
 Developers and Maintainers
 -------
-R. Todd Evans  (<mailto:rtevans@tacc.utexas.edu>)
+Stephen Lien Harrell  (<mailto:sharrell@tacc.utexas.edu>)
+R. Todd Evans  
 Bill Barth     (<mailto:bbarth@tacc.utexas.edu>)
 
 Original Developer
@@ -91,7 +92,7 @@ in the following format
 
 for example,
 
-1837137|rtevans|project140208|2018-08-01T18:18:51|2018-08-02T11:44:51|2018-07-29T08:05:43|normal|1-00:00:00|jobname|COMPLETED|8|104|c420-[024,073],c421-[051-052,063-064,092-093]
+1837137|sharrell|project140208|2018-08-01T18:18:51|2018-08-02T11:44:51|2018-07-29T08:05:43|normal|1-00:00:00|jobname|COMPLETED|8|104|c420-[024,073],c421-[051-052,063-064,092-093]
 
 If using SLURM the `sacct_gen.py` script that will be installed with the `tacc_stats` subpackage may be used. 
 This script generates a file for each date with the name format `year-month-day.txt`, e.g. `2018-11-01.txt`.
@@ -170,7 +171,7 @@ This will generate a table named `machinename_db` in your database.
 6.  Setup cron jobs to process raw data and ingest into database.  Add the following to your 
 cron file
 ```
-*/15 * * * * source /home/rtevans/testing/bin/activate; job_pickles.py; update_db.py > /tmp/ls5_update.log 2>&1
+*/15 * * * * source /home/sharrell/testing/bin/activate; job_pickles.py; update_db.py > /tmp/ls5_update.log 2>&1
 ```
 7.  Next configure the Apache server (make sure it is installed and the `mod_wsgi` Apache module is installed)
 A sample configuration file, `/etc/httpd/conf.d/ls5.conf`, looks like
@@ -180,11 +181,11 @@ WSGISocketPrefix run/wsgi
 
 <VirtualHost *:80>
 
-ServerAdmin rtevans@tacc.utexas.edu
+ServerAdmin sharrell@tacc.utexas.edu
 ServerName stats.webserver.tacc.utexas.edu
 ServerAlias stats.webserver.tacc.utexas.edu
 
-WSGIDaemonProcess s2-stats python-home=/stats/stampede2 python-path=/stats/stampede2/tacc_stats:/stats/stampede2/lib/python3.7/site-packages user=rtevans
+WSGIDaemonProcess s2-stats python-home=/stats/stampede2 python-path=/stats/stampede2/tacc_stats:/stats/stampede2/lib/python3.7/site-packages user=sharrell
 WSGIProcessGroup s2-stats
 WSGIScriptAlias / /tacc_stats/site/tacc_stats_site/wsgi.py process-group=s2-stats
 WSGIApplicationGroup %{GLOBAL}
