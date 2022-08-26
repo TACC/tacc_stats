@@ -97,7 +97,7 @@ static void intel_rapl_collect_socket(struct stats_type *type, char *cpu, int pk
   char msr_path[80];
   int msr_fd = -1;
   uint64_t unit_fact;
-  double conv;
+  //double conv;
   char pkg[80];
   
   snprintf(pkg, sizeof(pkg), "%d", pkg_id);
@@ -114,7 +114,7 @@ static void intel_rapl_collect_socket(struct stats_type *type, char *cpu, int pk
     ERROR("cannot open `%s': %m\n", msr_path);
     goto out;
   }
-
+  /*
   if (pread(msr_fd, &unit_fact, sizeof(unit_fact), MSR_RAPL_POWER_UNIT) < 0) {	
     ERROR("cannot read RAPL unit factor: %m\n");
     goto out;
@@ -122,14 +122,14 @@ static void intel_rapl_collect_socket(struct stats_type *type, char *cpu, int pk
   
   TRACE("Power unit %lld Energy Unit %lld\n", unit_fact & 0xf, (unit_fact >> 8) & 0x1f);
   conv = 1000*pow(0.5,(double)((unit_fact >> 8) & 0x1f));
-
+  */
 #define X(k,r...) \
   ({ \
     uint64_t val = 0; \
     if (pread(msr_fd, &val, sizeof(val), k) < 0) \
       ERROR("cannot read `%s' (%08X) through `%s': %m\n", #k, k, msr_path); \
     else \
-      stats_set(stats, #k, val*conv); \
+      stats_set(stats, #k, val); \
   })
   KEYS;
 #undef X

@@ -24,7 +24,7 @@
     X(MSR_CORE_ENERGY_STAT, "E,W=32,U=mJ", ""),	\
     X(MSR_PKG_ENERGY_STAT, "E,W=32,U=mJ", "")
 
-static double conv;
+// static double conv;
 
 static int amd64_rapl_begin_cpu(char *cpu)
 {
@@ -77,7 +77,7 @@ static void amd64_rapl_collect_cpu(struct stats_type *type, char *cpu, char *soc
     ERROR("cannot open `%s': %m\n", msr_path);
     goto out;
   }
-
+  /*
   {  
     uint64_t val = 0;						    
     if (pread(msr_fd, &val, sizeof(val), MSR_RAPL_PWR_UNIT) < 0) {
@@ -88,14 +88,14 @@ static void amd64_rapl_collect_cpu(struct stats_type *type, char *cpu, char *soc
     TRACE("Power unit %lld Energy Unit %lld\n", val & 0xf, (val >> 8) & 0x1f);  
     conv = 1000*pow(0.5,(double)((val >> 8) & 0x1f)); // milli-Joules
   }
-
+  */
 #define X(k,r...)							\
   ({									\
     uint64_t val = 0;							\
     if (pread(msr_fd, &val, sizeof(val), k) < 0)			\
       TRACE("cannot read `%s' (%08X) through `%s': %m\n", #k, k, msr_path); \
     else								\
-      stats_inc(stats, #k, val*conv);					\
+      stats_inc(stats, #k, val);					\
   })
   X(MSR_CORE_ENERGY_STAT, "E,W=32,U=mJ", "");
 #undef X
@@ -107,7 +107,7 @@ static void amd64_rapl_collect_cpu(struct stats_type *type, char *cpu, char *soc
       if (pread(msr_fd, &val, sizeof(val), k) < 0)			\
 	TRACE("cannot read `%s' (%08X) through `%s': %m\n", #k, k, msr_path); \
       else								\
-	stats_inc(stats, #k, val*conv);					\
+	stats_inc(stats, #k, val);					\
     })
     X(MSR_PKG_ENERGY_STAT, "E,W=32,U=mJ", "");
 #undef X
