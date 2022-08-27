@@ -19,7 +19,6 @@ import tacc_stats.analysis.plot as plots
 from datetime import datetime, timedelta
 
 from numpy import array, histogram, log, linspace
-from pandas import DataFrame
 
 from bokeh.embed import components
 from bokeh.layouts import gridplot
@@ -32,7 +31,8 @@ import time
 #pass
 
 import psycopg2
-from pandas import DataFrame, read_sql, to_timedelta
+from pandas import DataFrame, to_timedelta
+from tacc_stats.analysis.gen.utils import read_sql, clean_dataframe
 
 CONNECTION = "dbname={0} host=localhost user=postgres port=5432".format(cfg.dbname)
 
@@ -123,7 +123,9 @@ def index(request, **kwargs):
     # Base fields to use in histograms added to derived metrics explicitly searched on
     hist_metrics += [("runtime", "hours"), ("nhosts", "#nodes"), ("queue_wait", "hours")]
     df["queue_wait"] = to_timedelta(df["start_time"] - df["submit_time"]).dt.total_seconds()/3600
-    df["runtime"] = df["runtime"]/3600.  
+    df["runtime"] = df["runtime"]/3600.
+
+    df = clean_dataframe(df)
 
     ###
 
@@ -241,6 +243,7 @@ class job_dataDetailView(DetailView):
         context['server_url'] = serverstring
         ###
         context['logged_in'] = True
+
 
         return context
 

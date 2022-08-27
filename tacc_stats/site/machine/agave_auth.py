@@ -9,7 +9,7 @@ logging.basicConfig()
 logger = logging.getLogger('logger')
 
 try:
-    with open("/home1/02561/rtevans/.agave/current", 'r') as fd:
+    with open("/home1/02561/sharrell/.agave/current", 'r') as fd:
         data = json.load(fd)
 
     client_key = data["result"]["consumerKey"]
