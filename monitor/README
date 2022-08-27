@@ -135,7 +135,7 @@ There is a large variety of data collected and summarized below:
 
     
     For the source and meanings of the counters, see the tacc_stats source
-    `https://github.com/rtevans/tacc_stats`, the CentOS 5.6 kernel source,
+    `https://github.com/TACC/tacc_stats`, the CentOS 5.6 kernel source,
     especially `Documentation/*`, and the manpages, especially proc(5).
 
 
