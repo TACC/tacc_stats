@@ -5,9 +5,11 @@ from datetime import timedelta, datetime
 import psycopg2
 from pgcopy import CopyManager
 
-from pandas import read_sql, read_csv, to_datetime, to_timedelta, concat
+from pandas import read_csv, to_datetime, to_timedelta, concat
+
 import hostlist
 
+from tacc_stats.analysis.gen.utils import read_sql
 from tacc_stats import cfg
 
 CONNECTION = "dbname={0} user=postgres port=5432".format(cfg.dbname)

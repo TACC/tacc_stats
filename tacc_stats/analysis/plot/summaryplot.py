@@ -1,11 +1,15 @@
 #!/usr/bin/env python3
 import psycopg2
 import os, sys, stat
+import math
 from multiprocessing import Pool
 from datetime import datetime, timedelta
 import time, string
-from pandas import DataFrame, to_datetime, Timedelta, concat, read_sql
+from pandas import DataFrame, to_datetime, Timedelta, concat
 import pandas
+import numpy as np
+from tacc_stats.analysis.gen.utils import read_sql, clean_dataframe
+
 from bokeh.palettes import d3
 from bokeh.layouts import gridplot
 from bokeh.models import HoverTool, ColumnDataSource, Range1d
@@ -23,9 +27,15 @@ class SummaryPlot():
     s = time.time()
 
     df = df[["time", "host", metric]]
+    df = clean_dataframe(df)
+
+    y_range_end = 1.1*df[metric].max()
+    if math.isnan(y_range_end):
+        y_range_end = 0
+
     plot = figure(plot_width=400, plot_height=150, x_axis_type = "datetime",
-                  y_range = Range1d(-0.1, 1.1*df[metric].max()), y_axis_label = label)
-    print(df)
+                  y_range = Range1d(-0.1, y_range_end), y_axis_label = label)
+
     for h in self.host_list:
       source = ColumnDataSource(df[df.host == h])
       plot.add_glyph(source, Step(x = "time", y = metric, mode = "before", line_color = self.hc[h]))
@@ -99,6 +109,8 @@ class SummaryPlot():
 
     df["time"] = to_datetime(df["time"], utc = True)
     df["time"] = df["time"].dt.tz_convert('US/Central').dt.tz_localize(None)
+    df = clean_dataframe(df)
+    
     
     plots = []
     for typ, val, events, name, conv, label in metrics:

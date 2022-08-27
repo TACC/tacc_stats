@@ -5,11 +5,17 @@ import os, sys, stat
 from multiprocessing import Pool, get_context
 from datetime import datetime, timedelta, date
 import time, string
-from pandas import DataFrame, to_datetime, Timedelta, Timestamp, concat, read_sql
-from tacc_stats import cfg
 
 #import pandas
 #pandas.set_option('display.max_rows', 100)
+from pandas import DataFrame, to_datetime, Timedelta, Timestamp, concat
+
+from tacc_stats.analysis.gen.utils import read_sql
+from tacc_stats import cfg
+
+ #import pandas
+  #pandas.set_option('display.max_rows', 100)
+
 
 CONNECTION = "dbname={0} user=postgres port=5432".format(cfg.dbname)
 
@@ -61,9 +67,9 @@ with conn.cursor() as cur:
     # This should only be used for testing and debugging purposes
     #cur.execute("DROP TABLE IF EXISTS host_data CASCADE;")
 
-    cur.execute(query_create_hostdata_table)
-    cur.execute(query_create_hostdata_hypertable)
-    cur.execute(query_create_compression)
+    #cur.execute(query_create_hostdata_table)
+    #cur.execute(query_create_hostdata_hypertable)
+    #cur.execute(query_create_compression)
     cur.execute("SELECT pg_size_pretty(pg_database_size('{0}'));".format(cfg.dbname))
     for x in cur.fetchall():
         print("Database Size:", x[0])
@@ -85,6 +91,10 @@ conn.close()
 def process(stats_file):
 
     hostname, create_time = stats_file.split('/')[-2:]
+    try:
+        fdate = datetime.fromtimestamp(int(create_time))
+    except: return stats_file
+
     fdate = datetime.fromtimestamp(int(create_time))
     
     sql = "select distinct(time) from host_data where host = '{0}' and time >= '{1}'::timestamp - interval '24h' and time < '{1}'::timestamp + interval '48h' order by time;".format(hostname, fdate)
@@ -212,15 +222,19 @@ def process(stats_file):
     deltat = stats.groupby(["host", "type", "event"])["time"].diff()
     stats["arc"] = stats["delta"]/deltat
     stats["time"] = to_datetime(stats["time"], unit = 's').dt.tz_localize('UTC').dt.tz_convert('US/Central')
-    #print(stats)
+    
     # drop rows from first timestamp
-    stats = stats.dropna()
-    #print("processing time for {0} {1:.1f}s".format(stats_file, time.time() - start))
+    print("processing time for {0} {1:.1f}s".format(stats_file, time.time() - start))
 
     # bulk insertion using pgcopy
     sqltime = time.time()
     mgr = CopyManager(conn, 'host_data', stats.columns)
-    mgr.copy(stats.values.tolist())
+    try:
+        mgr.copy(stats.values.tolist())
+    except:
+        conn.close()
+        return stats_file
+
     conn.commit()
     #print("sql insert time for {0} {1:.1f}s".format(stats_file, time.time() - sqltime))
 
@@ -232,14 +246,21 @@ if __name__ == '__main__':
     while True:
 
         #################################################################
+
+
         try:
             startdate = datetime.strptime(sys.argv[1], "%Y-%m-%d")
         except: 
-         startdate = datetime.combine(datetime.today(), datetime.min.time())
+            startdate = datetime.combine(datetime.today(), datetime.min.time())
         try:
             enddate   = datetime.strptime(sys.argv[2], "%Y-%m-%d")
         except:
             enddate = startdate + timedelta(days = 1)
+
+        if (len(sys.argv) > 1):  
+            if sys.argv[1] == 'all':
+                startdate = 'all'
+                enddate = datetime.combine(datetime.today(), datetime.min.time()) - timedelta(days = 1)
 
         print("###Date Range of stats files to ingest: {0} -> {1}####".format(startdate, enddate))
         #################################################################
@@ -252,6 +273,9 @@ if __name__ == '__main__':
         for entry in os.scandir(directory):
             if entry.is_file() or not entry.name.startswith("c"): continue
             for stats_file in os.scandir(entry.path):
+                if startdate == 'all':
+                    stats_files += [stats_file.path]
+                    continue
                 if not stats_file.is_file() or stats_file.name.startswith('.'): continue
                 if stats_file.name.startswith("current"): continue
                 try:

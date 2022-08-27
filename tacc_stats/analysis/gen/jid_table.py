@@ -1,7 +1,7 @@
-from pandas import read_sql
 import time
 import psycopg2
 import tacc_stats.cfg as cfg
+from tacc_stats.analysis.gen.utils import read_sql
 
 class jid_table:
 

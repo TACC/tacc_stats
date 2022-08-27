@@ -2,10 +2,12 @@
 import psycopg2
 import os, sys, stat
 from multiprocessing import Pool
+import math
 from datetime import datetime, timedelta
 import time, string
-from pandas import DataFrame, to_datetime, Timedelta, concat, read_sql
+from pandas import DataFrame, to_datetime, Timedelta, concat
 import pandas
+from tacc_stats.analysis.gen.utils import read_sql, clean_dataframe
 from bokeh.palettes import d3
 from bokeh.layouts import gridplot
 from bokeh.models import HoverTool, ColumnDataSource, Range1d
@@ -22,8 +24,15 @@ class DevPlot():
     s = time.time()
 
     df = df[["time", "host", event]]
+
+
+    y_range_end = 1.1*df[metric].max()
+    if math.isnan(y_range_end):
+        y_range_end = 0
+
+
     plot = figure(plot_width=400, plot_height=150, x_axis_type = "datetime",
-                  y_range = Range1d(-0.1, 1.1*df[event].max()), y_axis_label = event + ' ' + unit)
+                  y_range = Range1d(-0.1, y_range_end), y_axis_label = label)
 
     for h in self.host_list:
       source = ColumnDataSource(df[df.host == h])
@@ -62,6 +71,8 @@ class DevPlot():
 
     df = df.reset_index()
     df["time"] = df["time"].dt.tz_convert('US/Central').dt.tz_localize(None)
+
+    df = clean_dataframe(df)
 
     plots = []
     for event,unit in event_list:

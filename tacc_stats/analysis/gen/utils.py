@@ -1,3 +1,6 @@
+from pandas import read_sql as rsql
+import numpy as np
+
 class utils():
   def __init__(self, job):
     freq_list = {"intel_snb" : 2.7, "intel_ivb" : 2.8, "intel_hsw" : 2.3,
@@ -41,3 +44,15 @@ class utils():
         for devname in host.stats[typename]:
           stats[hostname][devname] = host.stats[typename][devname].astype(float)
     return schema, stats
+
+def read_sql(*args, **kwargs):
+
+    df = rsql(*args, **kwargs)
+
+    #df = clean_dataframe(df)
+    return df
+
+def clean_dataframe(df):
+    df = df.fillna('')
+    df = df.replace([np.inf, -np.inf], '')
+    return df
