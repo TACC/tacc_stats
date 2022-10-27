@@ -129,76 +129,81 @@ def process(stats_file):
     stats  = []
     insert = False
     start = time.time()
-    for i, line in enumerate(lines): 
-        if not line[0]: continue
+    try:
+        for i, line in enumerate(lines): 
+            if not line[0]: continue
 
-        if line[0].isalpha() and insert:
-            typ, dev, vals = line.split(maxsplit = 2)        
-            vals = vals.split()
-            if typ in exclude_typs: continue
+            if line[0].isalpha() and insert:
+                typ, dev, vals = line.split(maxsplit = 2)        
+                vals = vals.split()
+                if typ in exclude_typs: continue
 
-            # Mapping hardware counters to events 
-            if typ == "amd64_pmc" or typ == "amd64_df" or typ == "intel_8pmc3" or typ == "intel_skx_imc":
-                if typ == "amd64_pmc": eventmap = amd64_pmc_eventmap
-                if typ == "amd64_df": eventmap = amd64_df_eventmap
-                if typ == "intel_8pmc3": eventmap = intel_8pmc3_eventmap
-                if typ == "intel_skx_imc": eventmap = intel_skx_imc_eventmap
-                n = {}
-                rm_idx = []
-                schema_mod = []*len(schema[typ])
+                # Mapping hardware counters to events 
+                if typ == "amd64_pmc" or typ == "amd64_df" or typ == "intel_8pmc3" or typ == "intel_skx_imc":
+                    if typ == "amd64_pmc": eventmap = amd64_pmc_eventmap
+                    if typ == "amd64_df": eventmap = amd64_df_eventmap
+                    if typ == "intel_8pmc3": eventmap = intel_8pmc3_eventmap
+                    if typ == "intel_skx_imc": eventmap = intel_skx_imc_eventmap
+                    n = {}
+                    rm_idx = []
+                    schema_mod = []*len(schema[typ])
 
-                for idx, eve in enumerate(schema[typ]):
-            
-                    eve = eve.split(',')[0]
-                    if "CTL" in eve:
-                        try:
-                            n[eve.lstrip("CTL")] = eventmap[int(vals[idx])]
-                        except:
-                            n[eve.lstrip("CTL")] = "OTHER"                    
-                        rm_idx += [idx]
+                    for idx, eve in enumerate(schema[typ]):
+                
+                        eve = eve.split(',')[0]
+                        if "CTL" in eve:
+                            try:
+                                n[eve.lstrip("CTL")] = eventmap[int(vals[idx])]
+                            except:
+                                n[eve.lstrip("CTL")] = "OTHER"                    
+                            rm_idx += [idx]
+                        
+                        elif "FIXED_CTR" in eve: 
+                            schema_mod += [eventmap[eve]]
+
+                        elif "CTR" in eve:
+                            schema_mod += [n[eve.lstrip("CTR")]]
+                        else:
+                            schema_mod += [eve]
                     
-                    elif "FIXED_CTR" in eve: 
-                        schema_mod += [eventmap[eve]]
+                    for idx in sorted(rm_idx, reverse = True): del vals[idx]
+                    vals = dict(zip(schema_mod, vals))
+                else:
+                    # Software counters are not programmable and do not require mapping
+                    vals = dict(zip(schema[typ], vals))
 
-                    elif "CTR" in eve:
-                        schema_mod += [n[eve.lstrip("CTR")]]
-                    else:
-                        schema_mod += [eve]
-                
-                for idx in sorted(rm_idx, reverse = True): del vals[idx]
-                vals = dict(zip(schema_mod, vals))
-            else:
-                # Software counters are not programmable and do not require mapping
-                vals = dict(zip(schema[typ], vals))
+                rec  =  { **tags, "type" : typ, "dev" : dev }   
 
-            rec  =  { **tags, "type" : typ, "dev" : dev }   
-
-            for eve, val in vals.items():
-                eve = eve.split(',')
-                width = 64
-                mult = 1
-                unit = "#"
+                for eve, val in vals.items():
+                    eve = eve.split(',')
+                    width = 64
+                    mult = 1
+                    unit = "#"
+                    
+                    for ele in eve[1:]:                    
+                        if "W=" in ele: width = int(ele.lstrip("W="))
+                        if "U=" in ele: 
+                            ele = ele.lstrip("U=")
+                            try:    mult = float(''.join(filter(str.isdigit, ele)))
+                            except: pass
+                            try:    unit = ''.join(filter(str.isalpha, ele))
+                            except: pass
+                    
+                    stats += [ { **rec, "event" : eve[0], "value" : float(val), "wid" : width, "mult" : mult, "unit" : unit } ]
                 
-                for ele in eve[1:]:                    
-                    if "W=" in ele: width = int(ele.lstrip("W="))
-                    if "U=" in ele: 
-                        ele = ele.lstrip("U=")
-                        try:    mult = float(''.join(filter(str.isdigit, ele)))
-                        except: pass
-                        try:    unit = ''.join(filter(str.isalpha, ele))
-                        except: pass
-                
-                stats += [ { **rec, "event" : eve[0], "value" : float(val), "wid" : width, "mult" : mult, "unit" : unit } ]
-            
-        elif i >= start_idx and line[0].isdigit():
-            t, jid, host = line.split()
-            insert = True
-            tags = { "time" : float(t), "host" : host, "jid" : jid }
-        elif line[0] == '!':
-            label, events = line.split(maxsplit = 1)
-            typ, events = label[1:], events.split()
-            schema[typ] = events 
+            elif i >= start_idx and line[0].isdigit():
+                t, jid, host = line.split()
+                insert = True
+                tags = { "time" : float(t), "host" : host, "jid" : jid }
+            elif line[0] == '!':
+                label, events = line.split(maxsplit = 1)
+                typ, events = label[1:], events.split()
+                schema[typ] = events 
         
+    except:
+        print("Possibly corrupt file: %s" % stats_file)
+        return(stats_file)
+
     stats = DataFrame.from_records(stats)
     if stats.empty: 
         return(stats_file)
@@ -289,8 +294,8 @@ if __name__ == '__main__':
         with Pool(processes = 2) as pool:
             for i in pool.imap_unordered(process, stats_files):
                 print("[{0:.1f}%] completed".format(100*stats_files.index(i)/len(stats_files)), end = "\r")
+            pool.terminate()
 
         print("loading time", time.time() - start)
 
-        time.sleep(900)
 
