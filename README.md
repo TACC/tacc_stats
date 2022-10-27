@@ -6,13 +6,12 @@ tacc_stats Documentation               {#mainpage}
 Developers and Maintainers
 -------
 Stephen Lien Harrell  (<mailto:sharrell@tacc.utexas.edu>)
-R. Todd Evans  
-Bill Barth     (<mailto:bbarth@tacc.utexas.edu>)
 
-Original Developer
+Developer Emeritus
 -------
 John Hammond
-
+R. Todd Evans  
+Bill Barth
 
 Description
 -----------------
