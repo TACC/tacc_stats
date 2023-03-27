@@ -82,7 +82,7 @@ def sync_acct(acct_file, date_str):
     
 if __name__ == "__main__":
 
-    while True:
+#    while True:
 
         #################################################################
         try:
@@ -105,8 +105,9 @@ if __name__ == "__main__":
             for entry in os.scandir(directory):
                 if not entry.is_file(): continue
                 if entry.name.startswith(str(startdate.date())):
+                    print(entry.path)
                     sync_acct(entry.path, str(startdate.date()))
             startdate += timedelta(days=1)
         print("loading time", time.time() - start)
 
-        time.sleep(900)
+        #time.sleep(900)
