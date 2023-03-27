@@ -34,6 +34,9 @@ import psycopg2
 from pandas import DataFrame, to_timedelta
 from tacc_stats.analysis.gen.utils import read_sql, clean_dataframe
 
+class DataNotFoundException(Exception):
+    pass
+
 CONNECTION = "dbname={0} host=localhost user=postgres port=5432".format(cfg.dbname)
 
 def home(request, error = False):
@@ -103,6 +106,8 @@ def index(request, **kwargs):
     metric_dict = {}
     jid_dict = { "jid" : [] }
     hist_metrics = []
+    if not len(job_list):
+        raise DataNotFoundException("No data found for this search request")
     for job in job_list:
         jid_dict["jid"] += [ job.jid ]
         for name in df_fields:
