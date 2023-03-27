@@ -43,7 +43,7 @@ def update_metrics(date, rerun = False):
 
     min_time = 300
     jobs_list = list(job_data.objects.filter(end_time__date = date.date()).exclude(runtime__lt = min_time))
-    print("Total jobs {0}".format(len(jobs_list)))
+    print("Total jobs {0}".format(len(jobs_list)) + " for date " + date.strftime("%Y-%m-%d"))
 
     if not rerun:
         jobs_list = [job for job in jobs_list if not job.metrics_data_set.all().exists() or job.metrics_data_set.all().filter(value__isnull = True).count() > 0]
