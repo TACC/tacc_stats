@@ -1,47 +1,39 @@
 {% extends "tacc_stats_site/base.html" %}
 {% block content %}
 
-{% if job %}
+{% if job_data %}
 <div>
   <h2>Job Detail</h2>
   <table class="table table-condensed table-bordered">
     <thead>
-      <th>Job ID</th><th>UID</th><th>user</th><th>project</th><th>executable</th><th>start time</th><th>end time</th>
-      <th>run time (s)</th><th>requested time (m)</th><th>queue</th><th>name</th><th>status</th><th>wayness</th><th>cores</th><th>nodes</th><th>threads</th>
+      <th>Job ID</th><th>user</th><th>project</th><th>start time</th><th>end time</th>
+      <th>run time (s)</th><th>requested time (m)</th><th>queue</th><th>name</th><th>status</th><th>ncores</th><th>nnodes</th>
     </thead>
     <tbody>
-      <tr bgcolor="{{job.color}}"><td><a href="{% url 'machine:job'  job.id %}">{{ job.id }}</a></td>
-
-	{% if job.uid %}
-	<td><a href="{% url 'machine:uid_view' job.uid %}" >{{ job.uid }}</td>           
-	{% else %}
-	<td>Unknown</td>
-	{% endif %}
+      <tr bgcolor="{{job_data.color}}"><td><a href="{% url 'machine:job_data'  job_data.jid %}">{{ job_data.jid }}</a></td>
 	
-	{% if job.user %}
-	<td><a href="{% url 'machine:user_view' job.user %}" >{{ job.user }}</td>
+	{% if job_data.username %}
+	<td><a href="{% url 'machine:username_view' job_data.username %}" >{{ job_data.username }}</td>
 	{% else %}
 	<td>Unknown</td>
 	{% endif %}
 
-	{% if job.project %}
-	<td><a href="{% url 'machine:project_view' job.project %}">{{ job.project }}</td>
+	{% if job_data.account %}
+	<td><a href="{% url 'machine:account_view' job_data.account %}">{{ job_data.account }}</td>
 	{% else %}
 	<td>None</td>
 	{% endif %}
 
-	<td><a href="{% url 'machine:exe_view' job.exe %}" >{{ job.exe }}</td>
-	<td align=right>{{ job.start_time }}</td>
-	<td align=right>{{ job.end_time }}</td>
-	<td align=right>{{ job.run_time }}</td>
-	<td align=right>{{ job.requested_time }}</td>
-	<td align=right>{{ job.queue }}</td>
-	<td align=right>{{ job.name }}</td>
-	<td align=right>{{ job.status }}</td>
-	<td align=right>{{ job.wayness }}</td>
-	<td align=right>{{ job.cores }}</td>
-	<td align=right>{{ job.nodes }}</td>
-	<td align=right>{{ job.threads }}</td></tr>
+	<td align=right>{{ job_data.start_time }}</td>
+	<td align=right>{{ job_data.end_time }}</td>
+	<td align=right>{{ job_data.runtime }}</td>
+	<td align=right>{{ job_data.timelimit }}</td>
+	<td align=right>{{ job_data.queue }}</td>
+	<td align=right>{{ job_data.jobname }}</td>
+	<td align=right>{{ job_data.state }}</td>
+
+	<td align=right>{{ job_data.ncores }}</td>
+	<td align=right>{{ job_data.nhosts }}</td>
     </tbody>
   </table>
 </div>
@@ -58,8 +50,8 @@
 
   <div class="col-md-3">
     <table class="table table-condensed" style="max-width:100%;">
-    <tr><td>Executable Path  </td><td>{{ job.exec_path }}</td></tr>      
-    <tr><td>Working Directory</td><td>{{ job.cwd }}</td></tr>
+    <tr><td>Executable Path  </td><td>{{ job_data.exec_path }}</td></tr>      
+    <tr><td>Working Directory</td><td>{{ job_data.cwd }}</td></tr>
     </table>
   </div>
 </div>
@@ -79,7 +71,7 @@
       <table class="table table-condensed table-bordered">
 	<tbody>
 	  {% for proc in proc_list %} 
-	  <tr><td><a href="{% url 'machine:proc_detail' job.id proc %}">{{proc}}</a></td></tr>
+	  <tr><td><a href="{% url 'machine:proc_detail' job_data.id proc %}">{{proc}}</a></td></tr>
 	  {% endfor %}
 	</tbody>
       </table>
@@ -93,8 +85,8 @@
     <div id="tests" class="collapse">
       <table class="table table-condensed table-bordered"><!--- style="max-width:100px;">--->
 	<tbody>
-	  {% for key, val in metric_dict.items %}
-	  <tr align=center><th>{{ key|ljust:"10" }}</th><td>{{ val|floatformat:"2" }}</td></tr>
+	  {% for obj in job_data.metrics_data_set.all %}
+	  <tr align=center><th>{{ obj.metric|ljust:"10" }}[{{ obj.units}}]</th><td>{{ obj.value|floatformat:"2" }}</td></tr>
 	  {% endfor %}	
 	</tbody>
       </table>
@@ -109,7 +101,7 @@
       <table class="table table-condensed table-bordered" style="max-width:30%;">
 	<thead><th>Module</th><th>Library</th></thead>
 	<tbody>
-	  {% for obj in job.libraries_set.all %}
+	  {% for obj in job_data.libraries_set.all %}
 	  {% if obj.module_name != "none" %}
 	  <tr><td align=left>{{ obj.module_name }}</td><td align=left>{{ obj.object_path }}</td></tr>
 	  {% endif %}
@@ -147,8 +139,8 @@
 <table>
   <tr>
     <td>
-      {{ mdiv|safe }}
       {{ mscript|safe }}
+      {{ mdiv|safe }}
     </td>
 
     <td>
@@ -166,8 +158,8 @@
 <div id="dev" class="collapse">
     <table class="table table-condensed table-bordered" style="margin-right:30px;width:100%;">
       <tr><th>Type Name</th><th>Recorded Performance Events</th></tr>
-         {% for type_name, schema in type_list %}
-            <tr><td><a href="{{ type_name }}/">{{ type_name }}</a></td><td style="text-align:left">{{ schema }}</td></tr>
+         {% for type_name, event in schema.items %}
+            <tr><td><a href="{{ type_name }}/">{{ type_name }}</a></td><td style="text-align:left">{{ event }}</td></tr>
          {% endfor %}
     </table>
 </div>
@@ -178,8 +170,8 @@
 {% endif %}
 <div><p>
 <center>
-     {{ div|safe }}
      {{ script|safe }}
+     {{ div|safe }}
 </center>
 </div>
 </p>

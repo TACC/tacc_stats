@@ -5,7 +5,7 @@ Release: 1%{?dist}
 License: GPL
 Vendor: Texas Advanced Computing Center
 Group: System Environment/Base
-Packager: TACC - rtevans@tacc.utexas.edu
+Packager: TACC - sharrell@tacc.utexas.edu
 Source: tacc_stats-%{version}.tar.gz
 BuildRequires: systemd libev
 

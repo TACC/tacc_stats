@@ -50,7 +50,8 @@ static int amd64_pmc_begin_cpu(char *cpu)
   switch(processor) {
 
   case AMD_10H:
-    events = amd10h_events; break;
+    events = amd10h_events; 
+    break;
   case AMD_17H:
     events = amd17h_events;
     break;

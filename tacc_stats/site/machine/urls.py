@@ -1,29 +1,22 @@
 from django.conf.urls import url
 from django.urls import path
 from django.views.generic import DetailView, ListView
-from tacc_stats.site.machine.models import Job
+from tacc_stats.site.machine.models import job_data
 from tacc_stats.site.machine.views import *
 
 app_name = "tacc_stats"
 
 urlpatterns = [
-                       path('',dates, name='dates'),
-                       path('job/<pk>/',
-                           JobDetailView.as_view(), name='job'),
-                       path('job/<pk>/<type_name>/',
-                           type_detail, name = 'type_detail'),
-                       path('proc/<pk>/<proc_name>/',
-                           proc_detail, name = 'proc_detail'),
-                       path('date/<date>', 
-                           index, name='date_view'),
-                       path('uid/<uid>/',
-                           index, name='uid_view'),
-                       path('user/<user>/',
-                           index, name='user_view'),
-                       path('project/<project>/',
-                           index, name='project_view'),
-                       path('exe/<exe__icontains>)/',
-                           index, name='exe_view'),                       
-                       path('search/',search, name='search'),
+                       path(r'', home, name='dates'),
+                       path(r'job/<pk>/',
+                           job_dataDetailView.as_view(), name='job_data'),
+                       path(r'host/<host>/', host_detail, name='host_view'),
+                       path(r'date/<end_time__date>', index, name='date_view'),
+                       path(r'username/<username>/', index, name = 'username_view'),
+                       path(r'account/<account>/'  , index, name = 'account_view'),
+                       path(r'job/<jid>/<type_name>/', type_detail, name = 'type_detail'),
+                       #path(r'proc/<pk>/<proc_name>/', proc_detail, name = 'proc_detail'),
+                       #path(r'exe/<exe__icontains>)/', index, name='exe_view'),                       
+                       path(r'search/',search, name='search'),
 ]
 

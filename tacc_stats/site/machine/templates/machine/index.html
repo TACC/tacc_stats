@@ -7,16 +7,14 @@
   {{ div|safe }}
 </center>
 
-<!----<img src="{{ histograms }}" style="max-width:100%;"/>---->
-
 <hr>
 
 <h4>Flagged Jobs:</h4>
 <button type="button" class="btn btn-primary" data-toggle="collapse" data-target="#flagged">Click for Flagged Jobs</button>
 <div id="flagged" class="collapse">
 <div class="table-responsive">
+<!---
   <table class="table table-condensed" style="max-width=100%;">
-
     {% if md_job_list %}
 
     <tr>
@@ -25,7 +23,7 @@
     {% for key,values in md_job_list.items %} 
     <tr><td><a href="{% url 'machine:user_view' key %}"> {{ key }}</a> </td>
       {% for v,d in values %} 
-      <td><a href="{% url 'machine:job' v %}">{{ v }}</a>({{ d|stringformat:"0.1f" }})</td>
+      <td><a href="{% url 'machine:job_data' v %}">{{ v }}</a>({{ d|stringformat:"0.1f" }})</td>
       {% endfor %}
     </tr>
     {% endfor %}
@@ -41,7 +39,7 @@
     {% for key,values in gigebw_job_list.items %} 
     <tr><td><a href="{% url 'machine:user_view' key %}"> {{ key }}</a> </td>
       {% for v,d in values %} 
-      <td><a href="{% url 'machine:job' v %}">{{ v }}</a>({{ d|stringformat:"0.3e" }})</td>
+      <td><a href="{% url 'machine:job_data' v %}">{{ v }}</a>({{ d|stringformat:"0.3e" }})</td>
       {% endfor %}
     </tr>
     {% endfor %}
@@ -56,7 +54,7 @@
     {% for key,values in idle_job_list.items %} 
     <tr><td><a href="{% url 'machine:user_view'  key %}"> {{ key }}</a></td>
       {% for v,d in values %} 
-      <td><a href="{% url 'machine:job'  v %}">{{ v }}</a>({{ d }})</td>
+      <td><a href="{% url 'machine:job_data'  v %}">{{ v }}</a>({{ d }})</td>
       {% endfor %}
     </tr>
     {% endfor %}
@@ -72,7 +70,7 @@
     {% for key,values in cat_job_list.items %} 
     <tr><td><a href="{% url 'machine:user_view'  key %}"> {{ key }}</a> </td>
       {% for v,d in values %} 
-      <td><a href="{% url 'machine:job'  v %}">{{ v }}</a>({{ d }})</td>
+      <td><a href="{% url 'machine:job_data'  v %}">{{ v }}</a>({{ d }})</td>
       {% endfor %}
     </tr>
     {% endfor %}
@@ -88,24 +86,26 @@
     {% for key,values in cpi_job_list.items %} 
     <tr><td><a href="{% url 'machine:user_view' key %}">{{ key }}</a></td>
       {% for v,d in values %} 
-      <td><a href="{% url 'machine:job' v %}">{{ v }}</a>({{ d|stringformat:"0.1f" }})</td>
+      <td><a href="{% url 'machine:job_data' v %}">{{ v }}</a>({{ d|stringformat:"0.1f" }})</td>
       {% endfor %}
     </tr>
     {% endfor %}
 
     {% endif %}
   </table>
+--->
 </div>
 </div>
+
 
 
 {% if date %}
 <h3>List of Jobs run on {{ date }}</h3>
 {% endif %}
-<h4> #Jobs = {{nj}} </h4>
+<h4> #Jobs = {{ nj }} </h4>
 
     {% if job_list.has_other_pages %}
-    <ul class="pagination">
+    <div class="pagination">
       {% if job_list.has_previous %}
 
       {% if current_path %}
@@ -141,7 +141,7 @@
       {% else %}
       <li class="disabled"><span>&raquo;</span></li>
       {% endif %}
-    </ul>
+    </div>
     {% endif %}
 
     <table class="table table-condensed table-bordered">
@@ -150,94 +150,50 @@
 	  <th> Job ID </th>
 	  <th> Data   </th>
 	  <th> user </th>
-	  <th> project </th>
-	  <th> executable </th>
+	  <th> Account </th>
 	  <th> start time </th>
 	  <th> end time </th>
 	  <th> run time (s)</th>
 	  <th> queue </th>
 	  <th> name </th>
 	  <th> status </th>
-	  <th> wayness </th>
 	  <th> cores </th>
-	  <th>nodes</th>
-	  <th> SUs </th>
+	  <th> nodes</th>
+	  <th> node hrs </th>
 	</tr>
       </thead>
       <tbody>
-	{% for job in job_list %}
+      {% for job in job_list %}
         <tr bgcolor="{{job.color}}">
-          <td><a href="{% url 'machine:job'  job.id %}">{{ job.id }}</a>
+          <td><a href="{% url 'machine:job_data' job.jid %}">{{ job.jid }}</a>
 
-	  {% if job.validated %}
-          <td>{{ job.validated }}</td> 
+	  {% if job.metrics_data_set.all %}
+          <td>True</td> 
 	  {% else %} <td align=right> False </td> 
 	  {% endif %}
 
-	  {% if job.user %}
-          <td><a href="{% url 'machine:user_view' job.user %}" >{{ job.user }}</td> 
+	  {% if job.username %}
+          <td><a href="{% url 'machine:username_view' job.username %}" >{{ job.username }}</td> 
 	  {% else %} <td align=right> unknown </td> 
 	  {% endif %}
 	  
-	  {% if job.project %}
-          <td align=right><a href="{% url 'machine:project_view' job.project %}" >{{ job.project }}</td>
+	  {% if job.account %}
+          <td align=right><a href="{% url 'machine:account_view' job.account %}" >{{ job.account }}</td>
 	  {% else %} <td align=right> None </td>
 	  {% endif %}
 
-          <td align=right><a href="{% url 'machine:exe_view' job.exe %}" >{{ job.exe }}</td>
           <td align=right>{{ job.start_time }}</td>
           <td align=right>{{ job.end_time }}</td>
-          <td align=right>{{ job.run_time }}</td>
+          <td align=right>{{ job.runtime }}</td>
           <td align=right>{{ job.queue }}</td>
-          <td align=right>{{ job.name }}</td>
-          <td align=right>{{ job.status }}</td>
-          <td align=right>{{ job.wayness }}</td>
-          <td align=right>{{ job.cores }}</td>
-          <td align=right>{{ job.nodes }}</td>
-	  <td align=right>{{ job.sus|stringformat:".2f" }} </td>
+          <td align=right>{{ job.jobname }}</td>
+          <td align=right>{{ job.state }}</td>
+          <td align=right>{{ job.ncores }}</td>
+          <td align=right>{{ job.nhosts }}</td>
+	  <td align=right>{{ job.node_hrs|stringformat:".2f" }} </td>
         </tr>
 	{% endfor %}
-      <tbody> 
+      </tbody> 
     </table>
-
-    {% if job_list.has_other_pages %}
-    <ul class="pagination">
-      {% if job_list.has_previous %}
-
-      {% if current_path %}
-      <li><a href="{{ current_path }}&page={{ job_list.previous_page_number }}">&laquo;</a></li>
-      {% else %}
-      <li><a href="?page={{ job_list.previous_page_number }}">&laquo;</a></li>
-      {% endif %}
-
-      {% else %}
-      <li class="disabled"><span>&laquo;</span></li>
-      {% endif %}
-      {% for i in job_list.paginator.page_range %}
-      {% if job_list.number == i %}
-      <li class="active"><span>{{ i }} <span class="sr-only">(current)</span></span></li>
-      {% else %}
-
-      {% if current_path %}
-      <li><a href="{{ current_path }}&page={{ i }}">{{ i }}</a></li>
-      {% else %}
-      <li><a href="?page={{ i }}">{{ i }}</a></li>
-      {% endif %}
-
-      {% endif %}
-      {% endfor %}
-      {% if job_list.has_next %}
-
-      {% if current_path %}
-      <li><a href="{{ current_path }}&page={{ job_list.next_page_number }}">&raquo;</a></li>
-      {% else %}
-      <li><a href="?page={{ job_list.next_page_number }}">&raquo;</a></li>
-      {% endif %}
-
-      {% else %}
-      <li class="disabled"><span>&raquo;</span></li>
-      {% endif %}
-    </ul>
-    {% endif %}
 
 {% endblock %}

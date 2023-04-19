@@ -7,7 +7,7 @@ DIR = os.path.dirname(os.path.abspath(__file__))
 DEBUG = True
 
 ADMINS = (
-    ('Richard Todd Evans', 'rtevans@tacc.utexas.edu'),
+    ('Stephen Lien Harrell', 'sharrell@tacc.utexas.edu'),
 )
 
 MANAGERS = ADMINS
@@ -16,8 +16,8 @@ MANAGERS = ADMINS
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql_psycopg2',
-        'NAME'  : cfg.machine + '_db',
-        'USER': 'taccstats',
+        'NAME'  : '{0}'.format(cfg.dbname),
+        'USER'  : 'postgres',
         'PASSWORD': 'taccstats',
         'HOST': 'localhost',         
         'PORT': '5432',               
@@ -204,7 +204,7 @@ LOGGING = {
         'logfile': {
             'level':'INFO',
             'class':'logging.handlers.RotatingFileHandler',
-            'filename': os.path.join('/stats', 'tacc_stats_site.log'),
+            'filename': os.path.join('/tmp', 'tacc_stats_site.log'),
             'maxBytes': 1024*1024*15, # 15MB
             'backupCount': 10,
         },
