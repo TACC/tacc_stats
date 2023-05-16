@@ -229,6 +229,7 @@ def process(stats_file):
     stats["time"] = to_datetime(stats["time"], unit = 's').dt.tz_localize('UTC').dt.tz_convert('US/Central')
     
     # drop rows from first timestamp
+    stats = stats.dropna()
     print("processing time for {0} {1:.1f}s".format(stats_file, time.time() - start))
 
     # bulk insertion using pgcopy
@@ -236,7 +237,8 @@ def process(stats_file):
     mgr = CopyManager(conn, 'host_data', stats.columns)
     try:
         mgr.copy(stats.values.tolist())
-    except:
+    except Exception as e:
+         print("error: mgr.copy failed: ", str(e))
         conn.close()
         return stats_file
 
