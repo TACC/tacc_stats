@@ -238,7 +238,7 @@ def process(stats_file):
     try:
         mgr.copy(stats.values.tolist())
     except Exception as e:
-         print("error: mgr.copy failed: ", str(e))
+        print("error: mgr.copy failed: ", str(e))
         conn.close()
         return stats_file
 
