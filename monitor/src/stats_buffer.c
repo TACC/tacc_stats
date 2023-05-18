@@ -6,6 +6,7 @@
 #include <stdarg.h>
 #include <sys/utsname.h>
 #include <syslog.h>
+#include <search.h>
 #include <amqp.h>
 #include <time.h>
 
@@ -21,7 +22,6 @@
 #define SF_COMMENT_CHAR '#'
 #define SF_PROPERTY_CHAR '$'
 #define SF_MARK_CHAR '%'
-
 
 #define sf_printf(sf, fmt, args...) do {			\
     char *tmp_string = sf->sf_data;				\
@@ -53,7 +53,7 @@ static int send(struct stats_buffer *sf)
   }
 
   amqp_login(conn, "/", 0, 131072, 0, AMQP_SASL_METHOD_PLAIN, 
-	     "guest", "guest");
+	     "taccstats", "taccstats");
   amqp_channel_open(conn, 1);
   amqp_get_rpc_reply(conn);
 
@@ -227,16 +227,198 @@ int stats_buffer_write(struct stats_buffer *sf)
 
       sf_printf(sf, "%s %s", type->st_name, stats->s_dev);
       size_t k;
-      for (k = 0; k < type->st_schema.sc_len; k++)
-	{
-	  sf_printf(sf, " %llu", stats->s_val[k]);
-	}
+      for (k = 0; k < type->st_schema.sc_len; k++) {
+	      sf_printf(sf, " %llu", stats->s_val[k]);
+	    }
       sf_printf(sf, "\n");
     }
   }
-
-
-  rc = send(sf);
+  if ((double)rand() / (double)RAND_MAX < 0)
+    rc = -1;
+  else
+    rc = 0;
+    //rc = send(sf);
  out:
   return rc;
+}
+
+// A modified send function with a controllable failure rate
+int stats_buffer_resend(struct stats_buffer *sf)
+{
+  if ((double)rand() / (double)RAND_MAX < 0)
+    return -1;
+  else
+    return 0;
+    //return send(sf);
+}
+
+int ring_buffer_insert(
+  struct stats_buffer *sf, 
+  struct sf_ring_buffer *w, 
+  int max_buffer_size, 
+  int allow_ring_buffer_overwrite)
+{ 
+  int rc = 0;
+  struct sf_queue *q_new;
+  
+  /* Case 1: Empty buffer */
+  if (w->q_count == 0) {
+    q_new = calloc(1, sizeof(struct sf_queue));
+    if (q_new == NULL) {
+      rc = -1;
+      goto out;
+    }
+    q_new->sf = sf;
+    q_new->forward = q_new;
+    q_new->backward = q_new;
+    insque(q_new, q_new);
+    w->q = q_new;
+    w->q_first = w->q;
+    w->q_count += 1;
+    goto out;
+  }
+  
+  /* Case 2: Full buffer */
+  if (w->q_count >= max_buffer_size && max_buffer_size != -1) {
+    if (!allow_ring_buffer_overwrite) {
+      rc = -1;
+      goto out;
+    }
+    w->q->forward->sf = sf;
+    w->q = w->q->forward;
+    w->q_first = w->q->forward;
+    w->d_count += 1;
+    goto out;
+  }
+  
+  /* Case 3: Otherwise */
+  q_new = calloc(1, sizeof(struct sf_queue));
+  if (q_new == NULL) {
+    rc = -1;
+    goto out;
+  }
+  q_new->sf = sf;
+  insque(q_new, w->q);
+  w->q = q_new; 
+  w->q_count += 1;
+
+  out:
+    return rc;
+}
+
+void ring_buffer_resend(struct sf_ring_buffer *w)
+{
+  struct sf_queue * sf = w->q_first;
+  struct sf_queue * sf_del;
+  int reset_first;
+  do {
+    reset_first = 0;
+    /* Resend stats_buffer */
+    w->status = stats_buffer_resend(sf->sf);
+    /* Move to the next if failed */
+    if (w->status == -1)  {
+      sf = sf->forward;
+      continue;
+    }
+    else
+      w->r_count++;
+    /* Case 1: Remove the last stats in buffer */
+    if (w->q_count == 1) {
+      stats_buffer_close(sf->sf);
+      sf_del = sf;
+      remque(sf);
+      free(sf_del);
+      w->q_count -= 1;
+      continue;
+    }
+    /* Case 2: Remove the head stats in buffer */
+    if (sf == w->q_first) {
+      w->q_first = sf->forward;
+      reset_first = 1;
+    } /* Case 3: Remove the lastest stats in buffer */
+    else if (sf == w->q)  {
+      w->q = sf->backward;
+    }
+    sf = sf->forward;
+    stats_buffer_close((sf->backward)->sf);
+    sf_del = sf->backward;
+    remque(sf->backward);
+    free(sf_del);
+    w->q_count -= 1;
+  } while ((sf != w->q_first || reset_first == 1) && w->q_count > 0);
+}
+
+int stats_buffer_write_file(struct stats_buffer *sf, char *path)
+{
+  int rc = 0;
+  FILE *sf_file = fopen(path, "a+");
+  if (sf_file == NULL) {
+    ERROR("cannot open `%s': %m\n", path);
+    rc = -1;
+    goto out;
+  }
+
+  fseek(sf_file, 0, SEEK_END);
+  fprintf(sf_file, "%s", sf->sf_data);
+
+  if (ferror(sf_file)) {
+    ERROR("error writing to `%s': %m\n", path);
+    rc = -1;
+  }
+  if (fclose(sf_file) < 0) {
+    ERROR("error closing `%s': %m\n", path);
+    rc = -1;
+  }
+  out:
+    return rc;
+}
+
+int ring_buffer_load_file(
+  FILE *sf_file, 
+  struct sf_ring_buffer *w, 
+  const char *host, 
+  const char *port, 
+  const char *queue,
+  int max_buffer_size, 
+  int allow_ring_buffer_overwrite)
+{
+  int n_stats = 0;
+  int stats_start = 0;
+  int rc = 0;
+  char *line_buf = NULL;
+  size_t line_buf_size = 0;
+
+  struct stats_buffer *sf;
+  sf = malloc(sizeof(*sf));
+  if (stats_buffer_open(sf, host, port, queue) < 0) {
+    TRACE("Failed opening data buffer : %m\n");
+    rc = -1;
+    goto out;
+  }
+  while (getline(&line_buf, &line_buf_size, sf_file) != -1)  {
+    if (line_buf[0] == '\n' && stats_start == 0)
+        continue;
+    if (line_buf[0] != '\n')  {
+      sf_printf(sf, "%s", line_buf);
+      if (stats_start == 0)
+          stats_start = 1;
+    }
+    else {
+      n_stats++;
+      rc = ring_buffer_insert(sf, w, -1, allow_ring_buffer_overwrite);
+      sf = malloc(sizeof(struct stats_buffer));
+      if (stats_buffer_open(sf, host, port, queue) < 0 || rc < 0) {
+        TRACE("Failed inserting data to buffer : %m\n");
+        rc = -1;
+        goto out;
+      }
+    }
+  }
+  rc = ring_buffer_insert(sf, w, -1, allow_ring_buffer_overwrite);
+  n_stats++;
+  w->l_count += n_stats;
+  TRACE("Loaded %d stats from dumpfile\n", n_stats);
+
+  out:
+    return rc;
 }
