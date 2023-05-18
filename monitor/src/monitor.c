@@ -629,9 +629,9 @@ int main(int argc, char *argv[])
   fprintf(log_stream, "Started %s\n", app_name);
 
   /* Create directory for dumpfiles */
-  if (mkdir("/tmp/taccstats", 0777) < 0) {
+  if (mkdir(dumpfile_dir, 0777) < 0) {
     if (errno != EEXIST)
-      ERROR("Cannot create directory /tmp/taccstats\n");
+      ERROR("Cannot create directory %s\n", dumpfile_dir);
   }
 
   if (get_dumpfile_number() > 0) {
