@@ -233,23 +233,26 @@ int stats_buffer_write(struct stats_buffer *sf)
       sf_printf(sf, "\n");
     }
   }
-  if ((double)rand() / (double)RAND_MAX < 0)
+  rc = send(sf);
+
+  /* For debugging */
+  /*if ((double)rand() / (double)RAND_MAX < 0.9)
     rc = -1;
   else
-    rc = 0;
-    //rc = send(sf);
+    rc = 0;*/
  out:
   return rc;
 }
 
-// A modified send function with a controllable failure rate
+// A modified send function with a controllable failure rate (for debugging)
 int stats_buffer_resend(struct stats_buffer *sf)
 {
-  if ((double)rand() / (double)RAND_MAX < 0)
+  /* For debugging */
+  /*if ((double)rand() / (double)RAND_MAX < 0)
     return -1;
   else
-    return 0;
-    //return send(sf);
+    return 0;*/
+  return send(sf);
 }
 
 int ring_buffer_insert(
