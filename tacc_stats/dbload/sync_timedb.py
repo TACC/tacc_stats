@@ -286,22 +286,8 @@ if __name__ == '__main__':
                 if not stats_file.is_file() or stats_file.name.startswith('.'): continue
                 if stats_file.name.startswith("current"): continue
                 try:
-### different ways to define the date of the file: use timestamp or use the time of the last piece of data
-                    # based on filename
-                    name_fdate = datetime.fromtimestamp(int(stats_file.name))
-                    # timestamp 
-                    real_fdate = datetime.fromtimestamp(int(os.path.getmtime(stats_file)))
-                    # time of last piece of data
-                    with open(stats_file,'r') as file:
-                        lines = file.readlines()
-                    for line in reversed(lines): 
-                        if line.strip().startswith(tuple('0123456789')):
-                           last_fdate = datetime.fromtimestamp(int(float(line.strip().split()[0])))
-                           break
-                    fdate = last_fdate
-                except Exception as e:
-                       print("error in obtaining timestamp of raw data files: ", str(e))
-                       continue
+                    fdate = datetime.fromtimestamp(int(stats_file.name))
+                except: continue
                 if  fdate <= startdate - timedelta(days = 1) or fdate > enddate: continue
                 stats_files += [stats_file.path]
 
