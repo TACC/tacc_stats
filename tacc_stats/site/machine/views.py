@@ -285,12 +285,26 @@ def type_detail(request, jid, type_name):
     # Build Type Plot
     ptime = time.time()
     sp = plots.DevPlot(conj, data_host_list)
-    script,div = components(sp.plot())
+    df, plot = sp.plot() # AL vvv
+    script,div = components(plot) 
+    schema = list(df.columns)[3:]
+
+    df['dt'] = df['time'].sub(df['time'][0]).astype('timedelta64[s]')
+    df1 = df.groupby('dt')[schema].agg(['mean'])
+    df1.set_axis(schema, axis=1, inplace=True)
+    df1.reset_index(inplace=True)
+
+    stats=[]
+
+    for t in range(len(df1)):
+        stats.append((df1['dt'][t], df1.loc[t, schema].values.flatten().tolist())) # AL ^^^
+
     print("type plot time: {0:.1f}".format(time.time()-ptime))
     conj.close()
     return render(request, "machine/type_detail.html",
                   {"type_name" : type_name, "jobid" : jid, 
-                   "tscript" : script, "tdiv" : div, "logged_in" : True})
+                   "tscript" : script, "tdiv" : div, "logged_in" : True,
+                   "stats_data": stats, "schema": schema})
 
 
 class host_table:

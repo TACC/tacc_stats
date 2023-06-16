@@ -26,13 +26,14 @@ class DevPlot():
     df = df[["time", "host", event]]
 
 
-    y_range_end = 1.1*df[metric].max()
+    y_range_end = 1.1*df[event].max()
     if math.isnan(y_range_end):
         y_range_end = 0
 
+    ylabel = event + ' (' + unit+')'
 
     plot = figure(plot_width=400, plot_height=150, x_axis_type = "datetime",
-                  y_range = Range1d(-0.1, y_range_end), y_axis_label = label)
+                  y_range = Range1d(-0.1, y_range_end), y_axis_label = ylabel)
 
     for h in self.host_list:
       source = ColumnDataSource(df[df.host == h])
@@ -79,4 +80,4 @@ class DevPlot():
       if event not in df.columns: continue
       plots += [self.plot_metric(df, event, unit)]
 
-    return gridplot(plots, ncols = len(plots)//4 + 1)
+    return df, gridplot(plots, ncols = len(plots)//4 + 1)
