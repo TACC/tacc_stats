@@ -16,6 +16,7 @@
 #include "trace.h"
 
 // Assume x is always non-negative
+#define DBL_TO_LLU_PERCENT(x) ((unsigned long long)((100.0 * x)+0.5))
 #define DBL_TO_LLU(x) ((unsigned long long)((x)+0.5))
 #define LLI_TO_LLU(x) ((unsigned long long)(x))
 
@@ -40,6 +41,9 @@ static int list_field_values(
       case DCGM_FI_DEV_POWER_USAGE:
         data[gpu_id].power_usage = values[i].value.dbl;
         break;
+      /* 202 */
+      case DCGM_FI_DEV_PCIE_REPLAY_COUNTER: 
+        data[gpu_id].pcie_replay_counter = values[i].value.i64;
       /* 203 */
       case DCGM_FI_DEV_GPU_UTIL: 
         data[gpu_id].gpu_util = values[i].value.i64;
@@ -68,6 +72,10 @@ static int list_field_values(
       case DCGM_FI_PROF_SM_OCCUPANCY: 
         data[gpu_id].sm_occupancy = values[i].value.dbl;
         break;
+      /* 1004 */
+      case DCGM_FI_PROF_PIPE_TENSOR_ACTIVE: 
+        data[gpu_id].tensor_active = values[i].value.dbl;
+        break;
       /* 1006 */
       case DCGM_FI_PROF_PIPE_FP64_ACTIVE: 
         data[gpu_id].fp64_active = values[i].value.dbl;
@@ -80,6 +88,14 @@ static int list_field_values(
       case DCGM_FI_PROF_PIPE_FP16_ACTIVE: 
         data[gpu_id].fp16_active = values[i].value.dbl;
         break;
+      /* 1009 */
+      case DCGM_FI_PROF_PCIE_TX_BYTES:
+        data[gpu_id].pcie_tx_bytes = values[i].value.i64;
+        break;
+      /* 1010 */
+      case DCGM_FI_PROF_PCIE_RX_BYTES:
+        data[gpu_id].pcie_rx_bytes = values[i].value.i64;
+        break;
     }
   }
   return 0;
@@ -91,14 +107,18 @@ static int nvidia_gpu_collect_dev(struct stats *stats, int i)
   stats_set(stats, "gpu_util",     LLI_TO_LLU(dcgm_data[i].gpu_util));
   stats_set(stats, "mem_util",     LLI_TO_LLU(dcgm_data[i].mem_util));
   stats_set(stats, "power_usage",  DBL_TO_LLU(dcgm_data[i].power_usage));
-  stats_set(stats, "fp64_active",  DBL_TO_LLU(dcgm_data[i].fp64_active));
-  stats_set(stats, "fp32_active",  DBL_TO_LLU(dcgm_data[i].fp32_active));
-  stats_set(stats, "fp16_active",  DBL_TO_LLU(dcgm_data[i].fp16_active));
-  stats_set(stats, "sm_active",    DBL_TO_LLU(dcgm_data[i].sm_active));
-  stats_set(stats, "sm_occupancy", DBL_TO_LLU(dcgm_data[i].sm_occupancy));
+  stats_set(stats, "tensor_active",DBL_TO_LLU_PERCENT(dcgm_data[i].tensor_active));
+  stats_set(stats, "fp64_active",  DBL_TO_LLU_PERCENT(dcgm_data[i].fp64_active));
+  stats_set(stats, "fp32_active",  DBL_TO_LLU_PERCENT(dcgm_data[i].fp32_active));
+  stats_set(stats, "fp16_active",  DBL_TO_LLU_PERCENT(dcgm_data[i].fp16_active));
+  stats_set(stats, "sm_active",    DBL_TO_LLU_PERCENT(dcgm_data[i].sm_active));
+  stats_set(stats, "sm_occupancy", DBL_TO_LLU_PERCENT(dcgm_data[i].sm_occupancy));
   stats_set(stats, "fb_total",     LLI_TO_LLU(dcgm_data[i].fb_total));
   stats_set(stats, "fb_free",      LLI_TO_LLU(dcgm_data[i].fb_free));
   stats_set(stats, "fb_used",      LLI_TO_LLU(dcgm_data[i].fb_used));
+  stats_set(stats, "pcie_replay_counter", LLI_TO_LLU(dcgm_data[i].pcie_replay_counter));
+  stats_set(stats, "pcie_tx_bytes", LLI_TO_LLU(dcgm_data[i].pcie_tx_bytes));
+  stats_set(stats, "pcie_rx_bytes", LLI_TO_LLU(dcgm_data[i].pcie_rx_bytes));
 
   return 0;
 }
@@ -155,6 +175,7 @@ static void nvidia_gpu_collect(struct stats_type *type)
     DCGM_FI_DEV_GPU_TEMP,
     DCGM_FI_DEV_MEM_COPY_UTIL,
     DCGM_FI_DEV_GPU_UTIL,
+    DCGM_FI_PROF_PIPE_TENSOR_ACTIVE,
     DCGM_FI_PROF_PIPE_FP64_ACTIVE,
     DCGM_FI_PROF_PIPE_FP32_ACTIVE,
     DCGM_FI_PROF_PIPE_FP16_ACTIVE,
@@ -162,7 +183,10 @@ static void nvidia_gpu_collect(struct stats_type *type)
     DCGM_FI_PROF_SM_OCCUPANCY,
     DCGM_FI_DEV_FB_TOTAL,
     DCGM_FI_DEV_FB_USED,
-    DCGM_FI_DEV_FB_FREE
+    DCGM_FI_DEV_FB_FREE,
+    DCGM_FI_PROF_PCIE_TX_BYTES,
+    DCGM_FI_PROF_PCIE_RX_BYTES,
+    DCGM_FI_DEV_PCIE_REPLAY_COUNTER
   };
 
   rc = dcgmFieldGroupCreate(dcgmHandle, NFIELDS, &fieldIds[0], (char *)"fields", &fieldGroupId);
@@ -172,7 +196,7 @@ static void nvidia_gpu_collect(struct stats_type *type)
       goto out;
   }
 
-  rc = dcgmWatchFields(dcgmHandle, myGroupId, fieldGroupId, 1000000, 1, 1);
+  rc = dcgmWatchFields(dcgmHandle, myGroupId, fieldGroupId, 100000, 1, 1);
 
   if (rc != DCGM_ST_OK) {
       ERROR("Error setting watches: %s\n", errorString(rc));
@@ -183,7 +207,9 @@ static void nvidia_gpu_collect(struct stats_type *type)
       dcgm_data = (DCMG_DATA*) malloc(sizeof(*dcgm_data) * ndev);
 
       dcgmUpdateAllFields(dcgmHandle, 1);
-      
+
+      usleep(500000);
+
       rc = dcgmGetLatestValues(
         dcgmHandle, myGroupId, fieldGroupId, &list_field_values, dcgm_data);
 
