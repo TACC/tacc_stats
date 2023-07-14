@@ -69,12 +69,14 @@ def search(request):
             return HttpResponseRedirect("/machine/job/"+str(job.jid)+"/")
         except: pass
     elif 'host' in request.GET and request.GET["host"]:
-        print("try to get host")
-        return host_detail(request)
+        try: 
+            print("try to get host")
+            return host_detail(request)
+        except: pass
     else:
-        #try:
-        return index(request)
-        #except: pass
+        try:
+           return index(request)
+        except: pass
 
     return home(request, error = True)
     
