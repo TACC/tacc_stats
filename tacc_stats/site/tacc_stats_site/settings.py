@@ -4,6 +4,11 @@ import tacc_stats.cfg as cfg
 import tacc_stats.site.tacc_stats_site as tacc_stats_site
 DIR = os.path.dirname(os.path.abspath(__file__))
 
+from django.contrib.messages import constants as messages
+MESSAGE_TAGS = { 
+    messages.ERROR: 'danger',
+}
+
 DEBUG = True
 
 ADMINS = (

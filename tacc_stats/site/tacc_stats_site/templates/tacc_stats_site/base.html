@@ -27,6 +27,16 @@
     </style>
   </head>
 
+  {% if messages %}
+        <div class="messages">
+        {% for message in messages %}
+                <div class="alert {% if message.tags %}alert-{{ message.tags }}"{% endif %}>
+                        {{ message }}
+                </div>
+        {% endfor %}
+        </div>
+  {% endif %}
+
   <body>
     <div class ="container-fluid">
       <nav class="navbar navbar-default" role="navigation">

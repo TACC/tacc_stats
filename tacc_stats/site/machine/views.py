@@ -6,6 +6,8 @@ from django.core.cache import cache
 from django.db.models.functions import Cast 
 from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
 from django import forms
+from django.shortcuts import get_object_or_404
+from django.contrib import messages
 
 import os,sys,pwd
 
@@ -67,16 +69,22 @@ def search(request):
             job_objects = job_data.objects            
             job = job_objects.get(jid = request.GET['jid'])
             return HttpResponseRedirect("/machine/job/"+str(job.jid)+"/")
-        except: pass
+        except:
+            messages.error(request, "No result found in search")
+            pass
     elif 'host' in request.GET and request.GET["host"]:
         try: 
             print("try to get host")
             return host_detail(request)
-        except: pass
+        except:
+            messages.error(request, "No result found in search")
+            pass
     else:
         try:
            return index(request)
-        except: pass
+        except:
+            messages.error(request, "No result found in search")
+            pass
 
     return home(request, error = True)
     
