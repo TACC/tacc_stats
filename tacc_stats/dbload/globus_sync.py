@@ -1,6 +1,17 @@
 #!/usr/bin/env python
 
-# Most code coppied from the copius examples in the globus sdk documentation
+"""Sync a directory between two Globus endpoints. Defaults:
+
+Source: Globus Tutorial Endpoint 1: /share/godata
+Destination: Globus Tutorial Endpoint 2: /~/sync-demo/
+
+# Checkout the Destination at:
+globus.org/app/transfer?destination_id=ddb59af0-6d04-11e5-ba46-22000b92c6ec
+
+Authorization only needs to happen once, afterwards tokens are saved to disk
+(MUST BE STORED IN A SECURE LOCATION). Store data is already checked for
+previous transfers, so if this script is run twice in quick succession,
+the second run won't queue a duplicate transfer."""
 
 import json
 import sys
@@ -9,6 +20,7 @@ import six
 import argparse
 import logging
 import pprint
+import time
 from dateutil.relativedelta import relativedelta
 from dateutil.parser import parse
 from datetime import datetime
@@ -49,11 +61,16 @@ REDIRECT_URI = 'https://auth.globus.org/v2/web/auth-code'
 SCOPES = ('openid email profile '
           'urn:globus:auth:scope:transfer.api.globus.org:all')
 
-APP_NAME = 'TACC STATS DATA COPY'
+APP_NAME = 'FileSYNC TACC STATS'
 
+# ONLY run new tasks if there was a previous task and it exited with one of the
+# following statuses. This is ignored if there was no previous task.
+# The previous task is queried from the DATA_FILE
 PREVIOUS_TASK_RUN_CASES = ['SUCCEEDED', 'FAILED']
 
+# Create the destination folder if it does not already exist
 CREATE_DESTINATION_FOLDER = True
+
 
 get_input = getattr(__builtins__, 'raw_input', input)
 
@@ -145,14 +162,17 @@ def do_native_app_authentication(client_id, redirect_uri, requested_scopes=None)
 
 def check_endpoint_path(transfer_client, endpoint, path):
     """Check the endpoint path exists"""
-    try:
-        transfer_client.operation_ls(endpoint, path=path)
-    except Exception as tapie:
-        print('Failed to query endpoint "{}": {}'.format(
-            endpoint,
-            tapie.message
-        ))
-        sys.exit(1)
+    for i in range(0,10): 
+        try:
+            transfer_client.operation_ls(endpoint, path=path)
+        except Exception as tapie:
+            print('Failed to query endpoint "{}": {}'.format(
+                endpoint,
+                tapie.message
+            ))
+            time.sleep(1)
+            continue
+        return
 
 
 
@@ -240,15 +260,15 @@ def main():
         performance_file = date + '.tgz'
         tdata.add_item(PERFORMANCE_SOURCE_PATH + performance_file, PERFORMANCE_DESTINATION_PATH + performance_file)
 
-    print("Transfer Information:")
+
     pprint.pprint(tdata)
     task = transfer.submit_transfer(tdata)
     save_data_to_file(DATA_FILE, 'task', task.data)
 #    print('Transfer has been started from\n  {}:{}\nto\n  {}:{}'.format(
-#        SOURCE_ENDPOINT,
-#        ACCOUNTING_SOURCE_PATH,
-#        DESTINATION_ENDPOINT,
-#        ACCOUNTING_DESTINATION_PATH
+#    SOURCE_ENDPOINT,
+#    ACCOUNTING_SOURCE_PATH,
+#    DESTINATION_ENDPOINT,
+#    ACCOUNTING_DESTINATION_PATH
 #    ))
 
 #    url_string = 'https://globus.org/app/transfer?' + \
