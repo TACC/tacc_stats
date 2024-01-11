@@ -6,14 +6,15 @@ tacc_stats Documentation               {#mainpage}
 Developers and Maintainers
 -------
 Stephen Lien Harrell  (<mailto:sharrell@tacc.utexas.edu>) <br />
-Albert Lu (<mailto:alu@tacc.utexas.edu>) <br />
 Junjie Li (<mailto:jli@tacc.utexas.edu>) <br />
+Sangamithra Goutham (<mailto:sgoutham@tacc.utexas.edu>) <br />
 
 Developer Emeritus
 -------
 John Hammond <br />
 R. Todd Evans  <br />
 Bill Barth <br />
+Albert Lu <br />
 
 Description
 -----------------
