@@ -8,6 +8,8 @@ from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
 from django import forms
 from django.shortcuts import get_object_or_404
 from django.contrib import messages
+from cryptography.fernet import Fernet
+from django.http import HttpRequest
 
 import os,sys,pwd
 
@@ -17,6 +19,9 @@ from tacc_stats.site.machine.models import job_data, metrics_data
 from tacc_stats.site.xalt.models import run, join_run_object, lib
 import tacc_stats.cfg as cfg
 import tacc_stats.analysis.plot as plots
+
+#xalt
+from tacc_stats.site.xalt.models import run, join_run_object, lib
 
 from datetime import datetime, timedelta
 
@@ -38,6 +43,17 @@ from tacc_stats.analysis.gen.utils import read_sql, clean_dataframe
 
 class DataNotFoundException(Exception):
     pass
+
+class libset_c: 
+     def __init__(self,object_path,module_name):
+         self.module_name=module_name
+         self.object_path=object_path
+class xalt_data_c:
+     def __init__(self): 
+         self.exec_path=[]
+         self.cwd=[]
+         self.libset=[]
+          
 
 CONNECTION = "dbname={0} host=localhost user=postgres port=5432".format(cfg.dbname)
 
@@ -221,6 +237,30 @@ class job_dataDetailView(DetailView):
         j = jid_table.jid_table(job.jid)
 
         context["host_list"] = j.acct_host_list
+
+
+
+
+
+
+# xalt
+        xalt_data=xalt_data_c()
+        for r in run.objects.using('xalt').filter(job_id = job.jid):
+            if "usr" in r.exec_path.split('/'): continue
+            xalt_data.exec_path.append(r.exec_path)
+            xalt_data.cwd.append(r.cwd[0:128])
+            for join in join_run_object.objects.using('xalt').filter(run_id = r.run_id):
+                object_path = lib.objects.using('xalt').get(obj_id = join.obj_id).object_path
+                module_name = lib.objects.using('xalt').get(obj_id = join.obj_id).module_name
+                if not module_name: module_name = 'none'
+                if any(libtmp.module_name == module_name for libtmp in xalt_data.libset): continue
+                xalt_data.libset.append (libset_c(object_path = object_path, module_name = module_name))
+        xalt_data.exec_path=list(set(xalt_data.exec_path))
+        xalt_data.cwd=list(set(xalt_data.cwd))
+        xalt_data.libset=sorted(xalt_data.libset, key=lambda x:x.module_name)
+        context['xalt_data'] = xalt_data
+
+
 
         # Build Summary Plot
         ptime = time.time()
