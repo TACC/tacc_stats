@@ -69,6 +69,20 @@
 
 </br>
 
+{% if gpu_active %}
+    <table border="1">
+        <caption style="color: black;">GPU Statistics</caption>
+        <tr>
+            <td style="border: 1px solid lightgrey;"><b>Number of GPUs active:</b></td>
+            <td style="border: 1px solid lightgrey; text-align: right;"> &nbsp;&nbsp;&nbsp; {{ gpu_active }}</td>
+        </tr>
+        <tr>
+            <td style="border: 1px solid lightgrey;"><b>Max GPU Utilization:</b></td>
+            <td style="border: 1px solid lightgrey; text-align: right;"> &nbsp;&nbsp;&nbsp; {{ gpu_utilization_max }}%</td>
+        </tr>
+    </table> <br></br>
+{% endif %}
+
 <p>
 <div class="row">
 

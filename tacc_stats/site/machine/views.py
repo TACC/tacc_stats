@@ -241,7 +241,11 @@ class job_dataDetailView(DetailView):
 
 
 
-
+# gpu
+        gpu_data = read_sql("""select type,event,value from host_data where jid = '{0}' and type='nvidia_gpu' and event='utilization'""".format(job.jid), conj)
+        gpu_utilization_max = gpu_data['value'].max()
+        context["gpu_active"]=round(gpu_utilization_max/100.0)
+        context["gpu_utilization_max"]=gpu_utilization_max
 
 # xalt
         xalt_data=xalt_data_c()
