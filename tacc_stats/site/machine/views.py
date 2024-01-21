@@ -25,7 +25,7 @@ from tacc_stats.site.xalt.models import run, join_run_object, lib
 
 from datetime import datetime, timedelta
 
-from numpy import array, histogram, log, linspace
+from numpy import array, histogram, log, linspace, isnan
 
 from bokeh.embed import components
 from bokeh.layouts import gridplot
