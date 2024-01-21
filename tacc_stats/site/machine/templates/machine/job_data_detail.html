@@ -80,6 +80,10 @@
             <td style="border: 1px solid lightgrey;"><b>Max GPU Utilization:</b></td>
             <td style="border: 1px solid lightgrey; text-align: right;"> &nbsp;&nbsp;&nbsp; {{ gpu_utilization_max }}%</td>
         </tr>
+        <tr>
+            <td style="border: 1px solid lightgrey;"><b>Mean GPU Utilization:</b></td>
+             <td style="border: 1px solid lightgrey; text-align: right;">&nbsp;&nbsp;&nbsp; {{ gpu_utilization_mean|floatformat:1 }}%</td>
+        </tr>
     </table> <br></br>
 {% endif %}
 

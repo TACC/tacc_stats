@@ -242,10 +242,17 @@ class job_dataDetailView(DetailView):
 
 
 # gpu
-        gpu_data = read_sql("""select type,event,value from host_data where jid = '{0}' and type='nvidia_gpu' and event='utilization'""".format(job.jid), conj)
-        gpu_utilization_max = gpu_data['value'].max()
-        context["gpu_active"]=round(gpu_utilization_max/100.0)
-        context["gpu_utilization_max"]=gpu_utilization_max
+        try:
+          gpu_data = read_sql("""select type,event,value from host_data where jid = '{0}' and type='nvidia_gpu' and event='utilization'""".format(job.jid), conj)
+          gpu_data = gpu_data.iloc[1:-1]
+          gpu_utilization_max = gpu_data['value'].max()
+          gpu_utilization_mean = gpu_data['value'].mean()
+          if not isnan(gpu_utilization_max):
+            context["gpu_active"]=round(gpu_utilization_max/100.0)
+            context["gpu_utilization_max"]=gpu_utilization_max
+            context["gpu_utilization_mean"]=gpu_utilization_mean
+        except:
+          print("error getting gpu data")
 
 # xalt
         xalt_data=xalt_data_c()
