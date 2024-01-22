@@ -26,6 +26,7 @@ from tacc_stats.site.xalt.models import run, join_run_object, lib
 from datetime import datetime, timedelta
 
 from numpy import array, histogram, log, linspace, isnan
+from math import ceil
 
 from bokeh.embed import components
 from bokeh.layouts import gridplot
@@ -248,7 +249,7 @@ class job_dataDetailView(DetailView):
           gpu_utilization_max = gpu_data['value'].max()
           gpu_utilization_mean = gpu_data['value'].mean()
           if not isnan(gpu_utilization_max):
-            context["gpu_active"]=round(gpu_utilization_max/100.0)
+            context["gpu_active"]=ceil(gpu_utilization_max/100.0)
             context["gpu_utilization_max"]=gpu_utilization_max
             context["gpu_utilization_mean"]=gpu_utilization_mean
         except:
