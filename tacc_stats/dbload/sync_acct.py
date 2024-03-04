@@ -5,6 +5,7 @@ from datetime import timedelta, datetime
 import psycopg2
 from pgcopy import CopyManager
 
+import pandas as pd
 from pandas import read_csv, to_datetime, to_timedelta, concat
 
 import hostlist
@@ -54,13 +55,24 @@ def sync_acct(acct_file, date_str):
     print(date_str)
     conn = psycopg2.connect(CONNECTION)
     edf = read_sql("select jid from job_data where date(end_time) = '{0}' ".format(date_str), conn)
+    print("Total number of existing entries:", edf.shape[0])
 
+# Junjie: ensure job name is treated as str. 
+    data_types = {8: str}
+ 
     df = read_csv(acct_file, sep='|')
     df.rename(columns = {'JobID': 'jid', 'User': 'username', 'Account' : 'account', 'Start' : 'start_time', 
                          'End' : 'end_time', 'Submit' : 'submit_time', 'Partition' : 'queue', 
                          'Timelimit' : 'timelimit', 'JobName' : 'jobname', 'State' : 'state', 
                          'NNodes' : 'nhosts', 'ReqCPUS' : 'ncores', 'NodeList' : 'host_list'}, inplace = True)
     df["jid"] = df["jid"].apply(str)
+
+ # Junjie: in case newer slurm gives "None" time for unstarted jobs.  Older slurm prints start_time=end_time=cancelled_time.
+ ### >>>
+    df['start_time'].replace('^None$', pd.NA, inplace=True, regex=True)
+    df['start_time'].replace('^Unknown$', pd.NA, inplace=True, regex=True)
+    df['start_time'].fillna(df['end_time'], inplace=True)
+ #### <<<
 
     df["start_time"] = to_datetime(df["start_time"]).dt.tz_localize('US/Central')
     df["end_time"] = to_datetime(df["end_time"]).dt.tz_localize('US/Central')
@@ -74,6 +86,8 @@ def sync_acct(acct_file, date_str):
     df["node_hrs"] = df["nhosts"]*df["runtime"]/3600.
 
     df = df[~df["jid"].isin(edf["jid"])]
+    print("Total number of new entries:", df.shape[0])
+
 
     mgr = CopyManager(conn, 'job_data', df.columns)
     mgr.copy(df.values.tolist())
