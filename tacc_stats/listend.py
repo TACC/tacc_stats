@@ -14,8 +14,11 @@ def on_message(channel, method_frame, header_frame, body):
         #print(body)
         return
 
-    if message[0] == '$': host = message.split('\n')[1].split()[1]       
-    else: host = message.split()[2]
+    if message[0] == '$': 
+        host = message.split('\n')[1].split()[1]       
+    else: 
+        host = message.split()[2]
+        
     #if host == "localhost.localdomain": return
     host_dir = os.path.join(cfg.archive_dir, host)
     if not os.path.exists(host_dir):

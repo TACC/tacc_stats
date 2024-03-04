@@ -5,10 +5,10 @@ import math
 from multiprocessing import Pool
 from datetime import datetime, timedelta
 import time, string
-from pandas import DataFrame, to_datetime, Timedelta, concat
+from pandas import DataFrame, to_datetime, Timedelta, concat, read_sql
 import pandas
 import numpy as np
-from tacc_stats.analysis.gen.utils import read_sql, clean_dataframe
+#from tacc_stats.analysis.gen.utils import read_sql, clean_dataframe
 
 from bokeh.palettes import d3
 from bokeh.layouts import gridplot
@@ -27,7 +27,7 @@ class SummaryPlot():
     s = time.time()
 
     df = df[["time", "host", metric]]
-    df = clean_dataframe(df)
+    #df = clean_dataframe(df)
 
     y_range_end = 1.1*df[metric].max()
     if math.isnan(y_range_end):
@@ -109,7 +109,7 @@ class SummaryPlot():
 
     df["time"] = to_datetime(df["time"], utc = True)
     df["time"] = df["time"].dt.tz_convert('US/Central').dt.tz_localize(None)
-    df = clean_dataframe(df)
+#    df = clean_dataframe(df)
     
     
     plots = []
