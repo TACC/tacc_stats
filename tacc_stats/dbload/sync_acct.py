@@ -2,6 +2,9 @@
 import os,sys,time
 from datetime import timedelta, datetime
 
+# Include the below line in the code with your username and then uncomment.
+# sys.path.append("/home/yourusername/tacc_stats")
+
 import psycopg2
 from pgcopy import CopyManager
 
@@ -9,10 +12,18 @@ from pandas import read_csv, to_datetime, to_timedelta, concat
 
 import hostlist
 
-from tacc_stats.analysis.gen.utils import read_sql
-from tacc_stats import cfg
+import configparser
 
-CONNECTION = "dbname={0} user=postgres port=5432".format(cfg.dbname)
+from tacc_stats.analysis.gen.utils import read_sql
+
+cfg = configparser.ConfigParser()
+
+# NOTE: Do this - go to tacc_stats.ini and remove all the comments. Make sure only the section names and variables are there.
+
+# Include the below line in this code with your username and then uncomment.
+# cfg.read('/home/yourusername/tacc_stats/tacc_stats.ini')
+
+CONNECTION = "dbname={0} user=postgres port=5432".format(cfg.get('PORTAL', 'dbname'))
 
 query_create_jobdata_table = """CREATE TABLE IF NOT EXISTS job_data (
 jid         VARCHAR(32) NOT NULL,
@@ -99,7 +110,7 @@ if __name__ == "__main__":
 
         # Parse and convert raw stats files to pandas dataframe
         start = time.time()
-        directory = cfg.acct_path
+        directory = cfg.get('PORTAL', 'acct_path')
         
         while startdate <= enddate:            
             for entry in os.scandir(directory):
