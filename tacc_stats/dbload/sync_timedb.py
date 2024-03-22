@@ -2,7 +2,10 @@
 import psycopg2
 from pgcopy import CopyManager
 import os, sys, stat
-from multiprocessing import Pool, get_context
+import multiprocessing
+import itertools
+from multiprocessing import Pool, get_context, Lock, set_start_method
+
 from datetime import datetime, timedelta, date
 import time, string
 import subprocess
@@ -16,11 +19,18 @@ from pandas import DataFrame, to_datetime, Timedelta, Timestamp, concat
 from tacc_stats.analysis.gen.utils import read_sql
 from tacc_stats import cfg
 
+# archive toggle
+should_archive = True
+
+# debug messages
+debug = False
+
+# Thread count for database loading and archival
+thread_count = 8
+
 tgz_archive_dir = "/tacc_stats_site/ls6/tgz_archives/"
 
-thread_count = 2
 
-debug = True
 
 CONNECTION = "dbname={0} user=postgres port=5432".format(cfg.dbname)
 
@@ -43,81 +53,12 @@ intel_skx_imc_eventmap = {0x400304 : "CAS_READS,W=48", 0x400c04 : "CAS_WRITES,W=
 exclude_types = ["ib", "ib_sw", "intel_skx_cha", "ps", "sysv_shm", "tmpfs", "vfs"]
 #exclude_types = ["ib", "ib_sw", "intel_skx_cha", "proc", "ps", "sysv_shm", "tmpfs", "vfs"]
 
-query_create_hostdata_table = """CREATE TABLE IF NOT EXISTS host_data (
-                                           time  TIMESTAMPTZ NOT NULL,
-                                           host  VARCHAR(64),
-                                           jid   VARCHAR(32),
-                                           type  VARCHAR(32),
-                                           event VARCHAR(64),
-                                           unit  VARCHAR(16),                                            
-                                           value real,
-                                           delta real,
-                                           arc   real,  
-                                           UNIQUE (time, host, type, event)
-                                           );"""
 
-
-query_create_hostdata_hypertable = """CREATE EXTENSION IF NOT EXISTS timescaledb CASCADE; 
-                                      SELECT create_hypertable('host_data', 'time', if_not_exists => TRUE, chunk_time_interval => INTERVAL '1 day');
-                                      CREATE INDEX ON host_data (host, time DESC);
-                                      CREATE INDEX ON host_data (jid, time DESC);"""
-
-query_create_compression = """ALTER TABLE host_data SET \
-                              (timescaledb.compress, timescaledb.compress_orderby = 'time DESC', timescaledb.compress_segmentby = 'host,jid,type,event');
-                              SELECT add_compression_policy('host_data', INTERVAL '12h', if_not_exists => true);"""
-
-
-query_create_process_table = """CREATE TABLE IF NOT EXISTS proc_data (                                
-jid         VARCHAR(32) NOT NULL,                                                                     
-host        VARCHAR(64),
-proc        VARCHAR(512),
-UNIQUE(jid, host, proc)                                                                                     
-);"""                                                                                                 
-                                                                                                       
-query_create_process_index = "CREATE INDEX ON proc_data (jid);"                                       
-
-
-conn = psycopg2.connect(CONNECTION)
-if debug:
-    print("Postgresql server version: " + str(conn.server_version))
-
-with conn.cursor() as cur:
-
-    # This should only be used for testing and debugging purposes
-    #cur.execute("DROP TABLE IF EXISTS host_data CASCADE;")
-
-    #cur.execute(query_create_hostdata_table)
-    #cur.execute(query_create_hostdata_hypertable)
-    #cur.execute(query_create_compression)
-    cur.execute(query_create_process_table) 
-    cur.execute(query_create_process_index)
-    if debug:
-        cur.execute("SELECT pg_size_pretty(pg_database_size('{0}'));".format(cfg.dbname))
-        for x in cur.fetchall():
-            print("Database Size:", x[0])
-
-        cur.execute("SELECT chunk_name,before_compression_total_bytes/(1024*1024*1024),after_compression_total_bytes/(1024*1024*1024) FROM chunk_compression_stats('host_data');")
-        for x in cur.fetchall():
-            try: print("{0} Size: {1:8.1f} {2:8.1f}".format(*x))
-            except: pass
-    else:
-        print("Reading Chunk Data")
-
-    all_compressed_chunks = []
-    cur.execute("SELECT chunk_name, range_start,range_end,is_compressed,chunk_schema FROM timescaledb_information.chunks WHERE hypertable_name = 'host_data';")
-    for x in cur.fetchall():
-        try:
-            all_compressed_chunks.append(x)
-            if debug:
-                 print("{0} Range: {1} -> {2}".format(*x))
-        except: pass
-    conn.commit()    
-conn.close()
 
 
 # This routine will read the file until a timestamp is read that is not in the database. It then reads in the rest of the file.
-def add_stats_file_to_db(stats_file):
-
+def add_stats_file_to_db(stats_data):
+    stats_file, all_compressed_chunks = stats_data
     hostname, create_time = stats_file.split('/')[-2:]
     try:
         fdate = datetime.fromtimestamp(int(create_time))
@@ -287,7 +228,7 @@ def add_stats_file_to_db(stats_file):
         if debug:
             print("error in mrg2.copy: " , str(e))
         conn.rollback()
-        copy_data_to_pgsql_individually(conn, proc_stats, 'proc_data')
+        copy_data_to_pgsql_individually(conn, proc_stats, 'proc_data', all_compressed_chunks)
     else: 
         conn.commit()
 
@@ -299,7 +240,7 @@ def add_stats_file_to_db(stats_file):
         if debug:
             print("error in mrg.copy: " , str(e)) 
         conn.rollback()
-        copy_data_to_pgsql_individually(conn, stats, 'host_data')
+        need_archival = copy_data_to_pgsql_individually(conn, stats, 'host_data', all_compressed_chunks)
     else:
         conn.commit()
 
@@ -310,34 +251,47 @@ def add_stats_file_to_db(stats_file):
     return((stats_file, need_archival))
 
 
-def copy_data_to_pgsql_individually(conn, data, table):
+def copy_data_to_pgsql_individually(conn, data, table, all_compressed_chunks):
     # Decompress chunks if needed
     a_day = timedelta(days=1)
     if table is 'host_data':
-        file_date = to_datetime(data["time"].values[0]).replace(tzinfo=pytz.timezone('US/Central'))
-        day_before_date = file_date - a_day
-        day_after_date = file_date + a_day
+        first_date = to_datetime(data["time"].values[0]).replace(tzinfo=pytz.timezone('US/Central'))
+        last_date = to_datetime(data["time"].values[-1]).replace(tzinfo=pytz.timezone('US/Central'))
+        day_before_date = first_date - a_day
+        day_after_date = last_date + a_day
+
+        chunks_needing_decompression = []
+
         for i, chunk_data in enumerate(all_compressed_chunks):
             chunk_name, chunk_start_date, chunk_end_date, is_compressed, chunk_schema = chunk_data
 
             # decompress previous, current, and next chunk in case of overlap.
             if is_compressed and (
-              (chunk_start_date <= file_date <= chunk_end_date) or
+              (chunk_start_date <= first_date <= chunk_end_date) or
+              (chunk_start_date <= last_date <= chunk_end_date) or
               (chunk_start_date <= day_before_date <= chunk_end_date) or
               (chunk_start_date <= day_after_date <= chunk_end_date)):
 
-                with conn.cursor() as curs:
+                chunks_needing_decompression.append(all_compressed_chunks[i][4] + "." +  all_compressed_chunks[i][0])
+
+        compression_lock = Lock()
+        with compression_lock:
+            with conn.cursor() as curs:
+                for chunk_name in chunks_needing_decompression:
                     try:
-                        curs.execute("SELECT decompress_chunk('%s', true);" % (all_compressed_chunks[i][4] + "." +  all_compressed_chunks[i][0]))
+                        curs.execute("SELECT decompress_chunk('%s', true);" % chunk_name)
                         if debug:
                             print("Chunk decompressed:" + str(curs.fetchall()))
                     except Exception as e:
                         print("error in decompressing chunks: " , str(e))
                         conn.rollback()
-                        sys.exit(1)
+                        continue
                     else:
                         conn.commit()
+
     
+    need_archival = True
+    unique_violations = 0
     with conn.cursor() as curs:
         for row in data.values.tolist():
 
@@ -346,29 +300,29 @@ def copy_data_to_pgsql_individually(conn, data, table):
             sql_insert = 'INSERT INTO "%s" (%s) VALUES ' % (table, sql_columns)
             sql_insert = sql_insert + "(" + ','.join(["%s" for i in row]) + ");"
 
+
             try:
                 curs.execute(sql_insert, row)
+            except psycopg2.errors.UniqueViolation as uv:
+                # count for rows that already exist.
+                unique_violations += 1
+                conn.rollback()
             except Exception as e:
-                if debug:
-                   print("error in single insert: " , str(e), "while executing", str(sql_insert))
+                print("error in single insert: ", e.pgcode, " ", str(e), "while executing", str(sql_insert))
+                need_archival = False
                 conn.rollback()
             else:
                 conn.commit()
+    if debug:
+        print("Existing Rows Found in DB: %s" % unique_violations)
 
+    return need_archival
 
 def archive_stats_files(archive_info):
     archive_fname, stats_files = archive_info
     archive_tar_fname = archive_fname[:-3]
     if os.path.exists(archive_fname):
         print(subprocess.check_output(['/usr/bin/gunzip', '-v', archive_fname]))
-
-#    currently_archived_files = []   
-#    if os.path.exists(archive_tar_fname):
-#        try: 
-#            currently_archived_files = subprocess.check_output(['/usr/bin/tar', 'tf', archive_tar_fname]).split() 
-#        except Exception as e:
-#            if debug:
-#                 print("Error when checking for exisiting tarfile: " , str(e))
 
     existing_archive_file = {}
     if os.path.exists(archive_tar_fname):
@@ -392,8 +346,8 @@ def archive_stats_files(archive_info):
             print("file %s found in archive, skipping" % stats_fname_path)
             continue
 
-        print(subprocess.check_output(['/usr/bin/tar', 'ufv', archive_tar_fname, stats_fname_path]))
-        print("Archived:" % stats_fname_path)
+        print(subprocess.check_output(['/usr/bin/tar', 'ufv', archive_tar_fname, stats_fname_path]), flush=True)
+        print("Archived: " + stats_fname_path)
 
 
     ### VERIFY TAR AND DELETE DATA IF IT IS ARCHIVED AND HAS THE SAME FILE SIZE
@@ -410,29 +364,100 @@ def archive_stats_files(archive_info):
                os.remove(stats_fname_path)
 
 
-    print(subprocess.check_output(['/usr/bin/gzip', '-8', '-v', archive_tar_fname]))
+    print(subprocess.check_output(['/usr/bin/gzip', '-8', '-v', archive_tar_fname]), flush=True)
 
+def database_startup():
+
+    query_create_hostdata_table = """CREATE TABLE IF NOT EXISTS host_data (
+                                               time  TIMESTAMPTZ NOT NULL,
+                                               host  VARCHAR(64),
+                                               jid   VARCHAR(32),
+                                               type  VARCHAR(32),
+                                               event VARCHAR(64),
+                                               unit  VARCHAR(16),                                            
+                                               value real,
+                                               delta real,
+                                               arc   real,  
+                                               UNIQUE (time, host, type, event)
+                                               );"""
+
+
+    query_create_hostdata_hypertable = """CREATE EXTENSION IF NOT EXISTS timescaledb CASCADE; 
+                                          SELECT create_hypertable('host_data', 'time', if_not_exists => TRUE, chunk_time_interval => INTERVAL '1 day');
+                                          CREATE INDEX ON host_data (host, time DESC);
+                                          CREATE INDEX ON host_data (jid, time DESC);"""
+
+    query_create_compression = """ALTER TABLE host_data SET \
+                                  (timescaledb.compress, timescaledb.compress_orderby = 'time DESC', timescaledb.compress_segmentby = 'host,jid,type,event');
+                                  SELECT add_compression_policy('host_data', INTERVAL '12h', if_not_exists => true);"""
+
+
+    query_create_process_table = """CREATE TABLE IF NOT EXISTS proc_data (                                
+    jid         VARCHAR(32) NOT NULL,                                                                     
+    host        VARCHAR(64),
+    proc        VARCHAR(512),
+    UNIQUE(jid, host, proc)                                                                                     
+    );"""                                                                                                 
+                                                                                                           
+    query_create_process_index = "CREATE INDEX ON proc_data (jid);"                                       
+
+
+    conn = psycopg2.connect(CONNECTION)
+    if debug:
+        print("Postgresql server version: " + str(conn.server_version))
+
+    with conn.cursor() as cur:
+
+        # This should only be used for testing and debugging purposes
+        #cur.execute("DROP TABLE IF EXISTS host_data CASCADE;")
+
+        #cur.execute(query_create_hostdata_table)
+        #cur.execute(query_create_hostdata_hypertable)
+        #cur.execute(query_create_compression)
+
+    #    cur.execute(query_create_process_table) 
+    #    cur.execute(query_create_process_index)
+        cur.execute("SELECT pg_size_pretty(pg_database_size('{0}'));".format(cfg.dbname))
+        for x in cur.fetchall():
+            print("Database Size:", x[0])
+        if debug:
+            cur.execute("SELECT chunk_name,before_compression_total_bytes/(1024*1024*1024),after_compression_total_bytes/(1024*1024*1024) FROM chunk_compression_stats('host_data');")
+            for x in cur.fetchall():
+                try: print("{0} Size: {1:8.1f} {2:8.1f}".format(*x))
+                except: pass
+        else:
+            print("Reading Chunk Data")
+
+        all_compressed_chunks = []
+        cur.execute("SELECT chunk_name, range_start,range_end,is_compressed,chunk_schema FROM timescaledb_information.chunks WHERE hypertable_name = 'host_data';")
+        for x in cur.fetchall():
+            try:
+                all_compressed_chunks.append(x)
+                if debug:
+                     print("{0} Range: {1} -> {2}".format(*x))
+            except: pass
+        conn.commit()    
+    conn.close()
+    return all_compressed_chunks
 
 if __name__ == '__main__':
 
-    #while True:
-
+        all_compressed_chunks = database_startup()
         #################################################################
-
 
         try:
             startdate = datetime.strptime(sys.argv[1], "%Y-%m-%d")
         except: 
-            startdate = datetime.combine(datetime.today(), datetime.min.time()) - timedelta(days = 3)
+            startdate = datetime.combine(datetime.today(), datetime.min.time()) - timedelta(days = 10)
         try:
             enddate   = datetime.strptime(sys.argv[2], "%Y-%m-%d")
         except:
-            enddate = startdate + timedelta(days = 1)
+            enddate = startdate + timedelta(days = 10)
 
         if (len(sys.argv) > 1):  
             if sys.argv[1] == 'all':
                 startdate = 'all'
-                enddate = datetime.combine(datetime.today(), datetime.min.time()) - timedelta(days = 1)
+                enddate = datetime.combine(datetime.today(), datetime.min.time()) 
 
         print("###Date Range of stats files to ingest: {0} -> {1}####".format(startdate, enddate))
         #################################################################
@@ -458,7 +483,7 @@ if __name__ == '__main__':
                     name_fdate = datetime.fromtimestamp(int(stats_file.name))
 
                     # timestamp of rabbitmq modify
-                    mtime_fdate = datetime.fromtimestamp(int(os.path.getmtime(stats_file)))
+                    mtime_fdate = datetime.fromtimestamp(int(os.path.getmtime(stats_file.path)))
 
                     fdate=mtime_fdate
                 except Exception as e:
@@ -469,11 +494,10 @@ if __name__ == '__main__':
 
         print("Number of host stats files to process = ", len(stats_files))
         files_to_be_archived = []
-        with Pool(processes = thread_count) as pool:
-            for stats_fname, need_archival in pool.imap_unordered(add_stats_file_to_db, stats_files):
-                if need_archival: files_to_be_archived.append(stats_fname)
-                print("[{0:.1f}%] completed".format(100*stats_files.index(stats_fname)/len(stats_files)), end = "\r")
-            pool.terminate()
+        with multiprocessing.get_context('spawn').Pool(processes = thread_count) as pool:
+            for stats_fname, need_archival in pool.imap_unordered(add_stats_file_to_db, zip(stats_files, itertools.repeat(all_compressed_chunks))):
+                if should_archive and need_archival: files_to_be_archived.append(stats_fname)
+                print("[{0:.1f}%] completed".format(100*stats_files.index(stats_fname)/len(stats_files)), end = "\r", flush=True)
 
         print("loading time", time.time() - start)
         
@@ -483,18 +507,21 @@ if __name__ == '__main__':
            for line in stats_start:
                if line[0].isdigit():
                    t, jid, host = line.split()
-                   archive_fname =  os.path.join(tgz_archive_dir, datetime.fromtimestamp(float(t)).strftime("%Y-%m-%d.tar.gz"))
+                   file_date = datetime.fromtimestamp(float(t))
+                   archive_fname =  os.path.join(tgz_archive_dir, file_date.strftime("%Y-%m-%d.tar.gz"))
                    break
+
+           if file_date.date == datetime.today().date:
+               continue
+
+
            if not archive_fname:
                print("Unable to find first timestamp in %s, skipping archiving" % stats_fname)
                continue
-           if archive_fname not in ar_file_mapping:
-               ar_file_mapping[archive_fname] = []
+           if archive_fname not in ar_file_mapping: ar_file_mapping[archive_fname] = []
            ar_file_mapping[archive_fname].append(stats_fname)
 
         
-        with Pool(processes = thread_count) as pool:
+        with multiprocessing.get_context('spawn').Pool(processes = thread_count) as pool:
             for stats_files_archived in pool.imap_unordered(archive_stats_files, list(ar_file_mapping.items())):
-                print("[{0:.1f}%] completed".format(100*stats_files.index(stats_fname)/len(stats_files)), end = "\r")
-                #pass
-            pool.terminate()
+                print("[{0:.1f}%] completed".format(100*stats_files.index(stats_fname)/len(stats_files)), end = "\r", flush=True)
