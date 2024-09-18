@@ -1,0 +1,3 @@
+recursive-include tacc_stats/site/machine/templates *.html
+recursive-include tacc_stats/site/tacc_stats_site/templates *html
+recursive-include tacc_stats/site/tacc_stats_site/media *png

@@ -1,0 +1,13 @@
+*.pdf
+*.png
+jobs
+27*
+*~
+.*~
+*.pyc
+*.gz
+*.csv
+TAGS
+nightly_jobs
+nightlies
+

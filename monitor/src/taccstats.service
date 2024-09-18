@@ -1,0 +1,13 @@
+[Unit]
+Description=Job-level Monitoring Service
+
+[Service]
+Type=simple
+ExecStart=/usr/sbin/tacc_statsd -c CONFIGFILE
+ExecReload=/bin/kill -HUP $MAINPID
+Restart=always
+RestartSec=10
+KillSignal=SIGINT
+
+[Install]
+WantedBy=multi-user.target
