@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 import os,sys, pwd
+sys.path.append("/home/sg99/tacc_stats")
 from datetime import timedelta, datetime
 from dateutil.parser import parse
 from fcntl import flock, LOCK_EX, LOCK_NB
@@ -9,7 +10,7 @@ django.setup()
 from tacc_stats.site.machine.models import Job, Host, Libraries
 from tacc_stats.site.xalt.models import run, join_run_object, lib
 from tacc_stats.analysis.metrics import metrics
-import tacc_stats.cfg as cfg
+import conf_parser as cfg
 from tacc_stats.progress import progress
 from tacc_stats.daterange import daterange
 import pytz, calendar
@@ -23,7 +24,7 @@ def update_acct(date, rerun = False):
     tz = pytz.timezone('US/Central')
     ctr = 0
 
-    with open(os.path.join(cfg.acct_path, date.strftime("%Y-%m-%d") + '.txt'), encoding = "latin1") as fd:
+    with open(os.path.join(cfg.get_accounting_path(), date.strftime("%Y-%m-%d") + '.txt'), encoding = "latin1") as fd:
         nrecords = sum(1 for record in csv.DictReader(fd))
         fd.seek(0)
         
