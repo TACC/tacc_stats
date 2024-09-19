@@ -1,5 +1,6 @@
 #!/usr/bin/env python
 import os,sys, pwd
+sys.path.append("/home/sg99/tacc_stats")
 from datetime import timedelta, datetime
 import psycopg2
 
@@ -10,11 +11,11 @@ django.setup()
 from tacc_stats.site.machine.models import job_data, metrics_data
 from tacc_stats.analysis.metrics import metrics
 
-import tacc_stats.cfg as cfg
+import conf_parser as cfg
 from tacc_stats.progress import progress
 
+CONNECTION = cfg.get_db_connection_string()
 
-CONNECTION = "dbname={0} user=postgres port=5432".format(cfg.dbname)
 query_create_metric_table = """CREATE TABLE IF NOT EXISTS metrics_data (
                                            id     SERIAL PRIMARY KEY,
                                            jid    VARCHAR(32),
@@ -79,4 +80,3 @@ if __name__ == "__main__":
     while date <= enddate:
         update_metrics(date, rerun = False)
         date += timedelta(days=1)
-
