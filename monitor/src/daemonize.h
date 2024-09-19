@@ -3,8 +3,8 @@
 
 #include <stdlib.h>
 
-int pid_fd;
-char *pid_file_name;
+extern int pid_fd;
+extern char *pid_file_name;
 void daemonize();
 
 #endif

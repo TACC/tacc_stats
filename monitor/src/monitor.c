@@ -29,7 +29,7 @@ static char *server = NULL;
 static char *queue  = "default";
 static char *port   = "5672";
 
-static char dumpfile_dir[] = "/tmp/taccstats";
+static char *dumpfile_dir = "/tmp/taccstats";
 static double freq = 300;
 static int max_buffer_size = 300; // 25 hours
 static int allow_ring_buffer_overwrite = 0;

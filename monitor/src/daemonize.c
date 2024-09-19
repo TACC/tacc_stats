@@ -1,4 +1,4 @@
-#include "daemonize.h"
+//#include "daemonize.h"
 #include <fcntl.h>
 #include <string.h>
 #include <stdio.h>
@@ -7,6 +7,10 @@
 #include <unistd.h>
 
 #include <syslog.h>
+
+
+int pid_fd;
+char *pid_file_name;
 
 void daemonize()
 {
