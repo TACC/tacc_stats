@@ -2,6 +2,7 @@
 import psycopg2
 from pgcopy import CopyManager
 import os, sys, stat
+sys.path.append("/home/sg99/tacc_stats")
 import multiprocessing
 import itertools
 from multiprocessing import Pool, get_context, Lock, set_start_method
@@ -17,7 +18,8 @@ import random
 from pandas import DataFrame, to_datetime, Timedelta, Timestamp, concat
 
 from tacc_stats.analysis.gen.utils import read_sql
-from tacc_stats import cfg
+
+import conf_parser as cfg
 
 # archive toggle
 should_archive = True
@@ -28,11 +30,10 @@ debug = False
 # Thread count for database loading and archival
 thread_count = 8
 
-tgz_archive_dir = "/tacc_stats_site/ls6/tgz_archives/"
+tgz_archive_dir = cfg.get_daily_archive_dir_path()
 
 
-
-CONNECTION = "dbname={0} user=postgres port=5432".format(cfg.dbname)
+CONNECTION = cfg.get_db_connection_string()
 
 amd64_pmc_eventmap = { 0x43ff03 : "FLOPS,W=48", 0x4300c2 : "BRANCH_INST_RETIRED,W=48", 0x4300c3: "BRANCH_INST_RETIRED_MISS,W=48", 
                        0x4308af : "DISPATCH_STALL_CYCLES1,W=48", 0x43ffae :"DISPATCH_STALL_CYCLES0,W=48" }
@@ -373,6 +374,7 @@ def database_startup():
                                                host  VARCHAR(64),
                                                jid   VARCHAR(32),
                                                type  VARCHAR(32),
+					       dev   VARCHAR(64),
                                                event VARCHAR(64),
                                                unit  VARCHAR(16),                                            
                                                value real,
@@ -415,9 +417,9 @@ def database_startup():
         #cur.execute(query_create_hostdata_hypertable)
         #cur.execute(query_create_compression)
 
-    #    cur.execute(query_create_process_table) 
-    #    cur.execute(query_create_process_index)
-        cur.execute("SELECT pg_size_pretty(pg_database_size('{0}'));".format(cfg.dbname))
+        #cur.execute(query_create_process_table) 
+        #cur.execute(query_create_process_index)
+        cur.execute("SELECT pg_size_pretty(pg_database_size('{0}'));".format(cfg.get_db_name()))
         for x in cur.fetchall():
             print("Database Size:", x[0])
         if debug:
@@ -464,7 +466,7 @@ if __name__ == '__main__':
 
         # Parse and convert raw stats files to pandas dataframe
         start = time.time()
-        directory = cfg.archive_dir
+        directory = cfg.get_archive_dir_path()
 
         stats_files = []
         ar_file_mapping = {}
