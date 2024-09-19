@@ -1,13 +1,16 @@
-import time
+import os,sys,time
+sys.path.append("/home/sg99/tacc_stats")
 import psycopg2
-import tacc_stats.cfg as cfg
+import conf_parser as cfg
 from tacc_stats.analysis.gen.utils import read_sql
 
 class jid_table:
 
     def __init__(self, jid):
-        CONNECTION = "dbname=ls6_db1 host=localhost user=postgres port=5432"
 
+        CONNECTION = cfg.get_db_connection_string()
+        print("SOMETHING SHOULD PRINT\n")
+        print(CONNECTION)
         print("Initializing table for job {0}".format(jid))
 
         self.jid = jid
@@ -18,7 +21,7 @@ class jid_table:
         # Get job accounting data
         acct_data = read_sql("""select * from job_data where jid = '{0}'""".format(jid), self.conj)
         # job_data accounting host names must be converted to fqdn
-        self.acct_host_list = [h + '.' + cfg.host_name_ext for h in acct_data["host_list"].values[0]]
+        self.acct_host_list = [h + '.' + cfg.get_host_name_ext() for h in acct_data["host_list"].values[0]]
     
         self.start_time = acct_data["start_time"].dt.tz_convert('US/Central').dt.tz_localize(None).values[0]
         self.end_time = acct_data["end_time"].dt.tz_convert('US/Central').dt.tz_localize(None).values[0]
