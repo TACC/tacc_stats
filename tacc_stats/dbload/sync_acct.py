@@ -1,4 +1,3 @@
-
 #!/usr/bin/env python3
 import os,sys,time
 sys.path.append("/home/sg99/tacc_stats")
