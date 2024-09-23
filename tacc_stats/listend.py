@@ -5,7 +5,8 @@ import time
 
 from fcntl import flock, LOCK_EX, LOCK_NB
 
-sys.path.append("/home/sg99/tacc_stats")
+# Append your local repository path here:
+# sys.path.append("/home/sg99/tacc_stats")
 
 import conf_parser as cfg
 
