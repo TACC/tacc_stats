@@ -1,7 +1,8 @@
 # Django settings for tacc_stats_site project.
 import os
 import sys
-sys.path.append("/home/sg99/tacc_stats")
+# Append your local repository path here:
+# sys.path.append("/home/sg99/tacc_stats")
 import conf_parser as cfg
 
 import tacc_stats.site.tacc_stats_site as tacc_stats_site
