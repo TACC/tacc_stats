@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 import os,sys
-sys.path.append("/home/sg99/tacc_stats")
+# Append your local repository path here:
+# sys.path.append("/home/sg99/tacc_stats")
 from datetime import timedelta,datetime
 os.environ['DJANGO_SETTINGS_MODULE']='tacc_stats.site.tacc_stats_site.settings'
 import django
