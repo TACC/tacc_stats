@@ -1,5 +1,6 @@
 import os,sys,time
-sys.path.append("/home/sg99/tacc_stats")
+# Append your local repository path here:
+# sys.path.append("/home/sg99/tacc_stats")
 import psycopg2
 import conf_parser as cfg
 from tacc_stats.analysis.gen.utils import read_sql
