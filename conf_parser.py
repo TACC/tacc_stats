@@ -3,9 +3,12 @@ import os
 import sys
 import time
 
-sys.path.append("/home/sg99/tacc_stats")
+# Append your local repository path here:
+# sys.path.append("/home/sg99/tacc_stats")
 
 cfg = configparser.ConfigParser()
+
+# Append your local repository path here:
 cfg.read('/home/sg99/tacc_stats/tacc_stats.ini')
 
 def get_db_connection_string():
