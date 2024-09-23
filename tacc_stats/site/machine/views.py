@@ -1,5 +1,6 @@
 import sys
-sys.path.append("/home/sg99/tacc_stats")
+# Append your local repository path here:
+# sys.path.append("/home/sg99/tacc_stats")
 from django.http import HttpResponse, HttpResponseRedirect
 from django.shortcuts import render
 from django.views.generic import DetailView, ListView
