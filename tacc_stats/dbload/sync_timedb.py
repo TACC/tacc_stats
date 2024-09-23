@@ -2,7 +2,8 @@
 import psycopg2
 from pgcopy import CopyManager
 import os, sys, stat
-sys.path.append("/home/sg99/tacc_stats")
+# Append your local repository path here:
+# sys.path.append("/home/sg99/tacc_stats")
 import multiprocessing
 import itertools
 from multiprocessing import Pool, get_context, Lock, set_start_method
