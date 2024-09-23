@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 import os,sys, pwd
-sys.path.append("/home/sg99/tacc_stats")
+# Append your local repository path here:
+# sys.path.append("/home/sg99/tacc_stats")
 from datetime import timedelta, datetime
 from dateutil.parser import parse
 from fcntl import flock, LOCK_EX, LOCK_NB
