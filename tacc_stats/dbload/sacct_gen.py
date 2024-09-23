@@ -1,5 +1,6 @@
 import os, sys
-sys.path.append("/home/sg99/tacc_stats")
+# Append your local repository path here:
+# sys.path.append("/home/sg99/tacc_stats")
 from datetime import timedelta, date, datetime
 from dateutil.parser import parse
 import conf_parser as cfg
