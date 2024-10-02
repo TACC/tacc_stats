@@ -10,7 +10,6 @@ class jid_table:
     def __init__(self, jid):
 
         CONNECTION = cfg.get_db_connection_string()
-        print("SOMETHING SHOULD PRINT\n")
         print(CONNECTION)
         print("Initializing table for job {0}".format(jid))
 
