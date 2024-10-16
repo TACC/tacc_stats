@@ -12,7 +12,7 @@ django.setup()
 from tacc_stats.site.machine.models import job_data, metrics_data
 from tacc_stats.analysis.metrics import metrics
 
-import conf_parser as cfg
+import tacc_stats.conf_parser as cfg
 from tacc_stats.progress import progress
 
 CONNECTION = cfg.get_db_connection_string()
