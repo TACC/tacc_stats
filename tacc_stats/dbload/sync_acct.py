@@ -16,7 +16,7 @@ import hostlist
 
 from tacc_stats.analysis.gen.utils import read_sql
 
-import conf_parser as cfg
+import tacc_stats.conf_parser as cfg
 
 CONNECTION = cfg.get_db_connection_string()
 
