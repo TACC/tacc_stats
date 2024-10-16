@@ -3,7 +3,7 @@ import os
 import sys
 # Append your local repository path here:
 # sys.path.append("/home/sg99/tacc_stats")
-import conf_parser as cfg
+import tacc_stats.conf_parser as cfg
 
 import tacc_stats.site.tacc_stats_site as tacc_stats_site
 DIR = os.path.dirname(os.path.abspath(__file__))
