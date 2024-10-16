@@ -20,7 +20,7 @@ from pandas import DataFrame, to_datetime, Timedelta, Timestamp, concat
 
 from tacc_stats.analysis.gen.utils import read_sql
 
-import conf_parser as cfg
+import tacc_stats.conf_parser as cfg
 
 # archive toggle
 should_archive = True
