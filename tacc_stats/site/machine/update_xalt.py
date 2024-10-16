@@ -7,7 +7,7 @@ os.environ['DJANGO_SETTINGS_MODULE']='tacc_stats.site.tacc_stats_site.settings'
 import django
 django.setup()
 from tacc_stats.site.machine import views
-import conf_parser as cfg
+import tacc_stats.conf_parser as cfg
 from tacc_stats.site.machine.models import Job, Libraries
 from tacc_stats.site.xalt.models import run, join_run_object, lib
 
