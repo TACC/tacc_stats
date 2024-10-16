@@ -8,7 +8,7 @@ from fcntl import flock, LOCK_EX, LOCK_NB
 # Append your local repository path here:
 # sys.path.append("/home/sg99/tacc_stats")
 
-import conf_parser as cfg
+import tacc_stats.conf_parser as cfg
 
 def on_message(channel, method_frame, header_frame, body):
 
