@@ -1,6 +1,10 @@
 # Django settings for tacc_stats_site project.
 import os
-import tacc_stats.cfg as cfg
+import sys
+# Append your local repository path here:
+# sys.path.append("/home/sg99/tacc_stats")
+import tacc_stats.conf_parser as cfg
+
 import tacc_stats.site.tacc_stats_site as tacc_stats_site
 DIR = os.path.dirname(os.path.abspath(__file__))
 
@@ -20,21 +24,21 @@ MANAGERS = ADMINS
 # Give a name that is unique for the computing platform
 DATABASES = {
     'default': {
-        'ENGINE': 'django.db.backends.postgresql_psycopg2',
-        'NAME'  : '{0}'.format(cfg.dbname),
-        'USER'  : 'postgres',
-        'PASSWORD': 'taccstats',
-        'HOST': 'localhost',         
-        'PORT': '5432',               
+        'ENGINE': cfg.get_engine_name(),
+        'NAME'  : '{0}'.format(cfg.get_db_name()),
+        'USER'  : cfg.get_username(),
+        'PASSWORD': cfg.get_password(),
+        'HOST': cfg.get_host(),         
+        'PORT': cfg.get_port(),               
         },
     # Uncomment this portion if an xalt database exists
     'xalt' : {
         #'ENGINE' : 'mysql.connector.django',
-        'ENGINE' : 'django.db.backends.mysql',
-        'NAME' : 'xalt_' + cfg.machine,
-        'USER' : 'xaltUser',
-        'PASSWORD' : 'kutwgbh',
-        'HOST' : 'xalt'
+        'ENGINE' : cfg.get_xalt_engine(),
+        'NAME' : cfg.get_xalt_name(),
+        'USER' : cfg.get_xalt_user(),
+        'PASSWORD' : cfg.get_xalt_password(),
+        'HOST' : cfg.get_xalt_host()
         }        
     }
 

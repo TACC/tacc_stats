@@ -1,11 +1,13 @@
 #!/usr/bin/env python
 import os,sys
+# Append your local repository path here:
+# sys.path.append("/home/sg99/tacc_stats")
 from datetime import timedelta,datetime
 os.environ['DJANGO_SETTINGS_MODULE']='tacc_stats.site.tacc_stats_site.settings'
 import django
 django.setup()
 from tacc_stats.site.machine import views
-import tacc_stats.cfg as cfg
+import tacc_stats.conf_parser as cfg
 from tacc_stats.site.machine.models import Job, Libraries
 from tacc_stats.site.xalt.models import run, join_run_object, lib
 
@@ -50,4 +52,3 @@ for date in daterange(start, end):
             library = Libraries(object_path = object_path, module_name = module_name)
             library.save()
             library.jobs.add(obj)
-

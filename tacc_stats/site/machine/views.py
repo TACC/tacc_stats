@@ -1,3 +1,6 @@
+import sys
+# Append your local repository path here:
+# sys.path.append("/home/sg99/tacc_stats")
 from django.http import HttpResponse, HttpResponseRedirect
 from django.shortcuts import render
 from django.views.generic import DetailView, ListView
@@ -11,13 +14,13 @@ from django.contrib import messages
 from cryptography.fernet import Fernet
 from django.http import HttpRequest
 
-import os,sys,pwd
+import os,pwd
 
 from tacc_stats.analysis.metrics import metrics
 from tacc_stats.analysis.gen import jid_table
 from tacc_stats.site.machine.models import job_data, metrics_data
 from tacc_stats.site.xalt.models import run, join_run_object, lib
-import tacc_stats.cfg as cfg
+import tacc_stats.conf_parser as cfg
 import tacc_stats.analysis.plot as plots
 
 #xalt
@@ -56,7 +59,7 @@ class xalt_data_c:
          self.libset=[]
           
 
-CONNECTION = "dbname={0} host=localhost user=postgres port=5432".format(cfg.dbname)
+CONNECTION = cfg.get_db_connection_string()
 
 def home(request, error = False):
     field = {}
@@ -69,7 +72,7 @@ def home(request, error = False):
         month_dict.setdefault(y + '-' + m, [])
         month_dict[y + '-' + m].append((str(date), d))
 
-    field["machine_name"] = cfg.host_name_ext
+    field["machine_name"] = cfg.get_host_name_ext()
     field['date_list'] = sorted(month_dict.items())[::-1]
     field['error'] = error
 
@@ -299,7 +302,7 @@ class job_dataDetailView(DetailView):
 
         ### Specific to TACC Splunk 
         urlstring="https://scribe.tacc.utexas.edu:8000/en-US/app/search/search?q=search%20"
-        hoststring=urlstring + "%20host%3D" + j.acct_host_list[0] + cfg.host_name_ext
+        hoststring=urlstring + "%20host%3D" + j.acct_host_list[0] + cfg.get_host_name_ext()
         serverstring=urlstring + "%20mds*%20OR%20%20oss*"
         for host in j.acct_host_list[1:]:
             hoststring+="%20OR%20%20host%3D"+host+"*"
@@ -324,7 +327,7 @@ def type_detail(request, jid, type_name):
     # Get job accounting data
     acct_data = read_sql("""select * from job_data where jid = '{0}'""".format(jid), conj)
     # job_data accounting host names must be converted to fqdn
-    acct_host_list = [h + '.' + cfg.host_name_ext for h in acct_data["host_list"].values[0]]
+    acct_host_list = [h + '.' + cfg.get_host_name_ext() for h in acct_data["host_list"].values[0]]
     
     start_time = acct_data["start_time"].dt.tz_convert('US/Central').dt.tz_localize(None).values[0]
     end_time = acct_data["end_time"].dt.tz_convert('US/Central').dt.tz_localize(None).values[0]
@@ -479,4 +482,3 @@ class ChoiceForm(forms.Form):
     STATECHOICES = [('','')] + [(s, s) for s in states]
     print(STATECHOICES)
     state = forms.ChoiceField(choices=STATECHOICES, widget=forms.Select(choices=STATECHOICES))
-

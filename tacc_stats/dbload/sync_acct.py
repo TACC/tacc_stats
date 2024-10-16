@@ -1,5 +1,9 @@
 #!/usr/bin/env python3
 import os,sys,time
+
+# Append your local repository path here:
+# sys.path.append("/home/sg99/tacc_stats")
+
 from datetime import timedelta, datetime
 
 import psycopg2
@@ -11,9 +15,10 @@ from pandas import read_csv, to_datetime, to_timedelta, concat
 import hostlist
 
 from tacc_stats.analysis.gen.utils import read_sql
-from tacc_stats import cfg
 
-CONNECTION = "dbname={0} user=postgres port=5432".format(cfg.dbname)
+import tacc_stats.conf_parser as cfg
+
+CONNECTION = cfg.get_db_connection_string()
 
 query_create_jobdata_table = """CREATE TABLE IF NOT EXISTS job_data (
 jid         VARCHAR(32) NOT NULL,
@@ -113,7 +118,7 @@ if __name__ == "__main__":
 
         # Parse and convert raw stats files to pandas dataframe
         start = time.time()
-        directory = cfg.acct_path
+        directory = cfg.get_accounting_path()
         
         while startdate <= enddate:            
             for entry in os.scandir(directory):
