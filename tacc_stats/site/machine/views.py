@@ -20,7 +20,7 @@ from tacc_stats.analysis.metrics import metrics
 from tacc_stats.analysis.gen import jid_table
 from tacc_stats.site.machine.models import job_data, metrics_data
 from tacc_stats.site.xalt.models import run, join_run_object, lib
-import conf_parser as cfg
+import tacc_stats.conf_parser as cfg
 import tacc_stats.analysis.plot as plots
 
 #xalt
