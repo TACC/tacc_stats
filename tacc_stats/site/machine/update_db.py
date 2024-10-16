@@ -11,7 +11,7 @@ django.setup()
 from tacc_stats.site.machine.models import Job, Host, Libraries
 from tacc_stats.site.xalt.models import run, join_run_object, lib
 from tacc_stats.analysis.metrics import metrics
-import conf_parser as cfg
+import tacc_stats.conf_parser as cfg
 from tacc_stats.progress import progress
 from tacc_stats.daterange import daterange
 import pytz, calendar
