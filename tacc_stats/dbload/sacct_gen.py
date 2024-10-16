@@ -3,7 +3,7 @@ import os, sys
 # sys.path.append("/home/sg99/tacc_stats")
 from datetime import timedelta, date, datetime
 from dateutil.parser import parse
-import conf_parser as cfg
+import tacc_stats.conf_parser as cfg
 
 acct_path = cfg.get_accounting_path()
 
