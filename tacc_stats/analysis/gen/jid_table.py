@@ -2,7 +2,7 @@ import os,sys,time
 # Append your local repository path here:
 # sys.path.append("/home/sg99/tacc_stats")
 import psycopg2
-import conf_parser as cfg
+import tacc_stats.conf_parser as cfg
 from tacc_stats.analysis.gen.utils import read_sql
 
 class jid_table:
