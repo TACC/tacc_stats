@@ -4,10 +4,11 @@ from django.db import models
 from django.forms import ModelForm
 from django.contrib.postgres.fields import ArrayField
 
-from timescale.db.models.models import TimescaleModel
+from timescale.db.models.fields import TimescaleDateTimeField
+from timescale.db.models.managers import TimescaleManager
 
 class RealField(models.FloatField):
-    # Use 32 bit floats (reals) instead of 64 bit floats
+    # Make type in order to use 32 bit floats (reals) instead of 64 bit floats
     def db_type(self, connection):
         return "real"
 
@@ -94,13 +95,13 @@ class metrics_data(models.Model):
     query_create_process_index = "CREATE INDEX ON proc_data (jid);"
 """
 
+# TODO: Compression in migration.py
 
 
-
-class host_data(TimescaleModel):
-    # time field is configured in the parent class
+class host_data(models.Model):
+    time = TimescaleDateTimeField(interval="1 day")
     host = models.CharField(max_length=64, blank=True, null=True)
-    jid = models.ForeignKey(job_data, on_delete = models.CASCADE, db_column='jid', blank=True, null=True)
+    jid = models.CharField(max_length=32, blank=True, null=True)
     type = models.CharField(max_length=32, blank=True, null=True)
     dev = models.CharField(max_length=64, blank=True, null=True)
     event = models.CharField(max_length=64, blank=True, null=True)
@@ -109,6 +110,8 @@ class host_data(TimescaleModel):
     arc = RealField(null=True)
     delta = RealField(null=True)
 
+    objects = models.Manager()
+    timescale = TimescaleManager()
     class Meta:
         db_table = 'host_data'
         abstract = True
@@ -124,7 +127,7 @@ class proc_data(models.Model):
     proc = models.CharField(max_length=512, blank=True, null=True)
 
     class Meta:
-        db_table = 'host_data'
+        db_table = 'proc_data'
         unique_together = (('jid', 'host', 'proc'),)
         indexes = [
             models.Index(fields=["jid"]),
