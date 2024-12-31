@@ -2,11 +2,12 @@
 FROM python:3.6
 
 # set work directory
-WORKDIR ../../../build/
+WORKDIR ../../../build
 
 # set environment variables
 ENV PYTHONDONTWRITEBYTECODE 1
 ENV PYTHONUNBUFFERED 1
+
 
 # install dependencies
 RUN pip install --upgrade pip
@@ -15,4 +16,10 @@ RUN pip install -r requirements.txt
 
 # copy project
 COPY . .
+#RUN echo $(pwd)
+#RUN echo $(ls -la)
+RUN python setup.py install
+
+COPY tacc_stats.ini tacc_stats/site/
+#RUN cd tacc_stats/site && python manage.py migrate
 
