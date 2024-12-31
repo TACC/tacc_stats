@@ -1,0 +1,42 @@
+version: '3.8'
+
+services:
+  web:
+    build: ./
+    command: python tacc_stats/site/manage.py runserver 0.0.0.0:8000
+    volumes:
+      - ./:/usr/src/hpcstats/
+    ports:
+      - 8000:8000
+    env_file:
+      - ./.env.dev
+
+
+  db:
+    image: timescale/timescaledb:latest-pg15
+    volumes:
+      - postgres_data:/var/lib/postgresql/data/
+    environment:
+      - POSTGRES_USER=hello_django
+      - POSTGRES_PASSWORD=hello_django
+      - POSTGRES_DB=hello_django_dev
+
+  rabbitmq:
+    image: rabbitmq:4-alpine
+    container_name: 'rabbitmq'
+    ports:
+        - 5672:5672
+        - 15672:15672
+    volumes:
+        - /tmp/rabbitmq/data/:/var/lib/rabbitmq/
+        - /tmp/rabbitmq/log/:/var/log/rabbitmq
+    networks:
+        - rabbitmq_go_net
+
+networks:
+  rabbitmq_go_net:
+    driver: bridge
+
+volumes:
+      postgres_data:
+

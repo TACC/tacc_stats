@@ -20,6 +20,6 @@ COPY . .
 #RUN echo $(ls -la)
 RUN python setup.py install
 
-COPY tacc_stats.ini tacc_stats/site/
+COPY ./tacc_stats.ini .
 #RUN cd tacc_stats/site && python manage.py migrate
 
