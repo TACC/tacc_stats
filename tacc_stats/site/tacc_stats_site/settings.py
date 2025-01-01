@@ -44,9 +44,6 @@ DATABASES = {
         }        
     }
 
-# Backend for timescale-specific tables
-TIMESCALE_DB_BACKEND_BASE = "timescale.db.backends.postgresql"
-
 # Hosts/domain names that are valid for this site; required if DEBUG is False
 # See https://docs.djangoproject.com/en/1.5/ref/settings/#allowed-hosts
 #ALLOWED_HOSTS = ['*']
