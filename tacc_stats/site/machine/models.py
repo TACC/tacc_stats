@@ -1,11 +1,7 @@
 """The database models of tacc stats"""
 
 from django.db import models
-from django.forms import ModelForm
 from django.contrib.postgres.fields import ArrayField
-
-from timescale.db.models.fields import TimescaleDateTimeField
-from timescale.db.models.managers import TimescaleManager
 
 class RealField(models.FloatField):
     # Make type in order to use 32 bit floats (reals) instead of 64 bit floats
@@ -33,6 +29,7 @@ class job_data(models.Model):
 
     class Meta:
         db_table = 'job_data'
+        managed = True
     
     def __unicode__(self):
         return str(self.id)
@@ -54,7 +51,7 @@ class metrics_data(models.Model):
     value = models.FloatField(blank=True, null=True)
 
     class Meta:
-        #managed = False
+        managed = True
         db_table = 'metrics_data'
         unique_together = (('jid', 'type', 'metric'),)
 
@@ -80,6 +77,7 @@ class metrics_data(models.Model):
                                           CREATE INDEX ON host_data (host, time DESC);
                                           CREATE INDEX ON host_data (jid, time DESC);
 
+    SELECT create_hypertable('host_data', by_range('time', 86400000000));
     query_create_compression = ALTER TABLE host_data SET \
                                   (timescaledb.compress, timescaledb.compress_orderby = 'time DESC', timescaledb.compress_segmentby = 'host,jid,type,event');
                                   SELECT add_compression_policy('host_data', INTERVAL '12h', if_not_exists => true);
@@ -97,9 +95,8 @@ class metrics_data(models.Model):
 
 # TODO: Compression in migration.py
 
-
 class host_data(models.Model):
-    time = TimescaleDateTimeField(interval="1 day")
+    time = models.DateTimeField(primary_key=True)
     host = models.CharField(max_length=64, blank=True, null=True)
     jid = models.CharField(max_length=32, blank=True, null=True)
     type = models.CharField(max_length=32, blank=True, null=True)
@@ -110,11 +107,8 @@ class host_data(models.Model):
     arc = RealField(null=True)
     delta = RealField(null=True)
 
-    objects = models.Manager()
-    timescale = TimescaleManager()
     class Meta:
         db_table = 'host_data'
-        abstract = True
         unique_together = (('time', 'host', 'type', 'event'),)
         indexes = [
             models.Index(fields=["host", "time"]),
@@ -127,8 +121,12 @@ class proc_data(models.Model):
     proc = models.CharField(max_length=512, blank=True, null=True)
 
     class Meta:
+        managed = True
         db_table = 'proc_data'
         unique_together = (('jid', 'host', 'proc'),)
         indexes = [
             models.Index(fields=["jid"]),
         ]
+
+    def __unicode__(self):
+        return str(self.id)

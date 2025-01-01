@@ -44,6 +44,9 @@ DATABASES = {
         }        
     }
 
+# Backend for timescale-specific tables
+TIMESCALE_DB_BACKEND_BASE = "timescale.db.backends.postgresql"
+
 # Hosts/domain names that are valid for this site; required if DEBUG is False
 # See https://docs.djangoproject.com/en/1.5/ref/settings/#allowed-hosts
 #ALLOWED_HOSTS = ['*']
@@ -150,6 +153,9 @@ ROOT_URLCONF = 'tacc_stats.site.tacc_stats_site.urls'
 WSGI_APPLICATION = 'tacc_stats.site.tacc_stats_site.wsgi.application'
 
 INSTALLED_APPS = (
+    'tacc_stats.site.machine',
+    'tacc_stats.site.xalt',
+    'tacc_stats.site.tacc_stats_site',
     'django.contrib.auth',
     'django.contrib.contenttypes',
     'django.contrib.sessions',
@@ -163,9 +169,6 @@ INSTALLED_APPS = (
     #'django_pdf',
     # Uncomment the next line to enable admin documentation:
     # 'django.contrib.admindocs',
-    'tacc_stats.site.machine',
-    'tacc_stats.site.xalt',
-    'tacc_stats.site.tacc_stats_site',
 )
 INTERNAL_IPS = ['127.0.0.1']
 SESSION_SERIALIZER = 'django.contrib.sessions.serializers.JSONSerializer'

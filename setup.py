@@ -29,10 +29,10 @@ scripts=[
 config = ConfigParser()
 config.read("tacc_stats.ini")
 
-with open("tacc_stats/cfg.py", 'w') as fd:
-    for s in config.sections():
-        for key, val in dict(config.items(s)).items():
-            fd.write(key + " = " + "\"" + val + "\"" + '\n')
+#with open("tacc_stats/cfg.py", 'w') as fd:
+#    for s in config.sections():
+#        for key, val in dict(config.items(s)).items():
+#            fd.write(key + " = " + "\"" + val + "\"" + '\n')
 
 setup(
     name = DISTNAME,

@@ -1,4 +1,5 @@
 import sys
+import traceback
 # Append your local repository path here:
 # sys.path.append("/home/sg99/tacc_stats")
 from django.http import HttpResponse, HttpResponseRedirect
@@ -475,10 +476,23 @@ class ChoiceForm(forms.Form):
     queues = job_data.objects.distinct("queue").values_list("queue", flat = True)
     states = job_data.objects.exclude(state__contains = "CANCELLED by").distinct("state").values_list("state", flat = True)
 
-    QUEUECHOICES = [('','')] + [(q, q) for q in queues]
-    print(QUEUECHOICES)
+
+    try:
+        QUEUECHOICES = [('','')] + [(q, q) for q in queues]
+    except Exception as e:
+        print(e)
+        print("Continuing in case of makemigrations")
+      #  print(traceback.format_exc())
+        QUEUECHOICES = []
+    #print(QUEUECHOICES)
     queue = forms.ChoiceField(choices=QUEUECHOICES, widget=forms.Select(choices=QUEUECHOICES))
     
-    STATECHOICES = [('','')] + [(s, s) for s in states]
-    print(STATECHOICES)
+    try:
+        STATECHOICES = [('','')] + [(s, s) for s in states]
+    except Exception as e:
+        print(e)
+        print("Continuing in case of makemigrations")
+        #print(traceback.format_exc())
+        STATECHOICES = []
+    #print(STATECHOICES)
     state = forms.ChoiceField(choices=STATECHOICES, widget=forms.Select(choices=STATECHOICES))
