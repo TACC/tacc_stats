@@ -1,0 +1,22 @@
+# From a base rocky image
+
+dnf install docker git podman-compose
+
+# May need to use an ssh git address if you plan to commit to the report
+git clone https://github.com/TACC/tacc_stats.git
+
+cd tacc_stats
+
+git checkout sharrell-docker
+
+docker compose up --build -d
+
+# to see the startup
+docker compose logs 
+
+#you should be able to get to the website at this point, will error if no data
+
+
+
+
+
