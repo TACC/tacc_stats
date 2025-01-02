@@ -2,7 +2,7 @@
 
 dnf install docker git podman-compose
 
-# May need to use an ssh git address if you plan to commit to the report
+# May need to use an ssh git address if you plan to commit to the repo
 git clone https://github.com/TACC/tacc_stats.git 
 
 cd tacc_stats
