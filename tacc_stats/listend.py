@@ -11,6 +11,7 @@ from fcntl import flock, LOCK_EX, LOCK_NB
 import tacc_stats.conf_parser as cfg
 
 def on_message(channel, method_frame, header_frame, body):
+    print("found message: %s" % header_frame)
 
     try:
         message = body.decode()    
@@ -52,11 +53,13 @@ with open(os.path.join(os.path.dirname(os.path.realpath(__file__)), "listend_loc
         print("listend is already running")
         sys.exit()
 
+    print("Starting Connection")
     parameters = pika.ConnectionParameters(cfg.get_rmq_server())
     connection = pika.BlockingConnection(parameters)
     channel = connection.channel()
     channel.queue_declare(queue=cfg.get_rmq_queue())
     channel.basic_consume(cfg.get_rmq_queue(), on_message)
+    print("Begining Consume")
     try:
         channel.start_consuming()
     except KeyboardInterrupt:
