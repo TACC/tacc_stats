@@ -3,11 +3,17 @@
 dnf install docker git podman-compose
 
 # May need to use an ssh git address if you plan to commit to the report
-git clone https://github.com/TACC/tacc_stats.git
+git clone https://github.com/TACC/tacc_stats.git 
 
 cd tacc_stats
 
 git checkout sharrell-docker
+
+# Create env.dev file, contents:
+DEBUG=1
+SECRET_KEY=foo
+PATH=$PATH:/home/hpcstats/.local/bin
+# end contents
 
 docker compose up --build -d
 
