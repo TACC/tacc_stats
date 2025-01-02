@@ -147,7 +147,7 @@ MIDDLEWARE = (
 
 ROOT_URLCONF = 'tacc_stats.site.tacc_stats_site.urls'
 # Python dotted path to the WSGI application used by Django's runserver.
-WSGI_APPLICATION = 'tacc_stats.site.tacc_stats_site.wsgi.application'
+WSGI_APPLICATION = 'tacc_stats.site.tacc_stats_site.wsgi'
 
 INSTALLED_APPS = (
     'tacc_stats.site.machine',
