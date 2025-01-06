@@ -3,7 +3,7 @@ services:
     build: ./
     command: /usr/bin/supervisord
     volumes:
-      - hpcstats_data:/hpcstats/
+      - /home/sharrell/compose_test/hpcstats_data/:/hpcstats/
     env_file:
       - ./.env.dev
 
@@ -43,8 +43,6 @@ volumes:
       postgres_data:
 
       rabbitmq_messages:
-
-      hpcstats_data:
       
       
 

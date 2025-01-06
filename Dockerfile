@@ -21,9 +21,11 @@ RUN pip install -r requirements.txt
 
 # copy project
 COPY --chown=hpcstats:hpcstats . .
-RUN pip install .
+# This includes the tacc_stats.ini
+#COPY --chown=hpcstats:hpcstats ./tacc_stats.ini .
 
-COPY --chown=hpcstats:hpcstats ./tacc_stats.ini .
+
+RUN pip install .
 
 ADD services-conf/supervisord.conf /etc/supervisor/conf.d/supervisord.conf
 

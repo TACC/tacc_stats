@@ -260,21 +260,24 @@ class job_dataDetailView(DetailView):
           print("error getting gpu data")
 
 # xalt
-        xalt_data=xalt_data_c()
-        for r in run.objects.using('xalt').filter(job_id = job.jid):
+        if not cfg.get_xalt_user() == '':
+          xalt_data=xalt_data_c()
+          for r in run.objects.using('xalt').filter(job_id = job.jid):
             if "usr" in r.exec_path.split('/'): continue
             xalt_data.exec_path.append(r.exec_path)
             xalt_data.cwd.append(r.cwd[0:128])
             for join in join_run_object.objects.using('xalt').filter(run_id = r.run_id):
-                object_path = lib.objects.using('xalt').get(obj_id = join.obj_id).object_path
-                module_name = lib.objects.using('xalt').get(obj_id = join.obj_id).module_name
-                if not module_name: module_name = 'none'
-                if any(libtmp.module_name == module_name for libtmp in xalt_data.libset): continue
-                xalt_data.libset.append (libset_c(object_path = object_path, module_name = module_name))
-        xalt_data.exec_path=list(set(xalt_data.exec_path))
-        xalt_data.cwd=list(set(xalt_data.cwd))
-        xalt_data.libset=sorted(xalt_data.libset, key=lambda x:x.module_name)
-        context['xalt_data'] = xalt_data
+              object_path = lib.objects.using('xalt').get(obj_id = join.obj_id).object_path
+              module_name = lib.objects.using('xalt').get(obj_id = join.obj_id).module_name
+              if not module_name: module_name = 'none'
+              if any(libtmp.module_name == module_name for libtmp in xalt_data.libset): continue
+              xalt_data.libset.append (libset_c(object_path = object_path, module_name = module_name))
+          xalt_data.exec_path=list(set(xalt_data.exec_path))
+          xalt_data.cwd=list(set(xalt_data.cwd))
+          xalt_data.libset=sorted(xalt_data.libset, key=lambda x:x.module_name)
+          context['xalt_data'] = xalt_data
+        else:
+          xalt_data = []
 
 
 

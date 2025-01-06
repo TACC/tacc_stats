@@ -48,6 +48,7 @@ class Migration(migrations.Migration):
                 ('account', models.CharField(blank=True, max_length=64, null=True)),
                 ('queue', models.CharField(blank=True, max_length=64, null=True)),
                 ('state', models.CharField(blank=True, max_length=64, null=True)),
+                ('QOS', models.CharField(blank=True, max_length=64, null=True)),
                 ('jobname', models.TextField(blank=True, null=True)),
                 ('host_list', django.contrib.postgres.fields.ArrayField(base_field=models.TextField(), size=None)),
             ],

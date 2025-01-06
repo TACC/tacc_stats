@@ -24,6 +24,7 @@ class job_data(models.Model):
     account = models.CharField(max_length=64, blank=True, null=True)
     queue = models.CharField(max_length=64, blank=True, null=True)
     state = models.CharField(max_length=64, blank=True, null=True)
+    QOS = models.CharField(max_length=64, blank=True, null=True)
     jobname = models.TextField(blank=True, null=True)
     host_list   = ArrayField(models.TextField())
 
