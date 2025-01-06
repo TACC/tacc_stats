@@ -10,7 +10,7 @@ services:
     image: hpcperfstats
     depends_on:
       - web
-    command: /usr/bin/supervisord
+    command: /home/hpcstats/services-conf/supervisor_startup.sh
     volumes:
       - /home/sharrell/compose_test/hpcstats_data/:/hpcstats/
     env_file:

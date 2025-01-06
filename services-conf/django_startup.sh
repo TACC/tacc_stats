@@ -8,12 +8,6 @@ done
 
 echo "PostgreSQL started"
 
-# make directories if they are not there
-mkdir -pv /hpcstats/accounting
-mkdir -pv /hpcstats/archive
-mkdir -pv /hpcstats/daily_archive
-mkdir -pv /hpcstats/logs
-
 # detect if the tables are existing and create if not
 /usr/local/bin/python3 tacc_stats/site/manage.py makemigrations
 /usr/local/bin/python3 tacc_stats/site/manage.py migrate
