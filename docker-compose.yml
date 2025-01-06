@@ -1,6 +1,15 @@
 services:
   web:
     build: ./
+    image: hpcperfstats
+    command: /home/hpcstats/services-conf/django_startup.sh
+    env_file:
+      - ./.env.dev
+
+  pipeline:
+    image: hpcperfstats
+    depends_on:
+      - web
     command: /usr/bin/supervisord
     volumes:
       - /home/sharrell/compose_test/hpcstats_data/:/hpcstats/
