@@ -1,3 +1,4 @@
+services-conf/nginx.conf
 dist/
 rabbitmq-c/
 tacc_stats.egg-info/
@@ -27,6 +28,7 @@ tacc_stats/version.py
 tacc_stats/cfg.py
 *egg*
 #*
+*.swp
 tacc_stats/taccstats
 Makefile.in
 /ar-lib
