@@ -55,7 +55,7 @@ REDIRECT_URI = "https://auth.globus.org/v2/web/auth-code"
 # For more information:
 # https://docs.globus.org/api/auth/developer-guide/#register-app
 CLIENT_ID = '900c3e14-cc2e-4a8d-819f-7eb2cf2ad854'
-TOKEN_FILE = 'taccstats-tokens.json'
+TOKEN_FILE = 'hpcperfstats-tokens.json'
 DATA_FILE = 'transfer-data.json'
 REDIRECT_URI = 'https://auth.globus.org/v2/web/auth-code'
 SCOPES = ('openid email profile '

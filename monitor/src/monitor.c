@@ -29,7 +29,7 @@ static char *server = NULL;
 static char *queue  = "default";
 static char *port   = "5672";
 
-static char *dumpfile_dir = "/tmp/taccstats";
+static char *dumpfile_dir = "/tmp/hpcperfstats";
 static double freq = 300;
 static int max_buffer_size = 300; // 25 hours
 static int allow_ring_buffer_overwrite = 0;
@@ -551,7 +551,7 @@ static void usage(void)
           "  -s [SERVER]     or --server     [SERVER]     Server to send data.\n"
           "  -q [QUEUE]      or --queue      [QUEUE]      Queue to route data to on RMQ server. \n"
           "  -p [PORT]       or --port       [PORT]       Port to use (5672 is the default).\n"
-          "  -t [TMP_DIR]    or --tmp        [TMP_DIR]    Directory for dumpfiles (/tmp/taccstats is the default).\n"
+          "  -t [TMP_DIR]    or --tmp        [TMP_DIR]    Directory for dumpfiles (/tmp/hpcperfstats is the default).\n"
           "  -b [BUFFER]     or --buffer     [BUFFER]     Max size (in # of stats) for temporary in-memory storage (288 is the default).\n"
           "  -f [FREQUENCY]  or --frequency  [FREQUENCY]  Frequency to sample (300 seconds is the default).\n"
           ,

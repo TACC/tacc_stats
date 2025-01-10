@@ -5,8 +5,8 @@ AM_DISTCHECK_CONFIGURE_FLAGS = \
 
 if HAVE_SYSTEMD
 systemduserunit_DATA = \
-	taccstats.service \
-	taccstats.conf
+	hpcperfstats.service \
+	hpcperfstats.conf
 endif
 
 bin_PROGRAMS = hpcperfstatsd
@@ -171,4 +171,4 @@ stats.o: stats.x
 stats.x: Makefile
 	echo '$(patsubst %.c, X(%),$(sort $(TYPES)))' > $@
 
-EXTRA_DIST = taccstats.conf taccstats.service
+EXTRA_DIST = hpcperfstats.conf hpcperfstats.service

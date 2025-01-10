@@ -22,7 +22,7 @@ The hpcperfstats package provides the tools to monitor resource usage of HPC sys
 
 The package is split into an `autotools`-based `monitor` subpackage and a Python `setuptools`-based `hpcperfstats` subpackage.  `monitor` performs the online data collection and transmission in a production environment while `hpcperfstats` performs the data curation and analysis in an offline environment.
 
-Building and installing the `hpcperfstats-2.3.5-1.el7.x86_64.rpm` package with the `taccstats.spec` file will build and install a systemd service `taccstats`.  This service launches a daemon with an overhead of 3% on a single core when configured to sample at a frequency of 1Hz.  It is typically configured to sample at 5 minute intervals, with samples taken at the start and end of every job as well. The TACC Stats daemon, `hpcperfstatsd`, is controlled by the `taccstats` service and sends the data directly to a RabbitMQ server over the administrative ethernet network.  RabbitMQ must be installed and running on the server in order for the data to be received.
+Building and installing the `hpcperfstats-2.3.5-1.el7.x86_64.rpm` package with the `hpcperfstats.spec` file will build and install a systemd service `hpcperfstats`.  This service launches a daemon with an overhead of 3% on a single core when configured to sample at a frequency of 1Hz.  It is typically configured to sample at 5 minute intervals, with samples taken at the start and end of every job as well. The TACC Stats daemon, `hpcperfstatsd`, is controlled by the `hpcperfstats` service and sends the data directly to a RabbitMQ server over the administrative ethernet network.  RabbitMQ must be installed and running on the server in order for the data to be received.
 
 Installing the `hpcperfstats` module will setup a Django-based web application along with tools for extracting the data from the RabbitMQ server and feeding them into a PostgreSQL database.   
 
@@ -45,7 +45,7 @@ First ensure the RabbitMQ library and header file are installed on the build and
 
 `./configure; make; make install` will then successfully build the `hpcperfstatsd` executable for many systems.  If Xeon Phi coprocessors are present on your system they can be monitored with the `--enable-mic` flag.  Additionally the configuration options, `--disable-infiniband`, `--disable-lustre`, `--disable-hardware` will disable infiniband, Lustre Filesystem, and Hardware Counter monitoring which are all enabled by default. Disabling RabbitMQ will result in a legacy build of `hpcperfstatsd` that relies on the shared filesystem to transmit data.  This mode is not recommended and currently used for testing purposes only.  If libraries or header files are not found than add their paths to the include and library paths with the `CPPFLAGS` and/or `LDFLAGS` vars as is standard in autoconf based installations.  
 
-There will be a configuration file, `/etc/taccstats/taccstats.conf`, after installation.  This file contains the fields
+There will be a configuration file, `/etc/hpcperfstats/hpcperfstats.conf`, after installation.  This file contains the fields
 
 `server localhost`
 
@@ -58,17 +58,17 @@ There will be a configuration file, `/etc/taccstats/taccstats.conf`, after insta
 
 `server` should be set to the hostname or IP hosting the RabbitMQ server, `queue` to the system/cluster name that is being monitored, `port` to the RabbitMQ port (5672 is default), and `freq` to the desired sampling frequency in seconds. The file and settings can be reloaded into a running `hpcperfstatsd` daemon with a SIGHUP signal.
 
-An RPM can be built for deployment using  the `taccstats.spec` file.  The most straightforward approach to build this is to setup your rpmbuild directory then run
+An RPM can be built for deployment using  the `hpcperfstats.spec` file.  The most straightforward approach to build this is to setup your rpmbuild directory then run
 
-`rpmbuild -bb taccstats.spec`
+`rpmbuild -bb hpcperfstats.spec`
 
-The `taccstats.spec` file `sed`s the `taccstats.conf` file to the correct server and queue. These can be changed by modifying these two lines 
+The `hpcperfstats.spec` file `sed`s the `hpcperfstats.conf` file to the correct server and queue. These can be changed by modifying these two lines 
 
-`sed -i 's/localhost/stats.frontera.tacc.utexas.edu/' src/taccstats.conf`
+`sed -i 's/localhost/stats.frontera.tacc.utexas.edu/' src/hpcperfstats.conf`
 
-`sed -i 's/default/frontera/' src/taccstats.conf`
+`sed -i 's/default/frontera/' src/hpcperfstats.conf`
 
-`hpcperfstatsd` can be started, stopped, and restarted using `systemctl start taccstats`, `systemctl stop taccstats`, and `systemctl restart taccstats`.
+`hpcperfstatsd` can be started, stopped, and restarted using `systemctl start hpcperfstats`, `systemctl stop hpcperfstats`, and `systemctl restart hpcperfstats`.
 
 In order to notify `hpcperfstats` of a job beginning, echo the job id into `/var/run/TACC_jobid` on each node where the job is running.  It order to notify
 it of a job ending echo `-` into `/var/run/TACC_jobid` on each node where the job is running.  This can be accomplished in the job scheduler prolog and
@@ -154,12 +154,12 @@ and the `hpcperfstats` Python module
 $ sudo su - postgres
 $ psql
 # CREATE DATABASE machinename_db;
-# CREATE USER taccstats WITH PASSWORD 'taccstats';
-# ALTER ROLE taccstats SET client_encoding TO 'utf8';
-# ALTER ROLE taccstats SET default_transaction_isolation TO 'read committed';
-# ALTER ROLE taccstats SET timezone TO 'UTC';
-# ALTER DATABASE machinename_db OWNER TO taccstats;
-# GRANT ALL PRIVILEGES ON DATABASE machinename_db TO taccstats;
+# CREATE USER hpcperfstats WITH PASSWORD 'hpcperfstats';
+# ALTER ROLE hpcperfstats SET client_encoding TO 'utf8';
+# ALTER ROLE hpcperfstats SET default_transaction_isolation TO 'read committed';
+# ALTER ROLE hpcperfstats SET timezone TO 'UTC';
+# ALTER DATABASE machinename_db OWNER TO hpcperfstats;
+# GRANT ALL PRIVILEGES ON DATABASE machinename_db TO hpcperfstats;
 # \q
 ```
 

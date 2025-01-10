@@ -9,7 +9,7 @@ from pandas import DataFrame, to_datetime, Timedelta, concat, read_sql
 #pandas.set_option('display.max_rows', 100)
 
 
-CONNECTION = "dbname=taccstats user=postgres port=5433"
+CONNECTION = "dbname=hpcperfstats user=postgres port=5433"
 
 conn = psycopg2.connect(CONNECTION)
 print(conn.server_version)
