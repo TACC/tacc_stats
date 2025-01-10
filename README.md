@@ -1,5 +1,7 @@
 hpcperfstats Documentation               {#mainpage}
 ========================
+(Renamed from TACC Stats)
+
 
 [![DOI](https://zenodo.org/badge/21212519.svg)](https://zenodo.org/badge/latestdoi/21212519)
 
