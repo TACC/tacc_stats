@@ -7,7 +7,7 @@ from datetime import datetime, timedelta
 import time, string
 from pandas import DataFrame, to_datetime, Timedelta, concat
 import pandas
-from tacc_stats.analysis.gen.utils import read_sql, clean_dataframe
+from hpcperfstats.analysis.gen.utils import read_sql, clean_dataframe
 from bokeh.palettes import d3
 from bokeh.layouts import gridplot
 from bokeh.models import HoverTool, ColumnDataSource, Range1d

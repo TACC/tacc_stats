@@ -24,7 +24,7 @@ import time
 from dateutil.relativedelta import relativedelta
 from dateutil.parser import parse
 from datetime import datetime
-from tacc_stats.daterange import daterange
+from hpcperfstats.daterange import daterange
 
 from globus_sdk import NativeAppAuthClient, TransferClient, RefreshTokenAuthorizer, TransferData
 from globus_sdk.exc import GlobusAPIError
@@ -36,10 +36,10 @@ SOURCE_ENDPOINT = '142d715e-8939-11e9-b807-0a37f382de32'
 DESTINATION_ENDPOINT = '27363a9a-f4fc-42a6-a2a1-2369a83d2c75'
 # Copy data off of the endpoint share
 
-ACCOUNTING_SOURCE_PATH = '/scratch1/projects/tacc/tacc_stats/frontera/xms-accounting/'
+ACCOUNTING_SOURCE_PATH = '/scratch1/projects/tacc/hpcperfstats/frontera/xms-accounting/'
 ACCOUNTING_DESTINATION_PATH = '/xms-accounting/'
 
-PERFORMANCE_SOURCE_PATH = '/scratch1/projects/tacc/tacc_stats/frontera/archive/'
+PERFORMANCE_SOURCE_PATH = '/scratch1/projects/tacc/hpcperfstats/frontera/archive/'
 PERFORMANCE_DESTINATION_PATH = '/'
 
 TRANSFER_LABEL = 'TACC STATS DATA COPY'

@@ -515,7 +515,7 @@ static void signal_cb_int(EV_P_ ev_signal *sig, int revents)
   while ((type = stats_type_for_each(&i)) != NULL)
     stats_type_destroy(type);    
 
-  fprintf(log_stream, "Stopping tacc_statsd\n");
+  fprintf(log_stream, "Stopping hpcperfstatsd\n");
   if (pid_fd != -1) {
     lockf(pid_fd, F_ULOCK, 0);
     close(pid_fd);
@@ -529,7 +529,7 @@ static void signal_cb_int(EV_P_ ev_signal *sig, int revents)
 static void signal_cb_hup(EV_P_ ev_signal *sig, int revents) 
 {
   struct sf_ring_buffer *w = (struct sf_ring_buffer *)sig->data;
-  fprintf(log_stream, "Reloading tacc_statsd config file %s\n", conf_file_name);
+  fprintf(log_stream, "Reloading hpcperfstatsd config file %s\n", conf_file_name);
   read_conf_file();    
   sample_timer.repeat = freq; 
   ev_timer_again(EV_DEFAULT, &sample_timer);
@@ -622,7 +622,7 @@ int main(int argc, char *argv[])
 
   if (daemonmode) {
     if (pid_file_name == NULL)
-      pid_file_name = strdup("/var/run/tacc_statsd.pid");
+      pid_file_name = strdup("/var/run/hpcperfstatsd.pid");
     daemonize();
   }
 
@@ -643,7 +643,7 @@ int main(int argc, char *argv[])
   struct sf_ring_buffer ring_buffer;
   memset(&ring_buffer, 0, sizeof(ring_buffer));
 
-  /* Setup signal callbacks to stop tacc_statsd or reload conf file */
+  /* Setup signal callbacks to stop hpcperfstatsd or reload conf file */
   signal(SIGPIPE, SIG_IGN);
   static struct ev_signal sigint;
   sigint.data = (void *)&ring_buffer;
@@ -659,7 +659,7 @@ int main(int argc, char *argv[])
     fprintf(log_stream, "Must specify a server to send data to with -s [--server] argument or conf file.\n");
     exit(0);
   } else {
-    fprintf(log_stream, "tacc_statsd data to server %s on port %s.\n", server, port);
+    fprintf(log_stream, "hpcperfstatsd data to server %s on port %s.\n", server, port);
   }
 
   ev_stat fd_watcher;
@@ -668,19 +668,19 @@ int main(int argc, char *argv[])
   rotate_timer.data = (void *)&ring_buffer;
   ev_timer_init(&rotate_timer, rotate_timer_cb, 0.0, 86400);
   ev_timer_start(EV_DEFAULT, &rotate_timer);
-  fprintf(log_stream, "Setting tacc_statsd rotate log files every %ds\n", 86400);
+  fprintf(log_stream, "Setting hpcperfstatsd rotate log files every %ds\n", 86400);
 
   /* Initialize callback to respond to writes to job_fd */
   fd_watcher.data = (void *)&ring_buffer;
   ev_stat_init(&fd_watcher, fd_cb, JOBID_FILE_PATH, EV_READ);
   ev_stat_start(EV_DEFAULT, &fd_watcher);
-  fprintf(log_stream, "Starting tacc_statsd watching fd %s\n", JOBID_FILE_PATH);
+  fprintf(log_stream, "Starting hpcperfstatsd watching fd %s\n", JOBID_FILE_PATH);
   
   /* Initialize timer routine to collect and send data */
   sample_timer.data = (void *)&ring_buffer;
   ev_timer_init(&sample_timer, sample_timer_cb, freq, freq);   
   ev_timer_start(EV_DEFAULT, &sample_timer);
-  fprintf(log_stream, "Setting tacc_statsd sample frequency to %.1fs\n", freq);
+  fprintf(log_stream, "Setting hpcperfstatsd sample frequency to %.1fs\n", freq);
 
   nr_cpus = sysconf(_SC_NPROCESSORS_ONLN);
   processor = signature(&n_pmcs);

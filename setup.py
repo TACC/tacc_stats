@@ -3,12 +3,12 @@ from setuptools import setup, find_packages
 import os
 from configparser import ConfigParser
 
-DISTNAME = 'tacc_stats'
+DISTNAME = 'hpcperfstats'
 LICENSE = 'LGPL'
 AUTHOR = "Texas Advanced Computing Center"
 EMAIL = "sharrell@tacc.utexas.edu"
 URL = "http://www.tacc.utexas.edu"
-DOWNLOAD_URL = 'https://github.com/TACC/tacc_stats'
+DOWNLOAD_URL = 'https://github.com/TACC/hpcperfstats'
 VERSION = "2.3.5"
 
 DESCRIPTION = ("A performance monitoring and analysis package for \
@@ -18,18 +18,18 @@ TACC Stats unifies and extends the measurements taken by Linux monitoring utilit
 """
 
 scripts=[
-    'tacc_stats/analysis/metrics/update_metrics.py',
-    'tacc_stats/site/manage.py',
-    'tacc_stats/dbload/sacct_gen.py',
-    'tacc_stats/dbload/sync_acct.py',
-    'tacc_stats/dbload/sync_timedb.py',
-    'tacc_stats/listend.py'
+    'hpcperfstats/analysis/metrics/update_metrics.py',
+    'hpcperfstats/site/manage.py',
+    'hpcperfstats/dbload/sacct_gen.py',
+    'hpcperfstats/dbload/sync_acct.py',
+    'hpcperfstats/dbload/sync_timedb.py',
+    'hpcperfstats/listend.py'
     ]
 
 config = ConfigParser()
-config.read("tacc_stats.ini")
+config.read("hpcperfstats.ini")
 
-#with open("tacc_stats/cfg.py", 'w') as fd:
+#with open("hpcperfstats/cfg.py", 'w') as fd:
 #    for s in config.sections():
 #        for key, val in dict(config.items(s)).items():
 #            fd.write(key + " = " + "\"" + val + "\"" + '\n')
@@ -45,7 +45,7 @@ setup(
     download_url = DOWNLOAD_URL,
     long_description = LONG_DESCRIPTION,
     packages = find_packages(),
-    package_data = {'tacc_stats' : ['cfg.py']},
+    package_data = {'hpcperfstats' : ['cfg.py']},
     include_package_data = True,
     scripts = scripts,
     install_requires = ['argparse','numpy', 'psycopg2-binary', 'pandas', 'pgcopy',

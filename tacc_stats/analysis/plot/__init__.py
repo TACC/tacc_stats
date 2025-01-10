@@ -1,4 +1,4 @@
 # Import plots to run on data
-from tacc_stats.analysis.plot.summaryplot import SummaryPlot
-from tacc_stats.analysis.plot.heatmap import HeatMap
-from tacc_stats.analysis.plot.devplot import DevPlot
+from hpcperfstats.analysis.plot.summaryplot import SummaryPlot
+from hpcperfstats.analysis.plot.heatmap import HeatMap
+from hpcperfstats.analysis.plot.devplot import DevPlot

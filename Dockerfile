@@ -21,8 +21,8 @@ RUN pip install -r requirements.txt
 
 # copy project
 COPY --chown=hpcperfstats:hpcperfstats . .
-# This includes the tacc_stats.ini
-#COPY --chown=hpcperfstats:hpcperfstats ./tacc_stats.ini .
+# This includes the hpcperfstats.ini
+#COPY --chown=hpcperfstats:hpcperfstats ./hpcperfstats.ini .
 
 
 RUN pip install .

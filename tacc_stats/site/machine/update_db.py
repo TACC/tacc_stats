@@ -1,19 +1,19 @@
 #!/usr/bin/env python
 import os,sys, pwd
 # Append your local repository path here:
-# sys.path.append("/home/sg99/tacc_stats")
+# sys.path.append("/home/sg99/hpcperfstats")
 from datetime import timedelta, datetime
 from dateutil.parser import parse
 from fcntl import flock, LOCK_EX, LOCK_NB
-os.environ['DJANGO_SETTINGS_MODULE']='tacc_stats.site.tacc_stats_site.settings'
+os.environ['DJANGO_SETTINGS_MODULE']='hpcperfstats.site.hpcperfstats_site.settings'
 import django
 django.setup()
-from tacc_stats.site.machine.models import Job, Host, Libraries
-from tacc_stats.site.xalt.models import run, join_run_object, lib
-from tacc_stats.analysis.metrics import metrics
-import tacc_stats.conf_parser as cfg
-from tacc_stats.progress import progress
-from tacc_stats.daterange import daterange
+from hpcperfstats.site.machine.models import Job, Host, Libraries
+from hpcperfstats.site.xalt.models import run, join_run_object, lib
+from hpcperfstats.analysis.metrics import metrics
+import hpcperfstats.conf_parser as cfg
+from hpcperfstats.progress import progress
+from hpcperfstats.daterange import daterange
 import pytz, calendar
 import pickle as p
 import traceback

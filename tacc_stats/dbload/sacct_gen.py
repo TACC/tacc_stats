@@ -1,9 +1,9 @@
 import os, sys
 # Append your local repository path here:
-# sys.path.append("/home/sg99/tacc_stats")
+# sys.path.append("/home/sg99/hpcperfstats")
 from datetime import timedelta, date, datetime
 from dateutil.parser import parse
-import tacc_stats.conf_parser as cfg
+import hpcperfstats.conf_parser as cfg
 
 acct_path = cfg.get_accounting_path()
 

@@ -1,11 +1,11 @@
-# Django settings for tacc_stats_site project.
+# Django settings for hpcperfstats_site project.
 import os
 import sys
 # Append your local repository path here:
-# sys.path.append("/home/sg99/tacc_stats")
-import tacc_stats.conf_parser as cfg
+# sys.path.append("/home/sg99/hpcperfstats")
+import hpcperfstats.conf_parser as cfg
 
-import tacc_stats.site.tacc_stats_site as tacc_stats_site
+import hpcperfstats.site.hpcperfstats_site as hpcperfstats_site
 DIR = os.path.dirname(os.path.abspath(__file__))
 
 from django.contrib.messages import constants as messages
@@ -111,7 +111,7 @@ TEMPLATES = [
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
         'DIRS': [
             # insert your TEMPLATE_DIRS here
-        #    'tacc_stats_site/templates',
+        #    'hpcperfstats_site/templates',
         ],
         'APP_DIRS': True,
         'OPTIONS': {
@@ -141,14 +141,14 @@ MIDDLEWARE = (
     'django.middleware.cache.FetchFromCacheMiddleware',
 )
 
-ROOT_URLCONF = 'tacc_stats.site.tacc_stats_site.urls'
+ROOT_URLCONF = 'hpcperfstats.site.hpcperfstats_site.urls'
 # Python dotted path to the WSGI application used by Django's runserver.
-WSGI_APPLICATION = 'tacc_stats.site.tacc_stats_site.wsgi'
+WSGI_APPLICATION = 'hpcperfstats.site.hpcperfstats_site.wsgi'
 
 INSTALLED_APPS = (
-    'tacc_stats.site.machine',
-    'tacc_stats.site.xalt',
-    'tacc_stats.site.tacc_stats_site',
+    'hpcperfstats.site.machine',
+    'hpcperfstats.site.xalt',
+    'hpcperfstats.site.hpcperfstats_site',
     'django.contrib.auth',
     'django.contrib.contenttypes',
     'django.contrib.sessions',
@@ -173,7 +173,7 @@ CACHES = {
         'LOCATION': '127.0.0.1:11211',
         },
     'default': {
-        'BACKEND': 'tacc_stats.site.tacc_stats_site.cache.LargeMemcachedCache',
+        'BACKEND': 'hpcperfstats.site.hpcperfstats_site.cache.LargeMemcachedCache',
         'LOCATION': '127.0.0.1:11211',
         'TIMEOUT' : None,
         },
@@ -215,14 +215,14 @@ LOGGING = {
         'logfile': {
             'level':'INFO',
             'class':'logging.handlers.RotatingFileHandler',
-            'filename': os.path.join('/tmp', 'tacc_stats_site.log'),
+            'filename': os.path.join('/tmp', 'hpcperfstats_site.log'),
             'maxBytes': 1024*1024*15, # 15MB
             'backupCount': 10,
         },
 
     },
     'loggers': {
-        'tacc_stats_site': {
+        'hpcperfstats_site': {
             'handlers': ['logfile',],
             'level': 'INFO',
         },

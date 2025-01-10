@@ -1,19 +1,19 @@
 #!/usr/bin/env python
 import os,sys, pwd
 # Append your local repository path here:
-# sys.path.append("/home/sg99/tacc_stats")
+# sys.path.append("/home/sg99/hpcperfstats")
 from datetime import timedelta, datetime
 import psycopg2
 
-os.environ['DJANGO_SETTINGS_MODULE']='tacc_stats.site.tacc_stats_site.settings'
+os.environ['DJANGO_SETTINGS_MODULE']='hpcperfstats.site.hpcperfstats_site.settings'
 import django
 django.setup()
 
-from tacc_stats.site.machine.models import job_data, metrics_data
-from tacc_stats.analysis.metrics import metrics
+from hpcperfstats.site.machine.models import job_data, metrics_data
+from hpcperfstats.analysis.metrics import metrics
 
-import tacc_stats.conf_parser as cfg
-from tacc_stats.progress import progress
+import hpcperfstats.conf_parser as cfg
+from hpcperfstats.progress import progress
 
 CONNECTION = cfg.get_db_connection_string()
 

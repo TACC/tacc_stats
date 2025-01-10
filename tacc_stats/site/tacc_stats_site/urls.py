@@ -1,10 +1,10 @@
 from django.conf.urls import include
 from django.urls import path
 from django.views.static import serve
-from tacc_stats.site.tacc_stats_site import settings
+from hpcperfstats.site.hpcperfstats_site import settings
 from django.contrib import admin
-from tacc_stats.site.machine.views import home
-from tacc_stats.site.machine import urls
+from hpcperfstats.site.machine.views import home
+from hpcperfstats.site.machine import urls
 
 admin.autodiscover()
 urlpatterns = [
@@ -14,7 +14,7 @@ urlpatterns = [
 ]
 
 #try:
-#from tacc_stats.site.machine.agave_auth import login, logout, login_oauth, agave_oauth_callback, login_prompt
+#from hpcperfstats.site.machine.agave_auth import login, logout, login_oauth, agave_oauth_callback, login_prompt
 #print("starting TACC Stats with agave authentication")
 #urlpatterns += [
 #    path(r'login/', login_oauth, name='login'),

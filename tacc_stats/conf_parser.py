@@ -4,12 +4,12 @@ import sys
 import time
 
 # Append your local repository path here:
-# sys.path.append("/home/username/tacc_stats")
+# sys.path.append("/home/username/hpcperfstats")
 
 cfg = configparser.ConfigParser()
 
 # Append your local repository path here:
-cfg.read('tacc_stats.ini')
+cfg.read('hpcperfstats.ini')
 
 def get_db_connection_string():
     temp_string = "dbname={0} user="+cfg.get('PORTAL', 'username')+" password="+cfg.get('PORTAL', 'password')+" port="+cfg.get('PORTAL', 'port') + " host="+cfg.get('PORTAL', 'host')

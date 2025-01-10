@@ -2,7 +2,7 @@
 import os,sys,time
 
 # Append your local repository path here:
-# sys.path.append("/home/sg99/tacc_stats")
+# sys.path.append("/home/sg99/hpcperfstats")
 
 from datetime import timedelta, datetime
 
@@ -14,9 +14,9 @@ from pandas import read_csv, to_datetime, to_timedelta, concat
 
 import hostlist
 
-from tacc_stats.analysis.gen.utils import read_sql
+from hpcperfstats.analysis.gen.utils import read_sql
 
-import tacc_stats.conf_parser as cfg
+import hpcperfstats.conf_parser as cfg
 
 
 def sync_acct(acct_file, date_str):

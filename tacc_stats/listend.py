@@ -5,7 +5,7 @@ import time
 
 from fcntl import flock, LOCK_EX, LOCK_NB
 
-import tacc_stats.conf_parser as cfg
+import hpcperfstats.conf_parser as cfg
 
 
 def on_message(channel, method_frame, header_frame, body):

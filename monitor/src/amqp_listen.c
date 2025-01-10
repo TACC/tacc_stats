@@ -251,7 +251,7 @@ int main(int argc, char *argv[])
   close(STDIN_FILENO);
   close(STDOUT_FILENO);
   close(STDERR_FILENO);
-  syslog(LOG_INFO, "Starting tacc_stats consuming daemon.\n");
+  syslog(LOG_INFO, "Starting hpcperfstats consuming daemon.\n");
   consume(hostname, port, archive_dir);
 
   exit(EXIT_SUCCESS);

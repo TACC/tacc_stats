@@ -1,15 +1,15 @@
 #!/usr/bin/env python
 import os,sys
 # Append your local repository path here:
-# sys.path.append("/home/sg99/tacc_stats")
+# sys.path.append("/home/sg99/hpcperfstats")
 from datetime import timedelta,datetime
-os.environ['DJANGO_SETTINGS_MODULE']='tacc_stats.site.tacc_stats_site.settings'
+os.environ['DJANGO_SETTINGS_MODULE']='hpcperfstats.site.hpcperfstats_site.settings'
 import django
 django.setup()
-from tacc_stats.site.machine import views
-import tacc_stats.conf_parser as cfg
-from tacc_stats.site.machine.models import Job, Libraries
-from tacc_stats.site.xalt.models import run, join_run_object, lib
+from hpcperfstats.site.machine import views
+import hpcperfstats.conf_parser as cfg
+from hpcperfstats.site.machine.models import Job, Libraries
+from hpcperfstats.site.xalt.models import run, join_run_object, lib
 
 try:
     start = datetime.strptime(sys.argv[1],"%Y-%m-%d")

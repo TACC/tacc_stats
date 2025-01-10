@@ -1,10 +1,10 @@
 from django.conf.urls import url
 from django.urls import path
 from django.views.generic import DetailView, ListView
-from tacc_stats.site.machine.models import job_data
-from tacc_stats.site.machine.views import *
+from hpcperfstats.site.machine.models import job_data
+from hpcperfstats.site.machine.views import *
 
-app_name = "tacc_stats"
+app_name = "hpcperfstats"
 
 urlpatterns = [
                        path(r'', home, name='dates'),

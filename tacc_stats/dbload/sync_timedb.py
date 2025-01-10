@@ -3,7 +3,7 @@ import psycopg2
 from pgcopy import CopyManager
 import os, sys, stat
 # Append your local repository path here:
-# sys.path.append("/home/sg99/tacc_stats")
+# sys.path.append("/home/sg99/hpcperfstats")
 import multiprocessing
 import itertools
 from multiprocessing import Pool, get_context, Lock, set_start_method
@@ -18,9 +18,9 @@ import random
 #pandas.set_option('display.max_rows', 100)
 from pandas import DataFrame, to_datetime, Timedelta, Timestamp, concat
 
-from tacc_stats.analysis.gen.utils import read_sql
+from hpcperfstats.analysis.gen.utils import read_sql
 
-import tacc_stats.conf_parser as cfg
+import hpcperfstats.conf_parser as cfg
 
 # archive toggle
 should_archive = True

@@ -9,13 +9,13 @@ systemduserunit_DATA = \
 	taccstats.conf
 endif
 
-bin_PROGRAMS = tacc_statsd
+bin_PROGRAMS = hpcperfstatsd
 
-STATS_DIR_PATH = /var/log/tacc_stats
-STATS_LOCK_PATH = /var/lock/tacc_stats
+STATS_DIR_PATH = /var/log/hpcperfstats
+STATS_LOCK_PATH = /var/lock/hpcperfstats
 JOBID_FILE_PATH = /var/run/TACC_jobid
 
-tacc_statsd_CPPFLAGS = \
+hpcperfstatsd_CPPFLAGS = \
 	-D_GNU_SOURCE \
 	-DSTATS_PROGRAM=\"@PACKAGE@\" \
 	-DSTATS_VERSION=\"@PACKAGE_VERSION@\" \
@@ -24,11 +24,11 @@ tacc_statsd_CPPFLAGS = \
 	-DJOBID_FILE_PATH=\"$(JOBID_FILE_PATH)\"
 
 if DEBUG
-tacc_statsd_CPPFLAGS += \
+hpcperfstatsd_CPPFLAGS += \
 	-DDEBUG
 endif
 
-tacc_statsd_SOURCES = \
+hpcperfstatsd_SOURCES = \
 	amd64_pmc.h \
 	amd64_df.h \
 	collect.h \
@@ -53,14 +53,14 @@ tacc_statsd_SOURCES = \
 	trace.h
 
 if RABBITMQ
-tacc_statsd_SOURCES += \
+hpcperfstatsd_SOURCES += \
 	monitor.c \
 	stats_buffer.c \
 	stats_buffer.h
-tacc_statsd_CPPFLAGS += \
+hpcperfstatsd_CPPFLAGS += \
 	-DRABBITMQ
 else
-tacc_statsd_SOURCES += \
+hpcperfstatsd_SOURCES += \
 	main.c \
 	stats_file.c \
 	stats_file.h
@@ -122,17 +122,17 @@ TYPES	 += \
 	ib_sw.c
 endif
 
-tacc_statsd_LDFLAGS =
+hpcperfstatsd_LDFLAGS =
 if OPA
 TYPES	+= \
 	opa.c
-tacc_statsd_LDFLAGS += \
+hpcperfstatsd_LDFLAGS += \
 		-lpthread \
 		-lmemusage
 endif
 
 if LUSTRE
-tacc_statsd_SOURCES += \
+hpcperfstatsd_SOURCES += \
 	lustre_obd_to_mnt.c \
 	lustre_obd_to_mnt.h
 
@@ -143,23 +143,23 @@ TYPES += \
 endif
 
 if MIC
-tacc_statsd_SOURCES += \
+hpcperfstatsd_SOURCES += \
 	miclib.h 
 TYPES += \
 	mic.c
 endif
 
-tacc_statsd_SOURCES += \
+hpcperfstatsd_SOURCES += \
 	$(TYPES)
 
-tacc_statsd_LDFLAGS += \
+hpcperfstatsd_LDFLAGS += \
 	-lm
 
-nodist_tacc_statsd_SOURCES = \
+nodist_hpcperfstatsd_SOURCES = \
 	stats.x
 
 if GPU
-nodist_tacc_statsd_SOURCES += \
+nodist_hpcperfstatsd_SOURCES += \
 	nvml.h 
 TYPES += \
 	nvidia_gpu.c

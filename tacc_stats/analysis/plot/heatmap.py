@@ -1,4 +1,4 @@
-from tacc_stats.analysis.gen import utils
+from hpcperfstats.analysis.gen import utils
 import numpy
 from bokeh.plotting import figure
 from bokeh.palettes import brewer

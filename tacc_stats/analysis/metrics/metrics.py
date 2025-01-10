@@ -1,10 +1,10 @@
 import sys
 import operator, traceback
 import multiprocessing
-from tacc_stats.analysis.gen import jid_table, utils
-from tacc_stats.site.machine.models import metrics_data
+from hpcperfstats.analysis.gen import jid_table, utils
+from hpcperfstats.site.machine.models import metrics_data
 from numpy import diff, amax, zeros, maximum, mean, isnan, trapz
-from tacc_stats.analysis.gen.utils import read_sql
+from hpcperfstats.analysis.gen.utils import read_sql
 
 def _unwrap(args):
   #try:

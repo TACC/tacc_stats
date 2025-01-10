@@ -1,7 +1,7 @@
 import sys
 import traceback
 # Append your local repository path here:
-# sys.path.append("/home/sg99/tacc_stats")
+# sys.path.append("/home/sg99/hpcperfstats")
 from django.http import HttpResponse, HttpResponseRedirect
 from django.shortcuts import render
 from django.views.generic import DetailView, ListView
@@ -17,15 +17,15 @@ from django.http import HttpRequest
 
 import os,pwd
 
-from tacc_stats.analysis.metrics import metrics
-from tacc_stats.analysis.gen import jid_table
-from tacc_stats.site.machine.models import job_data, metrics_data
-from tacc_stats.site.xalt.models import run, join_run_object, lib
-import tacc_stats.conf_parser as cfg
-import tacc_stats.analysis.plot as plots
+from hpcperfstats.analysis.metrics import metrics
+from hpcperfstats.analysis.gen import jid_table
+from hpcperfstats.site.machine.models import job_data, metrics_data
+from hpcperfstats.site.xalt.models import run, join_run_object, lib
+import hpcperfstats.conf_parser as cfg
+import hpcperfstats.analysis.plot as plots
 
 #xalt
-from tacc_stats.site.xalt.models import run, join_run_object, lib
+from hpcperfstats.site.xalt.models import run, join_run_object, lib
 
 from datetime import datetime, timedelta
 
@@ -38,13 +38,13 @@ from bokeh.plotting import figure
 from bokeh.models import HoverTool
 import time
 #try:
-#from tacc_stats.site.machine.agave_auth import check_for_tokens
+#from hpcperfstats.site.machine.agave_auth import check_for_tokens
 #except:
 #pass
 
 import psycopg2
 from pandas import DataFrame, to_timedelta
-from tacc_stats.analysis.gen.utils import read_sql, clean_dataframe
+from hpcperfstats.analysis.gen.utils import read_sql, clean_dataframe
 
 class DataNotFoundException(Exception):
     pass

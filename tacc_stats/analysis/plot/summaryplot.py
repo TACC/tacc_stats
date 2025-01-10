@@ -8,7 +8,7 @@ import time, string
 from pandas import DataFrame, to_datetime, Timedelta, concat, read_sql
 import pandas
 import numpy as np
-#from tacc_stats.analysis.gen.utils import read_sql, clean_dataframe
+#from hpcperfstats.analysis.gen.utils import read_sql, clean_dataframe
 
 from bokeh.palettes import d3
 from bokeh.layouts import gridplot

@@ -1,9 +1,9 @@
 import os,sys,time
 # Append your local repository path here:
-# sys.path.append("/home/sg99/tacc_stats")
+# sys.path.append("/home/sg99/hpcperfstats")
 import psycopg2
-import tacc_stats.conf_parser as cfg
-from tacc_stats.analysis.gen.utils import read_sql
+import hpcperfstats.conf_parser as cfg
+from hpcperfstats.analysis.gen.utils import read_sql
 
 class jid_table:
 

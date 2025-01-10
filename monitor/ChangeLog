@@ -1,2 +1,2 @@
-3/24/2016 The TACC Stats online monitoring binary, tacc_stats, is now built using autotools.
+3/24/2016 The TACC Stats online monitoring binary, hpcperfstats, is now built using autotools.
 	The binary can be built in a cron driven mode or a daemon driven mode (preferred).

@@ -140,7 +140,7 @@ int main(int argc, char *argv[])
   else
     FATAL("invalid command `%s'\n", cmd_str);
 
-  // Ensures only one tacc_stats is running at any time
+  // Ensures only one hpcperfstats is running at any time
   lock_fd = open_lock_timeout(STATS_LOCK_PATH, lock_timeout);
   if (lock_fd < 0)
     FATAL("cannot acquire lock\n");
