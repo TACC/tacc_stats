@@ -2,7 +2,7 @@ services:
   web:
     build: ./
     image: hpcperfstats
-    command: /home/hpcstats/services-conf/django_startup.sh
+    command: /home/hpcperfstats/services-conf/django_startup.sh
     env_file:
       - ./.env.dev
 
@@ -10,9 +10,9 @@ services:
     image: hpcperfstats
     depends_on:
       - web
-    command: /home/hpcstats/services-conf/supervisor_startup.sh
+    command: /home/hpcperfstats/services-conf/supervisor_startup.sh
     volumes:
-      - /home/sharrell/compose_test/hpcstats_data/:/hpcstats/
+      - hpcperfstatsdata:/hpcperfstats/
     env_file:
       - ./.env.dev
 
@@ -31,8 +31,8 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data/
     environment:
-      - POSTGRES_USER=hpcstats
-      - POSTGRES_PASSWORD=hpcstats
+      - POSTGRES_USER=hpcperfstats
+      - POSTGRES_PASSWORD=hpcperfstats
 
   rabbitmq:
     image: rabbitmq:4-alpine
@@ -52,6 +52,10 @@ volumes:
       postgres_data:
 
       rabbitmq_messages:
-      
-      
 
+      hpcperfstatsdata:
+        driver: local
+        driver_opts:
+          type: none
+          device: /home/sharrell/compose_test/hpcperfstats_data/
+          o: bind

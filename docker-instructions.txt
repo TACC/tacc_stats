@@ -12,7 +12,7 @@ git checkout sharrell-docker
 # Create env.dev file, contents:
 DEBUG=1
 SECRET_KEY=foo
-PATH=$PATH:/home/hpcstats/.local/bin
+PATH=$PATH:/home/hpcperfstats/.local/bin
 # end contents
 
 # In service-conf, nginx.conf needs to be chosen, to make things easier for development, use the nossl config, if its production use the ssl version, you can copy the nginx-nossl.conf to nginx.conf and build.

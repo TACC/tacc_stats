@@ -13,5 +13,5 @@ echo "PostgreSQL started"
 /usr/local/bin/python3 tacc_stats/site/manage.py migrate
 
 # then run this (gunicorn later)
-/usr/local/bin/gunicorn tacc_stats.site.tacc_stats_site.wsgi --bind 0.0.0.0:8000  --env DJANGO_SETTINGS_MODULE=tacc_stats.site.tacc_stats_site.settings
+/usr/local/bin/gunicorn tacc_stats.site.tacc_stats_site.wsgi --bind 0.0.0.0:8000  --env DJANGO_SETTINGS_MODULE=tacc_stats.site.tacc_stats_site.settings -u hpcperfstats
 
