@@ -369,57 +369,12 @@ def archive_stats_files(archive_info):
     print(subprocess.check_output(['/usr/bin/gzip', '-8', '-v', archive_tar_fname]), flush=True)
 
 def database_startup():
-
-    query_create_hostdata_table = """CREATE TABLE IF NOT EXISTS host_data (
-                                               time  TIMESTAMPTZ NOT NULL,
-                                               host  VARCHAR(64),
-                                               jid   VARCHAR(32),
-                                               type  VARCHAR(32),
-					       dev   VARCHAR(64),
-                                               event VARCHAR(64),
-                                               unit  VARCHAR(16),                                            
-                                               value real,
-                                               delta real,
-                                               arc   real,  
-                                               UNIQUE (time, host, type, event)
-                                               );"""
-
-
-    query_create_hostdata_hypertable = """CREATE EXTENSION IF NOT EXISTS timescaledb CASCADE; 
-                                          SELECT create_hypertable('host_data', 'time', if_not_exists => TRUE, chunk_time_interval => INTERVAL '1 day');
-                                          CREATE INDEX ON host_data (host, time DESC);
-                                          CREATE INDEX ON host_data (jid, time DESC);"""
-
-    query_create_compression = """ALTER TABLE host_data SET \
-                                  (timescaledb.compress, timescaledb.compress_orderby = 'time DESC', timescaledb.compress_segmentby = 'host,jid,type,event');
-                                  SELECT add_compression_policy('host_data', INTERVAL '12h', if_not_exists => true);"""
-
-
-    query_create_process_table = """CREATE TABLE IF NOT EXISTS proc_data (                                
-    jid         VARCHAR(32) NOT NULL,                                                                     
-    host        VARCHAR(64),
-    proc        VARCHAR(512),
-    UNIQUE(jid, host, proc)                                                                                     
-    );"""                                                                                                 
-                                                                                                           
-    query_create_process_index = "CREATE INDEX ON proc_data (jid);"                                       
-
-
     conn = psycopg2.connect(CONNECTION)
     if debug:
         print("Postgresql server version: " + str(conn.server_version))
 
     with conn.cursor() as cur:
 
-        # This should only be used for testing and debugging purposes
-        #cur.execute("DROP TABLE IF EXISTS host_data CASCADE;")
-
-        #cur.execute(query_create_hostdata_table)
-        #cur.execute(query_create_hostdata_hypertable)
-        #cur.execute(query_create_compression)
-
-        #cur.execute(query_create_process_table) 
-        #cur.execute(query_create_process_index)
         cur.execute("SELECT pg_size_pretty(pg_database_size('{0}'));".format(cfg.get_db_name()))
         for x in cur.fetchall():
             print("Database Size:", x[0])

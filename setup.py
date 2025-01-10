@@ -29,10 +29,10 @@ scripts=[
 config = ConfigParser()
 config.read("tacc_stats.ini")
 
-with open("tacc_stats/cfg.py", 'w') as fd:
-    for s in config.sections():
-        for key, val in dict(config.items(s)).items():
-            fd.write(key + " = " + "\"" + val + "\"" + '\n')
+#with open("tacc_stats/cfg.py", 'w') as fd:
+#    for s in config.sections():
+#        for key, val in dict(config.items(s)).items():
+#            fd.write(key + " = " + "\"" + val + "\"" + '\n')
 
 setup(
     name = DISTNAME,
@@ -49,7 +49,7 @@ setup(
     include_package_data = True,
     scripts = scripts,
     install_requires = ['argparse','numpy', 'psycopg2-binary', 'pandas', 'pgcopy',
-                        'bokeh', 'django==3.2.25', 'python-hostlist', 'PyMySQL', 'mod_wsgi',
+                        'bokeh', 'django==3.1.14', 'python-hostlist', 'PyMySQL',
                         'mysql-connector-python', 'python-memcached', 'pika', 'mysqlclient'],
     platforms = 'any',
     classifiers = [

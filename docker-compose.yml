@@ -1,0 +1,61 @@
+services:
+  web:
+    build: ./
+    image: hpcperfstats
+    command: /home/hpcperfstats/services-conf/django_startup.sh
+    env_file:
+      - ./.env.dev
+
+  pipeline:
+    image: hpcperfstats
+    depends_on:
+      - web
+    command: /home/hpcperfstats/services-conf/supervisor_startup.sh
+    volumes:
+      - hpcperfstatsdata:/hpcperfstats/
+    env_file:
+      - ./.env.dev
+
+  proxy:
+    restart: always
+    image: nginx:1-alpine
+    ports:
+      - 80:80
+      - 443:443
+    volumes:
+      - ./services-conf/nginx.conf:/etc/nginx/conf.d/default.conf
+      - /etc/letsencrypt/:/etc/letsencrypt/
+
+  db:
+    image: timescale/timescaledb:latest-pg15
+    volumes:
+      - postgres_data:/var/lib/postgresql/data/
+    environment:
+      - POSTGRES_USER=hpcperfstats
+      - POSTGRES_PASSWORD=hpcperfstats
+
+  rabbitmq:
+    image: rabbitmq:4-alpine
+    ports:
+        - 5672:5672
+    # Admin Console
+    #    - 15672:15672
+    volumes:
+        - rabbitmq_messages:/var/lib/rabbitmq/
+        - /var/log/rabbitmq:/var/log/rabbitmq
+
+networks:
+  default:
+    driver: bridge
+
+volumes:
+      postgres_data:
+
+      rabbitmq_messages:
+
+      hpcperfstatsdata:
+        driver: local
+        driver_opts:
+          type: none
+          device: /home/sharrell/compose_test/hpcperfstats_data/
+          o: bind

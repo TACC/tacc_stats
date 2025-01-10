@@ -13,7 +13,9 @@ MESSAGE_TAGS = {
     messages.ERROR: 'danger',
 }
 
-DEBUG = True
+# For dockerization 
+SECRET_KEY = os.environ.get("SECRET_KEY")
+DEBUG = bool(os.environ.get("DEBUG", default=0))
 
 ADMINS = (
     ('Stephen Lien Harrell', 'sharrell@tacc.utexas.edu'),
@@ -42,10 +44,10 @@ DATABASES = {
         }        
     }
 
-
 # Hosts/domain names that are valid for this site; required if DEBUG is False
 # See https://docs.djangoproject.com/en/1.5/ref/settings/#allowed-hosts
 ALLOWED_HOSTS = ['*']
+
 
 # Local time zone for this installation. Choices can be found here:
 # http://en.wikipedia.org/wiki/List_of_tz_zones_by_name
@@ -141,9 +143,12 @@ MIDDLEWARE = (
 
 ROOT_URLCONF = 'tacc_stats.site.tacc_stats_site.urls'
 # Python dotted path to the WSGI application used by Django's runserver.
-WSGI_APPLICATION = 'tacc_stats.site.tacc_stats_site.wsgi.application'
+WSGI_APPLICATION = 'tacc_stats.site.tacc_stats_site.wsgi'
 
 INSTALLED_APPS = (
+    'tacc_stats.site.machine',
+    'tacc_stats.site.xalt',
+    'tacc_stats.site.tacc_stats_site',
     'django.contrib.auth',
     'django.contrib.contenttypes',
     'django.contrib.sessions',
@@ -157,9 +162,6 @@ INSTALLED_APPS = (
     #'django_pdf',
     # Uncomment the next line to enable admin documentation:
     # 'django.contrib.admindocs',
-    'tacc_stats.site.machine',
-    'tacc_stats.site.xalt',
-    'tacc_stats.site.tacc_stats_site',
 )
 INTERNAL_IPS = ['127.0.0.1']
 SESSION_SERIALIZER = 'django.contrib.sessions.serializers.JSONSerializer'

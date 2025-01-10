@@ -18,43 +18,6 @@ from tacc_stats.analysis.gen.utils import read_sql
 
 import tacc_stats.conf_parser as cfg
 
-CONNECTION = cfg.get_db_connection_string()
-
-query_create_jobdata_table = """CREATE TABLE IF NOT EXISTS job_data (
-jid         VARCHAR(32) NOT NULL,
-submit_time TIMESTAMPTZ NOT NULL,
-start_time  TIMESTAMPTZ NOT NULL,
-end_time    TIMESTAMPTZ NOT NULL,
-runtime     REAL,
-timelimit   REAL, 
-node_hrs    REAL, 
-nhosts      INT CHECK (nhosts > 0), 
-ncores      INT CHECK (ncores > 0),
-username    VARCHAR(64) NOT NULL,
-account     VARCHAR(64),
-queue       VARCHAR(64),
-state       VARCHAR(64),
-jobname     TEXT,
-host_list   TEXT[],
-CHECK (start_time <= end_time),
-CHECK (submit_time <= start_time),
-CHECK (runtime >= 0),
-CHECK (timelimit >= 0),
-CHECK (node_hrs >= 0),
-UNIQUE(jid)
-);"""
-
-query_create_jobindex = "CREATE INDEX ON job_data (jid);"
-
-conn = psycopg2.connect(CONNECTION)
-print(conn.server_version)
-
-with conn.cursor() as cur:
-    #cur.execute("DROP TABLE IF EXISTS job_data;")
-    cur.execute(query_create_jobdata_table)
-    cur.execute(query_create_jobindex)
-    conn.commit()
-conn.close()
 
 def sync_acct(acct_file, date_str):
     print(date_str)
@@ -100,6 +63,8 @@ def sync_acct(acct_file, date_str):
     conn.close()
     
 if __name__ == "__main__":
+        CONNECTION = cfg.get_db_connection_string()
+        conn = psycopg2.connect(CONNECTION)
 
 #    while True:
 
@@ -119,6 +84,7 @@ if __name__ == "__main__":
         # Parse and convert raw stats files to pandas dataframe
         start = time.time()
         directory = cfg.get_accounting_path()
+
         
         while startdate <= enddate:            
             for entry in os.scandir(directory):
@@ -129,4 +95,4 @@ if __name__ == "__main__":
             startdate += timedelta(days=1)
         print("loading time", time.time() - start)
 
-        #time.sleep(900)
+        time.sleep(900)
