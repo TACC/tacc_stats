@@ -27,5 +27,7 @@ COPY --chown=hpcperfstats:hpcperfstats . .
 
 RUN pip install .
 
+RUN mkdir -p /hpcperfstats/
+
 ADD services-conf/supervisord.conf /etc/supervisor/conf.d/supervisord.conf
 

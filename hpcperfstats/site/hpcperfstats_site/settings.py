@@ -215,7 +215,7 @@ LOGGING = {
         'logfile': {
             'level':'INFO',
             'class':'logging.handlers.RotatingFileHandler',
-            'filename': os.path.join('/tmp', 'hpcperfstats_site.log'),
+            'filename': os.path.join('/hpcperfstats/logs/', 'hpcperfstats_site.log'),
             'maxBytes': 1024*1024*15, # 15MB
             'backupCount': 10,
         },

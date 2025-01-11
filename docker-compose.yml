@@ -5,6 +5,8 @@ services:
     command: /home/hpcperfstats/services-conf/django_startup.sh
     env_file:
       - ./.env.dev
+    volumes:
+      - hpcperfstatsweblog:/hpcperfstats/logs/
 
   pipeline:
     image: hpcperfstats
@@ -52,10 +54,17 @@ volumes:
       postgres_data:
 
       rabbitmq_messages:
-
+      
       hpcperfstatsdata:
         driver: local
         driver_opts:
           type: none
           device: /home/sharrell/compose_test/hpcperfstats_data/
+          o: bind
+      
+      hpcperfstatsweblog:
+        driver: local
+        driver_opts:
+          type: none
+          device: /home/sharrell/compose_test/hpcperfstats_log
           o: bind

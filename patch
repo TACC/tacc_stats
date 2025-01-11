@@ -1,0 +1,57 @@
+diff --git a/Dockerfile b/Dockerfile
+index cb18d17..ba490eb 100644
+--- a/Dockerfile
++++ b/Dockerfile
+@@ -27,5 +27,7 @@ COPY --chown=hpcperfstats:hpcperfstats . .
+ 
+ RUN pip install .
+ 
++RUN mkdir -p /hpcperfstats/
++
+ ADD services-conf/supervisord.conf /etc/supervisor/conf.d/supervisord.conf
+ 
+diff --git a/docker-compose.yml b/docker-compose.yml
+index 62abe4d..4030d67 100644
+--- a/docker-compose.yml
++++ b/docker-compose.yml
+@@ -5,6 +5,8 @@ services:
+     command: /home/hpcperfstats/services-conf/django_startup.sh
+     env_file:
+       - ./.env.dev
++    volumes:
++      - hpcperfstatsweblog:/hpcperfstats/log/
+ 
+   pipeline:
+     image: hpcperfstats
+@@ -52,10 +54,17 @@ volumes:
+       postgres_data:
+ 
+       rabbitmq_messages:
+-
++      
+       hpcperfstatsdata:
+         driver: local
+         driver_opts:
+           type: none
+           device: /home/sharrell/compose_test/hpcperfstats_data/
+           o: bind
++      
++      hpcperfstatsweblog:
++        driver: local
++        driver_opts:
++          type: none
++          device: /home/sharrell/compose_test/hpcperfstats_weblog/
++          o: bind
+diff --git a/hpcperfstats/site/hpcperfstats_site/settings.py b/hpcperfstats/site/hpcperfstats_site/settings.py
+index ee9b4d3..f7c44ac 100644
+--- a/hpcperfstats/site/hpcperfstats_site/settings.py
++++ b/hpcperfstats/site/hpcperfstats_site/settings.py
+@@ -215,7 +215,7 @@ LOGGING = {
+         'logfile': {
+             'level':'INFO',
+             'class':'logging.handlers.RotatingFileHandler',
+-            'filename': os.path.join('/tmp', 'hpcperfstats_site.log'),
++            'filename': os.path.join('/hpcperfstats/log/', 'hpcperfstats_site.log'),
+             'maxBytes': 1024*1024*15, # 15MB
+             'backupCount': 10,
+         },

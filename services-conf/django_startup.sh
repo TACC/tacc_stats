@@ -8,6 +8,9 @@ done
 
 echo "PostgreSQL started"
 
+
+chown -R hpcperfstats:hpcperfstats /hpcperfstats/
+
 # detect if the tables are existing and create if not
 /usr/local/bin/python3 hpcperfstats/site/manage.py makemigrations
 /usr/local/bin/python3 hpcperfstats/site/manage.py migrate
