@@ -1,14 +1,14 @@
 hpcperfstats Documentation               {#mainpage}
 ========================
-(Renamed from TACC Stats)
-
+(The package formerly known as TACC Stats)
 
 [![DOI](https://zenodo.org/badge/21212519.svg)](https://zenodo.org/badge/latestdoi/21212519)
 
 Developers and Maintainers
 -------
+Amit Ruhela  (<mailto:aruhela@tacc.utexas.edu>) <br />
 Stephen Lien Harrell  (<mailto:sharrell@tacc.utexas.edu>) <br />
-Junjie Li (<mailto:jli@tacc.utexas.edu>) <br />
+John McCalpin  (<mailto:mccalpin@tacc.utexas.edu>) <br />
 Sangamithra Goutham (<mailto:sgoutham@tacc.utexas.edu>) <br />
 
 Developer Emeritus
@@ -17,11 +17,15 @@ John Hammond <br />
 R. Todd Evans  <br />
 Bill Barth <br />
 Albert Lu <br />
+Junjie Li <br />
 
 Description
 -----------------
 The hpcperfstats package provides the tools to monitor resource usage of HPC systems at multiple levels of resolution.
 
+We are currently in the proccess of updating our documentation. Please stand by.
+
+<!---
 The package is split into an `autotools`-based `monitor` subpackage and a Python `setuptools`-based `hpcperfstats` subpackage.  `monitor` performs the online data collection and transmission in a production environment while `hpcperfstats` performs the data curation and analysis in an offline environment.
 
 Building and installing the `hpcperfstats-2.3.5-1.el7.x86_64.rpm` package with the `hpcperfstats.spec` file will build and install a systemd service `hpcperfstats`.  This service launches a daemon with an overhead of 3% on a single core when configured to sample at a frequency of 1Hz.  It is typically configured to sample at 5 minute intervals, with samples taken at the start and end of every job as well. The TACC Stats daemon, `hpcperfstatsd`, is controlled by the `hpcperfstats` service and sends the data directly to a RabbitMQ server over the administrative ethernet network.  RabbitMQ must be installed and running on the server in order for the data to be received.
@@ -247,7 +251,7 @@ columns to specific counters for the device.  To view the names for each counter
 or for a short version
 
     jobid.get_schema('intel_snb').desc
-
+--->
 ----------------------------------------------------------------------------
 
 ## Copyright
