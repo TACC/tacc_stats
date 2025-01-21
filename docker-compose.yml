@@ -15,6 +15,7 @@ services:
     command: /home/hpcperfstats/services-conf/supervisor_startup.sh
     volumes:
       - hpcperfstatsdata:/hpcperfstats/
+      - /home/sharrell/.ssh:/home/hpcperfstats/.ssh/
     env_file:
       - ./.env.dev
 
@@ -59,12 +60,12 @@ volumes:
         driver: local
         driver_opts:
           type: none
-          device: /home/sharrell/compose_test/hpcperfstats_data/
+          device: /home/sharrell/s3-stats/hpcperfstats_data/
           o: bind
       
       hpcperfstatsweblog:
         driver: local
         driver_opts:
           type: none
-          device: /home/sharrell/compose_test/hpcperfstats_log
+          device: /home/sharrell/s3-stats/hpcperfstats_log
           o: bind
