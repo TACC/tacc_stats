@@ -9,7 +9,7 @@ import hpcperfstats.conf_parser as cfg
 
 
 def on_message(channel, method_frame, header_frame, body):
-    print("found message: %s" % header_frame)
+    #print("found message: %s" % header_frame)
 
     try:
         message = body.decode()    
@@ -55,7 +55,7 @@ with open(os.path.join(os.path.dirname(os.path.realpath(__file__)), "listend_loc
     parameters = pika.ConnectionParameters(cfg.get_rmq_server())
     connection = pika.BlockingConnection(parameters)
     channel = connection.channel()
-    channel.queue_declare(queue=cfg.get_rmq_queue())
+    channel.queue_declare(queue=cfg.get_rmq_queue(), durable=True)
     channel.basic_consume(cfg.get_rmq_queue(), on_message)
     print("Begining Consume")
     try:
