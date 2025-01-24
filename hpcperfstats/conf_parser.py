@@ -9,7 +9,7 @@ import time
 cfg = configparser.ConfigParser()
 
 # Append your local repository path here:
-cfg.read('hpcperfstats.ini')
+cfg.read('/home/hpcperfstats/hpcperfstats.ini')
 
 def get_db_connection_string():
     temp_string = "dbname={0} user="+cfg.get('PORTAL', 'username')+" password="+cfg.get('PORTAL', 'password')+" port="+cfg.get('PORTAL', 'port') + " host="+cfg.get('PORTAL', 'host')
