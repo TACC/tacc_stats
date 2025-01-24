@@ -28,7 +28,7 @@ debug = False
 
 # Thread count for database loading and archival
 thread_count = 1
-archival_thread_count = 8
+archive_thread_count = 8
 
 tgz_archive_dir = cfg.get_daily_archive_dir_path()
 
@@ -347,7 +347,7 @@ def archive_stats_files(archive_info):
             print("file %s found in archive, skipping" % stats_fname_path)
             continue
 
-        print(subprocess.check_output(['/usr/bin/tar', 'ufv', archive_tar_fname, stats_fname_path]), flush=True)
+        print(subprocess.check_output(['/bin/tar', 'ufv', archive_tar_fname, stats_fname_path]), flush=True)
         print("Archived: " + stats_fname_path)
 
 
