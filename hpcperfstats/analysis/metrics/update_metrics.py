@@ -1,7 +1,5 @@
 #!/usr/bin/env python
-import os,sys, pwd
-# Append your local repository path here:
-# sys.path.append("/home/sg99/hpcperfstats")
+import os, sys, pwd, time
 from datetime import timedelta, datetime
 import psycopg2
 
@@ -14,32 +12,6 @@ from hpcperfstats.analysis.metrics import metrics
 
 import hpcperfstats.conf_parser as cfg
 from hpcperfstats.progress import progress
-
-CONNECTION = cfg.get_db_connection_string()
-
-query_create_metric_table = """CREATE TABLE IF NOT EXISTS metrics_data (
-                                           id     SERIAL PRIMARY KEY,
-                                           jid    VARCHAR(32),
-                                           type   VARCHAR(32),
-                                           metric VARCHAR(32),
-                                           units  VARCHAR(16),                                            
-                                           value  real,                                           
-                                           FOREIGN KEY(jid) REFERENCES job_data(jid),
-                                           UNIQUE (jid, type, metric)
-                                           );"""
-query_create_jobindex = "CREATE INDEX ON metrics_data (jid);"
-
-
-def create_metrics_table(reset = False):
-    conn = psycopg2.connect(CONNECTION)
-    with conn.cursor() as cur:
-        if reset:
-            cur.execute("DROP TABLE IF EXISTS metrics_data CASCADE;")
-        cur.execute(query_create_metric_table)
-        cur.execute(query_create_jobindex)
-    conn.commit()    
-    conn.close()
-
 
 def update_metrics(date, rerun = False):
 
@@ -75,9 +47,9 @@ if __name__ == "__main__":
     print("###Date Range of metrics to update: {0} -> {1}####".format(startdate, enddate))
     #################################################################
 
-    create_metrics_table(reset = False)
-
     date = startdate
     while date <= enddate:
         update_metrics(date, rerun = False)
         date += timedelta(days=1)
+
+    time.sleep(3600)

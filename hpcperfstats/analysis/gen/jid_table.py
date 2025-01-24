@@ -1,6 +1,4 @@
 import os,sys,time
-# Append your local repository path here:
-# sys.path.append("/home/sg99/hpcperfstats")
 import psycopg2
 import hpcperfstats.conf_parser as cfg
 from hpcperfstats.analysis.gen.utils import read_sql
@@ -10,7 +8,6 @@ class jid_table:
     def __init__(self, jid):
 
         CONNECTION = cfg.get_db_connection_string()
-        print(CONNECTION)
         print("Initializing table for job {0}".format(jid))
 
         self.jid = jid
