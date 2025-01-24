@@ -365,7 +365,7 @@ def archive_stats_files(archive_info):
                os.remove(stats_fname_path)
 
 
-    print(subprocess.check_output(['/usr/bin/gzip', '-8', '-v', archive_tar_fname]), flush=True)
+    print(subprocess.check_output(['/bin/gzip', '-8', '-v', archive_tar_fname]), flush=True)
 
 def database_startup():
     conn = psycopg2.connect(CONNECTION)
