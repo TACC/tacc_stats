@@ -8,26 +8,22 @@ WORKDIR /home/hpcperfstats
 RUN apt-get update && apt-get upgrade -y
 RUN apt-get install netcat supervisor rsync -y
 
-
 ENV PYTHONDONTWRITEBYTECODE 1
 ENV PYTHONUNBUFFERED 1
-ENV PATH $PATH:/home/hpcperfstats/.local/bin
 
 # install dependencies
 RUN pip install --upgrade pip
 COPY --chown=hpcperfstats:hpcperfstats ./requirements.txt .
 RUN pip install -r requirements.txt
 
-
-# copy project
-COPY --chown=hpcperfstats:hpcperfstats . .
-# This includes the hpcperfstats.ini
-#COPY --chown=hpcperfstats:hpcperfstats ./hpcperfstats.ini .
-
-
-RUN pip install .
-
+# Setup working directories and get ssh-keys for rsync
 RUN mkdir -p /hpcperfstats/
+RUN mkdir -p -m700 /home/hpcperfstats/.ssh/
+RUN chown hpcperfstats:hpcperfstats /home/hpcperfstats/.ssh/
 
+# Setup supervisord for the pipeline
 ADD services-conf/supervisord.conf /etc/supervisor/conf.d/supervisord.conf
 
+# Copy and install the hpcperfstats package
+COPY --chown=hpcperfstats:hpcperfstats . .
+RUN pip install .
