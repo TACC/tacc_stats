@@ -1,9 +1,6 @@
 #!/usr/bin/env python3
 import os,sys,time
 
-# Append your local repository path here:
-# sys.path.append("/home/sg99/hpcperfstats")
-
 from datetime import timedelta, datetime
 
 import psycopg2
@@ -36,11 +33,9 @@ def sync_acct(acct_file, date_str):
     df["jid"] = df["jid"].apply(str)
 
  # Junjie: in case newer slurm gives "None" time for unstarted jobs.  Older slurm prints start_time=end_time=cancelled_time.
- ### >>>
     df['start_time'].replace('^None$', pd.NA, inplace=True, regex=True)
     df['start_time'].replace('^Unknown$', pd.NA, inplace=True, regex=True)
     df['start_time'].fillna(df['end_time'], inplace=True)
- #### <<<
 
     df["start_time"] = to_datetime(df["start_time"]).dt.tz_localize('US/Central')
     df["end_time"] = to_datetime(df["end_time"]).dt.tz_localize('US/Central')
