@@ -2,6 +2,8 @@ services:
   web:
     build: ./
     image: hpcperfstats
+    links:
+      - db
     command: /home/hpcperfstats/services-conf/django_startup.sh
     env_file:
       - ./.env.dev
@@ -10,6 +12,9 @@ services:
 
   pipeline:
     image: hpcperfstats
+    links:
+      - db
+      - rabbitmq
     depends_on:
       - web
     command: /home/hpcperfstats/services-conf/supervisor_startup.sh
@@ -22,6 +27,8 @@ services:
   proxy:
     restart: always
     image: nginx:1-alpine
+    links:
+      - web
     ports:
       - 80:80
       - 443:443
@@ -46,10 +53,6 @@ services:
     volumes:
         - rabbitmq_messages:/var/lib/rabbitmq/
         - /var/log/rabbitmq:/var/log/rabbitmq
-
-networks:
-  default:
-    driver: bridge
 
 volumes:
       postgres_data:
