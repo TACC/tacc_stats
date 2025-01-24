@@ -117,7 +117,7 @@ class host_data(models.Model):
         ]
 
 class proc_data(models.Model):
-    jid = models.ForeignKey(job_data, on_delete = models.CASCADE, db_column='jid', blank=True, null=True)
+    jid = models.CharField(max_length=32, blank=True, null=True)
     host = models.CharField(max_length=64, blank=True, null=True)
     proc = models.CharField(max_length=512, blank=True, null=True)
 

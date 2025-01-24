@@ -2,8 +2,6 @@
 import psycopg2
 from pgcopy import CopyManager
 import os, sys, stat
-# Append your local repository path here:
-# sys.path.append("/home/sg99/hpcperfstats")
 import multiprocessing
 import itertools
 from multiprocessing import Pool, get_context, Lock, set_start_method
@@ -29,7 +27,8 @@ should_archive = True
 debug = False
 
 # Thread count for database loading and archival
-thread_count = 8
+thread_count = 1
+archival_thread_count = 8
 
 tgz_archive_dir = cfg.get_daily_archive_dir_path()
 
@@ -480,6 +479,7 @@ if __name__ == '__main__':
            ar_file_mapping[archive_fname].append(stats_fname)
 
         
-        with multiprocessing.get_context('spawn').Pool(processes = thread_count) as pool:
+        with multiprocessing.get_context('spawn').Pool(processes = archive_thread_count) as pool:
             for stats_files_archived in pool.imap_unordered(archive_stats_files, list(ar_file_mapping.items())):
                 print("[{0:.1f}%] completed".format(100*stats_files.index(stats_fname)/len(stats_files)), end = "\r", flush=True)
+        time.sleep(900)
