@@ -6,6 +6,9 @@ per-row insert.
 
 Attributes:
   COLUMNS_TO_READ: Sacct columns retained for job_data ingest.
+  DEAD_LETTER_UNIMPORTABLE_FLAG: Opt-in argv token that quarantines a
+    file this loader cannot import.
+  UNIMPORTABLE_JOBLIST_DIR: Hidden directory name for those files.
   _ACCT_TIMELIMIT_SENTINELS: Lowercase Slurm Timelimit tokens stored as NULL.
   local_timezone: Timezone used when localizing sacct Start/End/Submit.
 """
@@ -147,6 +150,9 @@ COLUMNS_TO_READ = [
   "NodeList",
 ]
 
+DEAD_LETTER_UNIMPORTABLE_FLAG = "--dead-letter-unimportable"
+UNIMPORTABLE_JOBLIST_DIR = ".unimportable-joblist"
+
 
 class AccountingFileShrinkError(Exception):
   """
@@ -266,6 +272,95 @@ def _acct_load_skip_reason(exc: BaseException) -> str:
   return f"{type(exc).__name__}: {exc}"
 
 
+def _sync_acct_cli_args(argv: list[str]) -> tuple[bool, list[str]]:
+  """
+  Split the dead-letter flag from the date arguments.
+
+  ``parse_start_end_dates`` reads argv[1] and argv[2] as dates. This
+  removes every copy of the flag first so a leading flag is not parsed
+  as a date.
+
+  Args:
+    argv (list[str]): ``sys.argv``-shaped list, program name first.
+
+  Returns:
+    tuple[bool, list[str]]: Whether the flag was present, and argv
+    with every flag token removed.
+
+  Examples:
+    >>> _sync_acct_cli_args(
+    ...   ["sync_acct.py", "--dead-letter-unimportable", "2023-09-18"]
+    ... )
+    (True, ['sync_acct.py', '2023-09-18'])
+  """
+  flag = DEAD_LETTER_UNIMPORTABLE_FLAG
+  return flag in argv, [arg for arg in argv if arg != flag]
+
+
+def _acct_load_is_unimportable(exc: BaseException) -> bool:
+  """
+  Decide whether a skipped file should move to the dead-letter box.
+
+  Lock timeouts and missing paths can succeed on a later run. Database
+  errors can mean rows were already inserted. Every other
+  AccountingFileLoadError is a file this loader will not import.
+
+  Args:
+    exc (BaseException): Failure from loading that file.
+
+  Returns:
+    bool: True when the file should be renamed into the box.
+
+  Examples:
+    >>> err = AccountingFileLoadError("missing required sacct columns: JobID")
+    >>> _acct_load_is_unimportable(err)
+    True
+    >>> _acct_load_is_unimportable(RuntimeError("disk"))
+    False
+  """
+  if not isinstance(exc, AccountingFileLoadError):
+    return False
+  cause = exc.__cause__
+  if isinstance(cause, (TimeoutError, FileNotFoundError)):
+    return False
+  return not exc.reason.startswith("database error")
+
+
+def _move_unimportable_joblist(path: str) -> str:
+  """
+  Rename one accounting file into ``.unimportable-joblist``.
+
+  The box is a subdirectory of the file's directory. ``os.replace``
+  moves the only copy. An existing destination is left untouched; a
+  second collision raises ``FileExistsError`` and leaves the source.
+
+  Args:
+    path (str): Accounting file to quarantine.
+
+  Returns:
+    str: Destination path after the rename.
+
+  Raises:
+    FileExistsError: Both the plain name and the timestamped name
+    already exist in the box.
+
+  Examples:
+    >>> _move_unimportable_joblist("/tmp/2024-06-01.txt")  # doctest: +SKIP
+    '/tmp/.unimportable-joblist/2024-06-01.txt'
+  """
+  parent = os.path.dirname(path) or "."
+  box = os.path.join(parent, UNIMPORTABLE_JOBLIST_DIR)
+  os.makedirs(box, exist_ok=True)
+  base = os.path.basename(path)
+  dest = os.path.join(box, base)
+  if os.path.lexists(dest):
+    dest = os.path.join(box, f"{base}.{int(time.time())}")
+  if os.path.lexists(dest):
+    raise FileExistsError(dest)
+  os.replace(path, dest)
+  return dest
+
+
 def _expand_acct_nodelist(jid: str, value: Any) -> list[str]:
   """
   Expand one sacct NodeList cell, naming the job when it is invalid.
@@ -296,20 +391,56 @@ def _expand_acct_nodelist(jid: str, value: Any) -> list[str]:
     )
 
 
-def _load_acct_file_for_daemon(path: str, jobs_in_db: Any) -> None:
+def _log_dead_letter_summary(moved: list[tuple[str, str, str]]) -> None:
+  """
+  Print each accounting file moved into the dead-letter box this run.
+
+  Args:
+    moved (list[tuple[str, str, str]]): Source path, destination path,
+      and the skip reason for each file that was renamed.
+
+  Returns:
+    None
+
+  Examples:
+    >>> _log_dead_letter_summary([])  # doctest: +SKIP
+  """
+  log_print(f"Dead-lettered accounting files: {len(moved)}")
+  for source, dest, reason in moved:
+    log_print(f"Dead-lettered {source} -> {dest}: {reason}")
+
+
+def _load_acct_file_for_daemon(
+  path: str,
+  jobs_in_db: Any,
+  *,
+  dead_letter: bool = False,
+  dead_lettered: list[tuple[str, str, str]] | None = None,
+) -> None:
   """
   Ingest one daily accounting file and log why it was skipped.
+
+  When ``dead_letter`` is true, a permanent read or parse failure is
+  renamed into ``.unimportable-joblist`` beside the file. Lock timeouts,
+  missing files, and database errors stay in place. A failed rename is
+  logged and the source is left where it is. A successful rename is
+  appended to ``dead_lettered`` when that list is provided.
 
   Args:
     path (str): Accounting file path.
     jobs_in_db (Any): Job ids already stored, forwarded to sync_acct.
+    dead_letter (bool): Move a permanently unimportable file. Default
+      False, so a run without the flag does not relocate files.
+    dead_lettered (list[tuple[str, str, str]] | None): Collector for
+      source, destination, and reason. None discards the record.
 
   Returns:
     None
 
   Raises:
     Exception: Re-raised after the skip line when settings.DEBUG is
-    true, so the original traceback is kept.
+    true, so the original traceback is kept. The move is attempted
+    before that re-raise.
 
   Examples:
     >>> _load_acct_file_for_daemon(
@@ -319,7 +450,19 @@ def _load_acct_file_for_daemon(path: str, jobs_in_db: Any) -> None:
   try:
     sync_acct(path, jobs_in_db)
   except Exception as exc:
-    log_print(f"Unable to load file: {path}: {_acct_load_skip_reason(exc)}")
+    reason = _acct_load_skip_reason(exc)
+    log_print(f"Unable to load file: {path}: {reason}")
+    if dead_letter and _acct_load_is_unimportable(exc):
+      try:
+        dest = _move_unimportable_joblist(path)
+      except OSError as move_exc:
+        log_print(
+          f"Could not move unimportable accounting file {path}: {move_exc}"
+        )
+      else:
+        log_print(f"Moved unimportable accounting file to {dest}")
+        if dead_lettered is not None:
+          dead_lettered.append((path, dest, reason))
     if settings.DEBUG:
       raise
 
@@ -717,46 +860,55 @@ if __name__ == "__main__":
   #################################################################
   default_start = datetime.combine(datetime.today(), datetime.min.time())
   default_end = default_start + timedelta(days=1)
-  startdate, enddate = parse_start_end_dates(
-    sys.argv, default_start, default_end
-  )
+  dead_letter, argv = _sync_acct_cli_args(sys.argv)
+  dead_lettered: list[tuple[str, str, str]] = []
+  try:
+    startdate, enddate = parse_start_end_dates(argv, default_start, default_end)
 
-  log_date_range("job files to ingest", startdate, enddate)
-  #################################################################
+    log_date_range("job files to ingest", startdate, enddate)
+    #################################################################
 
-  # Parse and convert raw stats files to pandas dataframe
-  start = time.time()
-  directory = cfg.get_accounting_path()
+    # Parse and convert raw stats files to pandas dataframe
+    start = time.time()
+    directory = cfg.get_accounting_path()
 
-  searchdate = startdate - timedelta(days=2)
-  jobs_in_db = set(
-    job_data.objects.filter(end_time__date__gte=searchdate)
-    .values_list("jid", flat=True)
-    .iterator(chunk_size=10000)
-  )
-  log_print(f"Jobs found in DB in this date range: {len(jobs_in_db)}")
+    searchdate = startdate - timedelta(days=2)
+    jobs_in_db = set(
+      job_data.objects.filter(end_time__date__gte=searchdate)
+      .values_list("jid", flat=True)
+      .iterator(chunk_size=10000)
+    )
+    log_print(f"Jobs found in DB in this date range: {len(jobs_in_db)}")
 
-  while startdate <= enddate and not shutdown_requested[0]:
-    for entry in os.scandir(directory):
-      if shutdown_requested[0]:
-        break
-      if not entry.is_file():
-        continue
-      if entry.name.endswith(".lock"):
-        continue
-      if entry.name.startswith(str(startdate.date())):
-        log_print(entry.path)
-        _load_acct_file_for_daemon(entry.path, jobs_in_db)
-    startdate += timedelta(days=1)
-  log_print("loading time", time.time() - start)
+    while startdate <= enddate and not shutdown_requested[0]:
+      for entry in os.scandir(directory):
+        if shutdown_requested[0]:
+          break
+        if not entry.is_file():
+          continue
+        if entry.name.endswith(".lock"):
+          continue
+        if entry.name.startswith(str(startdate.date())):
+          log_print(entry.path)
+          _load_acct_file_for_daemon(
+            entry.path,
+            jobs_in_db,
+            dead_letter=dead_letter,
+            dead_lettered=dead_lettered,
+          )
+      startdate += timedelta(days=1)
+    log_print("loading time", time.time() - start)
 
-  if shutdown_requested[0]:
-    log_print("Exiting due to SIGTERM")
-    sys.exit(143)
+    if shutdown_requested[0]:
+      log_print("Exiting due to SIGTERM")
+      sys.exit(143)
 
-  # Close DB connections before long sleep to avoid idle connections.
-  close_old_connections()
-  connections.close_all()
+    # Close DB connections before long sleep to avoid idle connections.
+    close_old_connections()
+    connections.close_all()
+  finally:
+    if dead_letter:
+      _log_dead_letter_summary(dead_lettered)
   # Since this is no longer part of the main workflow we don't need this sleep
   # as it was to wait for the supervisord restart.
   # sleep_until_shutdown(900)

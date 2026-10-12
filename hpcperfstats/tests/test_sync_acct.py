@@ -607,3 +607,285 @@ def test_sync_acct_non_debug_logs_reason_and_continues(_sync, mock_log):
   assert logged == (
     "Unable to load file: /tmp/2024-06-01.txt: RuntimeError: boom"
   )
+
+
+def _dead_letter_logs(mock_log):
+  return [call.args[0] for call in mock_log.call_args_list]
+
+
+@override_settings(DEBUG=False)
+@patch("hpcperfstats.dbload.sync_acct.log_print")
+def test_dead_letter_flag_off_leaves_bad_file(mock_log, tmp_path):
+  from hpcperfstats.dbload.sync_acct import _load_acct_file_for_daemon
+
+  path = tmp_path / "2024-06-01.txt"
+  body = _header_and_row_without("JobID")
+  path.write_text(body)
+  _load_acct_file_for_daemon(str(path), set(), dead_letter=False)
+  assert path.read_text() == body
+  assert not (tmp_path / ".unimportable-joblist").exists()
+  assert any(
+    "Unable to load file:" in line for line in _dead_letter_logs(mock_log)
+  )
+  assert not any(
+    "Moved unimportable accounting file" in line
+    for line in _dead_letter_logs(mock_log)
+  )
+
+
+@override_settings(DEBUG=False)
+@patch("hpcperfstats.dbload.sync_acct.log_print")
+def test_dead_letter_moves_unimportable_payload(mock_log, tmp_path):
+  from hpcperfstats.dbload.sync_acct import _load_acct_file_for_daemon
+
+  path = tmp_path / "2024-06-01.txt"
+  body = _header_and_row_without("JobID")
+  path.write_text(body)
+  _load_acct_file_for_daemon(str(path), set(), dead_letter=True)
+  dest = tmp_path / ".unimportable-joblist" / "2024-06-01.txt"
+  assert not path.exists()
+  assert dest.read_text() == body
+  assert any(
+    f"Moved unimportable accounting file to {dest}" in line
+    for line in _dead_letter_logs(mock_log)
+  )
+
+
+@override_settings(DEBUG=False)
+@patch(
+  "hpcperfstats.dbload.sync_acct.file_read_lock_wait",
+  side_effect=PermissionError(13, "Permission denied"),
+)
+@patch("hpcperfstats.dbload.sync_acct.log_print")
+def test_dead_letter_moves_unreadable_file(_lock, mock_log, tmp_path):
+  from hpcperfstats.dbload.sync_acct import _load_acct_file_for_daemon
+
+  path = tmp_path / "2024-06-01.txt"
+  path.write_text("still here")
+  _load_acct_file_for_daemon(str(path), set(), dead_letter=True)
+  dest = tmp_path / ".unimportable-joblist" / "2024-06-01.txt"
+  assert not path.exists()
+  assert dest.read_text() == "still here"
+
+
+@override_settings(DEBUG=False)
+@patch(
+  "hpcperfstats.dbload.sync_acct.file_read_lock_wait",
+  side_effect=TimeoutError("Timed out waiting for read lock: acct.fnctl.lock"),
+)
+@patch("hpcperfstats.dbload.sync_acct.log_print")
+def test_dead_letter_leaves_lock_timeout(_lock, mock_log, tmp_path):
+  from hpcperfstats.dbload.sync_acct import _load_acct_file_for_daemon
+
+  path = tmp_path / "2024-06-01.txt"
+  path.write_text("locked")
+  _load_acct_file_for_daemon(str(path), set(), dead_letter=True)
+  assert path.read_text() == "locked"
+  assert not (tmp_path / ".unimportable-joblist").exists()
+
+
+@override_settings(DEBUG=False)
+@patch("hpcperfstats.dbload.sync_acct.job_data")
+@patch("hpcperfstats.dbload.sync_acct.log_print")
+def test_dead_letter_leaves_database_error(mock_log, mock_jd, tmp_path):
+  from hpcperfstats.dbload.sync_acct import _load_acct_file_for_daemon
+
+  path = tmp_path / "2024-06-01.txt"
+  body = _sacct_content(_sacct_row(jid="8810"))
+  path.write_text(body)
+  mock_jd.objects.filter.side_effect = RuntimeError("connection lost")
+  _load_acct_file_for_daemon(str(path), set(), dead_letter=True)
+  assert path.read_text() == body
+  assert not (tmp_path / ".unimportable-joblist").exists()
+  assert any("database error" in line for line in _dead_letter_logs(mock_log))
+
+
+@override_settings(DEBUG=False)
+@patch("hpcperfstats.dbload.sync_acct.log_print")
+def test_dead_letter_missing_file_does_not_raise(mock_log, tmp_path):
+  from hpcperfstats.dbload.sync_acct import _load_acct_file_for_daemon
+
+  path = tmp_path / "2024-06-01.txt"
+  _load_acct_file_for_daemon(str(path), set(), dead_letter=True)
+  assert not path.exists()
+  assert not (tmp_path / ".unimportable-joblist").exists()
+  assert any(
+    "Unable to load file:" in line for line in _dead_letter_logs(mock_log)
+  )
+
+
+@override_settings(DEBUG=False)
+@patch("hpcperfstats.dbload.sync_acct.time.time", return_value=1700000000)
+@patch("hpcperfstats.dbload.sync_acct.log_print")
+def test_dead_letter_does_not_clobber_existing(mock_log, _time, tmp_path):
+  from hpcperfstats.dbload.sync_acct import _load_acct_file_for_daemon
+
+  path = tmp_path / "2024-06-01.txt"
+  body = _header_and_row_without("JobID")
+  path.write_text(body)
+  box = tmp_path / ".unimportable-joblist"
+  box.mkdir()
+  kept = box / "2024-06-01.txt"
+  kept.write_text("KEEP")
+  _load_acct_file_for_daemon(str(path), set(), dead_letter=True)
+  assert kept.read_text() == "KEEP"
+  assert not path.exists()
+  moved = box / "2024-06-01.txt.1700000000"
+  assert moved.read_text() == body
+
+
+@override_settings(DEBUG=False)
+@patch("hpcperfstats.dbload.sync_acct.time.time", return_value=1700000000)
+@patch("hpcperfstats.dbload.sync_acct.log_print")
+def test_dead_letter_refuses_when_suffix_taken(mock_log, _time, tmp_path):
+  from hpcperfstats.dbload.sync_acct import _load_acct_file_for_daemon
+
+  path = tmp_path / "2024-06-01.txt"
+  body = _header_and_row_without("JobID")
+  path.write_text(body)
+  box = tmp_path / ".unimportable-joblist"
+  box.mkdir()
+  (box / "2024-06-01.txt").write_text("KEEP")
+  (box / "2024-06-01.txt.1700000000").write_text("ALSO")
+  _load_acct_file_for_daemon(str(path), set(), dead_letter=True)
+  assert path.read_text() == body
+  assert (box / "2024-06-01.txt").read_text() == "KEEP"
+  assert (box / "2024-06-01.txt.1700000000").read_text() == "ALSO"
+  assert any(
+    line.startswith("Could not move unimportable accounting file ")
+    for line in _dead_letter_logs(mock_log)
+  )
+
+
+def test_dead_letter_flag_stripped_before_dates():
+  from datetime import datetime
+
+  from hpcperfstats.dbload.lib.date_utils import parse_start_end_dates
+  from hpcperfstats.dbload.sync_acct import _sync_acct_cli_args
+
+  dead_letter, argv = _sync_acct_cli_args(
+    [
+      "sync_acct.py",
+      "--dead-letter-unimportable",
+      "2023-09-18",
+      "2023-09-19",
+    ]
+  )
+  assert dead_letter is True
+  start, end = parse_start_end_dates(argv, None, None)
+  assert start == datetime(2023, 9, 18)
+  assert end == datetime(2023, 9, 19)
+  absent, plain = _sync_acct_cli_args(
+    ["sync_acct.py", "2023-09-18", "2023-09-19"]
+  )
+  assert absent is False
+  assert plain == ["sync_acct.py", "2023-09-18", "2023-09-19"]
+
+
+@override_settings(DEBUG=True)
+@patch("hpcperfstats.dbload.sync_acct.log_print")
+def test_dead_letter_debug_moves_then_reraises(mock_log, tmp_path):
+  from hpcperfstats.dbload.sync_acct import (
+    AccountingFileLoadError,
+    _load_acct_file_for_daemon,
+  )
+
+  path = tmp_path / "2024-06-01.txt"
+  body = _header_and_row_without("JobID")
+  path.write_text(body)
+  with pytest.raises(AccountingFileLoadError):
+    _load_acct_file_for_daemon(str(path), set(), dead_letter=True)
+  dest = tmp_path / ".unimportable-joblist" / "2024-06-01.txt"
+  assert not path.exists()
+  assert dest.read_text() == body
+  assert any(
+    "Unable to load file:" in line for line in _dead_letter_logs(mock_log)
+  )
+
+
+@override_settings(DEBUG=False)
+@patch("hpcperfstats.dbload.sync_acct.log_print")
+def test_dead_letter_summary_names_each_file_and_reason(mock_log):
+  from hpcperfstats.dbload.sync_acct import _log_dead_letter_summary
+
+  _log_dead_letter_summary(
+    [
+      (
+        "/acct/2023-09-18.txt",
+        "/acct/.unimportable-joblist/2023-09-18.txt",
+        "missing required sacct columns: JobID",
+      ),
+      (
+        "/acct/2023-09-19.txt",
+        "/acct/.unimportable-joblist/2023-09-19.txt",
+        "cannot read accounting file: Permission denied (errno 13)",
+      ),
+    ]
+  )
+  lines = _dead_letter_logs(mock_log)
+  assert lines[0] == "Dead-lettered accounting files: 2"
+  assert (
+    "Dead-lettered /acct/2023-09-18.txt -> "
+    "/acct/.unimportable-joblist/2023-09-18.txt: "
+    "missing required sacct columns: JobID"
+  ) in lines
+  assert (
+    "Dead-lettered /acct/2023-09-19.txt -> "
+    "/acct/.unimportable-joblist/2023-09-19.txt: "
+    "cannot read accounting file: Permission denied (errno 13)"
+  ) in lines
+
+
+@override_settings(DEBUG=False)
+@patch("hpcperfstats.dbload.sync_acct.log_print")
+def test_dead_letter_summary_reports_none(mock_log):
+  from hpcperfstats.dbload.sync_acct import _log_dead_letter_summary
+
+  _log_dead_letter_summary([])
+  assert _dead_letter_logs(mock_log) == ["Dead-lettered accounting files: 0"]
+
+
+@override_settings(DEBUG=False)
+@patch("hpcperfstats.dbload.sync_acct.log_print")
+def test_dead_letter_summary_records_a_move(mock_log, tmp_path):
+  from hpcperfstats.dbload.sync_acct import _load_acct_file_for_daemon
+
+  path = tmp_path / "2024-06-01.txt"
+  path.write_text(_header_and_row_without("JobID"))
+  moved = []
+  _load_acct_file_for_daemon(
+    str(path), set(), dead_letter=True, dead_lettered=moved
+  )
+  dest = tmp_path / ".unimportable-joblist" / "2024-06-01.txt"
+  assert moved == [
+    (str(path), str(dest), "missing required sacct columns: JobID")
+  ]
+
+
+@override_settings(DEBUG=False)
+@patch("hpcperfstats.dbload.sync_acct.time.time", return_value=1700000000)
+@patch("hpcperfstats.dbload.sync_acct.log_print")
+def test_dead_letter_summary_skips_a_failed_move(mock_log, _time, tmp_path):
+  from hpcperfstats.dbload.sync_acct import _load_acct_file_for_daemon
+
+  path = tmp_path / "2024-06-01.txt"
+  path.write_text(_header_and_row_without("JobID"))
+  box = tmp_path / ".unimportable-joblist"
+  box.mkdir()
+  (box / "2024-06-01.txt").write_text("KEEP")
+  (box / "2024-06-01.txt.1700000000").write_text("ALSO")
+  moved = []
+  _load_acct_file_for_daemon(
+    str(path), set(), dead_letter=True, dead_lettered=moved
+  )
+  assert moved == []
+
+
+def test_dead_letter_summary_runs_at_end_of_main():
+  from pathlib import Path
+
+  text = Path("hpcperfstats/dbload/sync_acct.py").read_text()
+  main = text.split('if __name__ == "__main__":', 1)[1]
+  assert "dead_lettered: list[tuple[str, str, str]] = []" in main
+  assert "_log_dead_letter_summary(dead_lettered)" in main
+  assert "finally:" in main
