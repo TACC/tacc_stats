@@ -48,6 +48,7 @@ Attributes:
 from __future__ import annotations
 
 import contextvars
+import ctypes
 import os
 import threading
 import time
@@ -2941,8 +2942,10 @@ def _apply_counter_deltas(stats_df: Any, carry: Any | None = None) -> Any:
   Apply counter diffs; optional cross-flush ``carry.raw`` continuity.
 
   Carry paths use group boundary masks after ``lexsort`` (not per-group
-  ``head``/``tail`` groupby). Object group keys are cast to ``category``
-  before reorder/diff to cut ``factorize_array`` cost on Horizon frames.
+  ``head``/``tail`` groupby). String and object group keys become sorted
+  category codes. Repeated values are coded by pointer identity, then
+  remapped by value. Columns that are already categorical keep their
+  codes.
 
   Args:
     stats_df (Any): Stats df passed to this helper.
@@ -2954,16 +2957,57 @@ def _apply_counter_deltas(stats_df: Any, carry: Any | None = None) -> Any:
   Examples:
     >>> _apply_counter_deltas(None, None)  # doctest: +SKIP
   """
+  code_cols: list[np.ndarray] = []
   for col in _COUNTER_GROUP_COLS:
-    if col in stats_df.columns and not isinstance(
-      stats_df[col].dtype,
-      pd.CategoricalDtype,
+    series = stats_df[col]
+    if isinstance(series.dtype, pd.CategoricalDtype):
+      code_cols.append(
+        series.cat.codes.to_numpy(dtype=np.int64, copy=False),
+      )
+      continue
+    # StringArray stores PyObject* in _ndarray. to_numpy() scans for NA.
+    backed = getattr(series.array, "_ndarray", None)
+    if (
+      isinstance(backed, np.ndarray)
+      and backed.dtype == object
+      and backed.flags.c_contiguous
     ):
-      stats_df[col] = stats_df[col].astype("category")
-  code_cols = [
-    stats_df[col].cat.codes.to_numpy(dtype=np.int64, copy=False)
-    for col in _COUNTER_GROUP_COLS
-  ]
+      arr = backed
+    else:
+      arr = np.ascontiguousarray(series.to_numpy(copy=False))
+    if arr.dtype != object or arr.size == 0:
+      stats_df[col] = series.astype("category")
+      code_cols.append(
+        stats_df[col].cat.codes.to_numpy(dtype=np.int64, copy=False),
+      )
+      continue
+    ptrs = np.empty(arr.size, dtype=np.uintp)
+    ctypes.memmove(
+      ptrs.ctypes.data,
+      arr.ctypes.data,
+      ptrs.nbytes,
+    )
+    ptr_codes, uniq_ptrs = pd.factorize(ptrs, sort=False)
+    first = np.full(len(uniq_ptrs), arr.size, dtype=np.intp)
+    np.minimum.at(
+      first,
+      ptr_codes,
+      np.arange(arr.size, dtype=np.intp),
+    )
+    val_codes, uniques = pd.factorize(arr[first], sort=True)
+    codes = np.asarray(val_codes, dtype=np.int64)[ptr_codes]
+    if codes.size and int(codes.min()) >= 0:
+      if series.dtype == object:
+        categories = list(uniques)
+      else:
+        categories = pd.Index(
+          pd.array(list(uniques), dtype=series.dtype),
+        )
+      stats_df[col] = pd.Categorical.from_codes(
+        codes,
+        categories=categories,
+      )
+    code_cols.append(codes)
   sizes = tuple(int(c.max()) + 1 for c in code_cols)
   times = stats_df["time"].to_numpy(dtype=np.float64, copy=False)
   if int(np.prod(sizes, dtype=np.float64)) <= (2**63 - 1):

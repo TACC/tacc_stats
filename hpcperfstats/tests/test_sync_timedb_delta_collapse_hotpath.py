@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import gc
 import itertools
 import time
 
@@ -15,6 +16,10 @@ from hpcperfstats.dbload.lib.sync_timedb_parsing import (
   _apply_counter_deltas,
   _collapse_stats_with_deltas,
   _groupby_sum_min_count,
+)
+from tests.sync_timedb_benchmark.screening_runner import (
+  e8_retain_hold_seconds,
+  summarize_hold_s_replicates,
 )
 
 
@@ -799,3 +804,277 @@ def test_delta_collapse_hotpath_smoke_timing():
   assert not out.empty
   assert elapsed < 30.0
   print("delta_collapse_hotpath_ok")
+
+
+def _shared_horizon_dense_frame() -> pd.DataFrame:
+  """230400-row Horizon frame; each distinct key is one shared object."""
+  n_hosts, n_times = 160, 24
+  n_cpu, n_gpu, n_dev = 28, 8, 4
+  hosts = [f"c{i:04d}.cluster.local" for i in range(n_hosts)]
+  cpu_events = [f"cpu_e{i}" for i in range(n_cpu)]
+  gpu_events = [f"gpu_e{i}" for i in range(n_gpu)]
+  cpu_type = "cpu"
+  gpu_type = "nvidia_gpu"
+  empty_dev = ""
+  devs = [str(i) for i in range(n_dev)]
+  unit = "none"
+  per_sample = n_cpu + n_dev * n_gpu
+  host_col: list[str] = []
+  type_col: list[str] = []
+  dev_col: list[str] = []
+  event_col: list[str] = []
+  unit_col: list[str] = []
+  time_col: list[float] = []
+  jid_col: list[str] = []
+  times = np.arange(1_700_000_000, 1_700_000_000 + n_times * 10, 10)
+  for host in hosts:
+    for stamp in times:
+      jid = f"{host}:{int(stamp)}"
+      host_col.extend((host,) * per_sample)
+      unit_col.extend((unit,) * per_sample)
+      jid_col.extend((jid,) * per_sample)
+      time_col.extend((float(stamp),) * per_sample)
+      type_col.extend((cpu_type,) * n_cpu)
+      dev_col.extend((empty_dev,) * n_cpu)
+      event_col.extend(cpu_events)
+      for dev in devs:
+        type_col.extend((gpu_type,) * n_gpu)
+        dev_col.extend((dev,) * n_gpu)
+        event_col.extend(gpu_events)
+  n_rows = n_hosts * n_times * per_sample
+  rng = np.random.default_rng(42)
+  return pd.DataFrame(
+    {
+      "host": host_col,
+      "type": type_col,
+      "dev": dev_col,
+      "event": event_col,
+      "unit": unit_col,
+      "time": time_col,
+      "value": rng.integers(0, 1_000_000, size=n_rows).astype(np.float64),
+      "wid": np.int64(64),
+      "mult": np.float64(1.0),
+      "jid": jid_col,
+    }
+  )
+
+
+def _apply_counter_deltas_category_baseline(stats_df, carry=None):
+  """Frozen astype('category') body of ``_apply_counter_deltas`` at E17."""
+  for col in _COUNTER_GROUP_COLS:
+    if col in stats_df.columns and not isinstance(
+      stats_df[col].dtype,
+      pd.CategoricalDtype,
+    ):
+      stats_df[col] = stats_df[col].astype("category")
+  code_cols = [
+    stats_df[col].cat.codes.to_numpy(dtype=np.int64, copy=False)
+    for col in _COUNTER_GROUP_COLS
+  ]
+  sizes = tuple(int(c.max()) + 1 for c in code_cols)
+  times = stats_df["time"].to_numpy(dtype=np.float64, copy=False)
+  if int(np.prod(sizes, dtype=np.float64)) <= (2**63 - 1):
+    gid = np.ravel_multi_index(np.vstack(code_cols), sizes)
+    order = np.lexsort((times, gid))
+    stats_df = stats_df.iloc[order].reset_index(drop=True)
+    gid = gid[order]
+    n = len(gid)
+    values = stats_df["value"].to_numpy(dtype=np.float64, copy=False)
+    same = np.ones(n, dtype=bool)
+    if n > 1:
+      same[1:] = gid[1:] == gid[:-1]
+    delta = np.empty(n, dtype=np.float64)
+    delta[0] = np.nan
+    if n > 1:
+      delta[1:] = np.where(same[1:], values[1:] - values[:-1], np.nan)
+    stats_df["delta"] = delta
+    is_first = np.ones(n, dtype=bool)
+    if n > 1:
+      is_first[1:] = gid[1:] != gid[:-1]
+    is_last = np.ones(n, dtype=bool)
+    if n > 1:
+      is_last[:-1] = gid[:-1] != gid[1:]
+  else:
+    stats_df = stats_df.sort_values(by=[*_COUNTER_GROUP_COLS, "time"])
+    stats_df["delta"] = stats_df.groupby(_COUNTER_GROUP_COLS, observed=True)[
+      "value"
+    ].diff()
+    is_first = is_last = None
+
+  if carry is not None and carry.raw:
+    if is_first is not None:
+      first = stats_df.loc[is_first]
+    else:
+      first = stats_df.groupby(_COUNTER_GROUP_COLS, observed=True).head(1)
+    if not first.empty:
+      keys = list(
+        zip(
+          *(first[col].tolist() for col in _COUNTER_GROUP_COLS),
+          strict=True,
+        )
+      )
+      values = first["value"].to_numpy(dtype=np.float64, copy=False)
+      idxs = first.index.to_numpy()
+      raw = carry.raw
+      no_prev = (np.nan,)
+      prev_vals = np.fromiter(
+        (
+          (prev[0] if isinstance(prev, tuple) else prev["value"])
+          for prev in (raw.get(key, no_prev) for key in keys)
+        ),
+        dtype=np.float64,
+        count=len(keys),
+      )
+      hit = np.isfinite(prev_vals)
+      if hit.any():
+        stats_df.loc[idxs[hit], "delta"] = values[hit] - prev_vals[hit]
+
+  wid = stats_df["wid"].to_numpy(dtype=np.float64, copy=False)
+  delta = stats_df["delta"].to_numpy(dtype=np.float64, copy=False)
+  wrap = (delta < 0) & np.isfinite(delta)
+  if wrap.any():
+    delta = delta.copy()
+    delta[wrap] = (2.0 ** wid[wrap]) + delta[wrap]
+  mult = stats_df["mult"].to_numpy(dtype=np.float64, copy=False)
+  stats_df["delta"] = delta * mult
+
+  if carry is not None:
+    if is_last is not None:
+      last = stats_df.loc[is_last]
+    else:
+      last = stats_df.groupby(_COUNTER_GROUP_COLS, observed=True).tail(1)
+    if not last.empty:
+      keys = list(
+        zip(
+          *(last[col].tolist() for col in _COUNTER_GROUP_COLS),
+          strict=True,
+        )
+      )
+      carry.raw.update(
+        zip(
+          keys,
+          zip(
+            last["value"].to_numpy(dtype=np.float64, copy=False).tolist(),
+            last["wid"].to_numpy(dtype=np.int64, copy=False).tolist(),
+            last["mult"].to_numpy(dtype=np.float64, copy=False).tolist(),
+            last["time"].to_numpy(dtype=np.float64, copy=False).tolist(),
+            strict=True,
+          ),
+          strict=True,
+        )
+      )
+
+  stats_df.drop(columns=["wid", "mult"], inplace=True)
+  return stats_df
+
+
+def _distinct_equal_key_copies(frame: pd.DataFrame) -> pd.DataFrame:
+  """Equal host/event text with a fresh object per cell."""
+  out = frame.copy()
+  out["host"] = [str(value) for value in out["host"].tolist()]
+  out["event"] = [str(value) for value in out["event"].tolist()]
+  return out
+
+
+def _assert_delta_frames_equal(got, expected) -> None:
+  pd.testing.assert_frame_equal(got, expected)
+
+
+def test_apply_counter_deltas_pointer_codes_match_category_baseline():
+  """Pointer codes match sorted categories and clear the hold-seconds gate."""
+  frame = _shared_horizon_dense_frame()
+  assert len(frame) == 230_400
+  probed = frame.copy()
+  probed.loc[0, "value"] = np.nan
+  shuffled = probed.sample(frac=1.0, random_state=1).reset_index(drop=True)
+  distinct = _distinct_equal_key_copies(shuffled)
+  appearance = list(dict.fromkeys(frame["event"].tolist()))
+  categorical = frame.copy()
+  categorical["event"] = pd.Categorical(
+    categorical["event"],
+    categories=appearance,
+  )
+  stringy = _horizonish_frame(
+    n_hosts=4,
+    n_times=4,
+    n_cpu_events=12,
+    n_gpu_events=2,
+  )
+  stringy["host"] = stringy["host"].astype("string")
+  stringy["event"] = stringy["event"].astype("string")
+  for sample in (probed, shuffled, distinct, categorical, stringy):
+    _assert_delta_frames_equal(
+      _apply_counter_deltas(sample.copy()),
+      _apply_counter_deltas_category_baseline(sample.copy()),
+    )
+  seeded = ("c0000.cluster.local", "cpu", "", "cpu_e0")
+  base_carry = DeltaCarryState()
+  cand_carry = DeltaCarryState()
+  base_carry.raw[seeded] = (1.0, 64, 1.0, 0.0)
+  cand_carry.raw[seeded] = (1.0, 64, 1.0, 0.0)
+  mid = len(probed) // 2
+  for part in (probed.iloc[:mid], probed.iloc[mid:]):
+    _assert_delta_frames_equal(
+      _apply_counter_deltas(part.copy(), cand_carry),
+      _apply_counter_deltas_category_baseline(part.copy(), base_carry),
+    )
+  assert base_carry.raw.keys() == cand_carry.raw.keys()
+  missing = _horizonish_frame(
+    n_hosts=1,
+    n_times=2,
+    n_cpu_events=1,
+    n_gpu_events=0,
+    n_dev=0,
+  )
+  missing.loc[0, "host"] = None
+  for fn in (
+    _apply_counter_deltas,
+    _apply_counter_deltas_category_baseline,
+  ):
+    raised = False
+    try:
+      fn(missing.copy())
+    except ValueError:
+      raised = True
+    assert raised
+
+  def _paired_body_seconds(
+    source: pd.DataFrame,
+    *,
+    replicates: int = 5,
+  ) -> tuple[list[float], list[float]]:
+    """Time baseline and candidate on interleaved copies, GC outside."""
+    _apply_counter_deltas_category_baseline(source.copy())
+    _apply_counter_deltas(source.copy())
+    gc.collect()
+    baseline_s: list[float] = []
+    candidate_s: list[float] = []
+    for _ in range(replicates):
+      base_work = source.copy()
+      cand_work = source.copy()
+      gc.collect()
+      gc.disable()
+      try:
+        started = time.perf_counter()
+        _apply_counter_deltas_category_baseline(base_work)
+        baseline_s.append(time.perf_counter() - started)
+        started = time.perf_counter()
+        _apply_counter_deltas(cand_work)
+        candidate_s.append(time.perf_counter() - started)
+      finally:
+        gc.enable()
+    return baseline_s, candidate_s
+
+  baseline_s, candidate_s = _paired_body_seconds(frame)
+  baseline = summarize_hold_s_replicates(baseline_s)
+  candidate = summarize_hold_s_replicates(candidate_s)
+  assert e8_retain_hold_seconds(baseline=baseline, candidate=candidate), (
+    f"retain_delta_s false base={baseline} cand={candidate}"
+  )
+  print(
+    "E18_DELTA_RETAIN_PASS"
+    f" base_mean={baseline['mean_s']:.4f}"
+    f" base_lo={baseline['lower_ci_s']:.4f}"
+    f" cand_mean={candidate['mean_s']:.4f}"
+    f" cand_hi={candidate['upper_ci_s']:.4f}",
+  )
