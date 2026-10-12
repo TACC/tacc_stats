@@ -13,6 +13,7 @@ def test_cgroup_admit_headroom_ok_fail_open_and_block(monkeypatch):
   monkeypatch.setattr(pm, "read_cgroup_memory_max_bytes", lambda: None)
   assert pm.cgroup_admit_headroom_ok(16384) is True
   monkeypatch.setattr(pm, "read_cgroup_memory_max_bytes", lambda: 128 * 1024**3)
+  monkeypatch.setattr(pm, "read_cgroup_memory_stat", dict)
   monkeypatch.setattr(
     pm,
     "read_cgroup_memory_current_bytes",
@@ -25,6 +26,31 @@ def test_cgroup_admit_headroom_ok_fail_open_and_block(monkeypatch):
     lambda: 100 * 1024**3,
   )
   assert pm.cgroup_admit_headroom_ok(16384) is True
+  monkeypatch.setattr(
+    pm,
+    "read_cgroup_memory_current_bytes",
+    lambda: 127 * 1024**3,
+  )
+  monkeypatch.setattr(
+    pm,
+    "read_cgroup_memory_stat",
+    lambda: {"inactive_file": 8 * 1024**3},
+  )
+  assert pm.cgroup_admit_headroom_ok(4096) is True
+  assert pm.cgroup_admit_headroom_ok(16384) is False
+  monkeypatch.setattr(
+    pm,
+    "read_cgroup_memory_stat",
+    lambda: {"inactive_file": 0},
+  )
+  assert pm.cgroup_admit_headroom_ok(4096) is False
+  monkeypatch.setattr(
+    pm,
+    "read_cgroup_memory_stat",
+    lambda: {"inactive_file": 200 * 1024**3},
+  )
+  assert pm.cgroup_admit_headroom_ok(16384) is True
+  assert pm.cgroup_admit_headroom_ok(129 * 1024) is False
 
 
 def test_cgroup_admit_file_cache_ok_fail_open_and_block(monkeypatch):
@@ -44,6 +70,24 @@ def test_cgroup_admit_file_cache_ok_fail_open_and_block(monkeypatch):
     lambda: {"file": 80 * 1024**3},
   )
   assert pm.cgroup_admit_file_cache_ok(81920) is True
+  monkeypatch.setattr(
+    pm,
+    "read_cgroup_memory_stat",
+    lambda: {"file": 90 * 1024**3, "inactive_file": 20 * 1024**3},
+  )
+  assert pm.cgroup_admit_file_cache_ok(81920) is True
+  monkeypatch.setattr(
+    pm,
+    "read_cgroup_memory_stat",
+    lambda: {"file": 90 * 1024**3, "inactive_file": 5 * 1024**3},
+  )
+  assert pm.cgroup_admit_file_cache_ok(81920) is False
+  monkeypatch.setattr(
+    pm,
+    "read_cgroup_memory_stat",
+    lambda: {"file": 90 * 1024**3, "inactive_file": 200 * 1024**3},
+  )
+  assert pm.cgroup_admit_file_cache_ok(1) is True
 
 
 def test_format_includes_contract_tokens(monkeypatch):

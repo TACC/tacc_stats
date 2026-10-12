@@ -384,7 +384,7 @@ def cgroup_admit_headroom_ok(headroom_mib: Any) -> bool:
 
   When ``headroom_mib <= 0`` or ``memory.max`` is unknown, the gate is off
   (fail open). When current and max are readable, require
-  ``(max - current) >= headroom_mib`` MiB.
+  ``(max - current + inactive_file) >= headroom_mib`` MiB.
 
   Args:
     headroom_mib (Any): Required free MiB under ``memory.max``.
@@ -403,7 +403,10 @@ def cgroup_admit_headroom_ok(headroom_mib: Any) -> bool:
   if cgroup_max is None or int(cgroup_max) <= 0:
     return True
   current = int(read_cgroup_memory_current_bytes() or 0)
-  left = int(cgroup_max) - current
+  reclaimable = min(
+    current, int(read_cgroup_memory_stat().get("inactive_file", 0) or 0)
+  )
+  left = int(cgroup_max) - (current - reclaimable)
   return left >= (need * _MIB)
 
 
@@ -412,7 +415,8 @@ def cgroup_admit_file_cache_ok(max_file_mib: Any) -> bool:
   Return True when multi-file admit / append may proceed under file page cache.
 
   When ``max_file_mib <= 0`` or ``memory.stat`` ``file`` is unavailable, the
-  gate is off (fail open). Otherwise require ``file <= max_file_mib`` MiB.
+  gate is off (fail open). Otherwise require
+  ``(file - inactive_file) <= max_file_mib`` MiB.
 
   Args:
     max_file_mib (Any): Maximum cgroup ``memory.stat`` ``file`` in MiB.
@@ -429,6 +433,7 @@ def cgroup_admit_file_cache_ok(max_file_mib: Any) -> bool:
     return True
   stat = read_cgroup_memory_stat()
   file_bytes = int(stat.get("file", 0) or 0)
+  file_bytes -= min(file_bytes, int(stat.get("inactive_file", 0) or 0))
   return file_bytes <= (cap * _MIB)
 
 
