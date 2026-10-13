@@ -10,17 +10,25 @@ Attributes:
   ThreadPoolUnorderedIterator: Completion-order Future iterator.
   apply_libpq_application_name: Stamp thread title onto Django backends.
   close_thread_local_django_connections: Close young CONN_MAX_AGE backends.
+  _ABANDONED_LOCK: Guards ``_ABANDONED_THREAD_IDENTS`` and pool task registries.
+  _ABANDONED_THREAD_IDENTS: Thread idents whose pool was terminated mid-task;
+    new Django connects from these threads are refused.
 """
 
 from __future__ import annotations
 
 import contextlib
+import os
+import socket
+import threading
 from collections.abc import Callable, Iterable, Iterator
 from concurrent.futures import Future, ThreadPoolExecutor, as_completed
 from queue import Empty, Queue
 from typing import Any, TypeVar
 
 from django.db import close_old_connections, connections
+from django.db.backends.signals import connection_created
+from django.db.utils import OperationalError
 
 from hpcperfstats.dbload.lib.process_title import (
   current_libpq_application_name,
@@ -29,6 +37,94 @@ from hpcperfstats.dbload.lib.process_title import (
 
 T = TypeVar("T")
 R = TypeVar("R")
+
+_ABANDONED_LOCK = threading.Lock()
+_ABANDONED_THREAD_IDENTS: set[int] = set()
+
+
+def _thread_django_wrappers() -> list[Any]:
+  """
+  Return this thread's Django connection wrappers.
+
+  Returns:
+    list[Any]: ``DatabaseWrapper`` objects, or empty when Django is unusable.
+
+  Examples:
+    >>> isinstance(_thread_django_wrappers(), list)
+    True
+  """
+  try:
+    return list(connections.all())
+  except Exception:
+    return []
+
+
+def _shutdown_backend_socket(raw: Any) -> None:
+  """
+  EOF a DB-API connection's socket from another thread so the server exits.
+
+  Uses a dup'd descriptor and ``shutdown`` instead of a cross-thread driver
+  ``close``, which is not thread-safe while the owner thread may be in libpq.
+
+  Args:
+    raw (Any): psycopg connection exposing ``fileno()``, or None.
+
+  Returns:
+    None
+
+  Examples:
+    >>> _shutdown_backend_socket(None)
+  """
+  if raw is None:
+    return
+  with contextlib.suppress(Exception):
+    fd = os.dup(raw.fileno())
+    try:
+      sock = socket.socket(fileno=fd)
+    except OSError:
+      os.close(fd)
+      return
+    with sock:
+      sock.shutdown(socket.SHUT_RDWR)
+
+
+def _refuse_abandoned_thread_connect(
+  sender: Any,
+  connection: Any,
+  **kwargs: Any,
+) -> None:
+  """
+  Close and refuse a new backend opened by a terminated pool's thread.
+
+  Args:
+    sender (Any): Backend wrapper class (unused).
+    connection (Any): Django ``DatabaseWrapper`` that just connected.
+    **kwargs (Any): Extra signal keyword arguments (unused).
+
+  Returns:
+    None
+
+  Raises:
+    OperationalError: When the current thread was abandoned by terminate().
+
+  Examples:
+    >>> _refuse_abandoned_thread_connect(None, connection=None)
+  """
+  del sender, kwargs
+  with _ABANDONED_LOCK:
+    if threading.get_ident() not in _ABANDONED_THREAD_IDENTS:
+      return
+  raw = connection.connection
+  connection.connection = None
+  with contextlib.suppress(Exception):
+    raw.close()
+  raise OperationalError("sync_timedb thread pool terminated")
+
+
+connection_created.connect(
+  _refuse_abandoned_thread_connect,
+  dispatch_uid="sync_timedb_refuse_abandoned_thread_connect",
+)
 
 
 def close_thread_local_django_connections() -> None:
@@ -331,6 +427,8 @@ class SyncTimedbThreadPool:
     _initializer: Optional per-task initializer.
     _processes: Compatibility worker count used for bounded inflight work.
     _shutdown: True after close or terminate refuses new submissions.
+    _task_connections: Running task thread ident -> its Django wrappers.
+    _terminated: True after terminate abandons running tasks.
   """
 
   def __init__(
@@ -365,6 +463,8 @@ class SyncTimedbThreadPool:
     self._initargs = tuple(initargs)
     self._processes = max(1, int(max_workers))
     self._shutdown = False
+    self._terminated = False
+    self._task_connections: dict[int, list[Any]] = {}
     self._executor = ThreadPoolExecutor(
       max_workers=self._processes,
       thread_name_prefix=self.thread_role,
@@ -385,6 +485,54 @@ class SyncTimedbThreadPool:
       >>> pool.terminate()
     """
     return not self._shutdown
+
+  def _run_task(self, call: Callable[[], Any]) -> Any:
+    """
+    Title this worker thread, register its backends, then run ``call``.
+
+    Registered backends are socket-shut by :meth:`terminate` so an abandoned
+    task cannot hold a Postgres slot.
+
+    Args:
+      call (Callable[[], Any]): Zero-argument worker invocation.
+
+    Returns:
+      Any: Value returned by ``call``.
+
+    Examples:
+      >>> pool = SyncTimedbThreadPool(max_workers=1, thread_role="x")
+      >>> pool._run_task(lambda: 4)
+      4
+      >>> pool.terminate()
+    """
+    from hpcperfstats.dbload.lib.sync_timedb_ingest_worker_diagnostics import (
+      reset_worker_pool_kind,
+      set_worker_pool_kind,
+    )
+
+    ident = threading.get_ident()
+    set_daemon_thread_title(
+      "",
+      script_name=self.process_title,
+      role=self.thread_role,
+    )
+    pool_token = set_worker_pool_kind(self.thread_role)
+    with _ABANDONED_LOCK:
+      self._task_connections[ident] = _thread_django_wrappers()
+      if self._terminated:
+        _ABANDONED_THREAD_IDENTS.add(ident)
+    try:
+      apply_libpq_application_name()
+      close_old_connections()
+      if self._initializer is not None:
+        self._initializer(*self._initargs)
+      return call()
+    finally:
+      with _ABANDONED_LOCK:
+        self._task_connections.pop(ident, None)
+        _ABANDONED_THREAD_IDENTS.discard(ident)
+      reset_worker_pool_kind(pool_token)
+      close_thread_local_django_connections()
 
   def apply_async(
     self,
@@ -417,40 +565,9 @@ class SyncTimedbThreadPool:
     """
     del callback, error_callback
     kwargs = dict(kwds or {})
-
-    def _run() -> Any:
-      """
-      Title this worker thread, close stale ORM connections, then run fn.
-
-      Returns:
-        Any: Worker return value.
-
-      Examples:
-        >>> callable(_run)
-        True
-      """
-      from hpcperfstats.dbload.lib.sync_timedb_ingest_worker_diagnostics import (
-        reset_worker_pool_kind,
-        set_worker_pool_kind,
-      )
-
-      set_daemon_thread_title(
-        "",
-        script_name=self.process_title,
-        role=self.thread_role,
-      )
-      pool_token = set_worker_pool_kind(self.thread_role)
-      apply_libpq_application_name()
-      close_old_connections()
-      if self._initializer is not None:
-        self._initializer(*self._initargs)
-      try:
-        return fn(*args, **kwargs)
-      finally:
-        reset_worker_pool_kind(pool_token)
-        close_thread_local_django_connections()
-
-    return ThreadPoolAsyncResult(self._executor.submit(_run))
+    return ThreadPoolAsyncResult(
+      self._executor.submit(self._run_task, lambda: fn(*args, **kwargs)),
+    )
 
   def imap_unordered(
     self,
@@ -496,26 +613,7 @@ class SyncTimedbThreadPool:
         >>> callable(_run)
         True
       """
-      from hpcperfstats.dbload.lib.sync_timedb_ingest_worker_diagnostics import (
-        reset_worker_pool_kind,
-        set_worker_pool_kind,
-      )
-
-      set_daemon_thread_title(
-        "",
-        script_name=self.process_title,
-        role=self.thread_role,
-      )
-      pool_token = set_worker_pool_kind(self.thread_role)
-      apply_libpq_application_name()
-      close_old_connections()
-      if self._initializer is not None:
-        self._initializer(*self._initargs)
-      try:
-        return fn(item)
-      finally:
-        reset_worker_pool_kind(pool_token)
-        close_thread_local_django_connections()
+      return self._run_task(lambda: fn(item))
 
     return ThreadPoolUnorderedIterator(self._executor, _run, items)
 
@@ -535,7 +633,11 @@ class SyncTimedbThreadPool:
 
   def terminate(self) -> None:
     """
-    Cancel pending futures and shut the pool down.
+    Cancel pending futures, shut the pool down, and free running tasks' DB slots.
+
+    Running tasks are abandoned (not joined): their open backends are
+    socket-shut so Postgres exits them, and further connects from those
+    threads raise ``OperationalError`` until the task returns.
 
     Returns:
       None
@@ -546,6 +648,14 @@ class SyncTimedbThreadPool:
     """
     self._shutdown = True
     self._executor.shutdown(wait=False, cancel_futures=True)
+    # Under the lock: a registered task cannot reach its finally close, so
+    # each fd still belongs to that task's live backend.
+    with _ABANDONED_LOCK:
+      self._terminated = True
+      _ABANDONED_THREAD_IDENTS.update(self._task_connections)
+      for wrappers in self._task_connections.values():
+        for wrapper in wrappers:
+          _shutdown_backend_socket(getattr(wrapper, "connection", None))
 
   def join(self) -> None:
     """

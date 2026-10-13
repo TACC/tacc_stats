@@ -1,18 +1,118 @@
 """Session executor wiring for startup coordinators."""
 
 import gc
+import socket
 import threading
 import time
 import weakref
 
 import pytest
+from django.db.backends.signals import connection_created
+from django.db.utils import OperationalError
 
+from hpcperfstats.dbload.lib import sync_timedb_session_executor as se
 from hpcperfstats.dbload.lib.sync_timedb_session_executor import (
   SyncTimedbThreadPool,
 )
 from hpcperfstats.dbload.lib.sync_timedb_startup_archive_scan import (
   StartupArchiveScanCoordinator,
 )
+
+
+class _FakeRaw:
+  """psycopg-like connection exposing a real socket fd."""
+
+  def __init__(self, sock):
+    self._sock = sock
+    self.closed = False
+
+  def fileno(self):
+    return self._sock.fileno()
+
+  def close(self):
+    self.closed = True
+
+
+class _FakeWrapper:
+  """Django DatabaseWrapper stand-in holding one raw connection."""
+
+  vendor = "sqlite"
+  alias = "default"
+
+  def __init__(self, raw):
+    self.connection = raw
+
+
+def test_terminate_shuts_abandoned_task_backend_socket(monkeypatch):
+  """terminate() must EOF a stuck task's backend so Postgres frees the slot."""
+  ours, peer = socket.socketpair()
+  peer.settimeout(5)
+  wrapper = _FakeWrapper(_FakeRaw(ours))
+  monkeypatch.setattr(se, "_thread_django_wrappers", lambda: [wrapper])
+  monkeypatch.setattr(se.connections, "close_all", lambda: None)
+  started = threading.Event()
+  release = threading.Event()
+  idents = []
+
+  def stuck():
+    idents.append(threading.get_ident())
+    started.set()
+    release.wait(timeout=5)
+
+  pool = SyncTimedbThreadPool(max_workers=1, thread_role="ingest-pool")
+  try:
+    pool.apply_async(stuck)
+    assert started.wait(timeout=5)
+    pool.terminate()
+    assert peer.recv(1) == b""
+    assert idents[0] in se._ABANDONED_THREAD_IDENTS
+  finally:
+    release.set()
+    pool.join()
+    ours.close()
+    peer.close()
+  assert idents[0] not in se._ABANDONED_THREAD_IDENTS
+  assert pool._task_connections == {}
+
+
+def test_completed_task_is_never_abandoned(monkeypatch):
+  """Normal completion unregisters the task; later terminate touches nothing."""
+  ours, peer = socket.socketpair()
+  wrapper = _FakeWrapper(_FakeRaw(ours))
+  monkeypatch.setattr(se, "_thread_django_wrappers", lambda: [wrapper])
+  monkeypatch.setattr(se.connections, "close_all", lambda: None)
+  pool = SyncTimedbThreadPool(max_workers=1, thread_role="ingest-pool")
+  try:
+    assert pool.apply_async(lambda: 7).get(timeout=5) == 7
+    pool.terminate()
+    pool.join()
+    assert pool._task_connections == {}
+    peer.setblocking(False)
+    with pytest.raises(BlockingIOError):
+      peer.recv(1)
+  finally:
+    ours.close()
+    peer.close()
+
+
+def test_abandoned_thread_reconnect_is_refused_and_closed():
+  """connection_created in an abandoned thread closes the new backend."""
+  raw = _FakeRaw(None)
+  wrapper = _FakeWrapper(raw)
+  ident = threading.get_ident()
+  with se._ABANDONED_LOCK:
+    se._ABANDONED_THREAD_IDENTS.add(ident)
+  try:
+    with pytest.raises(OperationalError, match="terminated"):
+      connection_created.send(sender=None, connection=wrapper)
+  finally:
+    with se._ABANDONED_LOCK:
+      se._ABANDONED_THREAD_IDENTS.discard(ident)
+  assert raw.closed is True
+  assert wrapper.connection is None
+  other = _FakeWrapper(_FakeRaw(None))
+  connection_created.send(sender=None, connection=other)
+  assert other.connection is not None
 
 
 def test_startup_archive_scan_coordinator_construct(tmp_path):

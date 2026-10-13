@@ -1,4 +1,4 @@
-"""Q5: ingest fill skip shares retry/dead-letter with _retry_or_dead_letter."""
+"""Q5: retry/dead-letter helper and no-bump ingest fill-skip requeue."""
 
 from __future__ import annotations
 
@@ -97,61 +97,8 @@ def test_retry_or_dead_letter_claim_none_empty_dir_and_score(monkeypatch):
   )
 
 
-def test_requeue_ingest_fill_skip_penalty_then_dead_letter(
-  monkeypatch, tmp_path
-):
-  client = jq.SyncTimedbJobStore("")
-  claim = jq.ClaimedJob(
-    kind=jq.JOB_KIND_INGEST,
-    identity="/no/such",
-    owner_token="n:h:b:1",
-    deadline=1060.0,
-    score=5.0,
-  )
-  requeues: list[dict] = []
-  acks: list[str] = []
-  monkeypatch.setattr(jq, "bump_job_attempt", lambda *_a, **_k: 1)
-  monkeypatch.setattr(jq, "job_max_attempts", lambda: 5)
-  monkeypatch.setattr(
-    jq,
-    "requeue_job",
-    lambda *_a, **k: requeues.append(dict(k)) or True,
-  )
-  monkeypatch.setattr(jq, "ack_job", lambda *_a, **k: acks.append("ack"))
-  assert (
-    qo._requeue_ingest_fill_skip(
-      client,
-      claim=claim,
-      archive_data_dir=str(tmp_path),
-      reason="skip_fp",
-      score=5.0,
-    )
-    == "requeued"
-  )
-  assert requeues[0]["score"] == qo._penalized_ingest_requeue_score(5.0)
-
-  monkeypatch.setattr(jq, "bump_job_attempt", lambda *_a, **_k: 99)
-  letters: list[str] = []
-  monkeypatch.setattr(
-    jq,
-    "append_queue_dead_letter",
-    lambda *_a, **k: letters.append(str(k.get("reason"))),
-  )
-  assert (
-    qo._requeue_ingest_fill_skip(
-      client,
-      claim=claim,
-      archive_data_dir=str(tmp_path),
-      reason="skip_missing",
-    )
-    == "dead_letter"
-  )
-  assert letters == ["skip_missing"]
-  assert acks
-
-
-def test_requeue_ingest_fill_skip_backpressure_no_attempt_burn(monkeypatch):
-  """skip_cgroup_headroom / skip_budget_bytes must not bump or dead-letter."""
+def test_requeue_ingest_fill_skip_no_attempt_burn(monkeypatch):
+  """Every fill skip (backpressure and skip_fp) must not bump or dead-letter."""
   client = jq.SyncTimedbJobStore("")
   claim = jq.ClaimedJob(
     kind=jq.JOB_KIND_INGEST,
@@ -184,6 +131,7 @@ def test_requeue_ingest_fill_skip_backpressure_no_attempt_burn(monkeypatch):
     "skip_cgroup_headroom",
     "skip_budget_bytes",
     "skip_file_cache_pressure",
+    "skip_fp",
   ):
     bumps.clear()
     requeues.clear()

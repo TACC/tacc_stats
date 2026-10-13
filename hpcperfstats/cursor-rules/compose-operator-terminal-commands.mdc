@@ -290,6 +290,14 @@ The compose **`db`** role is **`hpcperfstats`**, not the stock Postgres superuse
 |----|-------|
 | `docker compose exec db psql -h localhost -U hpcperfstats -c "…"` | `psql -U postgres …` / omit `-h localhost` when the peer map expects TCP |
 
+### Anti-pattern — `psql` census when `db` is at `max_connections` (hpcperfstats01)
+
+When backends are exhausted, `psql` itself is refused with **`FATAL: sorry, too many clients already`** (hpcperfstats01 2026-10 census), so a `pg_stat_activity` query yields no rows. Count backends from the process table instead and map client IPs to services.
+
+| Do | Don't |
+|----|-------|
+| `docker compose exec db sh -c "ps -eo args \| grep -c '^postgres: hpcperfstats'"` plus `docker compose exec pipeline hostname -i` / `docker compose exec web hostname -i` to attribute `postgres: … <ip>(…) idle` lines | `psql … -c "SELECT … FROM pg_stat_activity"` as the only census when slots are full |
+
 ### Anti-pattern — `rabbitmqctl … 2>/dev/null` hides failures (hpcperfstats04)
 
 Piping or redirecting **`rabbitmqctl` / `rabbitmq-plugins` stderr to `/dev/null`** yields empty pastes when the CLI fails (wrong user, node not ready, cookie mismatch) while **`ss`/`netstat` listeners still print**. Operators then cannot tell whether plugins/queues were queried.

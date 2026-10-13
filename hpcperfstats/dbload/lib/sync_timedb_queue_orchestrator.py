@@ -23,9 +23,6 @@ Attributes:
     steal and this-owner orphan lease reconcile when under pool capacity.
   INGEST_FILL_BLOCK_LOG_INTERVAL_S: Rate limit for fill-block / deep-queue logs.
   _FILL_BLOCK_KEYS: Ordered ingest fill failure counter names for telemetry.
-  _INGEST_BACKPRESSURE_SKIP_REASONS: Fill skip reasons that requeue without
-    bumping attempt (``skip_budget_bytes``, ``skip_cgroup_headroom``,
-    ``skip_file_cache_pressure``).
   _INGEST_MEM_BLOCK_STATE: Process-local census fields when fill waits on
     the in-flight raw-byte budget (``ingest_mem_blocked=...``).
   _MEM_TELEM_RUNTIME: Best-effort inflight/submitted/queue snapshots for
@@ -72,6 +69,8 @@ from concurrent.futures import FIRST_COMPLETED, Future, ThreadPoolExecutor, wait
 from datetime import date, datetime
 from multiprocessing.pool import AsyncResult
 from typing import Any
+
+from django.db.utils import OperationalError
 
 from hpcperfstats.dbload.lib import (
   conf_parser as cfg,
@@ -2632,7 +2631,6 @@ def _retry_or_dead_letter(
 
   Shared by the ingest, append, and day_close drains so every failure path
   accounts for its attempt exactly once and no claim is dropped silently.
-  Ingest fill skip passes a penalty ``score`` override.
 
   Args:
     client (Any): job store.
@@ -3438,17 +3436,6 @@ def _penalized_ingest_requeue_score(score: float | int | None) -> float:
   return base + float(jq.LEASE_CONFLICT_SCORE_PENALTY)
 
 
-# Fill skips that are backpressure waits, not hard failures. Must requeue
-# without bumping attempt / dead-letter (hpcperfstats01 2026-09-29 telem).
-_INGEST_BACKPRESSURE_SKIP_REASONS = frozenset(
-  {
-    "skip_budget_bytes",
-    "skip_cgroup_headroom",
-    "skip_file_cache_pressure",
-  }
-)
-
-
 def _requeue_ingest_fill_skip(
   client: Any,
   *,
@@ -3459,24 +3446,23 @@ def _requeue_ingest_fill_skip(
   log_fn: Callable[..., None] | None = None,
 ) -> str:
   """
-  Penalty-requeue an ingest fill skip; dead-letter only for hard failures.
+  Penalty-requeue an ingest fill skip without bumping its attempt counter.
 
-  Backpressure reasons (``skip_budget_bytes``, ``skip_cgroup_headroom``,
-  ``skip_file_cache_pressure``)
-  requeue without ``bump_job_attempt`` so sustained cgroup pressure cannot
-  dead-letter good work. Hard skips (``skip_missing``, ``skip_fp``, ...) still
-  use :func:`_retry_or_dead_letter`.
+  Every fill skip (``skip_budget_bytes``, ``skip_cgroup_headroom``,
+  ``skip_file_cache_pressure``, ``skip_fp``) is a wait, not a failure, so it
+  never dead-letters. The penalty score keeps a stale head (RC9) from
+  spinning ahead of claimable peers.
 
   Args:
     client (Any): job store.
     claim (Any): Claimed ingest job.
-    archive_data_dir (str | None): Archive root for dead-letter sidecar.
-    reason (str): Skip reason token (e.g. ``skip_fp``, ``skip_cgroup_headroom``).
-    score (float | int | None): Requeue score override (default claim score).
-    log_fn (Callable[..., None] | None): Optional logger.
+    archive_data_dir (str | None): Unused; kept for caller compatibility.
+    reason (str): Unused skip reason token; kept for caller compatibility.
+    score (float | int | None): Base score to penalize (default claim score).
+    log_fn (Callable[..., None] | None): Unused; kept for caller compatibility.
 
   Returns:
-    str: ``requeued``, ``dead_letter``, or ``dropped_no_claim``.
+    str: ``requeued`` or ``dropped_no_claim``.
 
   Examples:
     >>> _requeue_ingest_fill_skip(
@@ -3484,29 +3470,19 @@ def _requeue_ingest_fill_skip(
     ... )
     'dropped_no_claim'
   """
+  del archive_data_dir, reason, log_fn
   if claim is None or client is None:
     return "dropped_no_claim"
-  penalized = _penalized_ingest_requeue_score(
-    score if score is not None else getattr(claim, "score", None),
-  )
-  if reason in _INGEST_BACKPRESSURE_SKIP_REASONS:
-    jq.requeue_job(
-      client,
-      kind=jq.JOB_KIND_INGEST,
-      identity=claim.identity,
-      owner_token=claim.owner_token,
-      score=penalized,
-    )
-    return "requeued"
-  return _retry_or_dead_letter(
+  jq.requeue_job(
     client,
     kind=jq.JOB_KIND_INGEST,
-    claim=claim,
-    archive_data_dir=str(archive_data_dir or ""),
-    reason=reason,
-    log_fn=log_fn,
-    score=penalized,
+    identity=claim.identity,
+    owner_token=claim.owner_token,
+    score=_penalized_ingest_requeue_score(
+      score if score is not None else getattr(claim, "score", None),
+    ),
   )
+  return "requeued"
 
 
 def _ingest_fill_skip_budget_for_queued(zcard: int) -> int:
@@ -3738,23 +3714,18 @@ def _fill_ingest_band(
             )
           except Exception:
             complete = False
-        if complete:
-          jq.ack_job(
-            client,
-            kind=jq.JOB_KIND_INGEST,
-            identity=claim.identity,
-            owner_token=claim.owner_token,
-          )
-          _release_day_remainder(jq.JOB_KIND_INGEST, claim.identity)
-        else:
-          _requeue_ingest_fill_skip(
-            client,
-            claim=claim,
-            archive_data_dir=archive_data_dir,
-            reason="skip_missing",
-            score=claim.score,
-            log_fn=log_fn,
-          )
+        # Not a failure either way: discover re-enqueues a path that reappears.
+        _log(
+          f"queue_orchestrator ingest fill missing identity={claim.identity} already_complete={complete}",
+          log_fn=log_fn,
+        )
+        jq.ack_job(
+          client,
+          kind=jq.JOB_KIND_INGEST,
+          identity=claim.identity,
+          owner_token=claim.owner_token,
+        )
+        _release_day_remainder(jq.JOB_KIND_INGEST, claim.identity)
         skipped += 1
         stats["skip_missing"] += 1
         if skipped >= budget:
@@ -4305,7 +4276,7 @@ def _drain_ingest_ready(
       _release_ingest_inflight_size(inflight_sizes, identity)
       done += 1
       _log(
-        f"queue_orchestrator ingest fail identity={identity} err={type(exc).__name__}",
+        f"queue_orchestrator ingest fail identity={identity} err={type(exc).__name__} detail={exc}",
         log_fn=log_fn,
       )
       day_tok = _day_token_from_date(
@@ -4313,6 +4284,17 @@ def _drain_ingest_ready(
       )
       progress.record(day_tok, "ingest", 1)
       progress.record(day_tok, "fail", 1)
+      # DB refusal is not a file defect: ACK so discover re-enqueues, never
+      # burn attempts toward the dead-letter sidecar.
+      if isinstance(exc, OperationalError) and claim is not None:
+        jq.ack_job(
+          client,
+          kind=jq.JOB_KIND_INGEST,
+          identity=identity,
+          owner_token=claim.owner_token,
+        )
+        _release_day_remainder(jq.JOB_KIND_INGEST, identity)
+        continue
       _retry_or_dead_letter(
         client,
         kind=jq.JOB_KIND_INGEST,

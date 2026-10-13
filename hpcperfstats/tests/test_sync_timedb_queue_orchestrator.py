@@ -1716,6 +1716,87 @@ def test_poison_routes_to_dead_letter(tmp_path, monkeypatch):
   assert client.queued_count("ingest") == 0
 
 
+def _drain_one_ingest_failure(monkeypatch, tmp_path, exc):
+  """Drain one raising ingest result; return recorded side effects."""
+  seen = {"acks": [], "requeues": [], "bumps": [], "letters": [], "logs": []}
+  monkeypatch.setattr(
+    jq, "ack_job", lambda *a, **k: seen["acks"].append(k["identity"]) or True
+  )
+  monkeypatch.setattr(
+    jq,
+    "requeue_job",
+    lambda *a, **k: seen["requeues"].append(k["identity"]) or True,
+  )
+  monkeypatch.setattr(
+    jq,
+    "bump_job_attempt",
+    lambda *a, **k: seen["bumps"].append(k["identity"]) or 1,
+  )
+  monkeypatch.setattr(
+    jq,
+    "append_queue_dead_letter",
+    lambda *a, **k: seen["letters"].append(k) or True,
+  )
+
+  class _Ready:
+    def ready(self):
+      return True
+
+    def get(self, timeout=0):
+      raise exc
+
+  identity = "/raw/host/1700000000"
+  claim = jq.ClaimedJob(
+    kind=jq.JOB_KIND_INGEST,
+    identity=identity,
+    owner_token="n:h:b:1",
+    deadline=1.0,
+    score=5.0,
+  )
+  n = qo._drain_ingest_ready(
+    SyncTimedbJobStore(""),
+    inflight={identity: _Ready()},
+    claims={identity: claim},
+    tgz_archive_dir=str(tmp_path),
+    archive_data_dir=str(tmp_path),
+    log_fn=lambda msg, **_k: seen["logs"].append(msg),
+  )
+  assert n == 1
+  return identity, seen
+
+
+def test_drain_operational_error_acks_without_dead_letter(
+  monkeypatch, tmp_path
+):
+  """Postgres refusal is logged with detail and ACKed; discover re-enqueues."""
+  from django.db.utils import OperationalError
+
+  identity, seen = _drain_one_ingest_failure(
+    monkeypatch,
+    tmp_path,
+    OperationalError("FATAL:  sorry, too many clients already"),
+  )
+  assert seen["acks"] == [identity]
+  assert seen["requeues"] == []
+  assert seen["bumps"] == []
+  assert seen["letters"] == []
+  assert any(
+    "err=OperationalError" in m and "too many clients" in m
+    for m in seen["logs"]
+  ), seen["logs"]
+
+
+def test_drain_other_exception_still_retries(monkeypatch, tmp_path):
+  """Non-OperationalError worker failures keep attempt bump + requeue."""
+  identity, seen = _drain_one_ingest_failure(
+    monkeypatch, tmp_path, RuntimeError("parse boom")
+  )
+  assert seen["bumps"] == [identity]
+  assert seen["requeues"] == [identity]
+  assert seen["acks"] == []
+  assert any("parse boom" in m for m in seen["logs"]), seen["logs"]
+
+
 def test_sigterm_drains_and_releases_leases():
   """S1: SIGTERM is cooperative; drain timeout requeues outstanding claims."""
   src = inspect.getsource(qo.run_sync_timedb_queue_orchestrator)
@@ -3398,8 +3479,10 @@ def test_oq1_lease_no_heartbeat_renew_in_orchestrator_loop():
   assert "_renew_active_claims" not in src
 
 
-def test_missing_path_requeues_ingest_not_ack(monkeypatch, tmp_path):
-  """F4: missing raw must requeue, never terminal-ack."""
+def test_missing_path_acks_without_requeue_or_dead_letter(
+  monkeypatch, tmp_path
+):
+  """Missing incomplete raw is logged and ACKed; discover re-enqueues it."""
   client = SyncTimedbJobStore("")
   identity = "/no/such/raw/file"
   claim = jq.ClaimedJob(
@@ -3431,10 +3514,18 @@ def test_missing_path_requeues_ingest_not_ack(monkeypatch, tmp_path):
     acked.append(k.get("identity"))
     return True
 
+  bumps = []
+  letters = []
+  logs = []
   monkeypatch.setattr(jq, "requeue_job", _requeue)
   monkeypatch.setattr(jq, "ack_job", _ack)
-  monkeypatch.setattr(jq, "bump_job_attempt", lambda *_a, **_k: 1)
+  monkeypatch.setattr(
+    jq, "bump_job_attempt", lambda *_a, **_k: bumps.append(1) or 99
+  )
   monkeypatch.setattr(jq, "job_max_attempts", lambda: 3)
+  monkeypatch.setattr(
+    jq, "append_queue_dead_letter", lambda *_a, **_k: letters.append(1)
+  )
   monkeypatch.setattr(jq, "claim_ingest_job", _claim)
   monkeypatch.setattr(jq, "claim_ingest_jobs", _claim_jobs)
   monkeypatch.setattr(os.path, "isfile", lambda p: False)
@@ -3453,10 +3544,17 @@ def test_missing_path_requeues_ingest_not_ack(monkeypatch, tmp_path):
     ingest_pool=_Pool(),
     band_cap=1,
     tgz_archive_dir=str(tmp_path),
+    archive_data_dir=str(tmp_path),
     ingest_is_complete_fn=lambda *_a, **_k: False,
+    log_fn=lambda msg, **_k: logs.append(msg),
   )
-  assert requeued
-  assert not acked
+  assert acked == [identity]
+  assert not requeued
+  assert bumps == []
+  assert letters == []
+  assert any(
+    f"identity={identity}" in m and "already_complete=False" in m for m in logs
+  ), logs
 
 
 def test_missing_path_acks_when_ingest_complete(monkeypatch, tmp_path):
@@ -3500,6 +3598,8 @@ def test_missing_path_acks_when_ingest_complete(monkeypatch, tmp_path):
     def apply_async(self, *a, **k):
       raise AssertionError("must not submit missing path")
 
+  logs = []
+  qo.reset_total_ingested_for_tests()
   qo._fill_ingest_band(
     client,
     band="hot",
@@ -3511,9 +3611,15 @@ def test_missing_path_acks_when_ingest_complete(monkeypatch, tmp_path):
     band_cap=1,
     tgz_archive_dir=str(tmp_path),
     ingest_is_complete_fn=lambda *_a, **_k: True,
+    log_fn=lambda msg, **_k: logs.append(msg),
   )
   assert acked == [identity]
   assert not requeued
+  assert any(
+    f"identity={identity}" in m and "already_complete=True" in m for m in logs
+  ), logs
+  assert qo.get_total_ingested_for_tests() == 0
+  assert qo.get_total_completed_for_tests() == 0
 
 
 def test_fill_ingest_ack_drops_fnctl_lock_sidecar(monkeypatch, tmp_path):
@@ -3753,54 +3859,6 @@ def test_dominant_ingest_fill_block_picks_max():
   assert qo._dominant_ingest_fill_block(stats) == "claim_none"
 
 
-def test_skip_missing_penalty_requeues_with_score_bump(monkeypatch, tmp_path):
-  """RC9: missing-path fill skip must penalty-requeue, not same-score spin."""
-  client = SyncTimedbJobStore("")
-  identity = "/no/such/raw/file"
-  claim = jq.ClaimedJob(
-    kind=jq.JOB_KIND_INGEST,
-    identity=identity,
-    owner_token="n:h:b:1",
-    deadline=1060.0,
-    score=5.0,
-  )
-  requeue_kw: list[dict] = []
-  calls = {"n": 0}
-
-  def _claim_jobs(*a, **k):
-    calls["n"] += 1
-    return [claim] if calls["n"] == 1 else []
-
-  monkeypatch.setattr(jq, "claim_ingest_jobs", _claim_jobs)
-  monkeypatch.setattr(
-    jq,
-    "requeue_job",
-    lambda *a, **k: requeue_kw.append(dict(k)) or True,
-  )
-  monkeypatch.setattr(jq, "bump_job_attempt", lambda *a, **k: 1)
-  monkeypatch.setattr(jq, "ack_job", lambda *a, **k: True)
-
-  class _Pool:
-    def apply_async(self, *a, **k):
-      raise AssertionError("must not submit missing path")
-
-  qo._fill_ingest_band(
-    client,
-    band="hot",
-    cap=1,
-    inflight={},
-    claims={},
-    submitted={},
-    ingest_pool=_Pool(),
-    band_cap=1,
-    tgz_archive_dir=str(tmp_path),
-    archive_data_dir=str(tmp_path),
-    ingest_is_complete_fn=lambda *_a, **_k: False,
-  )
-  assert len(requeue_kw) == 1
-  assert requeue_kw[0]["score"] == qo._penalized_ingest_requeue_score(5.0)
-
-
 def test_skip_fp_penalty_lets_claimable_job_behind_submit(
   monkeypatch, tmp_path
 ):
@@ -3844,7 +3902,16 @@ def test_skip_fp_penalty_lets_claimable_job_behind_submit(
     "requeue_job",
     lambda *a, **k: requeue_kw.append(dict(k)) or True,
   )
-  monkeypatch.setattr(jq, "bump_job_attempt", lambda *a, **k: 1)
+  bumps: list[str] = []
+  letters: list = []
+  monkeypatch.setattr(
+    jq,
+    "bump_job_attempt",
+    lambda *a, **k: bumps.append(k.get("identity")) or 99,
+  )
+  monkeypatch.setattr(
+    jq, "append_queue_dead_letter", lambda *a, **k: letters.append(a) or True
+  )
   monkeypatch.setattr(jq, "write_job_fingerprint", lambda *a, **k: True)
   monkeypatch.setattr(jq, "ack_job", lambda *a, **k: True)
 
@@ -3870,6 +3937,8 @@ def test_skip_fp_penalty_lets_claimable_job_behind_submit(
   assert len(requeue_kw) == 1
   assert requeue_kw[0]["identity"] == str(bad_path)
   assert requeue_kw[0]["score"] == qo._penalized_ingest_requeue_score(5.0)
+  assert bumps == []
+  assert letters == []
 
 
 def test_fill_block_persists_until_store_hlen_recovers():
