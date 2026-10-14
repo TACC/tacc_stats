@@ -532,3 +532,21 @@ def test_list_slice_lock_hold_does_not_copy_whole_deque(tmp_path):
   got = store.list_slice(JOB_KIND_APPEND, 0, 0)
   assert got == ["head"]
   assert CountingDeque.visits == 1
+
+
+@pytest.mark.django_db(databases=[])
+def test_zadd_ingest_refuses_new_catchup_at_discover_cap(tmp_path, monkeypatch):
+  """New catchup stops at the ingest-queue cap. Hot and requeues still join."""
+  import hpcperfstats.dbload.lib.sync_timedb_job_discover as discover_mod
+
+  monkeypatch.setattr(
+    discover_mod.cfg,
+    "get_sync_ingest_queue_max_size",
+    lambda: 2,
+  )
+  store = SyncTimedbJobStore(str(tmp_path / "archive"))
+  assert store.zadd_ingest("/c/1", float(CATCHUP_SCORE_BASE)) == 1
+  assert store.zadd_ingest("/c/2", float(CATCHUP_SCORE_BASE)) == 1
+  assert store.zadd_ingest("/c/3", float(CATCHUP_SCORE_BASE)) == 0
+  assert store.zadd_ingest("/h/1", 0.0) == 1
+  assert store.zadd_ingest("/c/1", float(CATCHUP_SCORE_BASE)) == 0

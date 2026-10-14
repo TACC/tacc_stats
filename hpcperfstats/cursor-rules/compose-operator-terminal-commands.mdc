@@ -956,6 +956,14 @@ Do **not** use **`pg_ls_waldir()`** column alias forms that PG15 rejects; aggreg
 - When facts are missing and would change the plan, **do not guess** — ask for the paste (`plan-creation-contract.mdc` → *Grounding*).
 - When a command **fails**, update this file in the **same task** per **`operator-command-lessons-learned.mdc`** — do not repeat broken patterns in new plans.
 
+**Anti-pattern — host `python3` analyzer on hpcperfstats04 (2026-10-14):** host `/usr/lib64/python3.9` cannot import `datetime.UTC` from `scripts/measure_pipeline_ingest_rate.py`. Copy the existing host capture and the script into the pipeline container, then run image Python. Do not recapture the log. Do not point `--log-file` at a host `/tmp` path from inside `exec`.
+
+```bash
+podman cp /tmp/pipeline-ingest-health.log hpcperfstats_pipeline_1:/tmp/pipeline-ingest-health.log
+podman cp /data/hpcperfstats_site/source/scripts/measure_pipeline_ingest_rate.py hpcperfstats_pipeline_1:/tmp/measure_pipeline_ingest_rate.py
+podman-compose -p hpcperfstats exec -u hpcperfstats pipeline python3 /tmp/measure_pipeline_ingest_rate.py --log-file /tmp/pipeline-ingest-health.log --since-minutes 480
+```
+
 **Anti-pattern — `measure_pipeline_ingest_rate.py` positional log path (hpcperfstats02 2026-09-17):** `scripts/measure_pipeline_ingest_rate.py /tmp/….log` fails with `unrecognized arguments`. **Corrected:** pass `--log-file PATH`, or `--fetch-compose`, or stdin — never a bare positional path.
 
 ```bash

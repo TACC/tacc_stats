@@ -38,6 +38,7 @@ Attributes:
   _ANSI_ESCAPE_RE: Attribute.
   _ARCHIVE_FINALIZE_RE: Attribute.
   _BOOT_MARKERS: Attribute.
+  _CENSUS_INGEST_QUEUED_RE: Attribute.
   _CHUNK_IMMEDIATE_RE: Attribute.
   _FULL_INGEST_RE: Attribute.
   _GIB_BYTES: Attribute.
@@ -99,6 +100,9 @@ _LOG_TS_CONTAINER_FIRST_RE = re.compile(
 # Bare RFC3339 prefix (supervisord / some compose drivers): 2026-...T... message
 _LOG_TS_LEADING_RE = re.compile(rf"^(?P<ts>{_RFC3339_TS})\s+(?P<body>.*)$")
 _ANSI_ESCAPE_RE = re.compile(r"\x1b\[[0-9;]*m")
+_CENSUS_INGEST_QUEUED_RE = re.compile(
+  r"queue_orchestrator census\b.*\bingest=\d+/(\d+)\b"
+)
 _LISTEND_UNLINKS_RE = re.compile(
   r"current file unlinks \(last 10 minutes\): (\d+)"
 )
@@ -220,6 +224,7 @@ class LogMetrics:
     listend_unlink_samples: Timestamped rolling-window unlink counts.
     listend_unlink_sum: Effective non-overlapping unlink sum for rates.
     timestamped_lines: ``timestamped_lines``.
+    census_ingest_queued: Timestamped queued side of census ``ingest=``.
     truncate_max_samples: ``truncate_max_samples``.
   """
 
@@ -259,6 +264,9 @@ class LogMetrics:
   first_ts: datetime | None = None
   last_ts: datetime | None = None
   timestamped_lines: int = 0
+  census_ingest_queued: list[tuple[datetime, int]] = field(
+    default_factory=list,
+  )
 
   @property
   def backlog_rescan_samples(self) -> list[tuple[datetime, int]]:
@@ -384,6 +392,32 @@ def _median_or_none(samples: list[float]) -> float | None:
   return float(median(samples))
 
 
+def _queued_slope_per_min(metrics: LogMetrics) -> float | None:
+  """
+  Return queued-depth change per minute from census ``ingest=`` samples.
+
+  Args:
+    metrics (LogMetrics): Parsed metrics with ``census_ingest_queued``.
+
+  Returns:
+    float | None: ``(last - first) / minutes``, or None when fewer than
+    two samples span a positive interval.
+
+  Examples:
+    >>> _queued_slope_per_min(LogMetrics()) is None
+    True
+  """
+  samples = metrics.census_ingest_queued
+  if len(samples) < 2:
+    return None
+  start_ts, start_q = samples[0]
+  end_ts, end_q = samples[-1]
+  minutes = (end_ts - start_ts).total_seconds() / 60.0
+  if minutes <= 0:
+    return None
+  return (float(end_q) - float(start_q)) / minutes
+
+
 def _decision_next(
   *,
   ratio_ingest: str,
@@ -395,6 +429,7 @@ def _decision_next(
   ge_1gib_wall_share: float | None,
   telem_incomplete: bool = False,
   parse_unaccounted_dominates: bool = False,
+  queued_slope_per_min: float | None = None,
 ) -> str:
   """
   Map overnight analyzer signals to the locked next-CODE token.
@@ -409,6 +444,7 @@ def _decision_next(
     ge_1gib_wall_share (Optional[float]): Share of elapsed samples in large tiers.
     telem_incomplete (bool): Parse holds present but no write-phase tokens.
     parse_unaccounted_dominates (bool): Mid ``parse_unaccounted_s`` >= top named hold.
+    queued_slope_per_min (float | None): Census ingest queued change per minute.
 
   Returns:
     str: Decision token for operators (never empty).
@@ -437,7 +473,11 @@ def _decision_next(
   large_n = int(metrics.full_ingest_count_by_tier.get("1_4gib", 0)) + int(
     metrics.full_ingest_count_by_tier.get("ge_4gib", 0),
   )
-  if ratio <= 1.0 + EVEN_RATIO_TOLERANCE:
+  if (
+    ratio <= 1.0 + EVEN_RATIO_TOLERANCE
+    and queued_slope_per_min is not None
+    and queued_slope_per_min <= 0
+  ):
     return "stop_ingest_rate_watch_archive"
   if (
     ge_1gib_wall_share is not None and ge_1gib_wall_share >= 0.5 and large_n > 0
@@ -924,6 +964,11 @@ def parse_log_lines(
       if backlog_match:
         metrics.backlog_throughput_samples.append(
           (ts, int(backlog_match.group(1))),
+        )
+      census_match = _CENSUS_INGEST_QUEUED_RE.search(body)
+      if census_match:
+        metrics.census_ingest_queued.append(
+          (ts, int(census_match.group(1))),
         )
 
   metrics.listend_unlink_sum = _nonoverlapping_listend_unlink_sum(
@@ -1539,6 +1584,10 @@ def build_outcomes(
     dense_pack["mid_top_parse"] or "N/A" if dense_n > 0 else "N/A"
   )
   outcomes["decision_next_dense"] = decision_next_dense
+  queued_slope = _queued_slope_per_min(metrics)
+  outcomes["queued_slope_per_min"] = (
+    f"{queued_slope:.4f}" if queued_slope is not None else "N/A"
+  )
   outcomes["decision_next"] = _decision_next(
     ratio_ingest=ratio_ingest,
     window_minutes=window_minutes,
@@ -1551,6 +1600,7 @@ def build_outcomes(
     parse_unaccounted_dominates=(
       parse_unaccounted_dominates and not mid_write_dominates
     ),
+    queued_slope_per_min=queued_slope,
   )
   return outcomes
 

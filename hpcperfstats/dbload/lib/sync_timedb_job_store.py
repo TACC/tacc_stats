@@ -550,9 +550,9 @@ class SyncTimedbJobStore:
     """
     Queue or reband one ingest identity.
 
-    New catchup identities are refused when the member cap is full.
-    New hot-band identities still join so live listend files are not
-    starved behind a catchup-full ZSET.
+    New catchup identities are refused at the discover ingest cap
+    (``sync_ingest_queue_max_size``). New hot-band identities still
+    join so live listend files are not starved behind a full catchup.
 
     Args:
       identity (str): Normalized ingest path.
@@ -567,8 +567,12 @@ class SyncTimedbJobStore:
       >>> store.zadd_ingest("/raw/a", 1.0)
       1
     """
+    from hpcperfstats.dbload.lib.sync_timedb_job_discover import (
+      discover_ingest_capacity_limit,
+    )
+
     ident = str(identity)
-    cap = queue_capacity_limit()
+    cap = discover_ingest_capacity_limit()
     with self._lock:
       if ident in self._inflight[JOB_KIND_INGEST]:
         return 0

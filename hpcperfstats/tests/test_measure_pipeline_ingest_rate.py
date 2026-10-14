@@ -772,3 +772,55 @@ def test_tier_stdout_prints_all_hold_medians(mod):
     "orm_materialize_s",
   ):
     assert f"tier_8mib_64mib_median_{tok}" in keys
+
+
+def _winning_ratio_lines(census: list[str] | None = None) -> list[str]:
+  lines = [
+    _ts(0) + "Messages consumed in the last 10 minutes: 100; messages waiting "
+    "to be consumed: 0; current file unlinks (last 10 minutes): 1",
+    _ts(30) + "ingest file path=/arch/a outcome=ingested elapsed_s=1.0 "
+    "ingest_ok=yes archive=yes db_skip=no size_bytes=1000",
+    _ts(60) + "ingest file path=/arch/b outcome=ingested elapsed_s=1.0 "
+    "ingest_ok=yes archive=yes db_skip=no size_bytes=1000",
+    _ts(90) + "Messages consumed in the last 10 minutes: 100; messages waiting "
+    "to be consumed: 0; current file unlinks (last 10 minutes): 1",
+  ]
+  if census:
+    lines[1:1] = census
+  return lines
+
+
+def test_rising_census_queue_does_not_stop(mod):
+  """A winning listend ratio must not stop while census queued depth rises."""
+  lines = _winning_ratio_lines(
+    [
+      _ts(10) + "queue_orchestrator census ingest=4/1000 discover=1/1",
+      _ts(80) + "queue_orchestrator census ingest=4/1800 discover=1/1",
+    ],
+  )
+  outcomes = mod.analyze_lines(lines, exclude_startup=False)
+  assert float(outcomes["queued_slope_per_min"]) > 0
+  assert outcomes["decision_next"] != "stop_ingest_rate_watch_archive"
+
+
+def test_missing_census_slope_does_not_stop(mod):
+  """No census samples must not claim the ingest-rate stop token."""
+  outcomes = mod.analyze_lines(
+    _winning_ratio_lines(),
+    exclude_startup=False,
+  )
+  assert outcomes["queued_slope_per_min"] == "N/A"
+  assert outcomes["decision_next"] != "stop_ingest_rate_watch_archive"
+
+
+def test_nonpositive_census_slope_stops_when_ratio_wins(mod):
+  """Stop only when the listend ratio wins and queued depth is not rising."""
+  lines = _winning_ratio_lines(
+    [
+      _ts(10) + "queue_orchestrator census ingest=4/1800 discover=1/1",
+      _ts(80) + "queue_orchestrator census ingest=4/1000 discover=1/1",
+    ],
+  )
+  outcomes = mod.analyze_lines(lines, exclude_startup=False)
+  assert float(outcomes["queued_slope_per_min"]) < 0
+  assert outcomes["decision_next"] == "stop_ingest_rate_watch_archive"
