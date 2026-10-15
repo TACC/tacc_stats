@@ -31,8 +31,20 @@ while IFS= read -r ns; do
     failed+=( "${ns}: no raw/*.profraw and no default.profdata" )
     continue
   fi
-  echo "PGO merge: ${ns} (${#raw[@]} profraw) …" >&2
-  if ! llvm-profdata merge -output="${out}" "${raw[@]}"; then
+  usable=()
+  for f in "${raw[@]}"; do
+    if llvm-profdata show "${f}" >/dev/null 2>&1; then
+      usable+=("${f}")
+    else
+      echo "PGO merge: ${ns} skip malformed ${f}" >&2
+    fi
+  done
+  if [[ ${#usable[@]} -eq 0 ]]; then
+    failed+=( "${ns}: no readable profraw" )
+    continue
+  fi
+  echo "PGO merge: ${ns} (${#usable[@]} profraw) …" >&2
+  if ! llvm-profdata merge -output="${out}" "${usable[@]}"; then
     failed+=( "${ns}: llvm-profdata merge failed" )
     continue
   fi

@@ -10,6 +10,7 @@
 #   ./scripts/rebuild_full_site.sh --dry-run
 #   ./scripts/rebuild_full_site.sh --build-only
 #   ./scripts/rebuild_full_site.sh --no-start
+#   ./scripts/rebuild_full_site.sh --full-pgo
 set -euo pipefail
 
 if [[ "${BASH_SOURCE[0]}" != "${0}" ]]; then
@@ -36,6 +37,7 @@ NO_START=0
 PROFILE_PHASE=0
 PGO_USE=0
 PGO_SKIP=0
+FULL_PGO=0
 
 export PGOROOT="${PGOROOT:-${HPCPERFSTATS_PGO_ROOT:-/root/.hpcperfstats_pgo}}"
 
@@ -64,8 +66,10 @@ PGOROOT PGO (CPython --enable-optimizations + plain make install). PGOROOT defau
   --profile-phase  Wipe PGOROOT (confirm if complete set) and build PGO_PHASE=generate for live soak
   --pgo-use        After soak: merge profiles + one-time PGO_PHASE=use rebuild (--no-cache on images)
   --pgo-skip       Rebuild with PGO_PHASE=skip (merged profdata under PGOROOT; podman cache allowed)
+  --full-pgo       Generate → live soak → down → merge/use rebuild (orchestrates profile-phase + soak + pgo-use)
 
-Only one of --profile-phase, --pgo-use, --pgo-skip may be passed.
+Only one of --profile-phase, --pgo-use, --pgo-skip, --full-pgo may be passed.
+--full-pgo cannot be combined with --build-only, --no-start, or --dry-run soak skip (dry-run prints steps only).
 
 Options:
   --dry-run        Print planned steps only
@@ -87,6 +91,10 @@ while [[ $# -gt 0 ]]; do
       ;;
     --pgo-skip)
       PGO_SKIP=1
+      shift
+      ;;
+    --full-pgo)
+      FULL_PGO=1
       shift
       ;;
     --dry-run)
@@ -118,8 +126,14 @@ pgo_validate_exclusive_cli_flags() {
   [[ "${PROFILE_PHASE}" -eq 1 ]] && n=$((n + 1))
   [[ "${PGO_USE}" -eq 1 ]] && n=$((n + 1))
   [[ "${PGO_SKIP}" -eq 1 ]] && n=$((n + 1))
+  [[ "${FULL_PGO}" -eq 1 ]] && n=$((n + 1))
   if [[ "${n}" -gt 1 ]]; then
-    echo "rebuild_full_site.sh: only one of --profile-phase, --pgo-use, --pgo-skip allowed" >&2
+    echo "rebuild_full_site.sh: only one of --profile-phase, --pgo-use, --pgo-skip, --full-pgo allowed" >&2
+    usage >&2
+    exit 2
+  fi
+  if [[ "${FULL_PGO}" -eq 1 && ( "${BUILD_ONLY}" -eq 1 || "${NO_START}" -eq 1 ) ]]; then
+    echo "rebuild_full_site.sh: --full-pgo cannot be used with --build-only or --no-start" >&2
     usage >&2
     exit 2
   fi
@@ -290,6 +304,70 @@ compose_down_project() {
   run_cmd "${PODMAN_COMPOSE[@]}" down --remove-orphans
 }
 
+pgo_stop_stack_after_soak() {
+  echo "=== PGO post-soak stack teardown (supervisor shutdown + compose down) ===" >&2
+  compose_down_project
+}
+
+run_pgo_soak_web_traffic() {
+  local soak_args=()
+  echo "=== PHASE soak starting ===" >&2
+  if [[ "${DRY_RUN}" -eq 0 ]]; then
+    echo "PGO soak: stop pipeline and re-seed rank-0 before traffic" >&2
+    run_cmd podman stop -t 20 "${HPCPERFSTATS_COMPOSE_PROJECT}_pipeline_1" || true
+    run_cmd "${PODMAN_COMPOSE[@]}" exec -T web python3 - < "${SCRIPT_DIR}/pgo_soak_seed_rank0_job.py"
+  fi
+  echo "=== PGO live soak (Playwright + API rank-0 jobs) ===" >&2
+  soak_args=(
+    --repo-root "${REPO_ROOT}"
+    --compose-project "${HPCPERFSTATS_COMPOSE_PROJECT}"
+  )
+  if [[ "${DRY_RUN}" -eq 1 ]]; then
+    soak_args+=(--dry-run)
+  fi
+  run_cmd pgo_run_soak_web_traffic "${REPO_ROOT}" "${soak_args[@]}"
+}
+
+run_full_pgo_orchestration() {
+  echo "=== Full PGO orchestration (generate → soak → down → use rebuild) ===" >&2
+  if [[ "${DRY_RUN}" -eq 1 ]]; then
+    echo "[dry-run] would: wipe PGOROOT (profile-phase), build generate, up+verify, soak, down, merge+use build, up+verify" >&2
+    PROFILE_PHASE=1
+    resolve_pgo_phase
+    run_pgo_soak_web_traffic
+    return 0
+  fi
+
+  PROFILE_PHASE=1
+  pgo_confirm_wipe_pgroot_for_profile_phase "${REPO_ROOT}"
+  resolve_pgo_phase
+  pgo_die_if_partial_profile_collection "${REPO_ROOT}" "${PROFILE_PHASE}"
+  pgo_prepare_host_pgroot_for_rebuild "${REPO_ROOT}" "${SCRIPT_DIR}/pgo_ensure_layout.sh"
+
+  PHASE=build
+  compose_build_all_with_pgo
+  run_compose_up_memory_high_and_summary
+
+  PHASE=soak
+  run_pgo_soak_web_traffic
+
+  PHASE=post_soak_down
+  pgo_stop_stack_after_soak
+
+  profiles_ready "${REPO_ROOT}" \
+    || pgo_die "PGO full-pgo refused after soak: profiles_ready false (check PGOROOT bind and LLVM_PROFILE_FILE)"
+
+  PGO_USE=1
+  PGO_PHASE=use
+  echo "PGO: --full-pgo → PGO_PHASE=use (merge + profile-guided rebuild)" >&2
+  run_pgo_use_path
+
+  # memory.high left at the cgroup default (max). Do not call apply_pipeline_memory_high.
+  PHASE=summary
+  echo "Full-site PGO --full-pgo complete (generate + soak + use rebuild)."
+  print_stack_summary
+}
+
 compose_up_project_stack() {
   compose_down_project
   LAST_STEP="podman-compose --profile ${PG18_PROFILE} up -d --no-build (full stack incl. ${PG18_SERVICE})"
@@ -408,6 +486,10 @@ run_compose_up_memory_high_and_summary() {
 main() {
   trap on_exit EXIT
   preflight
+  if [[ "${FULL_PGO}" -eq 1 ]]; then
+    run_full_pgo_orchestration
+    return 0
+  fi
   if [[ "${PROFILE_PHASE}" -eq 1 ]]; then
     if [[ "${DRY_RUN}" -eq 1 ]]; then
       if profiles_ready "${REPO_ROOT}"; then

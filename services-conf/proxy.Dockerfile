@@ -90,7 +90,7 @@ ENV HPC_PGO_PHASE=${PGO_PHASE} HPC_PGO_ROOT=${PGO_ROOT}
 
 # --- jemalloc ---
 ARG PGO_NAMESPACE=proxy/jemalloc
-RUN --mount=type=bind,from=pgo,source=.,target=/root/.hpcperfstats_pgo,rw \
+RUN \
   /bin/bash -o pipefail -s <<'BASH'
 set -eux
 curl -fsSL "https://github.com/jemalloc/jemalloc/releases/download/${JEMALLOC_VERSION}/jemalloc-${JEMALLOC_VERSION}.tar.bz2" \
@@ -110,6 +110,7 @@ make -j"$(nproc)" CC="${CC}" CXX="${CXX}" CFLAGS="${_cf_bake}" CXXFLAGS="${_cf_b
   AR="${AR}" RANLIB="${RANLIB}" NM="${NM}"
 make install CC="${CC}" CXX="${CXX}" CFLAGS="${_cf_bake}" CXXFLAGS="${_cf_bake}" LDFLAGS="${_lto_ld}" EXTRA_LDFLAGS="${_lto_ld}" \
   AR="${AR}" RANLIB="${RANLIB}" NM="${NM}"
+hpcperfstats_pgo_capture_generate_dlopen proxy/jemalloc /opt/jemalloc
 rm -rf /usr/src/jemalloc /tmp/jemalloc.tar.bz2
 BASH
 
@@ -119,12 +120,12 @@ WORKDIR /usr/src
 # nginx auto/lib/zlib injects --with-zlib-opt into CFLAGS when it re-runs
 # ./configure. zlib-ng requires --zlib-compat as a configure argv flag; passing
 # it via CFLAGS aborts with "Compiler error reporting is too harsh".
-ARG PGO_NAMESPACE=proxy/zlib-ng
-RUN --mount=type=bind,from=pgo,source=.,target=/root/.hpcperfstats_pgo,rw \
+# Not a PGO namespace: nginx rebuilds this tree with nginx's own profile.
+RUN \
   /bin/bash -o pipefail -s <<'BASH'
 set -eux
-_cf_cfg="$(hpcperfstats_configure_cflags proxy/zlib-ng)"
-_cf_bake="$(hpcperfstats_bake_cflags proxy/zlib-ng)"
+_cf_cfg="$(hpcperfstats_strip_lto_and_pgo "$(hpcperfstats_native_base_cflags)")"
+_cf_bake="$(hpcperfstats_native_base_cflags)"
 curl -fsSL "https://github.com/zlib-ng/zlib-ng/archive/refs/tags/${ZLIB_NG_VERSION}.tar.gz" \
   -o /tmp/zlib-ng.tar.gz
 echo "${ZLIB_NG_SHA256}  /tmp/zlib-ng.tar.gz" | sha256sum -c -
@@ -169,11 +170,11 @@ RUN set -eux; \
 # brotli >=1.1 dropped scripts/sources.lst; ngx_brotli v1.0.0rc then links
 # -lbrotlienc instead of compiling deps sources. Pre-build static libs to
 # /opt/brotli so the nginx link line can resolve them (folded into the binary).
-ARG PGO_NAMESPACE=proxy/brotli
-RUN --mount=type=bind,from=pgo,source=.,target=/root/.hpcperfstats_pgo,rw \
+# Not a PGO namespace: static libs are ThinLTO-linked into nginx.
+RUN \
   /bin/bash -o pipefail -s <<'BASH'
 set -eux
-_cflags="$(hpcperfstats_bake_cflags proxy/brotli)"
+_cflags="$(hpcperfstats_native_base_cflags)"
 _lto_ld="$(hpcperfstats_alpine_thinlto_ldflags)"
 curl -fsSL "https://github.com/google/ngx_brotli/archive/refs/tags/v${NGX_BROTLI_VERSION}.tar.gz" \
   -o /tmp/ngx_brotli.tar.gz
@@ -213,11 +214,11 @@ BASH
 # Proxy has no /opt/zlib-ng or /opt/lz4; do not enable HAVE_ZLIB/HAVE_LZ4 (those
 # are for the db/Python zstd CLI). Do not lib-mt: nginx already has one worker
 # per CPU. Fold libzstd.a into nginx; do not COPY /opt/zstd into the runtime.
-ARG PGO_NAMESPACE=proxy/zstd
-RUN --mount=type=bind,from=pgo,source=.,target=/root/.hpcperfstats_pgo,rw \
+# Not a PGO namespace: libzstd.a is ThinLTO-linked into nginx.
+RUN \
   /bin/bash -o pipefail -s <<'BASH'
 set -eux
-_cflags="$(hpcperfstats_bake_cflags proxy/zstd)"
+_cflags="$(hpcperfstats_native_base_cflags)"
 curl -fsSL "https://github.com/facebook/zstd/releases/download/v${ZSTD_VERSION}/zstd-${ZSTD_VERSION}.tar.gz" \
   -o /tmp/zstd.tar.gz
 echo "${ZSTD_SHA256}  /tmp/zstd.tar.gz" | sha256sum -c -
@@ -244,12 +245,12 @@ BASH
 
 # --- nginx ---
 ARG PGO_NAMESPACE=proxy/nginx
-RUN --mount=type=bind,from=pgo,source=.,target=/root/.hpcperfstats_pgo,rw \
+RUN \
   /bin/bash -o pipefail -s <<'BASH'
 set -eux
 hpcperfstats_pgo_ensure_proxy_nginx_link_dirs
 _cflags="$(hpcperfstats_bake_cflags proxy/nginx)"
-_openssl_cflags="$(hpcperfstats_bake_cflags proxy/openssl)"
+_openssl_cflags="$(hpcperfstats_native_base_cflags)"
 test -f /usr/src/zlib-ng/libz.a
 curl -fsSL "https://nginx.org/download/nginx-${NGINX_VERSION}.tar.gz" \
   -o /tmp/nginx.tar.gz
@@ -300,6 +301,7 @@ make -f objs/Makefile -j1 \
   CFLAGS="${nginx_bake_cflags}" LDFLAGS="${_lto_ld}" EXTRA_LDFLAGS="${_lto_ld}"
 make -j"$(nproc)" CFLAGS="${nginx_bake_cflags}"
 make install CFLAGS="${nginx_bake_cflags}"
+hpcperfstats_pgo_capture_generate_exec proxy/nginx -- /usr/sbin/nginx -V
 strip --strip-unneeded /usr/sbin/nginx
 # --conf-path=/etc/nginx/nginx.conf installs mime.types under /etc/nginx/, not
 # prefix/conf/. Normalize into /opt/nginx/conf for the runtime COPY.

@@ -18,11 +18,168 @@ hpcperfstats_pgo_root() {
 
 hpcperfstats_pgo_ensure_raw_dir() {
   local namespace="${1:?namespace required}"
-  local phase root
+  local phase root raw
   phase="$(hpcperfstats_pgo_phase)"
   [[ "${phase}" == generate ]] || return 0
   root="$(hpcperfstats_pgo_root)"
-  mkdir -p "${root}/${namespace}/raw"
+  raw="${root}/${namespace}/raw"
+  mkdir -p "${raw}"
+  chmod 1777 "${raw}" 2>/dev/null || true
+}
+
+# One process writes one profraw. Compile-only RUNs never execute the library,
+# and strip removes the profile runtime, so call this after install and before strip.
+# Usage: hpcperfstats_pgo_capture_generate_exec NAMESPACE -- CMD... [--also NS...]
+# No-op unless PGO_PHASE=generate (stdlib/use/skip rebuilds must not require a smoke).
+hpcperfstats_pgo_capture_generate_exec() {
+  local namespace="${1:?namespace required}"
+  shift
+  [[ "$(hpcperfstats_pgo_phase)" == generate ]] || return 0
+  local -a cmd=() also=()
+  local mode="cmd"
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --also)
+        mode="also"
+        shift
+        continue
+        ;;
+      --)
+        shift
+        continue
+        ;;
+    esac
+    if [[ "${mode}" == "also" ]]; then
+      also+=("$1")
+    else
+      cmd+=("$1")
+    fi
+    shift
+  done
+  [[ ${#cmd[@]} -gt 0 ]] || hpcperfstats_pgo_die "generate capture missing command for ${namespace}"
+  hpcperfstats_pgo_ensure_raw_dir "${namespace}"
+  local raw dest f src_file="" extra
+  raw="$(hpcperfstats_pgo_root)/${namespace}/raw"
+  dest="${raw}/smoke-%p.profraw"
+  rm -f "${raw}"/smoke-*.profraw
+  LLVM_PROFILE_FILE="${dest}" "${cmd[@]}" >/dev/null || true
+  shopt -s nullglob
+  for f in "${raw}"/*.profraw; do
+    if [[ -s "${f}" ]]; then
+      src_file="${f}"
+      break
+    fi
+  done
+  shopt -u nullglob
+  [[ -n "${src_file}" ]] || hpcperfstats_pgo_die \
+    "generate capture wrote no profraw for ${namespace} (${cmd[*]})"
+  for extra in "${also[@]+"${also[@]}"}"; do
+    [[ -n "${extra}" ]] || continue
+    hpcperfstats_pgo_ensure_raw_dir "${extra}"
+    cp -f "${src_file}" "$(hpcperfstats_pgo_root)/${extra}/raw/smoke.profraw"
+  done
+}
+
+# jemalloc must be DT_NEEDED in an instrumented executable. dlopen after startup
+# does not install its malloc hooks in time, and a non-instrumented driver has
+# no profile runtime to dump the loaded library.
+hpcperfstats_pgo_capture_generate_linked_malloc() {
+  local namespace="${1:?namespace required}"
+  local dir="${2:?directory required}"
+  local libdir
+  [[ "$(hpcperfstats_pgo_phase)" == generate ]] || return 0
+  libdir="${dir}/lib"
+  [[ -d "${libdir}" ]] || libdir="${dir}"
+  cat > /tmp/hpc-pgo-malloc.c <<'EOF'
+#include <stdlib.h>
+int main(void) {
+  void *p = malloc(128);
+  if (!p) return 1;
+  free(p);
+  return 0;
+}
+EOF
+  # CC on Alpine is "clang -fuse-ld=lld --ld-path=..."; quoting it is one argv.
+  # shellcheck disable=SC2086
+  ${CC:-clang} -fprofile-instr-generate -O0 -o /tmp/hpc-pgo-malloc /tmp/hpc-pgo-malloc.c \
+    -L"${libdir}" -Wl,-rpath,"${libdir}" -ljemalloc \
+    || hpcperfstats_pgo_die "generate capture failed to link jemalloc smoke for ${namespace}"
+  hpcperfstats_pgo_capture_generate_exec "${namespace}" -- /tmp/hpc-pgo-malloc
+}
+
+hpcperfstats_pgo_capture_generate_dlopen() {
+  local namespace="${1:?namespace required}"
+  local dir="${2:?directory required}"
+  shift 2
+  [[ "$(hpcperfstats_pgo_phase)" == generate ]] || return 0
+  if [[ "${namespace}" == *jemalloc ]]; then
+    hpcperfstats_pgo_capture_generate_linked_malloc "${namespace}" "${dir}"
+    return
+  fi
+  local so="" f
+  shopt -s nullglob
+  for f in "${dir}"/lib/lib*.so.* "${dir}"/lib/lib*.so "${dir}"/lib*.so.* "${dir}"/*.so; do
+    [[ -f "${f}" ]] || continue
+    so="${f}"
+    break
+  done
+  shopt -u nullglob
+  [[ -n "${so}" ]] || hpcperfstats_pgo_die "generate capture found no shared object under ${dir} for ${namespace}"
+  cat > /tmp/hpc-pgo-dlopen.c <<'EOF'
+#include <dlfcn.h>
+#include <stdio.h>
+int main(int argc, char **argv) {
+  int i;
+  for (i = 1; i < argc; i++) {
+    if (!dlopen(argv[i], RTLD_NOW | RTLD_GLOBAL)) {
+      fprintf(stderr, "dlopen %s: %s\n", argv[i], dlerror());
+      return 1;
+    }
+  }
+  if (!fopen("/tmp/hpc-pgo-dlopen.ok", "w")) return 1;
+  return 0;
+}
+EOF
+  rm -f /tmp/hpc-pgo-dlopen.ok
+  # shellcheck disable=SC2086
+  ${CC:-clang} -fprofile-instr-generate -O0 -o /tmp/hpc-pgo-dlopen /tmp/hpc-pgo-dlopen.c -ldl \
+    || ${CC:-clang} -fprofile-instr-generate -O0 -o /tmp/hpc-pgo-dlopen /tmp/hpc-pgo-dlopen.c \
+    || hpcperfstats_pgo_die "generate capture failed to link dlopen smoke for ${namespace}"
+  hpcperfstats_pgo_capture_generate_exec "${namespace}" -- /tmp/hpc-pgo-dlopen "${so}" "$@"
+  [[ -f /tmp/hpc-pgo-dlopen.ok ]] || hpcperfstats_pgo_die \
+    "generate capture dlopen failed for ${namespace} (${so})"
+}
+
+# timescaledb.so has unresolved postgres symbols, so dlopen outside the backend
+# never registers counters. Start a throwaway postmaster (initdb refuses root).
+hpcperfstats_pgo_capture_generate_postgres_extension() {
+  local namespace="${1:?namespace required}"
+  [[ "$(hpcperfstats_pgo_phase)" == generate ]] || return 0
+  hpcperfstats_pgo_ensure_raw_dir "${namespace}"
+  local raw pgdata f copied=0
+  raw="$(hpcperfstats_pgo_root)/${namespace}/raw"
+  pgdata=/tmp/hpc-pgo-pgdata
+  rm -rf "${pgdata}"
+  rm -f /tmp/hpc-pgo-pgext-*.profraw
+  if ! id pgo >/dev/null 2>&1; then
+    adduser -D -H -s /bin/sh pgo
+  fi
+  install -d -o pgo -g pgo -m 1777 /var/run/postgresql
+  su pgo -c "/usr/local/bin/initdb -D '${pgdata}' --no-sync --auth=trust"
+  # Postmaster uid cannot create files on the rootless PGOROOT volume.
+  su pgo -c "export LLVM_PROFILE_FILE='/tmp/hpc-pgo-pgext-%p.profraw'; /usr/local/bin/pg_ctl -D '${pgdata}' -w start -o '-c shared_preload_libraries=timescaledb -c listen_addresses= -c unix_socket_directories=/var/run/postgresql'"
+  su pgo -c "/usr/local/bin/pg_ctl -D '${pgdata}' -m fast -w stop"
+  rm -rf "${pgdata}"
+  shopt -s nullglob
+  for f in /tmp/hpc-pgo-pgext-*.profraw; do
+    if [[ -s "${f}" ]]; then
+      cp -f "${f}" "${raw}/"
+      copied=1
+    fi
+  done
+  shopt -u nullglob
+  [[ "${copied}" -eq 1 ]] || hpcperfstats_pgo_die \
+    "generate capture wrote no profraw for ${namespace} (timescaledb preload)"
 }
 
 # Linking /opt/* built with PGO generate pulls instrumented deps (e.g. zstd→libz).
@@ -76,8 +233,7 @@ hpcperfstats_pgo_ensure_db_timescaledb_link_dirs() {
 
 hpcperfstats_pgo_ensure_proxy_nginx_link_dirs() {
   local ns
-  for ns in proxy/jemalloc proxy/zlib-ng proxy/brotli proxy/zstd \
-    proxy/openssl proxy/nginx; do
+  for ns in proxy/jemalloc proxy/nginx; do
     hpcperfstats_pgo_ensure_raw_dir "${ns}"
   done
 }

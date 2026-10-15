@@ -40,6 +40,23 @@ def test_proxy_dockerfile_declares_pgo_namespace_for_each_proxy_row() -> None:
     assert f"hpcperfstats_bake_cflags {ns}" in proxy_text, ns
 
 
+def test_unusable_proxy_archives_are_not_profile_namespaces() -> None:
+  """Static archives folded into nginx never get their own use-step profile."""
+  dropped = ("proxy/brotli", "proxy/openssl", "proxy/zlib-ng", "proxy/zstd")
+  names = _registry_namespaces()
+  for ns in dropped:
+    assert ns not in names, ns
+  proxy = (_repo_root() / "services-conf" / "proxy.Dockerfile").read_text()
+  flags = (_repo_root() / "services-conf" / "pgo_clang_flags.sh").read_text()
+  for ns in dropped:
+    assert f"hpcperfstats_bake_cflags {ns}" not in proxy, ns
+    assert f"hpcperfstats_pgo_ensure_raw_dir {ns}" not in flags, ns
+    assert f"hpcperfstats_pgo_capture_generate_exec {ns}" not in proxy, ns
+  assert "--also proxy/" not in proxy
+  assert "hpcperfstats_strip_profile_use" not in flags
+  assert "hpcperfstats_strip_profile_use" not in proxy
+
+
 def _pgo_ensure_raw_namespaces_from_shell() -> set[str]:
   script = (_repo_root() / "services-conf" / "pgo_clang_flags.sh").read_text()
   ensured = set(
@@ -79,28 +96,17 @@ def test_pgo_ensure_helpers_list_every_web_registry_namespace() -> None:
     )
 
 
-def test_pgo_registry_rows_use_pg_mount_with_bake_cflags() -> None:
-  """Every PGO bake/cpython make call in image Dockerfiles must sit in a from=pgo RUN."""
+def test_pgo_registry_rows_do_not_use_ephemeral_context_bind() -> None:
+  """from=pgo bind mounts do not write profraw back to the host PGOROOT."""
   mount = "from=pgo,source=.,target=/root/.hpcperfstats_pgo"
   for path in (
     _repo_root() / "Dockerfile",
     _repo_root() / "services-conf" / "db.Dockerfile",
     _repo_root() / "services-conf" / "proxy.Dockerfile",
   ):
-    text = path.read_text()
-    for pattern in (
-      r"hpcperfstats_bake_cflags[^\n\\]+",
-      r"hpcperfstats_cpython_make_install[^\n\\]+",
-    ):
-      for match in re.finditer(pattern, text):
-        start = text.rfind("RUN", 0, match.start())
-        end = text.find("\n\n", match.start())
-        if end == -1:
-          end = len(text)
-        run_block = text[start:end]
-        assert mount in run_block, (
-          f"{path.name}: PGO without PGOROOT mount near {match.group(0)!r}"
-        )
+    assert mount not in path.read_text(), path.name
+  pgo_lib = (_repo_root() / "scripts" / "pgo_lib.sh").read_text()
+  assert "--volume=${root}:/root/.hpcperfstats_pgo:rw" in pgo_lib
 
 
 def test_web_dockerfile_declares_pgo_namespace_for_each_web_row() -> None:
@@ -162,6 +168,7 @@ def test_pgo_podman_build_context_stdlib_uses_empty_dir_not_pgoroot(
     text=True,
   ).strip()
   assert f"--build-context=pgo={empty}" in out
+  assert "--volume=" not in out
   assert "pgo_sketch_podman_context" not in out
 
 
@@ -185,6 +192,7 @@ def test_pgo_podman_build_context_skip_uses_full_pgoroot(
   ).strip()
   assert "pgo_sketch_podman_context" not in out
   assert f"--build-context=pgo={pgoroot.resolve()}" in out
+  assert f"--volume={pgoroot.resolve()}:/root/.hpcperfstats_pgo:rw" in out
 
 
 def test_pgo_prepare_host_pgroot_skips_layout_on_stdlib(
@@ -664,8 +672,10 @@ def test_pgo_ensure_db_and_proxy_link_dirs_on_generate() -> None:
       ],
       env=env,
     )
-    for ns in ("db/lz4", "db/postgresql", "proxy/openssl"):
-      assert (Path(tmp) / ns / "raw").is_dir()
+    for ns in ("db/lz4", "db/postgresql", "proxy/jemalloc", "proxy/nginx"):
+      assert (Path(tmp) / ns / "raw").is_dir(), ns
+    for ns in ("proxy/brotli", "proxy/openssl", "proxy/zlib-ng", "proxy/zstd"):
+      assert not (Path(tmp) / ns).exists(), ns
 
 
 def test_pgo_ensure_web_abi_link_dirs_creates_raw_on_generate() -> None:
@@ -1103,3 +1113,210 @@ def test_rebuild_full_site_pgo_fail_loud_helpers() -> None:
   )
   assert "build_musl_gcc_toolchain_image" not in script
   assert 'run_cmd "${SCRIPT_DIR}/pgo_ensure_layout.sh"' not in script
+
+
+def test_generate_capture_exec_writes_profraw_and_copies_also(
+  tmp_path: Path,
+) -> None:
+  """Regression: generate capture must leave a nonempty profraw on the bind path."""
+  script = _repo_root() / "services-conf" / "pgo_clang_flags.sh"
+  writer = tmp_path / "writer.sh"
+  writer.write_text(
+    "#!/bin/sh\n"
+    "f=$(printf '%s' \"$LLVM_PROFILE_FILE\" | sed 's/%p/9/')\n"
+    'printf x > "$f"\n',
+    encoding="utf-8",
+  )
+  writer.chmod(0o755)
+  proc = subprocess.run(
+    [
+      "bash",
+      "-c",
+      (
+        f'source "{script}"; '
+        "hpcperfstats_pgo_capture_generate_exec db/jemalloc -- "
+        f'"{writer}" --also db/lz4'
+      ),
+    ],
+    env={
+      **os.environ,
+      "HPC_PGO_PHASE": "generate",
+      "HPC_PGO_ROOT": str(tmp_path),
+    },
+    capture_output=True,
+    text=True,
+    check=False,
+  )
+  assert proc.returncode == 0, proc.stderr
+  assert any((tmp_path / "db/jemalloc/raw").glob("*.profraw"))
+  copied = tmp_path / "db/lz4/raw/smoke.profraw"
+  assert copied.is_file() and copied.stat().st_size > 0
+
+
+def test_generate_capture_exec_dies_without_profraw(tmp_path: Path) -> None:
+  """A generate smoke that does not dump a profile must fail the image build."""
+  script = _repo_root() / "services-conf" / "pgo_clang_flags.sh"
+  proc = subprocess.run(
+    [
+      "bash",
+      "-c",
+      f'source "{script}"; hpcperfstats_pgo_capture_generate_exec db/jemalloc -- true',
+    ],
+    env={
+      **os.environ,
+      "HPC_PGO_PHASE": "generate",
+      "HPC_PGO_ROOT": str(tmp_path),
+    },
+    capture_output=True,
+    text=True,
+    check=False,
+  )
+  assert proc.returncode != 0
+  assert "wrote no profraw" in proc.stderr
+
+
+def test_generate_capture_noop_unless_generate_phase(tmp_path: Path) -> None:
+  script = _repo_root() / "services-conf" / "pgo_clang_flags.sh"
+  marker = tmp_path / "ran"
+  proc = subprocess.run(
+    [
+      "bash",
+      "-c",
+      (
+        f'source "{script}"; '
+        "hpcperfstats_pgo_capture_generate_exec db/jemalloc -- "
+        f'touch "{marker}"'
+      ),
+    ],
+    env={**os.environ, "HPC_PGO_PHASE": "skip", "HPC_PGO_ROOT": str(tmp_path)},
+    capture_output=True,
+    text=True,
+    check=False,
+  )
+  assert proc.returncode == 0, proc.stderr
+  assert not marker.exists()
+
+
+def test_library_capture_smoke_is_instrumented() -> None:
+  """A non-instrumented dlopen driver has no profile runtime, so jemalloc wrote nothing."""
+  flags = (_repo_root() / "services-conf" / "pgo_clang_flags.sh").read_text(
+    encoding="utf-8"
+  )
+  assert "-fno-profile-instr-generate" not in flags
+  start = flags.index("hpcperfstats_pgo_capture_generate_linked_malloc()")
+  block = flags[start : start + 900]
+  assert "-fprofile-instr-generate" in block
+  assert "-ljemalloc" in block
+  assert '"${cc}"' not in block
+  assert "${CC:-clang}" in block
+  dlopen = flags.index("hpcperfstats_pgo_capture_generate_dlopen()")
+  dlopen_block = flags[dlopen : dlopen + 1600]
+  assert "hpcperfstats_pgo_capture_generate_linked_malloc" in dlopen_block
+  assert "/tmp/hpc-pgo-dlopen.ok" in dlopen_block
+
+
+def test_timescaledb_capture_uses_postmaster_not_dlopen() -> None:
+  """timescaledb.so dlopen fails without postgres; preload must run before the layer ends."""
+  flags = (_repo_root() / "services-conf" / "pgo_clang_flags.sh").read_text(
+    encoding="utf-8"
+  )
+  start = flags.index("hpcperfstats_pgo_capture_generate_postgres_extension()")
+  block = flags[start : start + 2200]
+  assert "shared_preload_libraries=timescaledb" in block
+  assert "/usr/local/bin/initdb" in block
+  # Rootless PGOROOT is not writable by the unmapped postmaster uid.
+  assert "/tmp/hpc-pgo-pgext-%p.profraw" in block
+  assert 'cp -f "${f}" "${raw}/"' in block
+  db = (_repo_root() / "services-conf" / "db.Dockerfile").read_text(
+    encoding="utf-8"
+  )
+  assert (
+    "hpcperfstats_pgo_capture_generate_postgres_extension db/timescaledb" in db
+  )
+  assert "hpcperfstats_pgo_capture_generate_dlopen db/timescaledb" not in db
+
+
+def test_merge_skips_malformed_profraw() -> None:
+  """A truncated postmaster dump must not fail the namespace merge."""
+  script = (_repo_root() / "scripts" / "pgo_merge_namespaces.sh").read_text(
+    encoding="utf-8"
+  )
+  assert 'llvm-profdata show "${f}"' in script
+  assert "skip malformed" in script
+
+
+def test_postgres_extension_capture_noop_unless_generate(
+  tmp_path: Path,
+) -> None:
+  script = _repo_root() / "services-conf" / "pgo_clang_flags.sh"
+  proc = subprocess.run(
+    [
+      "bash",
+      "-c",
+      f'source "{script}"; hpcperfstats_pgo_capture_generate_postgres_extension db/timescaledb',
+    ],
+    env={**os.environ, "HPC_PGO_PHASE": "skip", "HPC_PGO_ROOT": str(tmp_path)},
+    capture_output=True,
+    text=True,
+    check=False,
+  )
+  assert proc.returncode == 0, proc.stderr
+  assert not (tmp_path / "db/timescaledb").exists()
+
+
+def test_web_jemalloc_and_nginx_capture_before_strip() -> None:
+  """strip --strip-unneeded drops the profile runtime, so capture must run first."""
+  web = (_repo_root() / "Dockerfile").read_text(encoding="utf-8")
+  cap = web.index(
+    "hpcperfstats_pgo_capture_generate_dlopen web/shared/jemalloc"
+  )
+  assert web.index("strip --strip-unneeded", cap) > cap
+  proxy = (_repo_root() / "services-conf" / "proxy.Dockerfile").read_text(
+    encoding="utf-8"
+  )
+  nginx = proxy.index("hpcperfstats_pgo_capture_generate_exec proxy/nginx")
+  assert proxy.index("strip --strip-unneeded", nginx) > nginx
+
+
+def test_pgo_log_profile_gaps_refuses_missing_build_namespace(
+  tmp_path: Path,
+) -> None:
+  """Resume must not pretend a partial generate tree can reach --pgo-use."""
+  pgo_lib = _repo_root() / "scripts" / "pgo_lib.sh"
+  repo = _repo_root()
+  proc = subprocess.run(
+    [
+      "bash",
+      "-c",
+      f'source "{pgo_lib}"; pgo_log_profile_gaps "{repo}"',
+    ],
+    env={**os.environ, "PGOROOT": str(tmp_path)},
+    capture_output=True,
+    text=True,
+    check=False,
+  )
+  assert proc.returncode == 1
+  assert "run full --full-pgo generate first" in proc.stderr
+
+
+def test_pgo_log_profile_gaps_allows_cpython_soak_only(tmp_path: Path) -> None:
+  pgo_lib = _repo_root() / "scripts" / "pgo_lib.sh"
+  repo = _repo_root()
+  for ns in _registry_namespaces():
+    if ns in ("web/gil/cpython", "web/ft/cpython"):
+      continue
+    raw = tmp_path / ns / "raw"
+    raw.mkdir(parents=True)
+    (raw / "x.profraw").write_bytes(b"profile")
+  proc = subprocess.run(
+    [
+      "bash",
+      "-c",
+      f'source "{pgo_lib}"; pgo_log_profile_gaps "{repo}"',
+    ],
+    env={**os.environ, "PGOROOT": str(tmp_path)},
+    capture_output=True,
+    text=True,
+    check=False,
+  )
+  assert proc.returncode == 0, proc.stderr

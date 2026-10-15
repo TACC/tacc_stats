@@ -26,7 +26,7 @@ def test_db_dockerfile_uses_clang22_apk_toolchain() -> None:
   assert "gcc-toolchain" not in text
   assert "assert_gcc_min_version" not in text
   assert "pgo_clang_flags.sh" in text
-  assert "from=pgo,source=.,target=/root/.hpcperfstats_pgo" in text
+  assert "from=pgo,source=.,target=/root/.hpcperfstats_pgo" not in text
   assert "clang_march_native_probe.sh" in text
   assert "-Q --help=target" not in text
   assert "-flto=thin" in text

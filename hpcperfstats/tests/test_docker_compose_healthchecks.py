@@ -719,7 +719,8 @@ def test_proxy_dockerfile_source_builds_nginx_with_pinned_deps():
     in dockerfile
   )
   assert "GetPageSpeed/zstd-nginx-module" in dockerfile
-  assert "hpcperfstats_bake_cflags proxy/zstd" in dockerfile
+  assert "hpcperfstats_native_base_cflags" in dockerfile
+  assert "hpcperfstats_bake_cflags proxy/zstd" not in dockerfile
   assert "HAVE_ZLIB=0" in dockerfile
   assert "HAVE_LZ4=0" in dockerfile
   assert "libzstd.a" in dockerfile
@@ -777,9 +778,10 @@ def test_proxy_dockerfile_source_builds_nginx_with_pinned_deps():
   zlib_run = dockerfile[
     dockerfile.index("# --- zlib-ng") : dockerfile.index("# --- OpenSSL")
   ]
-  assert "hpcperfstats_bake_cflags proxy/zlib-ng" in zlib_run
+  assert "hpcperfstats_native_base_cflags" in zlib_run
   assert "make -j" in zlib_run and "libz.a" in zlib_run
-  assert "hpcperfstats_configure_cflags proxy/zlib-ng" in zlib_run
+  assert "hpcperfstats_strip_lto_and_pgo" in zlib_run
+  assert "hpcperfstats_bake_cflags proxy/zlib-ng" not in zlib_run
   assert "-DZLIB_COMPAT" in zlib_run, (
     "proxy zlib-ng make must not drop configure --zlib-compat (CFLAGS= override)"
   )

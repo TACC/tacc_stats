@@ -129,6 +129,10 @@ if ! grep -q 'pgo_podman_build_context_args' "${PGO_LIB}"; then
   echo "pgo_lib.sh must define pgo_podman_build_context_args for Podman PGO mounts" >&2
   exit 1
 fi
+if ! grep -q -- '--volume=${root}:/root/.hpcperfstats_pgo:rw' "${PGO_LIB}"; then
+  echo "pgo_lib.sh must podman build --volume the host PGOROOT (build-context binds do not persist)" >&2
+  exit 1
+fi
 if ! grep -q 'compose_build_proxy_image' "${FULL_SITE_SCRIPT}"; then
   echo "rebuild_full_site.sh must podman build proxy with --build-context=pgo=PGOROOT" >&2
   exit 1
@@ -347,6 +351,132 @@ if [[ -z "${main_build}" || -z "${main_up}" ]]; then
 fi
 if grep -q 'prepare_profile_phase' "${FULL_SITE_SCRIPT}"; then
   echo "rebuild_full_site.sh must not write unread profile_phase_started breadcrumb" >&2
+  exit 1
+fi
+if ! grep -q '\-\-full-pgo' "${FULL_SITE_SCRIPT}"; then
+  echo "rebuild_full_site.sh must support --full-pgo" >&2
+  exit 1
+fi
+if ! grep -q 'run_full_pgo_orchestration' "${FULL_SITE_SCRIPT}"; then
+  echo "rebuild_full_site.sh must define run_full_pgo_orchestration" >&2
+  exit 1
+fi
+if ! grep -q 'pgo_run_soak_web_traffic' "${FULL_SITE_SCRIPT}"; then
+  echo "rebuild_full_site.sh must call pgo_run_soak_web_traffic during --full-pgo" >&2
+  exit 1
+fi
+if ! grep -q 'pgo_soak_web_traffic.py' "${PGO_LIB}"; then
+  echo "pgo_lib.sh must invoke pgo_soak_web_traffic.py" >&2
+  exit 1
+fi
+if ! grep -q 'pgo_stop_stack_after_soak' "${FULL_SITE_SCRIPT}"; then
+  echo "rebuild_full_site.sh must define pgo_stop_stack_after_soak for post-soak down" >&2
+  exit 1
+fi
+if ! awk '/^pgo_stop_stack_after_soak\(\)/,/^}/' "${FULL_SITE_SCRIPT}" | grep -q 'compose_down_project'; then
+  echo "pgo_stop_stack_after_soak must call compose_down_project" >&2
+  exit 1
+fi
+full_pgo_line="$(grep -n '\-\-full-pgo' "${FULL_SITE_SCRIPT}" | head -n 1 | cut -d: -f1)"
+orchestrator_line="$(grep -n 'run_full_pgo_orchestration' "${FULL_SITE_SCRIPT}" | head -n 1 | cut -d: -f1)"
+main_full="$(awk '
+  /^main\(\)/ {m=1; saw_full=0}
+  m && /FULL_PGO/ && /-eq 1/ {saw_full=1}
+  m && saw_full && /run_full_pgo_orchestration/ {print NR; exit}
+' "${FULL_SITE_SCRIPT}")"
+if [[ -z "${main_full}" ]]; then
+  echo "rebuild_full_site.sh main must dispatch --full-pgo to run_full_pgo_orchestration" >&2
+  exit 1
+fi
+if [[ -n "${full_pgo_line}" && -n "${orchestrator_line}" && "${orchestrator_line}" -le "${full_pgo_line}" ]]; then
+  echo "run_full_pgo_orchestration should be defined after --full-pgo option parsing" >&2
+  exit 1
+fi
+if ! grep -q 'only one of --profile-phase, --pgo-use, --pgo-skip, --full-pgo' "${FULL_SITE_SCRIPT}"; then
+  echo "rebuild_full_site.sh must mutual-exclude --full-pgo with other PGO flags" >&2
+  exit 1
+fi
+SOAK_SCRIPT="${SCRIPT_DIR}/pgo_soak_web_traffic.py"
+if [[ ! -f "${SOAK_SCRIPT}" ]]; then
+  echo "missing ${SOAK_SCRIPT}" >&2
+  exit 1
+fi
+if ! grep -q '=== PHASE soak starting ===' "${FULL_SITE_SCRIPT}"; then
+  echo "rebuild_full_site.sh must log === PHASE soak starting === before soak" >&2
+  exit 1
+fi
+DETACHED="${SCRIPT_DIR}/run_pgo_e2e_detached.sh"
+if ! grep -q 'E2E_WRAPPER_PID=' "${DETACHED}"; then
+  echo "run_pgo_e2e_detached.sh must emit E2E_WRAPPER_PID=" >&2
+  exit 1
+fi
+if ! grep -q 'setsid' "${DETACHED}"; then
+  echo "run_pgo_e2e_detached.sh must detach with setsid" >&2
+  exit 1
+fi
+POLL="${SCRIPT_DIR}/poll_full_pgo_e2e.sh"
+if ! grep -q '=== resume soak' "${POLL}"; then
+  echo "poll_full_pgo_e2e.sh current_run_log_slice must include === resume soak" >&2
+  exit 1
+fi
+if ! grep -q 'rebuild_full_site.sh: PGO FAILED' "${POLL}"; then
+  echo "poll_full_pgo_e2e.sh must treat rebuild_full_site.sh: PGO FAILED as failure" >&2
+  exit 1
+fi
+if grep -q 'pgo_die_if_' "${POLL}"; then
+  echo "poll_full_pgo_e2e.sh must not treat pgo_die_if_ helper traces as failure" >&2
+  exit 1
+fi
+RESUME="${SCRIPT_DIR}/resume_pgo_soak_use_e2e_dev.sh"
+if ! grep -q 'pgo_log_profile_gaps' "${RESUME}"; then
+  echo "resume_pgo_soak_use_e2e_dev.sh must preflight with pgo_log_profile_gaps" >&2
+  exit 1
+fi
+RESTART="${SCRIPT_DIR}/restart_full_pgo_e2e_dev.sh"
+if ! grep -q 'PGOROOT=' "${RESTART}" || ! grep -q 'PGOROOT=' "${RESUME}"; then
+  echo "dev E2E scripts must export PGOROOT so generate binds the compose pgo_profiles device" >&2
+  exit 1
+fi
+assert_project_before_runtime_source() {
+  local path="$1"
+  local export_line source_line
+  export_line="$(grep -n 'HPCPERFSTATS_COMPOSE_PROJECT:-hpcperfstats-dev' "${path}" | head -1 | cut -d: -f1)"
+  source_line="$(grep -n 'scripts/lib/podman_runtime.sh' "${path}" | head -1 | cut -d: -f1)"
+  if [[ -z "${export_line}" || -z "${source_line}" || "${export_line}" -gt "${source_line}" ]]; then
+    echo "${path} must export HPCPERFSTATS_COMPOSE_PROJECT before sourcing podman_runtime.sh" >&2
+    exit 1
+  fi
+}
+assert_project_before_runtime_source "${RESTART}"
+assert_project_before_runtime_source "${RESUME}"
+restart_stop="$(grep -n 'podman stop -t 20' "${RESTART}" | head -1 | cut -d: -f1)"
+restart_seed="$(grep -n 'pgo_soak_seed_rank0_job.py' "${RESTART}" | head -1 | cut -d: -f1)"
+if [[ -z "${restart_stop}" || -z "${restart_seed}" || "${restart_stop}" -gt "${restart_seed}" ]]; then
+  echo "restart_full_pgo_e2e_dev.sh must podman stop pipeline before seeding rank-0" >&2
+  exit 1
+fi
+resume_stop="$(grep -n 'podman stop -t 20' "${RESUME}" | head -1 | cut -d: -f1)"
+resume_seed="$(grep -n 'pgo_soak_seed_rank0_job.py' "${RESUME}" | head -1 | cut -d: -f1)"
+if [[ -z "${resume_stop}" || -z "${resume_seed}" || "${resume_stop}" -gt "${resume_seed}" ]]; then
+  echo "resume_pgo_soak_use_e2e_dev.sh must podman stop pipeline before seeding rank-0" >&2
+  exit 1
+fi
+if ! awk '
+  /run_pgo_soak_web_traffic\(\)/ { in_fn=1 }
+  in_fn && /podman stop -t 20/ { saw_stop=1 }
+  in_fn && /pgo_soak_seed_rank0_job.py/ { saw_seed=1 }
+  in_fn && /^}/ { exit }
+  END { exit !(saw_stop && saw_seed) }
+' "${FULL_SITE_SCRIPT}"; then
+  echo "run_pgo_soak_web_traffic must podman stop pipeline and re-seed rank-0" >&2
+  exit 1
+fi
+if ! grep -q 'pgo_log_profile_gaps' "${PGO_LIB}"; then
+  echo "pgo_lib.sh must define pgo_log_profile_gaps" >&2
+  exit 1
+fi
+if ! grep -q 'run full --full-pgo generate first' "${PGO_LIB}"; then
+  echo "pgo_log_profile_gaps must tell the operator to run full --full-pgo generate first" >&2
   exit 1
 fi
 

@@ -50,10 +50,10 @@ def test_python_build_uses_clang_22_from_trixie() -> None:
 
 
 def test_python_build_mounts_pgoroot_for_pgo_namespaces() -> None:
-  """Build-time PGO profraw must reach host PGOROOT (from=pgo + rebuild --build-context)."""
+  """Host PGOROOT is a podman --volume; from=pgo context binds do not persist writes."""
   build = _stage_body((_repo_root() / "Dockerfile").read_text(), "python-build")
   mount = "from=pgo,source=.,target=/root/.hpcperfstats_pgo"
-  assert mount in build
+  assert mount not in build
   for needle in (
     "web/shared/jemalloc",
     "web/shared/zlib-ng",
@@ -62,7 +62,6 @@ def test_python_build_mounts_pgoroot_for_pgo_namespaces() -> None:
     "web/shared/libffi",
   ):
     assert needle in build
-  assert build.count(mount) >= 9
   assert "hpcperfstats_pgo_ensure_web_gil_cpython_link_dirs" in build
   assert "hpcperfstats_pgo_ensure_web_ft_cpython_link_dirs" in build
   assert "hpcperfstats_cpython_make_install web/gil/cpython" in build

@@ -123,7 +123,7 @@ ARG PGO_ROOT
 ENV HPC_PGO_PHASE=${PGO_PHASE} HPC_PGO_ROOT=${PGO_ROOT}
 
 # jemalloc 5.4.0 (shared; keep default initial-exec TLS — do not disable it).
-RUN --mount=type=bind,from=pgo,source=.,target=/root/.hpcperfstats_pgo,rw \
+RUN \
   /bin/bash -o pipefail -c '\
   set -euo pipefail; \
   PAGE_SIZE="$(getconf PAGE_SIZE)"; \
@@ -154,13 +154,14 @@ RUN --mount=type=bind,from=pgo,source=.,target=/root/.hpcperfstats_pgo,rw \
     CFLAGS="${_cf_bake}" CXXFLAGS="${_cf_bake}" LDFLAGS="${_ld}"; \
   make install CC="${CC}" CXX="${CXX}" AR="${AR}" RANLIB="${RANLIB}" NM="${NM}" \
     CFLAGS="${_cf_bake}" CXXFLAGS="${_cf_bake}" LDFLAGS="${_ld}"; \
+  hpcperfstats_pgo_capture_generate_dlopen web/shared/jemalloc /opt/jemalloc; \
   find /opt/jemalloc -type f | while read -r f; do file -b "$f" | grep -q ELF && strip --strip-unneeded "$f" || true; done; \
   echo "/opt/jemalloc/lib" > /etc/ld.so.conf.d/jemalloc.conf; \
   ldconfig; \
   rm -rf /usr/src/jemalloc'
 
 # zlib-ng 2.3.3 (ZLIB_COMPAT → libz.so.1). CPython and source builds link this; no apt zlib*.
-RUN --mount=type=bind,from=pgo,source=.,target=/root/.hpcperfstats_pgo,rw \
+RUN \
   /bin/bash -o pipefail -c '\
   set -euo pipefail; \
   curl -fsSL "https://github.com/zlib-ng/zlib-ng/archive/refs/tags/2.3.3.tar.gz" \
@@ -186,6 +187,7 @@ RUN --mount=type=bind,from=pgo,source=.,target=/root/.hpcperfstats_pgo,rw \
     -DCMAKE_C_FLAGS="${_cf_bake} ${HPC_CLANG_LD_PATH}"; \
   cmake --build build -j40; \
   cmake --install build; \
+  hpcperfstats_pgo_capture_generate_dlopen web/shared/zlib-ng /opt/zlib-ng; \
   find /opt/zlib-ng -type f | while read -r f; do file -b "$f" | grep -q ELF && strip --strip-unneeded "$f" || true; done; \
   test -f /opt/zlib-ng/lib/libz.so || test -f /opt/zlib-ng/lib/libz.so.1; \
   echo "/opt/zlib-ng/lib" > /etc/ld.so.conf.d/zlib-ng.conf; \
@@ -193,7 +195,7 @@ RUN --mount=type=bind,from=pgo,source=.,target=/root/.hpcperfstats_pgo,rw \
   rm -rf /usr/src/zlib-ng'
 
 # zstd 1.5.7 (lib + CLI). Link gzip/zlib support to /opt/zlib-ng; no apt zstd.
-RUN --mount=type=bind,from=pgo,source=.,target=/root/.hpcperfstats_pgo,rw \
+RUN \
   /bin/bash -o pipefail -c '\
   set -euo pipefail; \
   curl -fsSL "https://github.com/facebook/zstd/releases/download/v1.5.7/zstd-1.5.7.tar.gz" \
@@ -211,6 +213,7 @@ RUN --mount=type=bind,from=pgo,source=.,target=/root/.hpcperfstats_pgo,rw \
   export MOREFLAGS="$(hpcperfstats_bake_cflags web/shared/zstd debian-lib) ${HPC_CLANG_LD_PATH}"; \
   make -j40 PREFIX=/opt/zstd HAVE_ZLIB=1; \
   make install PREFIX=/opt/zstd; \
+  hpcperfstats_pgo_capture_generate_exec web/shared/zstd -- /opt/zstd/bin/zstd -h; \
   find /opt/zstd -type f | while read -r f; do file -b "$f" | grep -q ELF && strip --strip-unneeded "$f" || true; done; \
   test -x /opt/zstd/bin/zstd; \
   test -f /opt/zstd/lib/libzstd.so || test -f /opt/zstd/lib/libzstd.so.1; \
@@ -221,7 +224,7 @@ RUN --mount=type=bind,from=pgo,source=.,target=/root/.hpcperfstats_pgo,rw \
   rm -rf /usr/src/zstd'
 
 # mpdecimal 4.0.1 (x86_64 MACHINE=x64 → CONFIG_64 + ASM).
-RUN --mount=type=bind,from=pgo,source=.,target=/root/.hpcperfstats_pgo,rw \
+RUN \
   /bin/bash -o pipefail -c '\
   set -euo pipefail; \
   curl -fsSL "https://www.bytereef.org/software/mpdecimal/releases/mpdecimal-4.0.1.tar.gz" \
@@ -242,13 +245,14 @@ RUN --mount=type=bind,from=pgo,source=.,target=/root/.hpcperfstats_pgo,rw \
     CFLAGS="${_cf_bake}" CXXFLAGS="${_cf_bake}" LDFLAGS="${_ld}"; \
   make install CC="${CC}" CXX="${CXX}" AR="${AR}" RANLIB="${RANLIB}" NM="${NM}" \
     CFLAGS="${_cf_bake}" CXXFLAGS="${_cf_bake}" LDFLAGS="${_ld}"; \
+  hpcperfstats_pgo_capture_generate_dlopen web/shared/mpdecimal /opt/mpdecimal; \
   find /opt/mpdecimal -type f | while read -r f; do file -b "$f" | grep -q ELF && strip --strip-unneeded "$f" || true; done; \
   echo "/opt/mpdecimal/lib" > /etc/ld.so.conf.d/mpdecimal.conf; \
   ldconfig; \
   rm -rf /usr/src/mpdecimal'
 
 # libffi 3.8.0 (--with-gcc-arch=native).
-RUN --mount=type=bind,from=pgo,source=.,target=/root/.hpcperfstats_pgo,rw \
+RUN \
   /bin/bash -o pipefail -c '\
   set -euo pipefail; \
   curl -fsSL "https://github.com/libffi/libffi/releases/download/v3.8.0/libffi-3.8.0.tar.gz" \
@@ -269,6 +273,7 @@ RUN --mount=type=bind,from=pgo,source=.,target=/root/.hpcperfstats_pgo,rw \
     CFLAGS="${_cf_bake}" CXXFLAGS="${_cf_bake}" LDFLAGS="${_ld}"; \
   make install CC="${CC}" CXX="${CXX}" AR="${AR}" RANLIB="${RANLIB}" NM="${NM}" \
     CFLAGS="${_cf_bake}" CXXFLAGS="${_cf_bake}" LDFLAGS="${_ld}"; \
+  hpcperfstats_pgo_capture_generate_dlopen web/shared/libffi /opt/libffi; \
   find /opt/libffi -type f | while read -r f; do file -b "$f" | grep -q ELF && strip --strip-unneeded "$f" || true; done; \
   if [ -d /opt/libffi/lib/x86_64-linux-gnu ]; then \
     echo "/opt/libffi/lib/x86_64-linux-gnu" > /etc/ld.so.conf.d/libffi.conf; \
@@ -279,7 +284,7 @@ RUN --mount=type=bind,from=pgo,source=.,target=/root/.hpcperfstats_pgo,rw \
   rm -rf /usr/src/libffi'
 
 # GIL CPython 3.14.8 (--without-mimalloc; force-link jemalloc).
-RUN --mount=type=bind,from=pgo,source=.,target=/root/.hpcperfstats_pgo,rw \
+RUN \
   /bin/bash -o pipefail -c '\
   set -euo pipefail; \
   curl -fsSL "https://www.python.org/ftp/python/${PYTHON_VERSION}/Python-${PYTHON_VERSION}.tgz" \
@@ -345,7 +350,7 @@ RUN --mount=type=bind,from=pgo,source=.,target=/root/.hpcperfstats_pgo,rw \
   rm -rf /usr/src/python'
 
 # Free-threaded CPython 3.14.8 (mimalloc required; still force-link jemalloc).
-RUN --mount=type=bind,from=pgo,source=.,target=/root/.hpcperfstats_pgo,rw \
+RUN \
   /bin/bash -o pipefail -c '\
   set -euo pipefail; \
   curl -fsSL "https://www.python.org/ftp/python/${PYTHON_VERSION}/Python-${PYTHON_VERSION}.tgz" \
@@ -473,7 +478,7 @@ RUN /bin/bash -o pipefail -c '\
 # numexpr and pandas --no-deps: without it, pip resolves numpy>=… and replaces
 # the MKL source build with a manylinux OpenBLAS wheel (same version string).
 # python-dateutil (+ six) come from project.dependencies via the rest RUN.
-RUN --mount=type=bind,from=pgo,source=.,target=/root/.hpcperfstats_pgo,rw \
+RUN \
   /bin/bash -o pipefail -c '\
   set -euo pipefail; \
   . /usr/local/lib/hpcperfstats/pgo_clang_flags.sh; \
@@ -541,7 +546,8 @@ RUN --mount=type=bind,from=pgo,source=.,target=/root/.hpcperfstats_pgo,rw \
   python3 -m pip install --no-cache-dir --no-build-isolation --force-reinstall --no-deps \
     --no-binary brotli \
     -r /tmp/requirements-mkl-brotli.txt; \
-  python3 -c "import brotli; p=brotli.compress(b\"hps\", quality=11); assert brotli.decompress(p)==b\"hps\""'
+  python3 -c "import brotli; p=brotli.compress(b\"hps\", quality=11); assert brotli.decompress(p)==b\"hps\""; \
+  hpcperfstats_pgo_capture_generate_exec web/gil/optimization-stack -- python3 -c "import numpy"'
 
 # 4) GIL rest wheels (Bokeh/contourpy see MKL numpy; constraint blocks wheel upgrades).
 # python-dateutil is here; import pandas only after rest (needs dateutil).
@@ -567,7 +573,7 @@ RUN /bin/bash -o pipefail -c '\
 # Same as GIL: MKLROOT is sysconfig data prefix; numexpr VML via injected site.cfg.
 # -march=native: prod-host builds only (same as GIL compile RUN).
 # numexpr/pandas --no-deps: same MKL-numpy preservation as GIL (dateutil via rest).
-RUN --mount=type=bind,from=pgo,source=.,target=/root/.hpcperfstats_pgo,rw \
+RUN \
   /bin/bash -o pipefail -c '\
   set -euo pipefail; \
   . /usr/local/lib/hpcperfstats/pgo_clang_flags.sh; \
@@ -635,7 +641,8 @@ RUN --mount=type=bind,from=pgo,source=.,target=/root/.hpcperfstats_pgo,rw \
   /opt/python3.14t/bin/python3.14t -m pip install --no-cache-dir --no-build-isolation --force-reinstall --no-deps \
     --no-binary brotli \
     -r /tmp/requirements-mkl-brotli.txt; \
-  /opt/python3.14t/bin/python3.14t -c "import brotli; p=brotli.compress(b\"hps\", quality=11); assert brotli.decompress(p)==b\"hps\""'
+  /opt/python3.14t/bin/python3.14t -c "import brotli; p=brotli.compress(b\"hps\", quality=11); assert brotli.decompress(p)==b\"hps\""; \
+  hpcperfstats_pgo_capture_generate_exec web/ft/optimization-stack -- /opt/python3.14t/bin/python3.14t -c "import numpy"'
 
 # 7) Free-threaded rest wheels (dateutil then import pandas, same as GIL).
 RUN /bin/bash -o pipefail -c '\

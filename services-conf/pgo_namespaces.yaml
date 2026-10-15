@@ -40,22 +40,6 @@ namespaces:
     build_service: proxy
     soak_services: [proxy]
     abi: "-"
-  - namespace: proxy/openssl
-    build_service: proxy
-    soak_services: [proxy]
-    abi: "-"
-  - namespace: proxy/brotli
-    build_service: proxy
-    soak_services: [proxy]
-    abi: "-"
-  - namespace: proxy/zstd
-    build_service: proxy
-    soak_services: [proxy]
-    abi: "-"
-  - namespace: proxy/zlib-ng
-    build_service: proxy
-    soak_services: [proxy]
-    abi: "-"
   - namespace: web/shared/jemalloc
     build_service: web
     soak_services: [web, pipeline]

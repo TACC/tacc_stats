@@ -81,7 +81,9 @@ pgo_stderr_why_full_pgroot_context() {
   done < <(pgo_list_namespaces "${repo_root}")
 }
 
-# Host PGOROOT for podman build --build-context=pgo=… (proxy/db PGO profraw mounts).
+# Host PGOROOT for podman build. Additional --build-context bind mounts do not
+# write back to the host directory (verified: touch inside from=pgo is gone
+# after COMMIT). --volume is a real host bind and is what generate/use must use.
 pgo_podman_build_context_args() {
   local repo_root="${1:?repo_root}"
   local root stub empty
@@ -95,6 +97,7 @@ pgo_podman_build_context_args() {
   pgo_stderr_why_full_pgroot_context "${repo_root}"
   echo "pgo podman build-context: full PGOROOT ${root} (PGO_PHASE=${PGO_PHASE})" >&2
   printf '%s\n' "--build-context=pgo=${root}"
+  printf '%s\n' "--volume=${root}:/root/.hpcperfstats_pgo:rw"
 }
 
 # PGO_PHASE=use must ignore stale layer cache (profile-opt flags); skip keeps cache.
@@ -207,6 +210,30 @@ pgo_namespace_has_any_profile_artifact() {
   return 1
 }
 
+# Print build-time namespace gaps. Return 1 when resume cannot repair them.
+# CPython soak gaps are omitted: resume soak can still write python-*.profraw.
+pgo_log_profile_gaps() {
+  local repo_root="${1:?repo_root}"
+  local ns
+  local -a gaps=()
+  while IFS= read -r ns; do
+    [[ -n "${ns}" ]] || continue
+    case "${ns}" in
+      web/gil/cpython | web/ft/cpython) continue ;;
+    esac
+    if pgo_namespace_profile_input_ready "${ns}"; then
+      continue
+    fi
+    gaps+=( "$(pgo_namespace_use_gap_reason "${ns}")" )
+  done < <(pgo_list_namespaces "${repo_root}")
+  if [[ ${#gaps[@]} -eq 0 ]]; then
+    return 0
+  fi
+  printf '%s\n' "${gaps[@]}" >&2
+  echo "run full --full-pgo generate first; resume-only cannot fix build-time namespaces." >&2
+  return 1
+}
+
 # True when every namespace can enter merge/use (merged profdata or soak-backed raw inputs).
 profiles_ready() {
   local repo_root="${1:?repo_root}"
@@ -301,7 +328,9 @@ pgo_wipe_pgroot_for_profile_phase() {
     echo "pgo_wipe_pgroot_for_profile_phase: PGOROOT already empty under ${root}" >&2
     return 0
   fi
-  rm -rf "${root:?}"/*
+  pgo_chmod_shared_tree
+  find "${root}" -mindepth 1 -delete 2>/dev/null \
+    || rm -rf "${root:?}"/*
   echo "pgo_wipe_pgroot_for_profile_phase: removed all contents under ${root}" >&2
 }
 
@@ -342,4 +371,163 @@ pgo_print_summary() {
     crumb="failed"
   fi
   echo "PGO phase=${phase} use_failed_marker=${crumb} PGOROOT=$(pgo_root_dir)" >&2
+}
+
+# Post-soak teardown hook for --full-pgo (implementation lives in rebuild_full_site.sh).
+# rebuild_full_site.sh defines pgo_stop_stack_after_soak() → compose_down_project.
+
+pgo_soak_python() {
+  if [[ -n "${HPC_PGO_SOAK_PYTHON:-}" ]]; then
+    printf '%s' "${HPC_PGO_SOAK_PYTHON}"
+    return 0
+  fi
+  local ws_venv="/data/HPCPerfStats/.venv/bin/python3"
+  if [[ -x "${ws_venv}" ]]; then
+    printf '%s' "${ws_venv}"
+    return 0
+  fi
+  command -v python3
+}
+
+pgo_soak_chromium_launch_ok() {
+  local py="${1:?python}"
+  "${py}" - <<'PY' >/dev/null 2>&1
+from playwright.sync_api import sync_playwright
+
+try:
+  with sync_playwright() as playwright:
+    browser = playwright.chromium.launch()
+    browser.close()
+except Exception:
+  raise SystemExit(1)
+PY
+}
+
+pgo_ensure_web_playwright() {
+  local cid stamp=""
+  cid="$("${PODMAN[@]}" ps \
+    --filter "name=${HPCPERFSTATS_COMPOSE_PROJECT}_web" \
+    --format '{{.ID}}' 2>/dev/null | head -1)"
+  if [[ -n "${cid}" ]]; then
+    stamp="${HPCPERFSTATS_HOST_CACHE:-/tmp}/pgo-web-playwright-${cid}.stamp"
+  fi
+  if [[ -n "${stamp}" && -f "${stamp}" ]]; then
+    if "${PODMAN[@]}" exec "${cid}" python3 -c "import playwright" >/dev/null 2>&1; then
+      return 0
+    fi
+    rm -f "${stamp}"
+  fi
+  echo "pgo_soak: installing Playwright + Chromium OS deps in web container..." >&2
+  "${PODMAN_COMPOSE[@]}" exec -T web bash -lc \
+    'python3 -m pip install -q "playwright>=1.63.0" && python3 -m playwright install --with-deps chromium'
+  if [[ -n "${stamp}" ]]; then
+    touch "${stamp}"
+  fi
+}
+
+pgo_sync_soak_scripts_to_web() {
+  local repo_root="${1:?repo_root}"
+  local cid=""
+  cid="$("${PODMAN[@]}" ps \
+    --filter "name=${HPCPERFSTATS_COMPOSE_PROJECT}_web" \
+    --format '{{.ID}}' 2>/dev/null | head -1)"
+  if [[ -z "${cid}" ]]; then
+    pgo_die "pgo_sync_soak_scripts_to_web: web service is not running"
+  fi
+  local script_name
+  for script_name in \
+    pgo_soak_web_traffic.py \
+    pgo_soak_web_bootstrap.py \
+    pgo_soak_discover_jobs.py; do
+    podman cp "${repo_root}/scripts/${script_name}" \
+      "${cid}:/home/hpcperfstats/scripts/${script_name}"
+  done
+}
+
+pgo_web_container_proxy_ipv4() {
+  local cid="${1:?web_container_id}"
+  local proxy_ip=""
+  proxy_ip="$("${PODMAN[@]}" exec "${cid}" getent ahostsv4 proxy.dns.podman 2>/dev/null \
+    | awk '{print $1; exit}')"
+  if [[ -z "${proxy_ip}" ]]; then
+    proxy_ip="$("${PODMAN[@]}" exec "${cid}" getent ahostsv4 proxy 2>/dev/null \
+      | awk '{print $1; exit}')"
+  fi
+  if [[ -z "${proxy_ip}" ]]; then
+    pgo_die "pgo_web_container_proxy_ipv4: cannot resolve proxy from web container"
+  fi
+  printf '%s' "${proxy_ip}"
+}
+
+# Map INI server name → proxy on the web container loopback table so TLS SNI matches nginx.
+pgo_soak_ensure_web_hosts_for_proxy() {
+  local cid="${1:?web_container_id}"
+  local proxy_ip="${2:?proxy_ip}"
+  local server_line=""
+  server_line="$("${PODMAN[@]}" exec "${cid}" python3 \
+    /home/hpcperfstats/scripts/pgo_soak_web_bootstrap.py 2>/dev/null \
+    | awk '/^\{/ {print; exit}')"
+  if [[ -z "${server_line}" ]]; then
+    pgo_die "pgo_soak_ensure_web_hosts_for_proxy: bootstrap JSON missing"
+  fi
+  local host_token=""
+  host_token="$(HPC_PGO_SOAK_BOOTSTRAP_JSON="${server_line}" python3 - <<'PY'
+import json, os
+data = json.loads(os.environ["HPC_PGO_SOAK_BOOTSTRAP_JSON"])
+server = (data.get("server") or "").split(",")[0].strip()
+if "://" in server:
+    from urllib.parse import urlparse
+    server = urlparse(server).hostname or server
+print(server)
+PY
+)"
+  if [[ -z "${host_token}" ]]; then
+    pgo_die "pgo_soak_ensure_web_hosts_for_proxy: empty server name from INI"
+  fi
+  "${PODMAN[@]}" exec "${cid}" sh -c \
+    "grep -q '[[:space:]]${host_token}\$' /etc/hosts 2>/dev/null || echo '${proxy_ip} ${host_token}' >> /etc/hosts"
+  printf 'https://%s' "${host_token}"
+}
+
+pgo_run_soak_web_traffic_in_web() {
+  local repo_root="${1:?repo_root}"
+  shift
+  pgo_sync_soak_scripts_to_web "${repo_root}"
+  pgo_ensure_web_playwright
+  local cid proxy_ip proxy_base
+  cid="$("${PODMAN[@]}" ps \
+    --filter "name=${HPCPERFSTATS_COMPOSE_PROJECT}_web" \
+    --format '{{.ID}}' 2>/dev/null | head -1)"
+  proxy_ip="$(pgo_web_container_proxy_ipv4 "${cid}")"
+  proxy_base="$(pgo_soak_ensure_web_hosts_for_proxy "${cid}" "${proxy_ip}")"
+  local -a exec_env=(
+    -e HPC_PGO_SOAK_IN_WEB=1
+    -e "HPC_PGO_SOAK_BASE_URL=${proxy_base}"
+  )
+  if [[ -n "${HPC_PGO_SOAK_SECONDS:-}" ]]; then
+    exec_env+=(-e "HPC_PGO_SOAK_SECONDS=${HPC_PGO_SOAK_SECONDS}")
+  fi
+  if [[ -n "${HPC_PGO_SOAK_ALLOW_METRICS_ONLY:-}" ]]; then
+    exec_env+=(-e "HPC_PGO_SOAK_ALLOW_METRICS_ONLY=${HPC_PGO_SOAK_ALLOW_METRICS_ONLY}")
+  fi
+  "${PODMAN_COMPOSE[@]}" exec -T "${exec_env[@]}" web python3 \
+    /home/hpcperfstats/scripts/pgo_soak_web_traffic.py "$@"
+}
+
+# Host Playwright when OS libs exist; otherwise soak inside running web (root + apt deps).
+pgo_run_soak_web_traffic() {
+  local repo_root="${1:?repo_root}"
+  shift
+  local py
+  py="$(pgo_soak_python)"
+  if [[ "${HPC_PGO_SOAK_FORCE_WEB:-0}" == "1" ]]; then
+    pgo_run_soak_web_traffic_in_web "${repo_root}" "$@"
+    return $?
+  fi
+  if pgo_soak_chromium_launch_ok "${py}"; then
+    "${py}" "${repo_root}/scripts/pgo_soak_web_traffic.py" "$@"
+    return $?
+  fi
+  echo "pgo_soak: host Chromium unavailable; using web container Playwright." >&2
+  pgo_run_soak_web_traffic_in_web "${repo_root}" "$@"
 }
