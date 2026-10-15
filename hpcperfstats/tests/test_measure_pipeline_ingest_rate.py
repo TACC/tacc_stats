@@ -774,6 +774,32 @@ def test_tier_stdout_prints_all_hold_medians(mod):
     assert f"tier_8mib_64mib_median_{tok}" in keys
 
 
+def test_fresh_campaign_tokens_median_outside_write_share(mod):
+  """F1/F2 tokens median on the dense tier and do not enter write share."""
+  mib = 1024 * 1024
+  lines = [
+    _ts(0) + "startup ingest gate cleared; ingest may begin",
+    _ts(1)
+    + (
+      "ingest file path=/arch/dense outcome=ingested ingest_ok=yes "
+      "db_skip=no "
+      f"size_bytes={16 * mib} elapsed_s=45.0 postgres_s=12.0 "
+      "orm_materialize_s=3.0 overlap_headroom_s=9.0 orm_rows=4000"
+    ),
+  ]
+  outcomes = mod.analyze_lines(lines, exclude_startup=False)
+  assert outcomes["tier_8mib_64mib_median_overlap_headroom_s"] == "9.000"
+  assert outcomes["tier_8mib_64mib_median_orm_rows"] == "4000.000"
+  metrics = mod.parse_log_lines(lines, exclude_startup=False)
+  phases = metrics.full_ingest_phases_by_tier["8mib_64mib"]
+  write_sum = sum(
+    sum(phases.get(tok, [])) for tok in mod._WRITE_PHASE_TOKEN_NAMES
+  )
+  assert write_sum == 3.0
+  assert "orm_rows" not in mod._WRITE_PHASE_TOKEN_NAMES
+  assert "overlap_headroom_s" not in mod._WRITE_PHASE_TOKEN_NAMES
+
+
 def _winning_ratio_lines(census: list[str] | None = None) -> list[str]:
   lines = [
     _ts(0) + "Messages consumed in the last 10 minutes: 100; messages waiting "

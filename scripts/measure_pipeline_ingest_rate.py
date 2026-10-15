@@ -67,6 +67,7 @@ Attributes:
   _SIZE_TIER_NAMES: Attribute.
   _THROUGHPUT_BACKLOG_RE: Attribute.
   _WRITE_PHASE_TOKEN_NAMES: Write-phase token names scraped from ingest lines.
+  _FRESH_CAMPAIGN_TOKEN_NAMES: F1 orm_rows and F2 overlap_headroom_s tokens.
 """
 
 from __future__ import annotations
@@ -124,6 +125,11 @@ _WRITE_PHASE_TOKEN_NAMES = (
   "copy_s",
   "conflict_insert_s",
 )
+# F1 row count and F2 overlap ceiling. Reported, not added into write share.
+_FRESH_CAMPAIGN_TOKEN_NAMES = (
+  "overlap_headroom_s",
+  "orm_rows",
+)
 _PARSE_HOLD_TOKEN_NAMES = (
   "lock_s",
   "decode_s",
@@ -155,7 +161,11 @@ _PARSE_DERIVED_HOLD_TOKENS = frozenset(
 )
 _PHASE_TOKEN_RES = {
   name: re.compile(rf"{re.escape(name)}=(?P<v>[0-9.]+)")
-  for name in (_WRITE_PHASE_TOKEN_NAMES + _PARSE_HOLD_TOKEN_NAMES)
+  for name in (
+    _WRITE_PHASE_TOKEN_NAMES
+    + _PARSE_HOLD_TOKEN_NAMES
+    + _FRESH_CAMPAIGN_TOKEN_NAMES
+  )
 }
 _MID_TIER_NAME = "8mib_64mib"
 _DENSE_TIER_NAME = "8mib_64mib"
@@ -246,7 +256,12 @@ class LogMetrics:
   full_ingest_phases_by_tier: dict[str, dict[str, list[float]]] = field(
     default_factory=lambda: {
       name: {
-        tok: [] for tok in (_WRITE_PHASE_TOKEN_NAMES + _PARSE_HOLD_TOKEN_NAMES)
+        tok: []
+        for tok in (
+          _WRITE_PHASE_TOKEN_NAMES
+          + _PARSE_HOLD_TOKEN_NAMES
+          + _FRESH_CAMPAIGN_TOKEN_NAMES
+        )
       }
       for name in _SIZE_TIER_NAMES
     },
@@ -1512,7 +1527,11 @@ def build_outcomes(
         fracs.append(float(p_s) / float(e_s))
     outcomes[f"tier_{tier}_median_postgres_frac"] = _fmt_optional_median(fracs)
     phase_map = metrics.full_ingest_phases_by_tier.get(tier, {})
-    for tok in _WRITE_PHASE_TOKEN_NAMES + _PARSE_HOLD_TOKEN_NAMES:
+    for tok in (
+      _WRITE_PHASE_TOKEN_NAMES
+      + _PARSE_HOLD_TOKEN_NAMES
+      + _FRESH_CAMPAIGN_TOKEN_NAMES
+    ):
       outcomes[f"tier_{tier}_median_{tok}"] = _fmt_optional_median(
         phase_map.get(tok, []),
       )
@@ -1727,7 +1746,9 @@ def format_stdout(outcomes: dict[str, str]) -> str:
       )
     )
     for tok in dict.fromkeys(
-      _WRITE_PHASE_TOKEN_NAMES + _PARSE_HOLD_TOKEN_NAMES
+      _WRITE_PHASE_TOKEN_NAMES
+      + _PARSE_HOLD_TOKEN_NAMES
+      + _FRESH_CAMPAIGN_TOKEN_NAMES
     ):
       tier_keys.append(f"tier_{tier}_median_{tok}")
   return "\n".join(

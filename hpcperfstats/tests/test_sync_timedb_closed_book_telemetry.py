@@ -131,6 +131,9 @@ def test_write_phase_on_ingest_log_when_telem_on(monkeypatch):
         "copy_s": 1.0,
         "conflict_insert_s": 1.5,
         "postgres_s": 4.0,
+        "parse_elapsed_s": 10.0,
+        "orm_rows": 1000,
+        "overlap_headroom_s": 4.0,
       },
     )
     st._log_ingest_file_outcome(outcome)
@@ -141,6 +144,8 @@ def test_write_phase_on_ingest_log_when_telem_on(monkeypatch):
   assert "db_execute_s=2.5" in joined
   assert "copy_s=1.0" in joined
   assert "conflict_insert_s=1.5" in joined
+  assert "orm_rows=1000" in joined
+  assert "overlap_headroom_s=4.0" in joined
   assert "host_insert_arm=" in joined
   assert "proc_insert_arm=" in joined
 
@@ -171,8 +176,32 @@ def test_write_phase_absent_on_ingest_log_when_telem_off(monkeypatch):
   joined = " ".join(logged)
   assert "orm_materialize_s=" not in joined
   assert "db_execute_s=" not in joined
+  assert "orm_rows=" not in joined
+  assert "overlap_headroom_s=" not in joined
   assert "host_insert_arm=" in joined
   assert "proc_insert_arm=" in joined
+
+
+def test_fresh_campaign_orm_rows_and_overlap_headroom():
+  """F1 row count and F2 overlap ceiling follow the telemetry knob."""
+  assert st._fresh_overlap_headroom_s(10.0, 4.0) == 4.0
+  assert st._fresh_overlap_headroom_s(10.0, 8.0) == 2.0
+  st._reset_ingest_write_timing(enabled=True)
+  try:
+    st._add_ingest_orm_rows(7)
+    st._add_ingest_postgres_s(4.0)
+    meta = st._merge_ingest_write_timing_into_meta(
+      {"parse_elapsed_s": 10.0},
+    )
+    assert meta["orm_rows"] == 7.0
+    assert meta["overlap_headroom_s"] == 4.0
+  finally:
+    st._reset_ingest_write_timing(enabled=False)
+  meta_off = st._merge_ingest_write_timing_into_meta(
+    {"parse_elapsed_s": 10.0},
+  )
+  assert "overlap_headroom_s" not in meta_off
+  assert "orm_rows" not in meta_off
 
 
 def test_file_lock_telemetry_off_snapshot_empty(tmp_path):

@@ -1,5 +1,158 @@
 # sync_timedb Throughput Campaign
 
+Living ledger for the fresh throughput campaign that started 2026-10-15.
+The ranked work below is the active theme. Everything through 2026-10-14
+(E1–E18, width studies, knee, contention) is preserved under
+**Historical campaign** and is archaeology: it does not pick the next change.
+
+Raw run artifacts stay under `test_runs/sync_timedb_bench/` and
+`test_runs/sync_timedb_campaign/`.
+
+| Document | Role |
+| --- | --- |
+| This file | Rank, protocol, site facts, and the evidence ledger. Update it whenever a plan records a result. |
+| `.cursor/plans/sync-timedb-fresh-throughput-campaign.plan.md` | Full candidate designs (approach groups). |
+| `.cursor/plans/sync-timedb-fresh-baseline.plan.md` | First execution plan: baseline soak on 01 and 04. |
+| Later `.cursor/plans/sync-timedb-fresh-fN-*.plan.md` | One plan per rank, written from this document after the previous soak. |
+
+## How this document stays current
+
+1. Read the rank table and the evidence ledger before writing the next plan.
+2. The next product change is the highest rank that has not been retained or rejected. Start at **F1**.
+3. After each production soak, add a ledger row (site, window, image, medians, verdict) in the same task that records the plan result.
+4. If a baseline or soak median shows a different hold is larger than the current #1, rewrite the rank here before the next implementation plan. Do not silently skip.
+5. A retained commit becomes the next master image (arm A).
+
+## Campaign goal
+
+Raise sustainable durable ingest throughput (rows in Timescale plus correct
+archive membership) on the two live clusters. Local tests are correctness
+screens. The throughput verdict is a sequential production soak: arm A is the
+current master image, arm B is one candidate, equal windows, one writer.
+
+## Active sites
+
+| Host | Cluster | Scale (operator, 2026-10-15) | Role in this wave |
+| --- | --- | --- | --- |
+| hpcperfstats04 | Horizon | about 1,000 nodes | Baseline and every later A/B |
+| hpcperfstats01 | Stampede3 | about 2,000 nodes | Baseline and every later A/B |
+
+hpcperfstats02 (LS6) is historical only. It is not a baseline host for this wave.
+
+Known from prior operations, **not** a live census (confirm with the pending
+commands in the baseline plan):
+
+- Pipeline daemons run free-threaded CPython 3.14t. Host `.venv` stays GIL 3.14.
+- Registry ingest width default is **64**. Do not raise toward 96. The flat
+  width sweep did not buy files/s, and width 96 inflated walls on 04.
+- 04 dense files are often about 13–17 MiB (`8mib_64mib`). 01 carries giant-file
+  strata. Discover-pipe and `max_connections` exhaustion have both been seen on 01.
+- On 01, `exec -u hpcperfstats` is the pipeline user. `su hpcperfstats` fails.
+- DB role is `hpcperfstats`. When `max_connections` is exhausted, count backends
+  with `ps`, not `psql`.
+- COPY insert is the default host and proc arm unless
+  `HPCPERFSTATS_SYNC_HOST_DATA_COPY=0` or `HPCPERFSTATS_SYNC_PROC_DATA_COPY=0`.
+
+Slurm facts still needed from the login nodes (not compose). Paste both into
+the baseline plan and back into this table:
+
+- `sinfo -h -o "%P %D %c %m %G"` on Horizon and on Stampede3 (partition, node
+  count, CPUs, memory, GRES).
+- GPU node count versus CPU node count. A large GPU share can raise `arc_s` /
+  `collapse_gpu_s` relative to F1/F2 after the baseline; it does not change
+  tonight's meter set.
+
+## Ranked optimizations
+
+Rank is estimated structural speedup on 1k-node and 2k-node durable ingest
+(MiB/min and giant-file wall), **#1 largest**. Bands are hypotheses until the
+baseline medians exist. They are not taken from the historical E-series.
+
+| Rank | ID | Change | Estimated effect | Meter |
+| --- | --- | --- | --- | --- |
+| 1 | F1 | COPY rows without Django model construction | Largest. Every host and proc row currently constructs a model inside `orm_materialize_s`. That cost scales with nodes × series × samples on both clusters. | `orm_materialize_s`, **`orm_rows`** |
+| 2 | F2 | Overlap one parse chunk with the PostgreSQL write | Next. Giant files are serial. Hideable wall is the smaller of parse-without-database and postgres time. | **`overlap_headroom_s`** |
+| 3 | F3 | Vectorize ARC diff, carry apply, and carry finalization | Large on long counter series. | `arc_s` |
+| 4 | F4 | Reuse the COPY temp stage on the connection | `CREATE TEMP … ON COMMIT DROP` once per batch on both insert paths. | existing `copy_s` (stage DDL not split yet) |
+| 5 | F5 | Reuse the PostgreSQL session on the worker | Helps files/min of small files more than MiB/min of giants. | reconnect is inside `write_setup_s` / `db_execute_s` |
+| 6 | F6 | Stream COPY bytes with a bound | Cuts peak allocation on giant batches after F1. | RSS / `copy_s` |
+| 7 | F7 | Invalidate each job id once per successful file | Repeated cache invalidation on dense files. | `jid_invalidate_s` |
+| 8 | F8 | Coalesce job-store checkpoints | Snapshot I/O off the mutation path. | job-store wait/hold when telem is on |
+| 9 | F9 | Linearize find-buffer parsing | Removes repeated prefix copies on the stream. | `feed_s` / `decode_s` |
+| 10 | F10 | Capped discovery fast path | Stops catch-up discovery from scanning past the cap. | census / discover lines |
+| 11 | F11 | Coalesce archive-members sidecar writes | Fewer durable sidecar writes; safety flags stay immediate. | members-store hold |
+| 12 | F12 | Adaptive heap release | Keep end-of-file trim; skip mid-file trim when pressure is low. | `heap_release_s` |
+| 13 | F13 | O(1) ingest census | One snapshot per tick instead of a walk. | census cost |
+| 14 | F14 | Once-per-tick cgroup admit | Stop re-reading cgroup and re-summing in-flight bytes per file. | admit stall vs completions |
+| 15 | F15 | Collapse microstructure (separate pairs) | DCGM slices, one partition pass, drop a redundant sort, fixed proc column order. | `collapse_*` |
+| 16 | F16 | One inode map for streaming rescan | Drops a second full fd capture. | rescan wall |
+| 17 | F17 | Carry-stable counter-delta categories | Stop refactorizing stable keys on every flush. | `delta_s` |
+| 18 | F18 | Collapse duplicate proc keys inside the batch | Shrinks COPY upsert work when keys repeat. | `copy_s` / proc row counts |
+| 19 | F19 | Positive sealed-member match | Skip full populate on a conclusive hit. | populate wall |
+| 20 | F20 | Single-pass sealed populate | One member feed and one sidecar write. | populate wall |
+| 21 | F21 | Bisect a failed bulk write | Error path only. Near zero on the steady state. | failure logs |
+| 22 | F22 | Durable retry backoff | Stability under faults, not steady MiB/min. | retry cadence |
+
+Not ranked as speedups: the harness (fresh-plan group 1) and the production
+A/B protocol (groups 25 and 26). Those are how a rank is accepted.
+
+Design detail for each ID stays in
+`.cursor/plans/sync-timedb-fresh-throughput-campaign.plan.md`.
+
+## Protocol
+
+- One writer. Never run two ingest versions against the same database or archive.
+- Arm A is the image built from current master. Arm B is exactly one candidate.
+- Windows are equal and at least 6 hours, on both 04 and 01 when the change can
+  affect either file shape.
+- Compare MiB/min and the named hold for that rank, inside the same size tier.
+  files/s alone is not the retain meter.
+- If workload, host, or database conditions drift, run A again (A2) before
+  keeping B. Roll back immediately on a correctness, archive, or stall regression.
+- The retained commit becomes the next A.
+- Local pytest and the regression battery are required before a candidate image.
+  They do not decide throughput.
+
+## Baseline meters (shipped with this wave)
+
+New tokens are gated by the existing INI knob **`[PIPELINE] sync_ingest_telemetry = yes`**.
+There is no second key and no production environment variable. Site INI `yes`
+ships in the same image as the code.
+
+| Token | Meaning | Log form |
+| --- | --- | --- |
+| `orm_rows` | Host plus proc rows that constructed a Django model in the telem-on bulk path | integer |
+| `overlap_headroom_s` | `min(max(0, parse_elapsed_s - postgres_s), max(0, postgres_s))` | 1 decimal |
+
+They are **not** write-phase keys. The analyzer prints
+`tier_<tier>_median_orm_rows` and `tier_<tier>_median_overlap_headroom_s`
+and does not add them into write share. `orm_materialize_s` and `postgres_s`
+stay the phase clocks.
+
+Images built before this change cannot emit the two tokens. Tonight's baseline
+image is current master plus these meters, not an optimization.
+
+## Evidence ledger
+
+Append one row per soak. Leave the rank table unchanged until a row contradicts it.
+
+| Date | Plan | Sites | Window | Image / git | What was measured | Verdict |
+| --- | --- | --- | --- | --- | --- | --- |
+| 2026-10-15 | `sync-timedb-fresh-baseline` | 04 Horizon, 01 Stampede3 | pending (operator starts tonight, ≥6h) | master + `orm_rows` / `overlap_headroom_s` | F1 `orm_materialize_s` per `orm_rows`; F2 `overlap_headroom_s` vs elapsed | pending |
+
+## Next plan after the baseline
+
+Write the F1 implementation plan from this rank (direct COPY without model
+construction) only after both site readouts are in the ledger. If
+`orm_materialize_s` is a small share of elapsed and `overlap_headroom_s` is
+large, still start with F1 unless this table is explicitly re-ranked first.
+
+## Historical campaign (through 2026-10-14)
+
+The text below is the previous campaign. Keep it. Do not use it to choose F1–F22.
+
+### Archived campaign text
+
 Canonical interpreted baseline and ongoing optimization ledger for durable
 `sync_timedb` backlog drain. Raw run artifacts stay under
 `test_runs/sync_timedb_bench/` and `test_runs/sync_timedb_campaign/`.

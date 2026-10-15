@@ -54,8 +54,10 @@ Attributes:
   INGEST_WRITE_PHASE_KEYS: Closed-book write-phase timing key names.
   INGEST_WRITE_DETAIL_KEYS: COPY detail phases nested under db_execute (logged).
   INGEST_WRITE_LOG_KEYS: Phase + detail keys emitted on ingest outcome lines.
+  INGEST_FRESH_CAMPAIGN_LOG_KEYS: F1/F2 baseline tokens (not residual-summed).
   _ingest_postgres_campaign: Process-wide postgres_s campaign total.
   _ingest_postgres_s: Per-file postgres_s ContextVar.
+  _ingest_orm_rows: Per-file Django model row count when telemetry is on.
   _ingest_write_campaign: Process-wide write-phase campaign totals.
   _ingest_write_campaign_lock: Mutex for write campaign totals.
   _ingest_write_phases: Per-file write-phase ContextVar.
@@ -2091,6 +2093,12 @@ INGEST_WRITE_DETAIL_KEYS: tuple[str, ...] = (
 INGEST_WRITE_LOG_KEYS: tuple[str, ...] = (
   INGEST_WRITE_PHASE_KEYS + INGEST_WRITE_DETAIL_KEYS
 )
+# Fresh-campaign baseline meters. Not phase keys: orm_rows is a count and
+# overlap_headroom_s is derived from parse_elapsed_s and postgres_s.
+INGEST_FRESH_CAMPAIGN_LOG_KEYS: tuple[str, ...] = (
+  "overlap_headroom_s",
+  "orm_rows",
+)
 
 _ingest_write_telem_on = False
 _ingest_write_campaign: dict[str, float] = dict.fromkeys(
@@ -2101,6 +2109,10 @@ _ingest_write_campaign_lock = threading.Lock()
 _ingest_postgres_s: contextvars.ContextVar[float] = contextvars.ContextVar(
   "ingest_postgres_s",
   default=0.0,
+)
+_ingest_orm_rows: contextvars.ContextVar[int] = contextvars.ContextVar(
+  "ingest_orm_rows",
+  default=0,
 )
 _ingest_write_phases: contextvars.ContextVar[dict[str, float] | None] = (
   contextvars.ContextVar(
@@ -2170,6 +2182,7 @@ def _reset_ingest_write_timing(*, enabled: bool | None = None) -> None:
       for key in INGEST_WRITE_LOG_KEYS:
         _ingest_write_campaign[key] = 0.0
   _ingest_postgres_s.set(0.0)
+  _ingest_orm_rows.set(0)
   _ingest_write_phases.set(dict.fromkeys(INGEST_WRITE_LOG_KEYS, 0.0))
 
 
@@ -2226,6 +2239,58 @@ def _add_ingest_postgres_s(delta_s: float) -> None:
       _ingest_postgres_campaign = float(_ingest_postgres_campaign) + delta
 
 
+def _add_ingest_orm_rows(count: int) -> None:
+  """
+  Count host and proc rows that paid Django model construction.
+
+  Args:
+    count (int): Rows materialized in the current batch.
+
+  Returns:
+    None
+
+  Examples:
+    >>> _reset_ingest_write_timing(enabled=True)
+    >>> _add_ingest_orm_rows(3)
+    >>> _snapshot_ingest_write_timing()["orm_rows"]
+    3.0
+  """
+  if not _ingest_write_telem_on or count <= 0:
+    return
+  _ingest_orm_rows.set(int(_ingest_orm_rows.get()) + int(count))
+
+
+def _fresh_overlap_headroom_s(
+  parse_elapsed_s: float | None,
+  postgres_s: float | None,
+) -> float | None:
+  """
+  Return the serial parse/write wall that one-chunk overlap could hide.
+
+  Postgres time is nested inside ``parse_elapsed_s``. The hideable portion is
+  the smaller of parse-without-database and database time.
+
+  Args:
+    parse_elapsed_s (float | None): Parse wall including nested postgres.
+    postgres_s (float | None): Nested ORM/COPY wall.
+
+  Returns:
+    float | None: Hideable seconds, or ``None`` when either input is missing.
+
+  Examples:
+    >>> _fresh_overlap_headroom_s(10.0, 4.0)
+    4.0
+    >>> _fresh_overlap_headroom_s(10.0, 8.0)
+    2.0
+    >>> _fresh_overlap_headroom_s(None, 1.0) is None
+    True
+  """
+  if parse_elapsed_s is None or postgres_s is None:
+    return None
+  parse_cpu = max(0.0, float(parse_elapsed_s) - float(postgres_s))
+  return min(parse_cpu, max(0.0, float(postgres_s)))
+
+
 def _snapshot_ingest_write_timing() -> dict[str, float]:
   """
   Return per-file ``postgres_s`` and optional closed-book write phases.
@@ -2247,6 +2312,7 @@ def _snapshot_ingest_write_timing() -> dict[str, float]:
   acc = _ingest_write_phases_acc()
   for key in INGEST_WRITE_LOG_KEYS:
     out[key] = float(acc.get(key, 0.0))
+  out["orm_rows"] = float(_ingest_orm_rows.get())
   return out
 
 
@@ -2293,6 +2359,13 @@ def _merge_ingest_write_timing_into_meta(meta: Any) -> dict[str, Any]:
   if stage:
     out.update(stage)
     attach_parse_unaccounted(out)
+  if _ingest_write_telem_on:
+    headroom = _fresh_overlap_headroom_s(
+      out.get("parse_elapsed_s"),
+      out.get("postgres_s"),
+    )
+    if headroom is not None:
+      out["overlap_headroom_s"] = headroom
   return out
 
 
@@ -2988,6 +3061,7 @@ def _write_stats_payload_to_db(
             proc_objs = [
               proc_data(**_proc_data_row_kwargs(row)) for row in batch
             ]
+          _add_ingest_orm_rows(len(batch))
           with _held_ingest_write_phase("db_execute_s"):
             _raise_if_ingest_per_file_deadline_exceeded(
               stats_file, "db_write_proc"
@@ -3039,6 +3113,7 @@ def _write_stats_payload_to_db(
               host_objs = [
                 host_data_instance_from_stats_row(row) for row in batch
               ]
+            _add_ingest_orm_rows(len(batch))
             with _held_ingest_write_phase("db_execute_s"):
               _raise_if_ingest_per_file_deadline_exceeded(
                 stats_file,
@@ -3350,7 +3425,11 @@ def _ingest_file_outcome_from_worker(
   timeout_s = meta.get("timeout_s")
   stage = {
     key: float(meta[key])
-    for key in (*PARSE_STAGE_LOG_KEYS, *INGEST_WRITE_LOG_KEYS)
+    for key in (
+      *PARSE_STAGE_LOG_KEYS,
+      *INGEST_WRITE_LOG_KEYS,
+      *INGEST_FRESH_CAMPAIGN_LOG_KEYS,
+    )
     if meta.get(key) is not None
   }
   return IngestFileOutcome(
@@ -3433,9 +3512,18 @@ def _log_ingest_file_outcome(
   if outcome.postgres_s is not None:
     parts.append(f"postgres_s={float(outcome.postgres_s):.1f}")
   if outcome.parse_stage:
-    for key in (*PARSE_STAGE_LOG_KEYS, *INGEST_WRITE_LOG_KEYS):
-      if key in outcome.parse_stage:
-        parts.append(f"{key}={float(outcome.parse_stage[key]):.1f}")
+    for key in (
+      *PARSE_STAGE_LOG_KEYS,
+      *INGEST_WRITE_LOG_KEYS,
+      *INGEST_FRESH_CAMPAIGN_LOG_KEYS,
+    ):
+      if key not in outcome.parse_stage:
+        continue
+      value = float(outcome.parse_stage[key])
+      if key == "orm_rows":
+        parts.append(f"{key}={int(value)}")
+      else:
+        parts.append(f"{key}={value:.1f}")
   if outcome.stats_rows is not None:
     parts.append(f"stats_rows={int(outcome.stats_rows)}")
   if outcome.stats_rows_parsed is not None:
