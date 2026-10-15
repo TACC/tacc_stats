@@ -21,6 +21,7 @@ from hpcperfstats.dbload.lib.sync_timedb_archive_members_store import (
 from hpcperfstats.dbload.lib.sync_timedb_job_store import SyncTimedbJobStore
 from hpcperfstats.dbload.lib.sync_timedb_store_lock_timing import (
   STORE_LOCK_TELEM_KEYS,
+  TimedRLock,
   reset_store_lock_timing,
   snapshot_store_lock_timing,
 )
@@ -394,3 +395,59 @@ def test_ingest_write_campaign_accumulates_from_worker_thread():
     assert campaign.get("postgres_s", 0.0) >= 0.01
   finally:
     st._reset_ingest_write_timing(enabled=False)
+
+
+def test_stage_ddl_and_reconnect_are_detail_clocks(monkeypatch):
+  """Stage DDL and a down socket are detail clocks, absent when telem is off."""
+  assert "stage_ddl_s" in st.INGEST_WRITE_DETAIL_KEYS
+  assert "reconnect_s" in st.INGEST_WRITE_DETAIL_KEYS
+  assert "stage_ddl_s" not in st.INGEST_WRITE_PHASE_KEYS
+  assert "reconnect_s" not in st.INGEST_WRITE_PHASE_KEYS
+  calls = {"n": 0}
+
+  class _Conn:
+    connection = None
+
+    def ensure_connection(self) -> None:
+      calls["n"] += 1
+      time.sleep(0.02)
+      self.connection = object()
+
+  conn = _Conn()
+  monkeypatch.setattr("django.db.connection", conn)
+  st._reset_ingest_write_timing(enabled=False)
+  try:
+    st._time_ingest_db_reconnect()
+    assert calls["n"] == 0
+    assert "reconnect_s" not in st._snapshot_ingest_write_timing()
+    st._reset_ingest_write_timing(enabled=True)
+    with st._held_ingest_write_phase("stage_ddl_s"):
+      time.sleep(0.02)
+    st._time_ingest_db_reconnect()
+    snap = st._snapshot_ingest_write_timing()
+    assert snap["stage_ddl_s"] >= 0.01
+    assert snap["reconnect_s"] >= 0.01
+    assert calls["n"] == 1
+    st._time_ingest_db_reconnect()
+    assert calls["n"] == 1
+  finally:
+    st._reset_ingest_write_timing(enabled=False)
+
+
+def test_store_lock_enable_follows_write_telem_without_per_file_wipe():
+  """A per-file reset must keep store-lock totals that telem already started."""
+  st._reset_ingest_write_timing(enabled=False)
+  try:
+    assert snapshot_store_lock_timing() == {}
+    st._reset_ingest_write_timing(enabled=True)
+    lock = TimedRLock("job_store")
+    assert lock.acquire() is True
+    time.sleep(0.02)
+    lock.release()
+    held = snapshot_store_lock_timing()["job_store_hold_s"]
+    assert held > 0.0
+    st._reset_ingest_write_timing(enabled=None)
+    assert snapshot_store_lock_timing()["job_store_hold_s"] == held
+  finally:
+    st._reset_ingest_write_timing(enabled=False)
+    assert snapshot_store_lock_timing() == {}

@@ -850,3 +850,52 @@ def test_nonpositive_census_slope_stops_when_ratio_wins(mod):
   outcomes = mod.analyze_lines(lines, exclude_startup=False)
   assert float(outcomes["queued_slope_per_min"]) < 0
   assert outcomes["decision_next"] == "stop_ingest_rate_watch_archive"
+
+
+def test_campaign_detail_and_supervisor_meters_outside_write_share(mod):
+  """Detail clocks and supervisor meters median without entering write share."""
+  mib = 1024 * 1024
+  lines = [
+    _ts(0) + "startup ingest gate cleared; ingest may begin",
+    _ts(1)
+    + (
+      "ingest file path=/arch/dense outcome=ingested ingest_ok=yes "
+      "db_skip=no "
+      f"size_bytes={16 * mib} elapsed_s=100.0 postgres_s=1.0 "
+      "stage_ddl_s=50.0 reconnect_s=2.0"
+    ),
+    _ts(2)
+    + (
+      "queue_orchestrator status ingest_hot=0/0 "
+      "job_store_hold_s=1.500 census_s=0.040 rss_mib=12 "
+      "admit_probes=3 dead_letter_ingest=2 dead_letter_append=1"
+    ),
+    _ts(3) + "queue_orchestrator boot discover seen=1 rescan_s=4.500",
+    _ts(4) + "INFO: populate complete day=2026-07-08 populate_s=8.000",
+  ]
+  outcomes = mod.analyze_lines(lines, exclude_startup=False)
+  assert outcomes["tier_8mib_64mib_median_stage_ddl_s"] == "50.000"
+  assert outcomes["tier_8mib_64mib_median_reconnect_s"] == "2.000"
+  assert outcomes["median_job_store_hold_s"] == "1.500"
+  assert outcomes["median_census_s"] == "0.040"
+  assert outcomes["median_rss_mib"] == "12.000"
+  assert outcomes["median_admit_probes"] == "3.000"
+  assert outcomes["median_dead_letter"] == "3.000"
+  assert outcomes["median_rescan_s"] == "4.500"
+  assert outcomes["median_populate_s"] == "8.000"
+  metrics = mod.parse_log_lines(lines, exclude_startup=False)
+  pack = mod._tier_decision_pack(
+    metrics,
+    "8mib_64mib",
+    clear_top_parse_when_write_heavy=False,
+  )
+  assert pack["mid_write_dominates"] is False
+  assert pack["write_sample_n"] == 0
+  phases = metrics.full_ingest_phases_by_tier["8mib_64mib"]
+  write_sum = sum(
+    sum(phases.get(tok, [])) for tok in mod._WRITE_PHASE_TOKEN_NAMES
+  )
+  assert write_sum == 0.0
+  assert "stage_ddl_s" not in mod._WRITE_PHASE_TOKEN_NAMES
+  assert "reconnect_s" not in mod._WRITE_PHASE_TOKEN_NAMES
+  assert "census_s" not in mod._WRITE_PHASE_TOKEN_NAMES

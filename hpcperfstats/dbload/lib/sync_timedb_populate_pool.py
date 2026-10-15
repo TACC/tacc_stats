@@ -265,7 +265,17 @@ def _populate_pool_worker_entry(
       continue
     try:
       record_worker_stage(canonical, "populate_scan")
+      time_populate = bool(cfg.get_sync_ingest_telemetry())
+      populate_t0 = time.monotonic() if time_populate else 0.0
       execute_archive_members_populate_for_canonical(canonical)
+      if time_populate:
+        populate_s = time.monotonic() - populate_t0
+        if populate_s > 0.0:
+          log_print(
+            "INFO: populate complete "
+            f"day={day_token or '?'} populate_s={populate_s:.3f}",
+            flush=True,
+          )
       complete_populate_queue_job(job)
     except Exception as exc:
       log_print(

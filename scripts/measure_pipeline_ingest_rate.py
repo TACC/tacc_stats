@@ -68,6 +68,10 @@ Attributes:
   _THROUGHPUT_BACKLOG_RE: Attribute.
   _WRITE_PHASE_TOKEN_NAMES: Write-phase token names scraped from ingest lines.
   _FRESH_CAMPAIGN_TOKEN_NAMES: F1 orm_rows and F2 overlap_headroom_s tokens.
+  _DETAIL_REPORT_TOKEN_NAMES: Write detail clocks reported outside write share.
+  _SUPERVISOR_METER_NAMES: Process-level supervisor meters, not per size tier.
+  _DEAD_LETTER_RE: Sums ``dead_letter_<kind>=`` counts on one log line.
+  _SUPERVISOR_METER_RES: Compiled regexes for supervisor meter tokens.
 """
 
 from __future__ import annotations
@@ -130,6 +134,24 @@ _FRESH_CAMPAIGN_TOKEN_NAMES = (
   "overlap_headroom_s",
   "orm_rows",
 )
+# Stage DDL and reconnect handshake. Logged on ingest lines, not write share.
+_DETAIL_REPORT_TOKEN_NAMES = (
+  "stage_ddl_s",
+  "reconnect_s",
+)
+# Process-wide supervisor samples. Median is a magnitude, not a per-file share.
+_SUPERVISOR_METER_NAMES = (
+  "job_store_wait_s",
+  "job_store_hold_s",
+  "members_store_wait_s",
+  "members_store_hold_s",
+  "census_s",
+  "rescan_s",
+  "populate_s",
+  "admit_probes",
+  "rss_mib",
+)
+_DEAD_LETTER_RE = re.compile(r"dead_letter_[A-Za-z0-9_]+=(?P<n>[0-9]+)")
 _PARSE_HOLD_TOKEN_NAMES = (
   "lock_s",
   "decode_s",
@@ -165,7 +187,12 @@ _PHASE_TOKEN_RES = {
     _WRITE_PHASE_TOKEN_NAMES
     + _PARSE_HOLD_TOKEN_NAMES
     + _FRESH_CAMPAIGN_TOKEN_NAMES
+    + _DETAIL_REPORT_TOKEN_NAMES
   )
+}
+_SUPERVISOR_METER_RES = {
+  name: re.compile(rf"{re.escape(name)}=(?P<v>[0-9.]+)")
+  for name in _SUPERVISOR_METER_NAMES
 }
 _MID_TIER_NAME = "8mib_64mib"
 _DENSE_TIER_NAME = "8mib_64mib"
@@ -230,6 +257,7 @@ class LogMetrics:
     full_ingest_postgres_by_tier: Per-tier ``postgres_s`` samples.
     full_ingest_count_by_tier: Per-tier full-ingest counts.
     full_ingest_phases_by_tier: Per-tier write/parse phase sample lists.
+    supervisor_samples: Process-level meter samples, including dead letters.
     last_ts: ``last_ts``.
     listend_unlink_samples: Timestamped rolling-window unlink counts.
     listend_unlink_sum: Effective non-overlapping unlink sum for rates.
@@ -261,6 +289,7 @@ class LogMetrics:
           _WRITE_PHASE_TOKEN_NAMES
           + _PARSE_HOLD_TOKEN_NAMES
           + _FRESH_CAMPAIGN_TOKEN_NAMES
+          + _DETAIL_REPORT_TOKEN_NAMES
         )
       }
       for name in _SIZE_TIER_NAMES
@@ -281,6 +310,11 @@ class LogMetrics:
   timestamped_lines: int = 0
   census_ingest_queued: list[tuple[datetime, int]] = field(
     default_factory=list,
+  )
+  supervisor_samples: dict[str, list[float]] = field(
+    default_factory=lambda: {
+      name: [] for name in (*_SUPERVISOR_METER_NAMES, "dead_letter")
+    },
   )
 
   @property
@@ -916,6 +950,37 @@ def _iter_filtered_lines(
     yield ts, body
 
 
+def _record_supervisor_meters(metrics: LogMetrics, body: str) -> None:
+  """
+  Append supervisor meter samples from one timestamped log body.
+
+  ``dead_letter_<kind>`` counts on the same line are summed into one
+  ``dead_letter`` sample. Missing tokens are not recorded.
+
+  Args:
+    metrics (LogMetrics): Accumulator.
+    body (str): Log message after the timestamp prefix.
+
+  Returns:
+    None
+
+  Examples:
+    >>> _record_supervisor_meters(LogMetrics(), "rss_mib=4")
+  """
+  for name, cre in _SUPERVISOR_METER_RES.items():
+    match = cre.search(body)
+    if match is None:
+      continue
+    metrics.supervisor_samples[name].append(float(match.group("v")))
+  total = 0
+  found = False
+  for match in _DEAD_LETTER_RE.finditer(body):
+    found = True
+    total += int(match.group("n"))
+  if found:
+    metrics.supervisor_samples["dead_letter"].append(float(total))
+
+
 def parse_log_lines(
   lines: Iterable[str],
   *,
@@ -985,6 +1050,7 @@ def parse_log_lines(
         metrics.census_ingest_queued.append(
           (ts, int(census_match.group(1))),
         )
+      _record_supervisor_meters(metrics, body)
 
   metrics.listend_unlink_sum = _nonoverlapping_listend_unlink_sum(
     metrics.listend_unlink_samples,
@@ -1508,6 +1574,10 @@ def build_outcomes(
     "estimated_finish_local": finish_local,
     "estimated_finish_basis": finish_basis,
   }
+  for name in (*_SUPERVISOR_METER_NAMES, "dead_letter"):
+    outcomes[f"median_{name}"] = _fmt_optional_median(
+      metrics.supervisor_samples.get(name, []),
+    )
   for tier in _SIZE_TIER_NAMES:
     count = int(metrics.full_ingest_count_by_tier.get(tier, 0))
     tier_rate = (count / window_minutes) if window_minutes > 0 else 0.0
@@ -1531,6 +1601,7 @@ def build_outcomes(
       _WRITE_PHASE_TOKEN_NAMES
       + _PARSE_HOLD_TOKEN_NAMES
       + _FRESH_CAMPAIGN_TOKEN_NAMES
+      + _DETAIL_REPORT_TOKEN_NAMES
     ):
       outcomes[f"tier_{tier}_median_{tok}"] = _fmt_optional_median(
         phase_map.get(tok, []),
@@ -1733,6 +1804,7 @@ def format_stdout(outcomes: dict[str, str]) -> str:
     "dense_tier_top_parse_hold",
     "decision_next_dense",
     "decision_next",
+    *(f"median_{name}" for name in (*_SUPERVISOR_METER_NAMES, "dead_letter")),
   )
   tier_keys: list[str] = []
   for tier in _SIZE_TIER_NAMES:
@@ -1749,6 +1821,7 @@ def format_stdout(outcomes: dict[str, str]) -> str:
       _WRITE_PHASE_TOKEN_NAMES
       + _PARSE_HOLD_TOKEN_NAMES
       + _FRESH_CAMPAIGN_TOKEN_NAMES
+      + _DETAIL_REPORT_TOKEN_NAMES
     ):
       tier_keys.append(f"tier_{tier}_median_{tok}")
   return "\n".join(

@@ -74,25 +74,25 @@ and untrusted. Ranks are not taken from the historical E-series.
 | 2 | conflict_insert | Shrink the proc `ON CONFLICT` after COPY | Next after F2. 04 dense `conflict_insert_s` 64.3s. | `conflict_insert_s` |
 | 3 | F1 | COPY rows without Django model construction | 04 dense `orm_materialize_s` 36.8s. | `orm_materialize_s`, **`orm_rows`** |
 | 4 | F3 | Vectorize ARC diff, carry apply, and carry finalization | Large on long counter series. | `arc_s` |
-| 5 | F4 | Reuse the COPY temp stage on the connection | `CREATE TEMP … ON COMMIT DROP` once per batch on both insert paths. | existing `copy_s` (stage DDL not split yet) |
-| 6 | F5 | Reuse the PostgreSQL session on the worker | Helps files/min of small files more than MiB/min of giants. | reconnect is inside `write_setup_s` / `db_execute_s` |
-| 7 | F6 | Stream COPY bytes with a bound | Cuts peak allocation on giant batches after F1. | RSS / `copy_s` |
+| 5 | F4 | Reuse the COPY temp stage on the connection | `CREATE TEMP … ON COMMIT DROP` once per batch on both insert paths. | `stage_ddl_s` |
+| 6 | F5 | Reuse the PostgreSQL session on the worker | Helps files/min of small files more than MiB/min of giants. | `reconnect_s` |
+| 7 | F6 | Stream COPY bytes with a bound | Cuts peak allocation on giant batches after F1. | `rss_mib`, `copy_s` |
 | 8 | F7 | Invalidate each job id once per successful file | Repeated cache invalidation on dense files. | `jid_invalidate_s` |
-| 9 | F8 | Coalesce job-store checkpoints | Snapshot I/O off the mutation path. | job-store wait/hold when telem is on |
+| 9 | F8 | Coalesce job-store checkpoints | Snapshot I/O off the mutation path. | `job_store_wait_s`, `job_store_hold_s` |
 | 10 | F9 | Linearize find-buffer parsing | Removes repeated prefix copies on the stream. | `feed_s` / `decode_s` |
-| 11 | F10 | Capped discovery fast path | Stops catch-up discovery from scanning past the cap. | census / discover lines |
-| 12 | F11 | Coalesce archive-members sidecar writes | Fewer durable sidecar writes; safety flags stay immediate. | members-store hold |
+| 11 | F10 | Capped discovery fast path | Stops catch-up discovery from scanning past the cap. | pending-rescan count and census `ingest=` queued depth |
+| 12 | F11 | Coalesce archive-members sidecar writes | Fewer durable sidecar writes; safety flags stay immediate. | `members_store_wait_s`, `members_store_hold_s` |
 | 13 | F12 | Adaptive heap release | Keep end-of-file trim; skip mid-file trim when pressure is low. | `heap_release_s` |
-| 14 | F13 | O(1) ingest census | One snapshot per tick instead of a walk. | census cost |
-| 15 | F14 | Once-per-tick cgroup admit | Stop re-reading cgroup and re-summing in-flight bytes per file. | admit stall vs completions |
+| 14 | F13 | O(1) ingest census | One snapshot per tick instead of a walk. | `census_s` |
+| 15 | F14 | Once-per-tick cgroup admit | Stop re-reading cgroup and re-summing in-flight bytes per file. | `admit_probes`, `fill_block` |
 | 16 | F15 | Collapse microstructure (separate pairs) | DCGM slices, one partition pass, drop a redundant sort, fixed proc column order. | `collapse_*` |
-| 17 | F16 | One inode map for streaming rescan | Drops a second full fd capture. | rescan wall |
+| 17 | F16 | One inode map for streaming rescan | Drops a second full fd capture. | `rescan_s` |
 | 18 | F17 | Carry-stable counter-delta categories | Stop refactorizing stable keys on every flush. | `delta_s` |
-| 19 | F18 | Collapse duplicate proc keys inside the batch | Shrinks COPY upsert work when keys repeat. | `copy_s` / proc row counts |
-| 20 | F19 | Positive sealed-member match | Skip full populate on a conclusive hit. | populate wall |
-| 21 | F20 | Single-pass sealed populate | One member feed and one sidecar write. | populate wall |
+| 19 | F18 | Collapse duplicate proc keys inside the batch | Shrinks COPY upsert work when keys repeat. | `proc_rows`, `copy_s` |
+| 20 | F19 | Positive sealed-member match | Skip full populate on a conclusive hit. | `populate_s` |
+| 21 | F20 | Single-pass sealed populate | One member feed and one sidecar write. | `populate_s` |
 | 22 | F21 | Bisect a failed bulk write | Error path only. Near zero on the steady state. | failure logs |
-| 23 | F22 | Durable retry backoff | Stability under faults, not steady MiB/min. | retry cadence |
+| 23 | F22 | Durable retry backoff | Stability under faults, not steady MiB/min. | `dead_letter_*` |
 
 Not ranked as speedups: the harness (fresh-plan group 1) and the production
 A/B protocol (groups 25 and 26). Those are how a rank is accepted.
@@ -132,6 +132,13 @@ stay the phase clocks.
 
 Images built before this change cannot emit the two tokens. Tonight's baseline
 image is current master plus these meters, not an optimization.
+
+Later ranks use the same telemetry gate. `stage_ddl_s` and `reconnect_s` are
+write-detail clocks: the analyzer medians them per size tier and does not add
+them into write share. `census_s`, `rescan_s`, `populate_s`, `admit_probes`,
+`rss_mib`, and the store-lock totals are process-level. The analyzer reports
+`median_<name>` for those, and sums `dead_letter_<kind>` on a status line into
+`median_dead_letter`. Zero values are omitted from the log.
 
 ## Evidence ledger
 

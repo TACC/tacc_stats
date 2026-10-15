@@ -31,6 +31,34 @@ _store_lock_totals: dict[str, float] = dict.fromkeys(STORE_LOCK_TELEM_KEYS, 0.0)
 _store_lock_totals_lock = threading.Lock()
 
 
+def set_store_lock_timing_enabled(enabled: bool) -> None:
+  """
+  Turn store-lock timing on or off without wiping totals that are already on.
+
+  A repeat call in the same state does nothing. Totals zero only on the
+  transition into on, and again on the transition into off.
+
+  Args:
+    enabled (bool): When True, start recording. When False, stop and zero.
+
+  Returns:
+    None
+
+  Examples:
+    >>> set_store_lock_timing_enabled(False)
+    >>> snapshot_store_lock_timing()
+    {}
+  """
+  global _store_lock_telem_on
+  want = bool(enabled)
+  with _store_lock_totals_lock:
+    if _store_lock_telem_on == want:
+      return
+    _store_lock_telem_on = want
+    for key in STORE_LOCK_TELEM_KEYS:
+      _store_lock_totals[key] = 0.0
+
+
 def reset_store_lock_timing(*, enabled: bool = False) -> None:
   """
   Zero store-lock wait/hold accumulators; optionally enable telemetry.

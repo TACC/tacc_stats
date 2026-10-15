@@ -204,7 +204,8 @@ def bulk_insert_proc_data_update_conflicts(objs: Sequence[Any]) -> None:
   """
   Upsert ``proc_data`` via COPY staging with ON CONFLICT DO UPDATE.
 
-  When write telemetry is on, records ``copy_s`` and ``conflict_insert_s``.
+  When write telemetry is on, records ``stage_ddl_s``, ``copy_s``, and
+  ``conflict_insert_s``.
 
   Args:
     objs (Sequence[Any]): Peak-merged instances to upsert.
@@ -231,8 +232,12 @@ def bulk_insert_proc_data_update_conflicts(objs: Sequence[Any]) -> None:
   conflict_cm = (
     st._held_ingest_write_phase("conflict_insert_s") if telem else nullcontext()
   )
+  ddl_cm = (
+    st._held_ingest_write_phase("stage_ddl_s") if telem else nullcontext()
+  )
   with transaction.atomic(), connection.cursor() as cursor:
-    cursor.execute(_STAGE_DDL)
+    with ddl_cm:
+      cursor.execute(_STAGE_DDL)
     with copy_cm, cursor.copy(copy_sql) as copy:
       copy.write(payload)
     with conflict_cm:

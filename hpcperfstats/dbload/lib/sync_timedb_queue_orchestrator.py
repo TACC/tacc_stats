@@ -87,6 +87,7 @@ from hpcperfstats.dbload.lib.process_memory import (
   cgroup_admit_file_cache_ok,
   cgroup_admit_headroom_ok,
   effective_cgroup_admit_max_file_cache_mib,
+  read_process_rss_bytes,
 )
 from hpcperfstats.dbload.lib.process_title import (
   set_daemon_thread_title,
@@ -553,6 +554,39 @@ def _status_band_ratios(client: Any) -> dict[str, dict[str, int]]:
   return out
 
 
+def _status_extra_meters() -> dict[str, float]:
+  """
+  Build supervisor meters for the status line when ingest telemetry is on.
+
+  Store-lock totals are process-wide. Zero values are left for the formatter
+  to omit. Telemetry off returns an empty map and does not read RSS.
+
+  Returns:
+    dict[str, float]: Omit-zero candidates for the status line.
+
+  Examples:
+    >>> isinstance(_status_extra_meters(), dict)
+    True
+  """
+  if not bool(cfg.get_sync_ingest_telemetry()):
+    return {}
+  from hpcperfstats.dbload.lib.sync_timedb_store_lock_timing import (
+    snapshot_store_lock_timing,
+  )
+
+  meters = {
+    str(key): float(value)
+    for key, value in snapshot_store_lock_timing().items()
+  }
+  probes = int(_MEM_TELEM_RUNTIME.get("admit_probes") or 0)
+  if probes > 0:
+    meters["admit_probes"] = float(probes)
+  rss_mib = int(read_process_rss_bytes() or 0) // (1024 * 1024)
+  if rss_mib > 0:
+    meters["rss_mib"] = float(rss_mib)
+  return meters
+
+
 def _emit_progress_report_if_due(
   client: Any,
   *,
@@ -605,6 +639,11 @@ def _emit_progress_report_if_due(
     for kind in jq.JOB_KINDS_ALL
   }
   oldest_day, oldest_age_s = progress.resolve_oldest_queued_day(client)
+  extra_meters = (
+    _status_extra_meters()
+    if force or state.report_due(interval_s=PROGRESS_REPORT_INTERVAL_S)
+    else None
+  )
   if force:
     lines = state.emit_lines(
       band_ratios=band,
@@ -613,6 +652,7 @@ def _emit_progress_report_if_due(
       queue_depth_now=depth_now,
       oldest_day=oldest_day,
       oldest_age_s=oldest_age_s,
+      extra_meters=extra_meters,
     )
     for line in lines:
       _log(line, log_fn=log_fn)
@@ -626,6 +666,7 @@ def _emit_progress_report_if_due(
     queue_depth_now=depth_now,
     oldest_day=oldest_day,
     oldest_age_s=oldest_age_s,
+    extra_meters=extra_meters,
     log_fn=lambda msg, flush=False: _log(msg, log_fn=log_fn),
   )
 
@@ -1049,6 +1090,8 @@ def _boot_stream_discover(
     True
   """
   today = date.today()
+  time_rescan = mtime_days is not None and bool(cfg.get_sync_ingest_telemetry())
+  rescan_t0 = time.monotonic() if time_rescan else 0.0
   chunks = iter_find_stats_stdout_chunks(
     archive_dir,
     mtime_days=mtime_days,
@@ -1072,8 +1115,13 @@ def _boot_stream_discover(
     client,
     tgz_archive_dir=tgz_archive_dir,
   )
+  rescan_tok = ""
+  if time_rescan:
+    rescan_s = time.monotonic() - rescan_t0
+    if rescan_s > 0.0:
+      rescan_tok = f" rescan_s={rescan_s:.3f}"
   _log(
-    f"queue_orchestrator boot discover seen={stats.seen} ingest={stats.enqueued_ingest} append={stats.enqueued_append} day_close={stats.enqueued_day_close} skipped={stats.skipped_complete} daily_scan_day_close={day_n}",
+    f"queue_orchestrator boot discover seen={stats.seen} ingest={stats.enqueued_ingest} append={stats.enqueued_append} day_close={stats.enqueued_day_close} skipped={stats.skipped_complete} daily_scan_day_close={day_n}{rescan_tok}",
     log_fn=log_fn,
   )
   return stats
@@ -3761,6 +3809,7 @@ def _fill_ingest_band(
         continue
       size_bytes = int(st_now.st_size)
       if inflight_sizes is not None:
+        stats["admit_probes"] = int(stats.get("admit_probes", 0) or 0) + 1
         budget_bytes = int(
           worker_memory.compute_ingest_inflight_raw_bytes_budget(),
         )
@@ -5823,6 +5872,9 @@ def _ingest_coordinator_loop(
         )
         did += extra
         fill_submitted += extra
+        _MEM_TELEM_RUNTIME["admit_probes"] = int(
+          fill_stats.get("admit_probes", 0) or 0
+        )
         store_hlen_after = _store_ingest_hlen(client)
         hot_used, catch_used = _count_ingest_band_inflight(ingest_leases)
         if store_hlen_after >= ingest_pool_size - 1:
@@ -5856,6 +5908,7 @@ def _ingest_coordinator_loop(
               log_fn=log_fn,
             )
       else:
+        _MEM_TELEM_RUNTIME["admit_probes"] = 0
         did += _drain_ingest_ready(
           client,
           inflight=ingest_inflight,
@@ -6231,10 +6284,17 @@ def _reconstruct_coordinator_loop(
       now = time.monotonic()
       if now - last_census >= CENSUS_LOG_INTERVAL_S:
         last_census = now
+        time_census = bool(cfg.get_sync_ingest_telemetry())
+        census_t0 = time.monotonic() if time_census else 0.0
         try:
           census = jq.queue_census(client)
         except Exception:
           census = {}
+        census_tok = ""
+        if time_census:
+          census_s = time.monotonic() - census_t0
+          if census_s > 0.0:
+            census_tok = f" census_s={census_s:.3f}"
         with busy_lock:
           busy_kinds = [k for k, v in busy_flags.items() if v]
         if _discover_bg_is_busy() and "discover" not in busy_kinds:
@@ -6247,7 +6307,7 @@ def _reconstruct_coordinator_loop(
           mem_tok = format_ingest_mem_block_census_suffix()
           writers_tok = format_append_writers_census_token()
           _log(
-            f"queue_orchestrator census {jq.format_queue_census(census)} total_ingested={total_ingested} total_completed={total_completed}{' ' + busy_tok if busy_tok else ''}{mem_tok} {writers_tok}",
+            f"queue_orchestrator census {jq.format_queue_census(census)} total_ingested={total_ingested} total_completed={total_completed}{' ' + busy_tok if busy_tok else ''}{mem_tok} {writers_tok}{census_tok}",
             log_fn=log_fn,
           )
           snap = mem_telem.snapshot_pipeline_mem_telemetry(

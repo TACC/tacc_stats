@@ -158,7 +158,7 @@ def bulk_insert_host_data_ignore_conflicts(objs: Sequence[Any]) -> None:
 
   Matches Django ``bulk_create(..., ignore_conflicts=True)`` semantics on
   unique ``(time, host, type, event, dev)``. When write telemetry is on,
-  records ``copy_s`` and ``conflict_insert_s`` detail phases.
+  records ``stage_ddl_s``, ``copy_s``, and ``conflict_insert_s``.
 
   Args:
     objs (Sequence[Any]): Unsaved ``host_data`` model instances to insert.
@@ -185,9 +185,13 @@ def bulk_insert_host_data_ignore_conflicts(objs: Sequence[Any]) -> None:
   conflict_cm = (
     st._held_ingest_write_phase("conflict_insert_s") if telem else nullcontext()
   )
+  ddl_cm = (
+    st._held_ingest_write_phase("stage_ddl_s") if telem else nullcontext()
+  )
   # Django defaults to autocommit; keep TEMP visible for COPY + INSERT.
   with transaction.atomic(), connection.cursor() as cursor:
-    cursor.execute(_STAGE_DDL)
+    with ddl_cm:
+      cursor.execute(_STAGE_DDL)
     with copy_cm, cursor.copy(copy_sql) as copy:
       copy.write(payload)
     with conflict_cm:

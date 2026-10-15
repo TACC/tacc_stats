@@ -389,6 +389,33 @@ def format_queue_ratio_token(name: str, inflight: int, queued: int) -> str:
   return f"{name}={i}/{q}"
 
 
+def format_positive_meter(name: str, value: float) -> str:
+  """
+  Format one omit-zero supervisor meter token.
+
+  Counts (``admit_probes``, ``rss_mib``) print as integers. Durations print
+  with three decimal places so a sub-second census is not rounded away.
+
+  Args:
+    name (str): Token name without ``=``.
+    value (float): Sample. Non-positive values emit nothing.
+
+  Returns:
+    str: ``name=value`` or an empty string.
+
+  Examples:
+    >>> format_positive_meter("census_s", 0.0)
+    ''
+    >>> format_positive_meter("rss_mib", 12)
+    'rss_mib=12'
+  """
+  if float(value) <= 0.0:
+    return ""
+  if name in ("admit_probes", "rss_mib"):
+    return f"{name}={int(value)}"
+  return f"{name}={float(value):.3f}"
+
+
 def format_status_line(
   *,
   band_ratios: Mapping[str, Mapping[str, int]],
@@ -400,6 +427,7 @@ def format_status_line(
   undated: Mapping[str, int] | None = None,
   dead_letter_by_kind: Mapping[str, int] | None = None,
   fill_block: str | None = None,
+  extra_meters: Mapping[str, float] | None = None,
 ) -> str:
   """
   Format omit-zeros ``queue_orchestrator status`` footer (always one line).
@@ -415,6 +443,8 @@ def format_status_line(
     undated (Optional[Mapping[str, int]]): Undated fallback counters.
     dead_letter_by_kind (Optional[Mapping[str, int]]): Undated dead letters.
     fill_block (Optional[str]): Last ingest fill-block reason token.
+    extra_meters (Optional[Mapping[str, float]]): Omit-zero supervisor meters
+      such as store-lock totals, ``rss_mib``, and ``admit_probes``.
 
   Returns:
     str: Status line. Always includes ``ingest_hot=`` /
@@ -462,6 +492,10 @@ def format_status_line(
   for kind, n in sorted((dead_letter_by_kind or {}).items()):
     if int(n or 0):
       parts.append(f"dead_letter_{kind}={int(n)}")
+  for name, value in sorted((extra_meters or {}).items()):
+    token = format_positive_meter(str(name), float(value or 0.0))
+    if token:
+      parts.append(token)
   for key, n in sorted((undated or {}).items()):
     if int(n or 0):
       parts.append(f"{key}={int(n)}")
@@ -644,6 +678,7 @@ class ProgressReportState:
     queue_depth_now: Mapping[str, int],
     oldest_day: str | None = None,
     oldest_age_s: int | None = None,
+    extra_meters: Mapping[str, float] | None = None,
   ) -> list[str]:
     """
     Build progress + status lines for the current window (does not reset).
@@ -655,6 +690,7 @@ class ProgressReportState:
       queue_depth_now (Mapping[str, int]): Kind -> queued depth now.
       oldest_day (Optional[str]): Oldest queued day.
       oldest_age_s (Optional[int]): Oldest head age seconds.
+      extra_meters (Optional[Mapping[str, float]]): Omit-zero status meters.
 
     Returns:
       List[str]: Day lines (if any) then one status line.
@@ -701,9 +737,38 @@ class ProgressReportState:
         undated=undated,
         dead_letter_by_kind=dead,
         fill_block=fill_block,
+        extra_meters=extra_meters,
       ),
     )
     return lines
+
+  def report_due(
+    self,
+    *,
+    now_mono: float | None = None,
+    interval_s: float = PROGRESS_REPORT_INTERVAL_S,
+  ) -> bool:
+    """
+    Return whether the progress window is ready to emit.
+
+    Args:
+      now_mono (Optional[float]): Monotonic now (tests inject).
+      interval_s (float): Emit interval.
+
+    Returns:
+      bool: True when elapsed time has reached ``interval_s``.
+
+    Examples:
+      >>> state = ProgressReportState()
+      >>> state.report_due(
+      ...   now_mono=state._window_started_mono,
+      ...   interval_s=600.0,
+      ... )
+      False
+    """
+    now = float(now_mono if now_mono is not None else time.monotonic())
+    with self._lock:
+      return (now - self._window_started_mono) >= float(interval_s)
 
   def maybe_emit_and_reset(
     self,
@@ -716,6 +781,7 @@ class ProgressReportState:
     queue_depth_now: Mapping[str, int],
     oldest_day: str | None = None,
     oldest_age_s: int | None = None,
+    extra_meters: Mapping[str, float] | None = None,
     log_fn: Callable[..., None] | None = None,
   ) -> bool:
     """
@@ -730,6 +796,7 @@ class ProgressReportState:
       queue_depth_now (Mapping[str, int]): Kind -> queued depth now.
       oldest_day (Optional[str]): Oldest queued day.
       oldest_age_s (Optional[int]): Oldest head age seconds.
+      extra_meters (Optional[Mapping[str, float]]): Omit-zero status meters.
       log_fn (Optional[Callable[..., None]]): Logger (``log_print``-compatible).
 
     Returns:
@@ -758,6 +825,7 @@ class ProgressReportState:
       queue_depth_now=queue_depth_now,
       oldest_day=oldest_day,
       oldest_age_s=oldest_age_s,
+      extra_meters=extra_meters,
     )
     quiet = log_fn
     if quiet is not None:

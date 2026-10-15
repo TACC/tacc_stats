@@ -64,6 +64,46 @@ def test_format_status_idle_and_busy_includes_discover():
   assert "oldest_day=2025-05-05" in line
 
 
+def test_report_due_is_false_until_the_interval():
+  """A fresh window must not look due at its start time."""
+  state = pr.ProgressReportState()
+  assert (
+    state.report_due(
+      now_mono=state._window_started_mono,
+      interval_s=600.0,
+    )
+    is False
+  )
+  assert (
+    state.report_due(
+      now_mono=state._window_started_mono + 600.0,
+      interval_s=600.0,
+    )
+    is True
+  )
+
+
+def test_format_status_omits_zero_extra_meters():
+  """Supervisor meters print when positive and stay off the line at zero."""
+  line = pr.format_status_line(
+    band_ratios={},
+    queue_deltas={},
+    busy_kinds=[],
+    orphan_inflight={},
+    extra_meters={
+      "census_s": 0.0,
+      "rss_mib": 0,
+      "job_store_hold_s": 1.25,
+      "admit_probes": 4,
+    },
+  )
+  assert "census_s=" not in line
+  assert "rss_mib=" not in line
+  assert "job_store_hold_s=1.250" in line
+  assert "admit_probes=4" in line
+  assert line.startswith("queue_orchestrator status ingest_hot=0/0")
+
+
 def test_format_status_includes_fill_block():
   line = pr.format_status_line(
     band_ratios={"ingest_hot": {"inflight": 0, "queued": 452}},

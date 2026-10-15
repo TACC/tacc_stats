@@ -2091,6 +2091,8 @@ INGEST_WRITE_PHASE_KEYS: tuple[str, ...] = (
 INGEST_WRITE_DETAIL_KEYS: tuple[str, ...] = (
   "copy_s",
   "conflict_insert_s",
+  "stage_ddl_s",
+  "reconnect_s",
 )
 INGEST_WRITE_LOG_KEYS: tuple[str, ...] = (
   INGEST_WRITE_PHASE_KEYS + INGEST_WRITE_DETAIL_KEYS
@@ -2183,6 +2185,11 @@ def _reset_ingest_write_timing(*, enabled: bool | None = None) -> None:
       _ingest_postgres_campaign = 0.0
       for key in INGEST_WRITE_LOG_KEYS:
         _ingest_write_campaign[key] = 0.0
+  from hpcperfstats.dbload.lib.sync_timedb_store_lock_timing import (
+    set_store_lock_timing_enabled,
+  )
+
+  set_store_lock_timing_enabled(_ingest_write_telem_on)
   _ingest_postgres_s.set(0.0)
   _ingest_orm_rows.set(0)
   _ingest_write_phases.set(dict.fromkeys(INGEST_WRITE_LOG_KEYS, 0.0))
@@ -3081,6 +3088,30 @@ def _ingest_ok_from_host_write_path(
   return bool(individual_need_archival)
 
 
+def _time_ingest_db_reconnect() -> None:
+  """
+  Time a closed Django connection's handshake as ``reconnect_s``.
+
+  A live socket is left alone. Telemetry off skips the check. The connect
+  that runs here is the one the next cursor would have performed.
+
+  Returns:
+    None
+
+  Examples:
+    >>> _reset_ingest_write_timing(enabled=False)
+    >>> _time_ingest_db_reconnect()
+  """
+  if not _ingest_write_telem_on:
+    return
+  from django.db import connection
+
+  if getattr(connection, "connection", None) is not None:
+    return
+  with _held_ingest_write_phase("reconnect_s"):
+    connection.ensure_connection()
+
+
 def _write_stats_payload_to_db(
   stats_file: str,
   stats: Any,
@@ -3112,6 +3143,7 @@ def _write_stats_payload_to_db(
   update_worker_substage("db_write")
   individual_need_archival = None
   try:
+    _time_ingest_db_reconnect()
     if _ingest_write_telem_on:
       with _held_ingest_write_timing():
         with _held_ingest_write_phase("write_setup_s"):
