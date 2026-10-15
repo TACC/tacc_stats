@@ -452,6 +452,15 @@ def test_security_audit_is_fail_closed_for_both_tools():
   assert "npm audit" in security
   assert "skipping npm audit" not in security.lower()
   assert "command -v npm" not in security
+  assert "compose_test build web" in security
+  assert 'if [[ "${SKIP_BUILD}" != "1" ]]' in security
+  workflow = _read(".github/workflows/security-audit.yaml")
+  assert "permissions:" in workflow
+  assert "contents: read" in workflow
+  assert "podman" in workflow
+  assert "run: docker-compose" not in workflow
+  assert "docker compose" not in workflow
+  assert "/data/podman/" in workflow
 
 
 def test_full_orchestrator_runs_complete_matrix_without_recursion():

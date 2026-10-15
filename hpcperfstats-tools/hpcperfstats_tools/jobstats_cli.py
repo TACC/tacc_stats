@@ -15,7 +15,6 @@ from typing import Any
 
 from .api_client import ApiClient
 from .api_key_cache import (
-  API_KEY_CACHE_DISPLAY,
   api_key_help_url,
   load_cached_api_key,
   save_cached_api_key,
@@ -168,7 +167,7 @@ def _get_json(
     print(
       "Obtain an API key from the Machine API keys page on your HPCPerfStats site, "
       "then run this command again with --api-key.\n"
-      f"The key will be cached in {API_KEY_CACHE_DISPLAY}."
+      "The key will be cached in ~/.hpcperfstats-api."
     )
     return None, result.status_code
   if not result.ok:
@@ -316,7 +315,7 @@ def main(argv: list[str] | None = None) -> int:
   parser = argparse.ArgumentParser(
     description="Print an efficiency summary for a single Slurm job.",
     formatter_class=argparse.RawDescriptionHelpFormatter,
-    epilog=f"""
+    epilog="""
 Environment variables:
   HPCPERFSTATS_TOOLS_INI  Path to INI file with [API] base_url. If set, the
                          default for --api-url is read from this file.
@@ -324,7 +323,7 @@ Environment variables:
                          (where to obtain an API key).
 
 Files:
-  {API_KEY_CACHE_DISPLAY}  Cached API keys per API base URL. Written when you pass --api-key.
+  ~/.hpcperfstats-api  Cached API keys per API base URL. Written when you pass --api-key.
 """,
   )
   parser.add_argument(
@@ -336,7 +335,7 @@ Files:
     "--api-key",
     help=(
       "API key for authenticating to the HPCPerfStats REST API. "
-      f"If omitted, a cached key in {API_KEY_CACHE_DISPLAY} is used when present."
+      "If omitted, a cached key in ~/.hpcperfstats-api is used when present."
     ),
   )
   parser.add_argument(

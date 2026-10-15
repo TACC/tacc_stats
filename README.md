@@ -412,7 +412,7 @@ This is a container orchestration with Django/PostgreSQL, ingest/archival tools,
    Full-stack image rebuilds (including **proxy** and homemade **db_pg18**) use **`./scripts/rebuild_full_site.sh`**, which **`podman build`**s **web**, **proxy**, and **`db_pg18`** (Clang **22** in-image on Alpine **db/proxy** and Debian **`python-build`**), then **`podman-compose down`** and **`up -d --no-build`**. Default rebuild is **stdlib** (no PGOROOT PGO). Optional Clang PGO: **`--profile-phase`** (generate only), manual soak, then **`--pgo-use`**, later **`--pgo-skip`** (post-use rebuild with merged profdata), or one-shot **`--full-pgo`** (generate → **`scripts/pgo_soak_web_traffic.py`** rank-0 discovery + 15m soak → down → merge/use rebuild; see **`docs/upgrade.md`**).
 
    The **`proxy`** image is **source-built** from **`services-conf/proxy.Dockerfile`**:
-   pinned **nginx 1.31.6**, **jemalloc**, **zlib-ng (ZLIB_COMPAT)**, **OpenSSL 3.5.x**,
+   pinned **nginx 1.31.7**, **jemalloc**, **zlib-ng (ZLIB_COMPAT)**, **OpenSSL 3.5.x**,
    **ngx_brotli**, and **zstd 1.5.7** (static **`libzstd.a`** + GetPageSpeed
    **zstd-nginx-module**), with **`-march=native -mtune=native`** on every source-built
    lib (including OpenSSL **`--with-openssl-opt`**). **Build the proxy image on

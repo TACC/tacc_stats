@@ -12,8 +12,9 @@ Prioritized follow-ups from [SECURITY_AUDIT.md](SECURITY_AUDIT.md). Update this 
 
 ## P2 — Hardening and hygiene
 
-- **shadcn CLI transitive `braces` (npm audit):** 7 high in dev-only `shadcn` / `@shadcn/registry` tree (GHSA-vfj7-8cjw-p6xm); not shipped in production static export. Track upstream or safe `overrides` — do not `npm audit fix --force` (downgrades `shadcn` to 1.0.0). Log: [`test_runs/gh_security_alerts_sweep_2026-10-05.md`](../test_runs/gh_security_alerts_sweep_2026-10-05.md).
-- **Audit workflow compose overlay (F9):** mitigated — workflows use **`docker-compose.yaml`** (from example) plus **`tests/docker-compose.test-overlay.yaml`** so local machines do not need production `/data` binds. Optional: still run `pip-audit` via `docker run --rm` on the built image.
+- **shadcn CLI transitive `braces` (npm audit):** 7 high in dev-only `shadcn` / `@shadcn/registry` tree (GHSA-vfj7-8cjw-p6xm); not shipped in production static export. 2026-10-15 audit still reports this chain after the pin refresh. Track upstream. Do not `npm audit fix --force`.
+- **`sprintf-js` via `@bokeh/bokehjs@3.10.1`:** 2 moderate npm audit findings (unbounded precision DoS). Production loads the vendored UMD script, not the npm package graph. No same-line override was applied because Bokeh owns the dependency. Revisit when Bokeh or `sprintf-js` publishes a patched line.
+- **Audit workflow:** `.github/workflows/security-audit.yaml` installs rootless Podman, stores images under `/data/podman/$USER`, and calls `tests/run_security_audit_workflow.sh`. That runner builds `web` unless `--skip-build` is set, then runs `pip-audit` in the image and `npm audit` on the host frontend tree. GitHub alert closure for Dependabot #119 and CodeQL #42–#44 waits for a default-branch rescan.
 
 ## Done
 

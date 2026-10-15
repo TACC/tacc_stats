@@ -19,7 +19,6 @@ from dateutil.parser import parse
 
 from .api_client import ApiClient
 from .api_key_cache import (
-  API_KEY_CACHE_DISPLAY,
   api_key_help_url,
   load_cached_api_key,
   save_cached_api_key,
@@ -339,7 +338,7 @@ def main(argv: list[str] | None = None) -> None:
       "or write daily YYYY-MM-DD.txt files (-f)."
     ),
     formatter_class=argparse.RawDescriptionHelpFormatter,
-    epilog=f"""
+    epilog="""
 Modes (mutually exclusive):
   API mode (default)  POST each day's sacct output to sacct/ingest/.
                       Requires [API] base_url and --api-key (or a cached key).
@@ -352,7 +351,7 @@ Environment variables:
                          API mode only.
 
 Files:
-  {API_KEY_CACHE_DISPLAY}  Cached API keys per API base URL. Written when you pass --api-key.
+  ~/.hpcperfstats-api  Cached API keys per API base URL. Written when you pass --api-key.
 """,
   )
   parser.add_argument(
@@ -378,7 +377,7 @@ Files:
   mode.add_argument(
     "--api-key",
     help="API key for authenticating to the HPCPerfStats REST API. "
-    f"If omitted in API mode, a cached key in {API_KEY_CACHE_DISPLAY} is used when present. "
+    "If omitted in API mode, a cached key in ~/.hpcperfstats-api is used when present. "
     "Mutually exclusive with -f.",
   )
   args = parser.parse_args(argv)

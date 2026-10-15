@@ -985,7 +985,7 @@ cd HPCPerfStats
 tests/run_security_audit_workflow.sh
 ```
 
-This runs `pip-audit` inside the compose `web` image and runs frontend `npm audit`.
+This builds the compose `web` image unless `--skip-build` is passed, runs `pip-audit` inside that image, and runs frontend `npm audit`. GitHub Actions installs rootless Podman, points storage at `/data/podman/$USER`, and calls this runner with `permissions: contents: read`.
 
 **Frontend:**
 

@@ -7,10 +7,11 @@ cd "${ROOT_DIR}"
 # shellcheck source=compose_test_cmd.sh
 . "$(dirname "${BASH_SOURCE[0]}")/compose_test_cmd.sh"
 
+SKIP_BUILD=0
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --skip-build)
-      # The audit uses the image built by an earlier matrix phase.
+      SKIP_BUILD=1
       ;;
     -h|--help)
       echo "Usage: tests/run_security_audit_workflow.sh [--skip-build]"
@@ -30,6 +31,11 @@ cleanup() {
   podman_compose_teardown "${COMPOSE_TEST[@]}"
 }
 trap cleanup EXIT
+
+if [[ "${SKIP_BUILD}" != "1" ]]; then
+  echo "[security-audit] building web image"
+  compose_test build web
+fi
 
 echo "[security-audit] running pip-audit inside compose web image"
 compose_test run --rm --entrypoint sh web -lc \

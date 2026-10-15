@@ -199,6 +199,28 @@ def test_xmldom_override_meets_dependabot_110_floor():
   )
 
 
+def test_mcp_sdk_lock_meets_dependabot_119_floor():
+  """Dependabot #119 / GHSA-6qxp-vccf-f47h: MCP SDK < 1.31.0 is vulnerable."""
+  import json
+
+  lock = json.loads(
+    (_repo_root() / "hpcperfstats/site/frontend/package-lock.json").read_text(
+      encoding="utf-8",
+    )
+  )
+  versions = [
+    pkg.get("version")
+    for name, pkg in (lock.get("packages") or {}).items()
+    if name.endswith("node_modules/@modelcontextprotocol/sdk")
+  ]
+  assert versions, "package-lock.json missing @modelcontextprotocol/sdk"
+  for version in versions:
+    assert _semver_triple(version) >= (1, 31, 0), (
+      f"lock @modelcontextprotocol/sdk@{version} must be >= 1.31.0 "
+      "(GHSA-6qxp-vccf-f47h / Dependabot #119)"
+    )
+
+
 def test_build_prod_runs_write_site_identity_hook():
   """build:prod must generate gitignored site-identity.ts (Docker uses build:prod, not build)."""
   import json

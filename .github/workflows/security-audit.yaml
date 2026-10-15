@@ -8,9 +8,13 @@ on:
       - "docker-compose.yaml"
       - "Dockerfile"
       - "tests/run_security_audit_workflow.sh"
+      - ".github/workflows/security-audit.yaml"
   schedule:
     - cron: "0 9 * * 1"
   workflow_dispatch:
+
+permissions:
+  contents: read
 
 jobs:
   audits:
@@ -18,8 +22,33 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
-      - name: Build web image for production-context pip-audit
-        run: docker-compose build web
+      - name: Install rootless Podman
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y podman
+          python3 -m pip install --user podman-compose
+          echo "${HOME}/.local/bin" >> "${GITHUB_PATH}"
+
+      - name: Configure /data Podman storage
+        run: |
+          set -euo pipefail
+          sudo mkdir -p "/data/user/${USER}/"{cache,tmp,tools}
+          sudo mkdir -p "/data/podman/${USER}/"{storage,images,volumes,cache,tmp}
+          sudo chown -R "${USER}:${USER}" "/data/user/${USER}" "/data/podman/${USER}"
+          mkdir -p "${HOME}/.config/containers"
+          cat > "${HOME}/.config/containers/storage.conf" <<EOF
+          [storage]
+          driver = "overlay"
+          graphroot = "/data/podman/${USER}/storage"
+          imagestore = "/data/podman/${USER}/images"
+          runroot = "/run/user/$(id -u)/containers"
+          EOF
+          cat > "${HOME}/.config/containers/containers.conf" <<EOF
+          [engine]
+          volume_path = "/data/podman/${USER}/volumes"
+          image_copy_tmp_dir = "/data/podman/${USER}/tmp"
+          EOF
 
       - name: Run security audits
         run: tests/run_security_audit_workflow.sh

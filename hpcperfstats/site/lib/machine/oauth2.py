@@ -26,6 +26,7 @@ import requests
 from django.conf import settings
 from django.http import HttpResponseRedirect
 from django.urls import reverse
+from django.utils.http import url_has_allowed_host_and_scheme
 from requests.auth import HTTPBasicAuth
 
 import hpcperfstats.dbload.lib.conf_parser as cfg
@@ -79,13 +80,12 @@ def _safe_redirect_path(path: str) -> Any:
     >>> _safe_redirect_path("x")  # doctest: +SKIP
   """
   if (
-    not path
-    or not path.startswith("/")
-    or path.startswith("//")
-    or "\\" in path
+    path
+    and path.startswith("/")
+    and url_has_allowed_host_and_scheme(path, allowed_hosts=None)
   ):
-    return None
-  return path
+    return path
+  return None
 
 
 def login_oauth(request: Any) -> Any:

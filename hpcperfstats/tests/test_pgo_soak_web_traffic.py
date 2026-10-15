@@ -19,11 +19,11 @@ import pgo_soak_web_traffic as soak  # noqa: E402
 def test_bootstrap_parses_exec_json(monkeypatch: pytest.MonkeyPatch) -> None:
   monkeypatch.delenv("HPCPERFSTATS_HTTPS_PORT", raising=False)
   monkeypatch.delenv("HPC_PGO_SOAK_BASE_URL", raising=False)
+  monkeypatch.setattr(soak.secrets, "token_hex", lambda _nbytes: "a" * 64)
   payload = {
     "server": "hpc.example.edu",
     "scheme": "https",
     "host_name_ext": ".example.edu",
-    "raw_api_key": "a" * 64,
   }
 
   def fake_exec(_root: str, _project: str) -> subprocess.CompletedProcess[str]:
@@ -38,16 +38,19 @@ def test_bootstrap_parses_exec_json(monkeypatch: pytest.MonkeyPatch) -> None:
     compose_project="hpcperfstats",
     compose_exec_fn=fake_exec,
   )
-  assert site["raw_api_key"] == payload["raw_api_key"]
+  assert site["raw_api_key"] == "a" * 64
+  assert "a" * 64 not in json.dumps(payload)
   assert site["base_url"] == "https://hpc.example.edu"
 
 
-def test_bootstrap_dev_project_uses_localhost_proxy() -> None:
+def test_bootstrap_dev_project_uses_localhost_proxy(
+  monkeypatch: pytest.MonkeyPatch,
+) -> None:
+  monkeypatch.setattr(soak.secrets, "token_hex", lambda _nbytes: "e" * 64)
   payload = {
     "server": "hpc.example.edu",
     "scheme": "https",
     "host_name_ext": ".example.edu",
-    "raw_api_key": "e" * 64,
   }
 
   def fake_exec(_root: str, _project: str) -> subprocess.CompletedProcess[str]:
@@ -70,6 +73,7 @@ def test_bootstrap_in_web_runs_helper_script(
   tmp_path: Path,
 ) -> None:
   monkeypatch.setenv("HPC_PGO_SOAK_IN_WEB", "1")
+  monkeypatch.setattr(soak.secrets, "token_hex", lambda _nbytes: "d" * 64)
   scripts = tmp_path / "scripts"
   scripts.mkdir()
   helper = scripts / "pgo_soak_web_bootstrap.py"
@@ -77,7 +81,7 @@ def test_bootstrap_in_web_runs_helper_script(
     "server": "hpc.example.edu",
     "scheme": "https",
     "host_name_ext": "",
-    "raw_api_key": "d" * 64,
+    "raw_api_key": "leaked-from-stdout",
   }
   helper.write_text(
     "import json, sys\nsys.stdout.write(json.dumps("
@@ -91,17 +95,18 @@ def test_bootstrap_in_web_runs_helper_script(
     repo_root=str(tmp_path),
     compose_project="hpcperfstats-dev",
   )
-  assert site["raw_api_key"] == payload["raw_api_key"]
+  assert site["raw_api_key"] == "d" * 64
+  assert "leaked-from-stdout" not in site["raw_api_key"]
 
 
 def test_bootstrap_honors_base_url_override(
   monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+  monkeypatch.setattr(soak.secrets, "token_hex", lambda _nbytes: "b" * 64)
   payload = {
     "server": "hpc.example.edu",
     "scheme": "https",
     "host_name_ext": ".example.edu",
-    "raw_api_key": "b" * 64,
   }
 
   def fake_exec(_root: str, _project: str) -> subprocess.CompletedProcess[str]:
@@ -115,6 +120,46 @@ def test_bootstrap_honors_base_url_override(
   monkeypatch.setenv("HPC_PGO_SOAK_BASE_URL", "https://127.0.0.1:8443")
   site = soak.bootstrap_soak_site(compose_exec_fn=fake_exec)
   assert site["base_url"] == "https://127.0.0.1:8443"
+
+
+def test_bootstrap_failure_exception_omits_stdout(
+  monkeypatch: pytest.MonkeyPatch,
+) -> None:
+  secret = "f" * 64
+  monkeypatch.setattr(soak.secrets, "token_hex", lambda _nbytes: secret)
+
+  def fake_exec(_root: str, _project: str) -> subprocess.CompletedProcess[str]:
+    return subprocess.CompletedProcess(
+      args=["python3", "-"],
+      returncode=1,
+      stdout=secret,
+      stderr="disk full",
+    )
+
+  with pytest.raises(RuntimeError, match="disk full") as raised:
+    soak.bootstrap_soak_site(compose_exec_fn=fake_exec)
+  assert secret not in str(raised.value)
+
+
+def test_compose_exec_passes_key_name_not_value(
+  monkeypatch: pytest.MonkeyPatch,
+) -> None:
+  secret = "9" * 64
+  monkeypatch.delenv("HPC_PGO_SOAK_IN_WEB", raising=False)
+  monkeypatch.setenv("HPC_PGO_SOAK_RAW_API_KEY", secret)
+  captured: dict[str, object] = {}
+
+  def fake_run(
+    cmd: list[str], **kwargs: object
+  ) -> subprocess.CompletedProcess[str]:
+    captured["cmd"] = cmd
+    return subprocess.CompletedProcess(cmd, 0, stdout="", stderr="")
+
+  monkeypatch.setattr(soak.subprocess, "run", fake_run)
+  soak._compose_exec_web(str(REPO), "hpcperfstats-test")
+  argv = " ".join(captured["cmd"])  # type: ignore[arg-type]
+  assert secret not in argv
+  assert "HPC_PGO_SOAK_RAW_API_KEY" in argv
 
 
 def test_discover_job_ids_rank0_from_wire() -> None:

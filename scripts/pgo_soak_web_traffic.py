@@ -13,6 +13,7 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import secrets
 import subprocess
 import sys
 import time
@@ -139,7 +140,15 @@ def _compose_exec_web(
     >>> _compose_exec_web("/tmp", "hpcperfstats")  # doctest: +SKIP
   """
   if _soak_in_web_container():
-    return _run_web_helper_script(repo_root, "pgo_soak_web_bootstrap.py")
+    return _run_web_helper_script(
+      repo_root,
+      "pgo_soak_web_bootstrap.py",
+      extra_env={
+        "HPC_PGO_SOAK_RAW_API_KEY": os.environ.get(
+          "HPC_PGO_SOAK_RAW_API_KEY", ""
+        ),
+      },
+    )
   with open(BOOTSTRAP_SCRIPT, encoding="utf-8") as bootstrap_file:
     bootstrap_src = bootstrap_file.read()
   cmd = [
@@ -148,6 +157,8 @@ def _compose_exec_web(
     compose_project,
     "exec",
     "-T",
+    "-e",
+    "HPC_PGO_SOAK_RAW_API_KEY",
     "web",
     "python3",
     "-",
@@ -190,12 +201,21 @@ def bootstrap_soak_site(
   root = repo_root or REPO_ROOT
   project = compose_project or _compose_project()
   exec_fn = compose_exec_fn or _compose_exec_web
-  proc = exec_fn(root, project)
+  raw_key = secrets.token_hex(32)
+  previous = os.environ.get("HPC_PGO_SOAK_RAW_API_KEY")
+  os.environ["HPC_PGO_SOAK_RAW_API_KEY"] = raw_key
+  try:
+    proc = exec_fn(root, project)
+  finally:
+    if previous is None:
+      os.environ.pop("HPC_PGO_SOAK_RAW_API_KEY", None)
+    else:
+      os.environ["HPC_PGO_SOAK_RAW_API_KEY"] = previous
   if proc.returncode != 0:
     raise RuntimeError(
       "bootstrap exec web failed (exit {}): {}".format(
         proc.returncode,
-        (proc.stderr or proc.stdout or "").strip(),
+        (proc.stderr or "").strip(),
       ),
     )
   line = ""
@@ -207,6 +227,8 @@ def bootstrap_soak_site(
   if not line:
     raise RuntimeError("bootstrap exec web produced no JSON line")
   data = json.loads(line)
+  data.pop("raw_api_key", None)
+  data["raw_api_key"] = raw_key
   server_token = (data.get("server") or "").split(",")[0].strip()
   if server_token and "://" not in server_token:
     data["host_header"] = server_token
@@ -441,13 +463,11 @@ def _discover_job_ids_via_exec(
       "exec",
       "-T",
       "-e",
-      f"HPC_PGO_SOAK_RAW_API_KEY={raw_api_key}",
+      "HPC_PGO_SOAK_RAW_API_KEY",
       "-e",
-      f"HPC_PGO_SOAK_JOB_LIST_DAYS={list_days}",
+      "HPC_PGO_SOAK_JOB_LIST_DAYS",
       "-e",
-      "HPC_PGO_SOAK_ALLOW_METRICS_ONLY={}".format(
-        "1" if allow_metrics_only else "0",
-      ),
+      "HPC_PGO_SOAK_ALLOW_METRICS_ONLY",
       "web",
       "python3",
       "-",
@@ -459,12 +479,13 @@ def _discover_job_ids_via_exec(
       capture_output=True,
       text=True,
       check=False,
+      env={**os.environ, **extra_env},
     )
   if proc.returncode != 0:
     raise RuntimeError(
       "discover exec web failed (exit {}): {}".format(
         proc.returncode,
-        (proc.stderr or proc.stdout or "").strip(),
+        (proc.stderr or "").strip(),
       ),
     )
   for raw_line in (proc.stdout or "").splitlines():

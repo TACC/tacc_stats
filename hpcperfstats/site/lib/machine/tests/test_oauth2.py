@@ -15,12 +15,17 @@ class TestSafeRedirectPath:
 
     assert oauth2._safe_redirect_path("") is None
     assert oauth2._safe_redirect_path("//evil.com") is None
-    assert oauth2._safe_redirect_path("/ok\\x") is None
+    assert oauth2._safe_redirect_path("/\\evil") is None
+    assert oauth2._safe_redirect_path("https://evil.example/next") is None
+    assert oauth2._safe_redirect_path("javascript:alert(1)") is None
+    assert oauth2._safe_redirect_path("\t/machine/") is None
+    assert oauth2._safe_redirect_path(" /machine/") is None
 
   def test_accepts_same_origin_path(self):
     from hpcperfstats.site.lib.machine import oauth2
 
     assert oauth2._safe_redirect_path("/machine/") == "/machine/"
+    assert oauth2._safe_redirect_path("/machine/?q=1#x") == "/machine/?q=1#x"
 
 
 class TestCheckForTokens:
@@ -169,6 +174,24 @@ class TestLoginPrompt:
       response = oauth2.login_prompt(request)
     assert isinstance(response, HttpResponseRedirect)
     assert response.url.startswith("/login/")
+
+  def test_authenticated_hostile_next_falls_back_to_root(self):
+    from hpcperfstats.site.lib.machine import oauth2
+
+    request = RequestFactory().get("/login_prompt", {"next": "//evil.example"})
+    request.session = {"access_token": "t"}
+    with patch.object(oauth2, "check_for_tokens", return_value=True):
+      response = oauth2.login_prompt(request)
+    assert response.url == "/"
+
+  def test_authenticated_safe_next_is_preserved(self):
+    from hpcperfstats.site.lib.machine import oauth2
+
+    request = RequestFactory().get("/login_prompt", {"next": "/machine/?q=1#x"})
+    request.session = {"access_token": "t"}
+    with patch.object(oauth2, "check_for_tokens", return_value=True):
+      response = oauth2.login_prompt(request)
+    assert response.url == "/machine/?q=1#x"
 
 
 def test_check_for_tokens_accepts_test_login_prefix():

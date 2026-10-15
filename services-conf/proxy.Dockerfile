@@ -20,8 +20,8 @@ COPY services-conf/alpine_pgo_profile_runtime_link.sh /usr/local/lib/hpcperfstat
 RUN chmod +x /usr/local/lib/hpcperfstats/pgo_clang_flags.sh /usr/local/lib/hpcperfstats/clang_march_native_probe.sh /usr/local/lib/hpcperfstats/alpine_pgo_profile_runtime_link.sh
 
 # nginx and /opt deps: unified -O2 ThinLTO bake (+ optional PGO via pgo_clang_flags.sh).
-ARG NGINX_VERSION=1.31.6
-ARG NGINX_SHA256=974ed5298a5e398e008704ed5db284e655fc270c596493dbccada452448fc9f1
+ARG NGINX_VERSION=1.31.7
+ARG NGINX_SHA256=89ea8a3dc171511f7325043b50e4c036248d9fad5feb7ec809c0b82d5df42c65
 ARG OPENSSL_VERSION=3.5.9
 ARG OPENSSL_SHA256=603f5602e2eef00d77fbd429d34dcd5822bb301757a1bc9cdb24c670f1eb859a
 ARG JEMALLOC_VERSION=5.4.0
@@ -337,7 +337,7 @@ BASH
 # ---------------------------------------------------------------------------
 FROM alpine:${ALPINE_VERSION}
 
-ARG NGINX_VERSION=1.31.6
+ARG NGINX_VERSION=1.31.7
 
 RUN apk add --no-cache \
     ca-certificates \
