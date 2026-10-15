@@ -64,34 +64,35 @@ the baseline plan and back into this table:
 
 ## Ranked optimizations
 
-Rank is estimated structural speedup on 1k-node and 2k-node durable ingest
-(MiB/min and giant-file wall), **#1 largest**. Bands are hypotheses until the
-baseline medians exist. They are not taken from the historical E-series.
+Rank is structural speedup on durable ingest (MiB/min and giant-file wall),
+**#1 largest**, from the 2026-10-15 soak. The 01 `feed_s` median is telem-on
+and untrusted. Ranks are not taken from the historical E-series.
 
 | Rank | ID | Change | Estimated effect | Meter |
 | --- | --- | --- | --- | --- |
-| 1 | F1 | COPY rows without Django model construction | Largest. Every host and proc row currently constructs a model inside `orm_materialize_s`. That cost scales with nodes × series × samples on both clusters. | `orm_materialize_s`, **`orm_rows`** |
-| 2 | F2 | Overlap one parse chunk with the PostgreSQL write | Next. Giant files are serial. Hideable wall is the smaller of parse-without-database and postgres time. | **`overlap_headroom_s`** |
-| 3 | F3 | Vectorize ARC diff, carry apply, and carry finalization | Large on long counter series. | `arc_s` |
-| 4 | F4 | Reuse the COPY temp stage on the connection | `CREATE TEMP … ON COMMIT DROP` once per batch on both insert paths. | existing `copy_s` (stage DDL not split yet) |
-| 5 | F5 | Reuse the PostgreSQL session on the worker | Helps files/min of small files more than MiB/min of giants. | reconnect is inside `write_setup_s` / `db_execute_s` |
-| 6 | F6 | Stream COPY bytes with a bound | Cuts peak allocation on giant batches after F1. | RSS / `copy_s` |
-| 7 | F7 | Invalidate each job id once per successful file | Repeated cache invalidation on dense files. | `jid_invalidate_s` |
-| 8 | F8 | Coalesce job-store checkpoints | Snapshot I/O off the mutation path. | job-store wait/hold when telem is on |
-| 9 | F9 | Linearize find-buffer parsing | Removes repeated prefix copies on the stream. | `feed_s` / `decode_s` |
-| 10 | F10 | Capped discovery fast path | Stops catch-up discovery from scanning past the cap. | census / discover lines |
-| 11 | F11 | Coalesce archive-members sidecar writes | Fewer durable sidecar writes; safety flags stay immediate. | members-store hold |
-| 12 | F12 | Adaptive heap release | Keep end-of-file trim; skip mid-file trim when pressure is low. | `heap_release_s` |
-| 13 | F13 | O(1) ingest census | One snapshot per tick instead of a walk. | census cost |
-| 14 | F14 | Once-per-tick cgroup admit | Stop re-reading cgroup and re-summing in-flight bytes per file. | admit stall vs completions |
-| 15 | F15 | Collapse microstructure (separate pairs) | DCGM slices, one partition pass, drop a redundant sort, fixed proc column order. | `collapse_*` |
-| 16 | F16 | One inode map for streaming rescan | Drops a second full fd capture. | rescan wall |
-| 17 | F17 | Carry-stable counter-delta categories | Stop refactorizing stable keys on every flush. | `delta_s` |
-| 18 | F18 | Collapse duplicate proc keys inside the batch | Shrinks COPY upsert work when keys repeat. | `copy_s` / proc row counts |
-| 19 | F19 | Positive sealed-member match | Skip full populate on a conclusive hit. | populate wall |
-| 20 | F20 | Single-pass sealed populate | One member feed and one sidecar write. | populate wall |
-| 21 | F21 | Bisect a failed bulk write | Error path only. Near zero on the steady state. | failure logs |
-| 22 | F22 | Durable retry backoff | Stability under faults, not steady MiB/min. | retry cadence |
+| 1 | F2 | Overlap one parse chunk with the PostgreSQL write | Next code change. 04 dense `overlap_headroom_s` 131.7s of elapsed 310.6s. | **`overlap_headroom_s`** |
+| 2 | conflict_insert | Shrink the proc `ON CONFLICT` after COPY | Next after F2. 04 dense `conflict_insert_s` 64.3s. | `conflict_insert_s` |
+| 3 | F1 | COPY rows without Django model construction | 04 dense `orm_materialize_s` 36.8s. | `orm_materialize_s`, **`orm_rows`** |
+| 4 | F3 | Vectorize ARC diff, carry apply, and carry finalization | Large on long counter series. | `arc_s` |
+| 5 | F4 | Reuse the COPY temp stage on the connection | `CREATE TEMP … ON COMMIT DROP` once per batch on both insert paths. | existing `copy_s` (stage DDL not split yet) |
+| 6 | F5 | Reuse the PostgreSQL session on the worker | Helps files/min of small files more than MiB/min of giants. | reconnect is inside `write_setup_s` / `db_execute_s` |
+| 7 | F6 | Stream COPY bytes with a bound | Cuts peak allocation on giant batches after F1. | RSS / `copy_s` |
+| 8 | F7 | Invalidate each job id once per successful file | Repeated cache invalidation on dense files. | `jid_invalidate_s` |
+| 9 | F8 | Coalesce job-store checkpoints | Snapshot I/O off the mutation path. | job-store wait/hold when telem is on |
+| 10 | F9 | Linearize find-buffer parsing | Removes repeated prefix copies on the stream. | `feed_s` / `decode_s` |
+| 11 | F10 | Capped discovery fast path | Stops catch-up discovery from scanning past the cap. | census / discover lines |
+| 12 | F11 | Coalesce archive-members sidecar writes | Fewer durable sidecar writes; safety flags stay immediate. | members-store hold |
+| 13 | F12 | Adaptive heap release | Keep end-of-file trim; skip mid-file trim when pressure is low. | `heap_release_s` |
+| 14 | F13 | O(1) ingest census | One snapshot per tick instead of a walk. | census cost |
+| 15 | F14 | Once-per-tick cgroup admit | Stop re-reading cgroup and re-summing in-flight bytes per file. | admit stall vs completions |
+| 16 | F15 | Collapse microstructure (separate pairs) | DCGM slices, one partition pass, drop a redundant sort, fixed proc column order. | `collapse_*` |
+| 17 | F16 | One inode map for streaming rescan | Drops a second full fd capture. | rescan wall |
+| 18 | F17 | Carry-stable counter-delta categories | Stop refactorizing stable keys on every flush. | `delta_s` |
+| 19 | F18 | Collapse duplicate proc keys inside the batch | Shrinks COPY upsert work when keys repeat. | `copy_s` / proc row counts |
+| 20 | F19 | Positive sealed-member match | Skip full populate on a conclusive hit. | populate wall |
+| 21 | F20 | Single-pass sealed populate | One member feed and one sidecar write. | populate wall |
+| 22 | F21 | Bisect a failed bulk write | Error path only. Near zero on the steady state. | failure logs |
+| 23 | F22 | Durable retry backoff | Stability under faults, not steady MiB/min. | retry cadence |
 
 Not ranked as speedups: the harness (fresh-plan group 1) and the production
 A/B protocol (groups 25 and 26). Those are how a rank is accepted.
@@ -138,14 +139,14 @@ Append one row per soak. Leave the rank table unchanged until a row contradicts 
 
 | Date | Plan | Sites | Window | Image / git | What was measured | Verdict |
 | --- | --- | --- | --- | --- | --- | --- |
-| 2026-10-15 | `sync-timedb-fresh-baseline` | 04 Horizon, 01 Stampede3 | pending (operator starts tonight, ≥6h) | master + `orm_rows` / `overlap_headroom_s` | F1 `orm_materialize_s` per `orm_rows`; F2 `overlap_headroom_s` vs elapsed | pending |
+| 2026-10-15 | `sync-timedb-fresh-baseline` | 04 Horizon, 01 Stampede3 | scored ~8h, telem on | master + `orm_rows` / `overlap_headroom_s` | 04 dense overlap 131.7s, conflict_insert 64.3s, orm 36.8s. 01 dense overlap 2.4s. 01 `feed_s` is telem-on and untrusted. | Re-rank: F2, then conflict_insert, then F1 |
 
 ## Next plan after the baseline
 
-Write the F1 implementation plan from this rank (direct COPY without model
-construction) only after both site readouts are in the ledger. If
-`orm_materialize_s` is a small share of elapsed and `overlap_headroom_s` is
-large, still start with F1 unless this table is explicitly re-ranked first.
+The next code change is F2: one in-flight PostgreSQL write per file
+(`.cursor/plans/overlap-one-chunk.plan.md`). After that A/B, the next measured
+slice is `conflict_insert` (04 dense 64.3s), then F1 ORM construction (36.8s).
+The 2026-10-15 01 `feed_s` median is telem-on and untrusted.
 
 ## Historical campaign (through 2026-10-14)
 

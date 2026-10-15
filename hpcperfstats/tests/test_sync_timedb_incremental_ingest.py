@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import inspect
+import threading
 
 import numpy as np
 import pandas as pd
@@ -407,6 +408,204 @@ def test_streaming_incremental_combined_path_writes_multiple_chunks(
   assert ingest_ok is True
   assert need_archival is True
   assert len(write_calls) >= 2
+
+
+def _streaming_incremental_with_fake_write(
+  monkeypatch,
+  tmp_path,
+  fake_write,
+  *,
+  extra_samples=30,
+):
+  stats_file = tmp_path / "host.example.com" / "1709123456"
+  stats_file.parent.mkdir(parents=True)
+  lines = _counter_fixture_lines(extra_samples=extra_samples)
+  stats_file.write_text("".join(lines), encoding="utf-8")
+  monkeypatch.setattr(st, "bulk_create_batch_size", lambda: 2)
+  monkeypatch.setattr(
+    st,
+    "_resolve_streaming_ingest_start",
+    lambda _path, _elapsed: (False, (0, True)),
+  )
+  monkeypatch.setattr(st, "_write_stats_payload_to_db", fake_write)
+  monkeypatch.setattr(st, "_release_ingest_worker_heap", lambda: None)
+  result = st._add_stats_file_to_db_streaming_incremental(
+    str(stats_file),
+    0.0,
+  )
+  return lines, result
+
+
+def test_streaming_incremental_one_chunk_rows_match_serial(
+  monkeypatch,
+  tmp_path,
+):
+  """Chunk writes match one-shot delta/arc on the same file."""
+  written = []
+
+  def fake_write(path, stats, proc_stats, need_archival=True):
+    del proc_stats
+    written.append(stats.copy())
+    return path, need_archival, True
+
+  lines, result = _streaming_incremental_with_fake_write(
+    monkeypatch,
+    tmp_path,
+    fake_write,
+  )
+  _path, _need_archival, ingest_ok, _elapsed, _meta = (
+    st._unpack_ingest_worker_result(result)
+  )
+  assert ingest_ok is True
+  assert len(written) >= 2
+  stats_list, _proc_list = _stats_list_from_lines(lines)
+  full_stats, _full_proc = build_stats_dataframes(stats_list, [])
+  expected = compute_deltas_and_arc(full_stats)
+  combined = (
+    pd.concat(written, ignore_index=True)
+    .sort_values(by=["host", "type", "event", "time"])
+    .reset_index(drop=True)
+  )
+  expected = expected.sort_values(
+    by=["host", "type", "event", "time"],
+  ).reset_index(drop=True)
+  cols = ["host", "type", "event", "time", "delta", "arc"]
+  pd.testing.assert_frame_equal(
+    combined[cols],
+    expected[cols],
+    check_dtype=False,
+    check_categorical=False,
+    rtol=1e-9,
+    atol=1e-9,
+  )
+
+
+def test_streaming_incremental_one_chunk_write_overlaps_next_parse(
+  monkeypatch,
+  tmp_path,
+):
+  """Chunk N's write is inside _write_stats_payload_to_db during chunk N+1."""
+  state = {
+    "writes": 0,
+    "deltas": 0,
+    "in_write": False,
+    "overlapped": False,
+    "entered": threading.Event(),
+    "release": threading.Event(),
+  }
+  real_deltas = st.compute_deltas_and_arc_chunk
+
+  def fake_write(path, stats, proc_stats, need_archival=True):
+    del stats, proc_stats
+    state["writes"] += 1
+    if state["writes"] == 1:
+      state["in_write"] = True
+      state["entered"].set()
+      state["release"].wait(5)
+      state["in_write"] = False
+    return path, need_archival, True
+
+  def wrapped_deltas(stats_chunk, carry=None):
+    state["deltas"] += 1
+    if state["deltas"] >= 2:
+      assert state["entered"].wait(5)
+      if state["in_write"]:
+        state["overlapped"] = True
+      state["release"].set()
+    return real_deltas(stats_chunk, carry=carry)
+
+  monkeypatch.setattr(st, "compute_deltas_and_arc_chunk", wrapped_deltas)
+  _lines, result = _streaming_incremental_with_fake_write(
+    monkeypatch,
+    tmp_path,
+    fake_write,
+  )
+  _path, _need_archival, ingest_ok, _elapsed, _meta = (
+    st._unpack_ingest_worker_result(result)
+  )
+  assert ingest_ok is True
+  assert state["overlapped"] is True
+  assert state["writes"] >= 2
+
+
+def test_streaming_incremental_chunk_write_failure_skips_later_submits(
+  monkeypatch,
+  tmp_path,
+):
+  """A failed chunk write does not submit another write for that file."""
+  calls = {"n": 0}
+
+  def fake_write(path, stats, proc_stats, need_archival=True):
+    del stats, proc_stats, need_archival
+    calls["n"] += 1
+    return path, False, False
+
+  _lines, result = _streaming_incremental_with_fake_write(
+    monkeypatch,
+    tmp_path,
+    fake_write,
+  )
+  _path, _need_archival, ingest_ok, _elapsed, _meta = (
+    st._unpack_ingest_worker_result(result)
+  )
+  assert ingest_ok is False
+  assert calls["n"] == 1
+
+
+def test_streaming_incremental_folds_writer_postgres_s(
+  monkeypatch,
+  tmp_path,
+):
+  """Parser outcome postgres_s includes time recorded on the writer thread."""
+  st._reset_ingest_write_timing(enabled=True)
+
+  def fake_write(path, stats, proc_stats, need_archival=True):
+    del stats, proc_stats
+    st._add_ingest_postgres_s(0.25)
+    return path, need_archival, True
+
+  try:
+    _lines, result = _streaming_incremental_with_fake_write(
+      monkeypatch,
+      tmp_path,
+      fake_write,
+      extra_samples=4,
+    )
+    _path, _need_archival, ingest_ok, _elapsed, meta = (
+      st._unpack_ingest_worker_result(result)
+    )
+    assert ingest_ok is True
+    assert float(meta["postgres_s"]) >= 0.25
+  finally:
+    st._reset_ingest_write_timing(enabled=False)
+
+
+def test_streaming_incremental_chunk_writer_closes_connections(
+  monkeypatch,
+  tmp_path,
+):
+  """The chunk-write thread closes Django connections on the way out."""
+  seen = []
+
+  def spy_close():
+    seen.append(threading.current_thread().name)
+
+  def fake_write(path, stats, proc_stats, need_archival=True):
+    del stats, proc_stats
+    raise RuntimeError("chunk write failed")
+
+  monkeypatch.setattr(st, "close_old_connections", spy_close)
+  _lines, result = _streaming_incremental_with_fake_write(
+    monkeypatch,
+    tmp_path,
+    fake_write,
+    extra_samples=4,
+  )
+  _path, _need_archival, ingest_ok, _elapsed, _meta = (
+    st._unpack_ingest_worker_result(result)
+  )
+  assert ingest_ok is False
+  assert seen.count("ingest-chunk-write") >= 2
 
 
 def test_small_file_combined_path_unchanged(monkeypatch, tmp_path):
