@@ -193,8 +193,10 @@ from hpcperfstats.dbload.lib.sync_timedb_archive_members_coord import (
   members_cache_is_fully_warm,
 )
 from hpcperfstats.dbload.lib.sync_timedb_host_data_insert import (
+  bulk_insert_host_rows,
   host_insert_arm,
   insert_host_data_batch,
+  use_copy_host_insert,
 )
 from hpcperfstats.dbload.lib.sync_timedb_ingest_readiness import (
   _path_ready_via_file_complete_mark,
@@ -248,8 +250,10 @@ from hpcperfstats.dbload.lib.sync_timedb_persistence import (
   save_persistence_document,
 )
 from hpcperfstats.dbload.lib.sync_timedb_proc_data_insert import (
+  bulk_insert_proc_rows,
   insert_proc_data_batch,
   proc_insert_arm,
+  use_copy_proc_insert,
 )
 from hpcperfstats.dbload.lib.sync_timedb_queue_orchestrator import (
   run_sync_timedb_queue_orchestrator,
@@ -3071,6 +3075,7 @@ def _write_stats_payload_to_db(
   """
   update_worker_substage("db_write")
   individual_need_archival = None
+  copy_proc = use_copy_proc_insert()
   try:
     _time_ingest_db_reconnect()
     if _ingest_write_telem_on:
@@ -3087,26 +3092,34 @@ def _write_stats_payload_to_db(
             batch = list(itertools.islice(proc_it, bulk_create_batch_size()))
           if not batch:
             break
-          with _held_ingest_write_phase("orm_materialize_s"):
-            proc_objs = [
-              proc_data(**_proc_data_row_kwargs(row)) for row in batch
-            ]
-          _add_ingest_orm_rows(len(batch))
+          if not copy_proc:
+            with _held_ingest_write_phase("orm_materialize_s"):
+              proc_objs = [
+                proc_data(**_proc_data_row_kwargs(row)) for row in batch
+              ]
+            _add_ingest_orm_rows(len(batch))
           with _held_ingest_write_phase("db_execute_s"):
             _raise_if_ingest_per_file_deadline_exceeded(
               stats_file, "db_write_proc"
             )
-            insert_proc_data_batch(proc_objs)
+            if copy_proc:
+              bulk_insert_proc_rows(batch)
+            else:
+              insert_proc_data_batch(proc_objs)
       else:
         batch = list(itertools.islice(proc_it, bulk_create_batch_size()))
         if not batch:
           break
-        proc_objs = [proc_data(**_proc_data_row_kwargs(row)) for row in batch]
+        if not copy_proc:
+          proc_objs = [proc_data(**_proc_data_row_kwargs(row)) for row in batch]
         with _held_ingest_write_timing():
           _raise_if_ingest_per_file_deadline_exceeded(
             stats_file, "db_write_proc"
           )
-          insert_proc_data_batch(proc_objs)
+          if copy_proc:
+            bulk_insert_proc_rows(batch)
+          else:
+            insert_proc_data_batch(proc_objs)
   except Exception as e:
     _reraise_if_ingest_control_flow(e)
     if is_database_unavailable_error(e):
@@ -3125,6 +3138,7 @@ def _write_stats_payload_to_db(
         message=".*[Dd]iscarding nonzero nanoseconds.*",
         category=UserWarning,
       )
+      copy_host = use_copy_host_insert()
       if _ingest_write_telem_on:
         with _held_ingest_write_timing():
           with _held_ingest_write_phase("write_setup_s"):
@@ -3139,27 +3153,37 @@ def _write_stats_payload_to_db(
               batch = list(itertools.islice(stats_it, bulk_create_batch_size()))
             if not batch:
               break
-            with _held_ingest_write_phase("orm_materialize_s"):
-              host_objs = [
-                host_data_instance_from_stats_row(row) for row in batch
-              ]
-            _add_ingest_orm_rows(len(batch))
+            if not copy_host:
+              with _held_ingest_write_phase("orm_materialize_s"):
+                host_objs = [
+                  host_data_instance_from_stats_row(row) for row in batch
+                ]
+              _add_ingest_orm_rows(len(batch))
             with _held_ingest_write_phase("db_execute_s"):
               _raise_if_ingest_per_file_deadline_exceeded(
                 stats_file,
                 "db_write_host",
               )
-              insert_host_data_batch(host_objs)
+              if copy_host:
+                bulk_insert_host_rows(batch)
+              else:
+                insert_host_data_batch(host_objs)
         else:
           batch = list(itertools.islice(stats_it, bulk_create_batch_size()))
           if not batch:
             break
-          host_objs = [host_data_instance_from_stats_row(row) for row in batch]
+          if not copy_host:
+            host_objs = [
+              host_data_instance_from_stats_row(row) for row in batch
+            ]
           with _held_ingest_write_timing():
             _raise_if_ingest_per_file_deadline_exceeded(
               stats_file, "db_write_host"
             )
-            insert_host_data_batch(host_objs)
+            if copy_host:
+              bulk_insert_host_rows(batch)
+            else:
+              insert_host_data_batch(host_objs)
   except Exception as e:
     _reraise_if_ingest_control_flow(e)
     if is_database_unavailable_error(e):

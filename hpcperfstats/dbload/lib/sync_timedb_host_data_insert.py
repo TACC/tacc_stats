@@ -18,6 +18,11 @@ import os
 from collections.abc import Sequence
 from typing import Any
 
+import pandas as pd
+
+from hpcperfstats.dbload.lib.date_utils import to_pydatetime_or_none
+from hpcperfstats.dbload.lib.io_helpers import _dev_str_from_stats_row
+
 HOST_DATA_COPY_COLUMNS: tuple[str, ...] = (
   "time",
   "host",
@@ -129,6 +134,65 @@ def _sql_literal(value: Any) -> str:
   )
 
 
+def _host_row_value(row: Any, col: str) -> Any:
+  """
+  Return one host_data COPY field from a stats namedtuple.
+
+  Matches ``host_data_instance_from_stats_row``: blank device stays ``''``,
+  idle jid ``-`` and NaN measures become NULL.
+
+  Args:
+    row (Any): itertuples row with host_data field attributes.
+    col (str): ``HOST_DATA_COPY_COLUMNS`` name.
+
+  Returns:
+    Any: Scalar passed to ``_sql_literal``.
+
+  Examples:
+    >>> from types import SimpleNamespace
+    >>> _host_row_value(SimpleNamespace(dev=None), "dev")
+    ''
+  """
+  if col == "time":
+    return to_pydatetime_or_none(row.time)
+  if col == "jid":
+    jid_val = getattr(row, "jid", None)
+    if pd.notna(jid_val) and str(jid_val) != "-":
+      return str(jid_val)
+    return None
+  if col == "dev":
+    return _dev_str_from_stats_row(row)
+  if col in ("value", "delta", "arc"):
+    val = getattr(row, col)
+    return float(val) if pd.notna(val) else None
+  return getattr(row, col)
+
+
+def host_rows_to_copy_bytes(rows: Sequence[Any]) -> bytes:
+  """
+  Serialize parsed host rows to the same COPY body as model instances.
+
+  Args:
+    rows (Sequence[Any]): itertuples rows with host_data field attributes.
+
+  Returns:
+    bytes: UTF-8 COPY body.
+
+  Examples:
+    >>> host_rows_to_copy_bytes([])
+    b''
+  """
+  if not rows:
+    return b""
+  lines: list[str] = []
+  for row in rows:
+    fields = [
+      _sql_literal(_host_row_value(row, col)) for col in HOST_DATA_COPY_COLUMNS
+    ]
+    lines.append("\t".join(fields))
+  return ("\n".join(lines) + "\n").encode("utf-8")
+
+
 def host_data_objs_to_copy_bytes(objs: Sequence[Any]) -> bytes:
   """
   Serialize ``host_data`` instances to Postgres text COPY payload.
@@ -152,30 +216,28 @@ def host_data_objs_to_copy_bytes(objs: Sequence[Any]) -> bytes:
   return ("\n".join(lines) + "\n").encode("utf-8")
 
 
-def bulk_insert_host_data_ignore_conflicts(objs: Sequence[Any]) -> None:
+def _write_host_copy_payload(payload: bytes) -> None:
   """
-  Insert ``host_data`` rows via COPY staging with conflict skip.
+  COPY ``payload`` into the host staging table and run the insert.
 
-  Matches Django ``bulk_create(..., ignore_conflicts=True)`` semantics on
-  unique ``(time, host, type, event, dev)``. When write telemetry is on,
-  records ``stage_ddl_s``, ``copy_s``, and ``conflict_insert_s``.
+  When write telemetry is on, records ``stage_ddl_s``, ``copy_s``, and
+  ``conflict_insert_s``. The ``DO NOTHING`` statement is unchanged.
 
   Args:
-    objs (Sequence[Any]): Unsaved ``host_data`` model instances to insert.
+    payload (bytes): UTF-8 text COPY body. Empty skips the statement.
 
   Returns:
     None
 
   Examples:
-    >>> bulk_insert_host_data_ignore_conflicts([])  # doctest: +SKIP
+    >>> _write_host_copy_payload(b"")
   """
-  if not objs:
+  if not payload:
     return
   from contextlib import nullcontext
 
   from django.db import connection, transaction
 
-  payload = host_data_objs_to_copy_bytes(objs)
   col_list = ", ".join(HOST_DATA_COPY_COLUMNS)
   copy_sql = f"COPY host_data_ingest_stage ({col_list}) FROM STDIN"
   from hpcperfstats.dbload import sync_timedb as st
@@ -196,6 +258,46 @@ def bulk_insert_host_data_ignore_conflicts(objs: Sequence[Any]) -> None:
       copy.write(payload)
     with conflict_cm:
       cursor.execute(_STAGE_INSERT)
+
+
+def bulk_insert_host_rows(rows: Sequence[Any]) -> None:
+  """
+  Insert parsed host rows via COPY without building ``host_data`` models.
+
+  Args:
+    rows (Sequence[Any]): itertuples rows with host_data field attributes.
+
+  Returns:
+    None
+
+  Examples:
+    >>> bulk_insert_host_rows([])
+  """
+  if not rows:
+    return
+  _write_host_copy_payload(host_rows_to_copy_bytes(rows))
+
+
+def bulk_insert_host_data_ignore_conflicts(objs: Sequence[Any]) -> None:
+  """
+  Insert ``host_data`` rows via COPY staging with conflict skip.
+
+  Matches Django ``bulk_create(..., ignore_conflicts=True)`` semantics on
+  unique ``(time, host, type, event, dev)``. When write telemetry is on,
+  records ``stage_ddl_s``, ``copy_s``, and ``conflict_insert_s``.
+
+  Args:
+    objs (Sequence[Any]): Unsaved ``host_data`` model instances to insert.
+
+  Returns:
+    None
+
+  Examples:
+    >>> bulk_insert_host_data_ignore_conflicts([])
+  """
+  if not objs:
+    return
+  _write_host_copy_payload(host_data_objs_to_copy_bytes(objs))
 
 
 def bulk_create_host_data_ignore_conflicts(objs: Sequence[Any]) -> None:

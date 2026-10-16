@@ -56,51 +56,40 @@ CREATE TEMP TABLE proc_data_ingest_stage (
 """
 
 
-def _sql_nullable_int_max(existing_col: str, excluded_col: str) -> str:
-  """
-  SQL equivalent of ``_nullable_int_max`` for ON CONFLICT updates.
-
-  Args:
-    existing_col (str): Existing table column reference (e.g. ``proc_data.vm_peak``).
-    excluded_col (str): EXCLUDED column reference.
-
-  Returns:
-    str: CASE expression for peak merge semantics.
-
-  Examples:
-    >>> _sql_nullable_int_max("a", "b")  # doctest: +SKIP
-  """
-  return (
-    f"CASE WHEN {existing_col} IS NULL THEN {excluded_col} "
-    f"WHEN {excluded_col} IS NULL THEN {existing_col} "
-    f"ELSE GREATEST({existing_col}, {excluded_col}) END"
-  )
-
-
 def _stage_upsert_sql() -> str:
   """
   Build INSERT...SELECT...ON CONFLICT DO UPDATE for ``proc_data``.
+
+  Peak columns use ``GREATEST``, which ignores nulls. The ``WHERE`` skips
+  the rewrite when no last-write field differs and no peak would rise.
 
   Returns:
     str: Upsert SQL string.
 
   Examples:
-    >>> "ON CONFLICT" in _stage_upsert_sql()
+    >>> "GREATEST(proc_data.vm_peak, EXCLUDED.vm_peak)" in _stage_upsert_sql()
     True
   """
   cols = ", ".join(PROC_DATA_COPY_COLUMNS)
   set_parts: list[str] = []
+  where_parts: list[str] = []
   for field in PROC_DATA_UPDATE_FIELDS:
     if field in HOST_PROC_PEAK_KEYS:
       set_parts.append(
-        f"{field} = {_sql_nullable_int_max(f'proc_data.{field}', f'EXCLUDED.{field}')}"
+        f"{field} = GREATEST(proc_data.{field}, EXCLUDED.{field})"
+      )
+      where_parts.append(
+        f"(EXCLUDED.{field} IS NOT NULL AND "
+        f"(proc_data.{field} IS NULL OR "
+        f"EXCLUDED.{field} > proc_data.{field}))"
       )
     else:
       set_parts.append(f"{field} = EXCLUDED.{field}")
-  set_clause = ", ".join(set_parts)
+      where_parts.append(f"proc_data.{field} IS DISTINCT FROM EXCLUDED.{field}")
   return (
     f"INSERT INTO proc_data ({cols}) SELECT {cols} FROM proc_data_ingest_stage "
-    f"ON CONFLICT (jid, host, proc) DO UPDATE SET {set_clause}"
+    f"ON CONFLICT (jid, host, proc) DO UPDATE SET {', '.join(set_parts)} "
+    f"WHERE {' OR '.join(where_parts)}"
   )
 
 
@@ -177,6 +166,32 @@ def _sql_literal(value: Any) -> str:
   )
 
 
+def proc_rows_to_copy_bytes(rows: Sequence[Any]) -> bytes:
+  """
+  Serialize parsed proc rows to the same COPY body as model instances.
+
+  Args:
+    rows (Sequence[Any]): itertuples rows with proc_data field attributes.
+
+  Returns:
+    bytes: UTF-8 COPY body.
+
+  Examples:
+    >>> proc_rows_to_copy_bytes([])
+    b''
+  """
+  if not rows:
+    return b""
+  from hpcperfstats.dbload import sync_timedb as st
+
+  lines: list[str] = []
+  for row in rows:
+    kwargs = st._proc_data_row_kwargs(row)
+    fields = [_sql_literal(kwargs[col]) for col in PROC_DATA_COPY_COLUMNS]
+    lines.append("\t".join(fields))
+  return ("\n".join(lines) + "\n").encode("utf-8")
+
+
 def proc_data_objs_to_copy_bytes(objs: Sequence[Any]) -> bytes:
   """
   Serialize ``proc_data`` instances to Postgres text COPY payload.
@@ -200,29 +215,28 @@ def proc_data_objs_to_copy_bytes(objs: Sequence[Any]) -> bytes:
   return ("\n".join(lines) + "\n").encode("utf-8")
 
 
-def bulk_insert_proc_data_update_conflicts(objs: Sequence[Any]) -> None:
+def _write_proc_copy_payload(payload: bytes) -> None:
   """
-  Upsert ``proc_data`` via COPY staging with ON CONFLICT DO UPDATE.
+  COPY ``payload`` into the proc staging table and run the upsert.
 
   When write telemetry is on, records ``stage_ddl_s``, ``copy_s``, and
   ``conflict_insert_s``.
 
   Args:
-    objs (Sequence[Any]): Peak-merged instances to upsert.
+    payload (bytes): UTF-8 text COPY body. Empty skips the statement.
 
   Returns:
     None
 
   Examples:
-    >>> bulk_insert_proc_data_update_conflicts([])  # doctest: +SKIP
+    >>> _write_proc_copy_payload(b"")
   """
-  if not objs:
+  if not payload:
     return
   from contextlib import nullcontext
 
   from django.db import connection, transaction
 
-  payload = proc_data_objs_to_copy_bytes(objs)
   col_list = ", ".join(PROC_DATA_COPY_COLUMNS)
   copy_sql = f"COPY proc_data_ingest_stage ({col_list}) FROM STDIN"
   from hpcperfstats.dbload import sync_timedb as st
@@ -242,6 +256,45 @@ def bulk_insert_proc_data_update_conflicts(objs: Sequence[Any]) -> None:
       copy.write(payload)
     with conflict_cm:
       cursor.execute(_stage_upsert_sql())
+
+
+def bulk_insert_proc_rows(rows: Sequence[Any]) -> None:
+  """
+  Upsert parsed proc rows via COPY without building ``proc_data`` models.
+
+  Args:
+    rows (Sequence[Any]): itertuples rows with proc_data field attributes.
+
+  Returns:
+    None
+
+  Examples:
+    >>> bulk_insert_proc_rows([])
+  """
+  if not rows:
+    return
+  _write_proc_copy_payload(proc_rows_to_copy_bytes(rows))
+
+
+def bulk_insert_proc_data_update_conflicts(objs: Sequence[Any]) -> None:
+  """
+  Upsert ``proc_data`` via COPY staging with ON CONFLICT DO UPDATE.
+
+  When write telemetry is on, records ``stage_ddl_s``, ``copy_s``, and
+  ``conflict_insert_s``.
+
+  Args:
+    objs (Sequence[Any]): Peak-merged instances to upsert.
+
+  Returns:
+    None
+
+  Examples:
+    >>> bulk_insert_proc_data_update_conflicts([])
+  """
+  if not objs:
+    return
+  _write_proc_copy_payload(proc_data_objs_to_copy_bytes(objs))
 
 
 def bulk_create_proc_data_update_conflicts(objs: Sequence[Any]) -> None:

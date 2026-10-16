@@ -152,10 +152,13 @@ Append one row per soak. Leave the rank table unchanged until a row contradicts 
 ## Next plan after the baseline
 
 F2 was tried and rejected. The one-chunk writer is gone from the current tree.
-The next code change is `conflict_insert` (04 dense 64.3s), then F1 ORM
-construction (36.8s). Telemetry was on in both the 2026-10-15 and 2026-10-16
-windows and does not explain the `proc_merge` jump. The 2026-10-15 01 `feed_s`
-median is telem-on and untrusted.
+Both cuts in `.cursor/plans/conflict-insert-shrink.plan.md` are in the tree.
+The proc upsert is scored on `conflict_insert_s` (04 dense prior 64.3s). COPY
+without model construction is scored on `orm_materialize_s` (prior 36.8s) and
+`orm_rows`. They ship in one image. The soak row is written after that window.
+Telemetry was on in both the 2026-10-15 and 2026-10-16 windows and does not
+explain the `proc_merge` jump. The 2026-10-15 01 `feed_s` median is telem-on
+and untrusted.
 
 ## Historical campaign (through 2026-10-14)
 

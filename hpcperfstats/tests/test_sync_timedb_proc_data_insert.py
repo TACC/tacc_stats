@@ -60,6 +60,55 @@ def test_proc_copy_sql_has_conflict_update():
   assert "GREATEST(proc_data.vm_peak" in sql
 
 
+def test_proc_upsert_uses_greatest_and_skips_noop_rewrite():
+  """Peak SET is GREATEST. WHERE skips a conflict that changes nothing."""
+  sql = pdi._stage_upsert_sql()
+  assert "CASE WHEN" not in sql
+  for key in ("vm_peak", "vm_hwm", "vm_stk", "vm_exe", "vm_lib"):
+    assert f"{key} = GREATEST(proc_data.{key}, EXCLUDED.{key})" in sql
+    assert (
+      f"(EXCLUDED.{key} IS NOT NULL AND "
+      f"(proc_data.{key} IS NULL OR EXCLUDED.{key} > proc_data.{key}))"
+    ) in sql
+  assert "proc_data.device IS DISTINCT FROM EXCLUDED.device" in sql
+  assert "proc_data.uid IS DISTINCT FROM EXCLUDED.uid" in sql
+  assert "proc_data.vm_rss IS DISTINCT FROM EXCLUDED.vm_rss" in sql
+  assert " WHERE " in sql
+
+
+def test_proc_rows_copy_bytes_match_model_tokens():
+  """Namedtuple COPY tokens match the model serializer, including nulls."""
+  from types import SimpleNamespace
+
+  from hpcperfstats.dbload import sync_timedb as st
+
+  row = SimpleNamespace(
+    jid=None,
+    host="h",
+    proc="bash",
+    device="",
+    uid=float("nan"),
+    vm_peak=10.0,
+    vm_size=0.0,
+    vm_lck=float("nan"),
+    vm_hwm=4.0,
+    vm_rss=1.0,
+    vm_data=float("nan"),
+    vm_stk=2.0,
+    vm_exe=3.0,
+    vm_lib=5.0,
+    vm_pte=float("nan"),
+    vm_swap=236948.0,
+    threads=1.0,
+  )
+  model = proc_data(**st._proc_data_row_kwargs(row))
+  assert pdi.proc_rows_to_copy_bytes([row]) == pdi.proc_data_objs_to_copy_bytes(
+    [model]
+  )
+  assert b"236948.0" not in pdi.proc_rows_to_copy_bytes([row])
+  assert b"\\N" in pdi.proc_rows_to_copy_bytes([row])
+
+
 def test_proc_copy_bytes_coerces_float_bigint_fields():
   """
   Pandas float64 on sparse proc ints must not become COPY text like ``0.0``.
@@ -162,6 +211,110 @@ def test_bulk_insert_proc_copy_s_and_conflict_insert_under_write_telem(
     snap = st._snapshot_ingest_write_timing()
     assert snap["copy_s"] > 0.0
     assert snap["conflict_insert_s"] > 0.0
+  finally:
+    st._reset_ingest_write_timing(enabled=False)
+
+
+def test_copy_arm_skips_models(monkeypatch):
+  """COPY write builds no proc_data or host_data and leaves orm_rows at zero."""
+  import pandas as pd
+
+  from hpcperfstats.dbload import sync_timedb as st
+
+  monkeypatch.delenv("HPCPERFSTATS_PROC_INSERT_ARM", raising=False)
+  monkeypatch.delenv("HPCPERFSTATS_HOST_INSERT_ARM", raising=False)
+  monkeypatch.delenv("HPCPERFSTATS_SYNC_PROC_DATA_COPY", raising=False)
+  monkeypatch.delenv("HPCPERFSTATS_SYNC_HOST_DATA_COPY", raising=False)
+
+  def _proc_model(**_kwargs):
+    raise AssertionError("proc model")
+
+  def _host_model(_row):
+    raise AssertionError("host model")
+
+  monkeypatch.setattr(st, "proc_data", _proc_model)
+  monkeypatch.setattr(st, "host_data_instance_from_stats_row", _host_model)
+  monkeypatch.setattr(st, "bulk_insert_proc_rows", lambda rows: None)
+  monkeypatch.setattr(st, "bulk_insert_host_rows", lambda rows: None)
+  monkeypatch.setattr(st, "_invalidate_jid_caches", lambda *_a, **_k: None)
+  monkeypatch.setattr(
+    st,
+    "_raise_if_ingest_per_file_deadline_exceeded",
+    lambda *_a, **_k: None,
+  )
+  monkeypatch.setattr(st, "bulk_create_batch_size", lambda: 100)
+  st._reset_ingest_write_timing(enabled=True)
+  monkeypatch.setattr(st, "_ingest_write_telem_on", True)
+  proc = pd.DataFrame([{"jid": "1", "host": "h", "proc": "bash"}])
+  stats = pd.DataFrame(
+    [
+      {
+        "time": "2026-01-01T00:00:00Z",
+        "host": "h",
+        "jid": "1",
+        "type": "cpu",
+        "dev": "",
+        "event": "user",
+        "unit": "%",
+        "value": 1.0,
+        "delta": 0.0,
+        "arc": 0.0,
+      }
+    ]
+  )
+  try:
+    st._write_stats_payload_to_db("/archive/h/1", stats, proc)
+    snap = st._snapshot_ingest_write_timing()
+    assert snap["orm_rows"] == 0.0
+    assert snap["orm_materialize_s"] == 0.0
+  finally:
+    st._reset_ingest_write_timing(enabled=False)
+
+
+def test_baseline_arm_counts_orm_rows(monkeypatch):
+  """ORM opt-out still builds one model per proc row and per host row."""
+  from datetime import UTC, datetime
+
+  import pandas as pd
+
+  from hpcperfstats.dbload import sync_timedb as st
+
+  monkeypatch.setenv("HPCPERFSTATS_PROC_INSERT_ARM", "baseline")
+  monkeypatch.setenv("HPCPERFSTATS_HOST_INSERT_ARM", "baseline")
+  monkeypatch.setattr(st, "insert_proc_data_batch", lambda objs: None)
+  monkeypatch.setattr(st, "insert_host_data_batch", lambda objs: None)
+  monkeypatch.setattr(st, "_time_ingest_db_reconnect", lambda: None)
+  monkeypatch.setattr(st, "_invalidate_jid_caches", lambda *_a, **_k: None)
+  monkeypatch.setattr(
+    st,
+    "_raise_if_ingest_per_file_deadline_exceeded",
+    lambda *_a, **_k: None,
+  )
+  monkeypatch.setattr(st, "bulk_create_batch_size", lambda: 100)
+  st._reset_ingest_write_timing(enabled=True)
+  monkeypatch.setattr(st, "_ingest_write_telem_on", True)
+  proc = pd.DataFrame([{"jid": "1", "host": "h", "proc": "bash"}])
+  stats = pd.DataFrame(
+    [
+      {
+        "time": datetime(2026, 1, 1, tzinfo=UTC),
+        "host": "h",
+        "jid": "1",
+        "type": "cpu",
+        "dev": "",
+        "event": "user",
+        "unit": "%",
+        "value": 1.0,
+        "delta": 0.0,
+        "arc": 0.0,
+      }
+    ]
+  )
+  try:
+    st._write_stats_payload_to_db("/archive/h/1", stats, proc)
+    snap = st._snapshot_ingest_write_timing()
+    assert snap["orm_rows"] == 2.0
+    assert snap["orm_materialize_s"] > 0.0
   finally:
     st._reset_ingest_write_timing(enabled=False)
 

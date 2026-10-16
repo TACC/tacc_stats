@@ -51,6 +51,45 @@ def test_host_data_objs_to_copy_bytes_escapes_null():
   assert payload.endswith(b"\n")
 
 
+def test_host_stage_insert_unchanged():
+  """Host hypertable insert stays DO NOTHING with no peak rewrite."""
+  assert (
+    "ON CONFLICT (time, host, type, event, dev) DO NOTHING" in hdi._STAGE_INSERT
+  )
+  assert "GREATEST" not in hdi._STAGE_INSERT
+  assert "WHERE" not in hdi._STAGE_INSERT
+
+
+def test_host_rows_copy_bytes_match_model_tokens():
+  """Namedtuple COPY tokens match host_data_instance_from_stats_row."""
+  from types import SimpleNamespace
+
+  from hpcperfstats.dbload.lib.io_helpers import (
+    host_data_instance_from_stats_row,
+  )
+
+  row = SimpleNamespace(
+    time=datetime(2026, 1, 1, 12, 0, 0, tzinfo=UTC),
+    host="h",
+    jid="-",
+    type="cpu",
+    dev=float("nan"),
+    event="user",
+    unit="%",
+    value=float("nan"),
+    delta=None,
+    arc=1.5,
+  )
+  model = host_data_instance_from_stats_row(row)
+  assert hdi.host_rows_to_copy_bytes([row]) == hdi.host_data_objs_to_copy_bytes(
+    [model]
+  )
+  payload = hdi.host_rows_to_copy_bytes([row])
+  assert b"\\N" in payload
+  fields = payload.strip().split(b"\t")
+  assert fields[4] == b""  # blank device, not NULL
+
+
 def test_insert_host_data_batch_routes_baseline_to_bulk_create(monkeypatch):
   monkeypatch.setenv("HPCPERFSTATS_HOST_INSERT_ARM", "baseline")
   seen = []
