@@ -480,11 +480,11 @@ def test_streaming_incremental_one_chunk_rows_match_serial(
   )
 
 
-def test_streaming_incremental_one_chunk_write_overlaps_next_parse(
+def test_streaming_incremental_chunk_write_does_not_overlap_next_parse(
   monkeypatch,
   tmp_path,
 ):
-  """Chunk N's write is inside _write_stats_payload_to_db during chunk N+1."""
+  """A blocked chunk write finishes before the next chunk's deltas run."""
   state = {
     "writes": 0,
     "deltas": 0,
@@ -501,14 +501,14 @@ def test_streaming_incremental_one_chunk_write_overlaps_next_parse(
     if state["writes"] == 1:
       state["in_write"] = True
       state["entered"].set()
-      state["release"].wait(5)
+      state["release"].wait(1)
       state["in_write"] = False
     return path, need_archival, True
 
   def wrapped_deltas(stats_chunk, carry=None):
     state["deltas"] += 1
     if state["deltas"] >= 2:
-      assert state["entered"].wait(5)
+      assert state["entered"].wait(2)
       if state["in_write"]:
         state["overlapped"] = True
       state["release"].set()
@@ -524,7 +524,7 @@ def test_streaming_incremental_one_chunk_write_overlaps_next_parse(
     st._unpack_ingest_worker_result(result)
   )
   assert ingest_ok is True
-  assert state["overlapped"] is True
+  assert state["overlapped"] is False
   assert state["writes"] >= 2
 
 
@@ -580,21 +580,18 @@ def test_streaming_incremental_folds_writer_postgres_s(
     st._reset_ingest_write_timing(enabled=False)
 
 
-def test_streaming_incremental_chunk_writer_closes_connections(
+def test_streaming_incremental_chunk_write_stays_on_parser_thread(
   monkeypatch,
   tmp_path,
 ):
-  """The chunk-write thread closes Django connections on the way out."""
+  """Chunk writes run on the parser thread, not ingest-chunk-write."""
   seen = []
-
-  def spy_close():
-    seen.append(threading.current_thread().name)
 
   def fake_write(path, stats, proc_stats, need_archival=True):
     del stats, proc_stats
+    seen.append(threading.current_thread().name)
     raise RuntimeError("chunk write failed")
 
-  monkeypatch.setattr(st, "close_old_connections", spy_close)
   _lines, result = _streaming_incremental_with_fake_write(
     monkeypatch,
     tmp_path,
@@ -605,7 +602,8 @@ def test_streaming_incremental_chunk_writer_closes_connections(
     st._unpack_ingest_worker_result(result)
   )
   assert ingest_ok is False
-  assert seen.count("ingest-chunk-write") >= 2
+  assert seen
+  assert "ingest-chunk-write" not in seen
 
 
 def test_small_file_combined_path_unchanged(monkeypatch, tmp_path):

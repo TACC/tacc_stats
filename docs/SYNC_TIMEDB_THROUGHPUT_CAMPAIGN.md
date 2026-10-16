@@ -70,8 +70,8 @@ and untrusted. Ranks are not taken from the historical E-series.
 
 | Rank | ID | Change | Estimated effect | Meter |
 | --- | --- | --- | --- | --- |
-| 1 | F2 | Overlap one parse chunk with the PostgreSQL write | Next code change. 04 dense `overlap_headroom_s` 131.7s of elapsed 310.6s. | **`overlap_headroom_s`** |
-| 2 | conflict_insert | Shrink the proc `ON CONFLICT` after COPY | Next after F2. 04 dense `conflict_insert_s` 64.3s. | `conflict_insert_s` |
+| 1 | F2 | Overlap one parse chunk with the PostgreSQL write | Rejected 2026-10-16 and removed from the tree. 04 dense elapsed fell; 01 MiB/min fell 41 percent. | **`overlap_headroom_s`** |
+| 2 | conflict_insert | Shrink the proc `ON CONFLICT` after COPY | Next code change. 04 dense `conflict_insert_s` 64.3s. | `conflict_insert_s` |
 | 3 | F1 | COPY rows without Django model construction | 04 dense `orm_materialize_s` 36.8s. | `orm_materialize_s`, **`orm_rows`** |
 | 4 | F3 | Vectorize ARC diff, carry apply, and carry finalization | Large on long counter series. | `arc_s` |
 | 5 | F4 | Reuse the COPY temp stage on the connection | `CREATE TEMP … ON COMMIT DROP` once per batch on both insert paths. | `stage_ddl_s` |
@@ -147,13 +147,15 @@ Append one row per soak. Leave the rank table unchanged until a row contradicts 
 | Date | Plan | Sites | Window | Image / git | What was measured | Verdict |
 | --- | --- | --- | --- | --- | --- | --- |
 | 2026-10-15 | `sync-timedb-fresh-baseline` | 04 Horizon, 01 Stampede3 | scored ~8h, telem on | master + `orm_rows` / `overlap_headroom_s` | 04 dense overlap 131.7s, conflict_insert 64.3s, orm 36.8s. 01 dense overlap 2.4s. 01 `feed_s` is telem-on and untrusted. | Re-rank: F2, then conflict_insert, then F1 |
+| 2026-10-16 | `f2-overlap-reject` | 04 Horizon, 01 Stampede3 | 8h, telem on, pool 64 | overlap image, later removed from HEAD | 04 dense elapsed 198.5s, overlap 76.3s, 15.0808 MiB/min. 01 dense elapsed 7421.6s, proc_merge 4079s, 75.1626 MiB/min (was 128.2226). Telem was on in both arms. | Reject F2. Next code change is conflict_insert |
 
 ## Next plan after the baseline
 
-The next code change is F2: one in-flight PostgreSQL write per file
-(`.cursor/plans/overlap-one-chunk.plan.md`). After that A/B, the next measured
-slice is `conflict_insert` (04 dense 64.3s), then F1 ORM construction (36.8s).
-The 2026-10-15 01 `feed_s` median is telem-on and untrusted.
+F2 was tried and rejected. The one-chunk writer is gone from the current tree.
+The next code change is `conflict_insert` (04 dense 64.3s), then F1 ORM
+construction (36.8s). Telemetry was on in both the 2026-10-15 and 2026-10-16
+windows and does not explain the `proc_merge` jump. The 2026-10-15 01 `feed_s`
+median is telem-on and untrusted.
 
 ## Historical campaign (through 2026-10-14)
 

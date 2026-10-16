@@ -81,7 +81,6 @@ import contextvars
 import gc
 import itertools
 import os
-import queue
 import threading
 from collections.abc import Iterator
 from contextlib import contextmanager, suppress
@@ -104,10 +103,7 @@ from datetime import UTC, date as date_cls, datetime, timedelta
 from enum import StrEnum
 
 from hpcperfstats.dbload.lib.django_bootstrap import ensure_django
-from hpcperfstats.dbload.lib.process_title import (
-  set_daemon_process_title,
-  set_daemon_thread_title,
-)
+from hpcperfstats.dbload.lib.process_title import set_daemon_process_title
 
 ensure_django()
 
@@ -2300,73 +2296,6 @@ def _fresh_overlap_headroom_s(
   return min(parse_cpu, max(0.0, float(postgres_s)))
 
 
-class _ChunkWriteStopped(Exception):
-  """Previous chunk write failed; do not submit another write for this file."""
-
-
-def _capture_ingest_write_context() -> tuple[float, int, dict[str, float]]:
-  """
-  Copy this thread's per-file write meters.
-
-  The chunk-write thread records ``postgres_s`` on its own context. The parser
-  thread folds the delta after it joins that write.
-
-  Returns:
-    tuple[float, int, dict[str, float]]: ``postgres_s``, ``orm_rows``, and
-    write-phase seconds.
-
-  Examples:
-    >>> _reset_ingest_write_timing(enabled=False)
-    >>> _capture_ingest_write_context()[0]
-    0.0
-  """
-  phases = _ingest_write_phases.get()
-  return (
-    float(_ingest_postgres_s.get()),
-    int(_ingest_orm_rows.get()),
-    dict(phases) if phases else {},
-  )
-
-
-def _fold_ingest_write_context(
-  before: tuple[float, int, dict[str, float]],
-  after: tuple[float, int, dict[str, float]],
-) -> None:
-  """
-  Add one chunk-write thread's meter delta onto the parser thread.
-
-  Campaign totals are already updated on the writer thread. This only copies
-  the per-file context so the outcome line still sees ``postgres_s``.
-
-  Args:
-    before (tuple[float, int, dict[str, float]]): Writer context before the
-      write.
-    after (tuple[float, int, dict[str, float]]): Writer context after the
-      write.
-
-  Returns:
-    None
-
-  Examples:
-    >>> _reset_ingest_write_timing(enabled=False)
-    >>> _fold_ingest_write_context((0.0, 0, {}), (0.0, 0, {}))
-  """
-  postgres_delta = float(after[0]) - float(before[0])
-  if postgres_delta > 0.0:
-    _ingest_postgres_s.set(float(_ingest_postgres_s.get()) + postgres_delta)
-  if not _ingest_write_telem_on:
-    return
-  orm_delta = int(after[1]) - int(before[1])
-  if orm_delta > 0:
-    _ingest_orm_rows.set(int(_ingest_orm_rows.get()) + orm_delta)
-  acc = dict(_ingest_write_phases_acc())
-  for key, val in after[2].items():
-    delta = float(val) - float(before[2].get(key, 0.0))
-    if delta > 0.0:
-      acc[key] = float(acc.get(key, 0.0)) + delta
-  _ingest_write_phases.set(acc)
-
-
 def _snapshot_ingest_write_timing() -> dict[str, float]:
   """
   Return per-file ``postgres_s`` and optional closed-book write phases.
@@ -4260,10 +4189,10 @@ def _add_stats_file_to_db_streaming_incremental(
   t0: Any,
 ) -> Any:
   """
-  Parse the next chunk while the previous chunk's PostgreSQL write runs.
+  Parse one chunk, write it, then parse the next chunk.
 
-  One daemon thread, depth one. Carry stays on the parser thread. The file
-  is archive-ready only after the last write joins successfully.
+  Carry stays on the parser thread. The file is archive-ready only after
+  every chunk write on that thread succeeds.
 
   Args:
     stats_file (str): String for stats file.
@@ -4283,8 +4212,6 @@ def _add_stats_file_to_db_streaming_incremental(
   need_archival = True
   ingest_ok = True
   flush_rows = bulk_create_batch_size()
-  chunk_writes: queue.SimpleQueue[Any] = queue.SimpleQueue()
-  chunk_write_state: dict[str, Any] = {"thread": None, "inflight": None}
 
   def _parse_elapsed() -> Any:
     """
@@ -4298,161 +4225,9 @@ def _add_stats_file_to_db_streaming_incremental(
     """
     return time.time() - parse_t0
 
-  def _chunk_write_main() -> None:
-    """
-    Write one chunk at a time on the ingest-chunk-write thread.
-
-    Returns:
-      None
-
-    Examples:
-      >>> _chunk_write_main()  # doctest: +SKIP
-    """
-    set_daemon_thread_title(
-      "sync_timedb.py [thread:ingest-chunk-write]",
-      script_name="sync_timedb.py",
-      role="ingest-chunk-write",
-    )
-    try:
-      close_old_connections()
-      while True:
-        item = chunk_writes.get()
-        if item is None:
-          return
-        item["before"] = _capture_ingest_write_context()
-        try:
-          item["result"] = _write_stats_payload_to_db(
-            item["stats_file"],
-            item["stats"],
-            item["proc"],
-            need_archival=item["need_archival"],
-          )
-        except Exception as exc:
-          item["exc"] = exc
-        finally:
-          item["after"] = _capture_ingest_write_context()
-          stats_done = item.pop("stats", None)
-          proc_done = item.pop("proc", None)
-          del stats_done, proc_done
-          close_old_connections()
-          item["event"].set()
-    finally:
-      close_old_connections()
-      while True:
-        try:
-          leftover = chunk_writes.get_nowait()
-        except queue.Empty:
-          break
-        if isinstance(leftover, dict):
-          leftover["exc"] = leftover.get("exc") or RuntimeError(
-            "chunk writer exited",
-          )
-          leftover["event"].set()
-
-  def _join_chunk_write() -> None:
-    """
-    Wait for the in-flight chunk write and apply its result on the parser.
-
-    Returns:
-      None
-
-    Raises:
-      Exception: Re-raises a failure from ``_write_stats_payload_to_db``.
-
-    Examples:
-      >>> _join_chunk_write()  # doctest: +SKIP
-    """
-    nonlocal need_archival, ingest_ok, total_stats_rows
-    nonlocal total_stats_rows_parsed, total_proc_rows
-    item = chunk_write_state["inflight"]
-    if item is None:
-      return
-    item["event"].wait()
-    chunk_write_state["inflight"] = None
-    _fold_ingest_write_context(item["before"], item["after"])
-    if item.get("exc") is not None:
-      raise item["exc"]
-    _stats_file_local, archival, chunk_ok = item["result"]
-    del _stats_file_local
-    need_archival = archival
-    if not chunk_ok:
-      ingest_ok = False
-    else:
-      total_stats_rows += item["chunk_stats_rows"]
-      total_stats_rows_parsed += item["parsed_stats_n"]
-      total_proc_rows += item["chunk_proc_rows"]
-    with _held_parse_stage("heap_release_s"):
-      _release_ingest_worker_heap()
-
-  def _submit_chunk_write(
-    stats_chunk: Any,
-    proc_chunk: Any,
-    *,
-    parsed_stats_n: int,
-    chunk_stats_rows: int,
-    chunk_proc_rows: int,
-  ) -> None:
-    """
-    Hand one chunk's frames to the single writer thread.
-
-    Args:
-      stats_chunk (Any): Host frame for this chunk.
-      proc_chunk (Any): Proc frame for this chunk.
-      parsed_stats_n (int): Parsed host rows before delta/arc.
-      chunk_stats_rows (int): Host rows after delta/arc.
-      chunk_proc_rows (int): Proc rows in this chunk.
-
-    Returns:
-      None
-
-    Examples:
-      >>> _submit_chunk_write(None, None)  # doctest: +SKIP
-    """
-    if chunk_write_state["thread"] is None:
-      writer = threading.Thread(
-        target=_chunk_write_main,
-        name="ingest-chunk-write",
-        daemon=True,
-      )
-      writer.start()
-      chunk_write_state["thread"] = writer
-    item = {
-      "event": threading.Event(),
-      "stats_file": stats_file,
-      "stats": stats_chunk,
-      "proc": proc_chunk,
-      "need_archival": need_archival,
-      "parsed_stats_n": parsed_stats_n,
-      "chunk_stats_rows": chunk_stats_rows,
-      "chunk_proc_rows": chunk_proc_rows,
-      "before": (0.0, 0, {}),
-      "after": (0.0, 0, {}),
-      "exc": None,
-      "result": None,
-    }
-    chunk_write_state["inflight"] = item
-    chunk_writes.put(item)
-
-  def _stop_chunk_writer() -> None:
-    """
-    Join the chunk-write thread after the last write has been applied.
-
-    Returns:
-      None
-
-    Examples:
-      >>> _stop_chunk_writer()  # doctest: +SKIP
-    """
-    writer = chunk_write_state["thread"]
-    if writer is None:
-      return
-    chunk_writes.put(None)
-    writer.join()
-    chunk_write_state["thread"] = None
-
   def _on_chunk(stats_list: Any, proc_stats_list: Any) -> None:
     """
-    Build one chunk, join the previous write, and submit this chunk.
+    Build one chunk and write it before the next chunk is parsed.
 
     Args:
       stats_list (Any): Stats list passed to this helper.
@@ -4461,13 +4236,11 @@ def _add_stats_file_to_db_streaming_incremental(
     Returns:
       None
 
-    Raises:
-      _ChunkWriteStopped: Previous chunk write failed; this chunk is not
-      submitted.
-
     Examples:
       >>> _on_chunk(None, None)  # doctest: +SKIP
     """
+    nonlocal need_archival, ingest_ok, total_stats_rows
+    nonlocal total_stats_rows_parsed, total_proc_rows
     with _held_parse_stage("chunk_setup_s"):
       parsed_stats_n = stats_payload_row_count(stats_list)
       update_worker_substage("parse:dataframes")
@@ -4489,18 +4262,30 @@ def _add_stats_file_to_db_streaming_incremental(
         f"WARN: sync_timedb: nonempty stats frame collapsed to empty delta/arc path={stats_file} parsed_rows={parsed_stats_n}",
         flush=True,
       )
-    _join_chunk_write()
     if not ingest_ok:
       del stats_chunk
       del proc_chunk
-      raise _ChunkWriteStopped()
-    _submit_chunk_write(
-      stats_chunk,
-      proc_chunk,
-      parsed_stats_n=parsed_stats_n,
-      chunk_stats_rows=chunk_stats_rows,
-      chunk_proc_rows=chunk_proc_rows,
-    )
+      return
+    try:
+      _stats_file_local, archival, chunk_ok = _write_stats_payload_to_db(
+        stats_file,
+        stats_chunk,
+        proc_chunk,
+        need_archival=need_archival,
+      )
+    finally:
+      del stats_chunk
+      del proc_chunk
+      with _held_parse_stage("heap_release_s"):
+        _release_ingest_worker_heap()
+    del _stats_file_local
+    need_archival = archival
+    if not chunk_ok:
+      ingest_ok = False
+      return
+    total_stats_rows += chunk_stats_rows
+    total_stats_rows_parsed += parsed_stats_n
+    total_proc_rows += chunk_proc_rows
 
   _pack_quarantine = lambda failure: (
     lambda unpacked: _pack_ingest_worker_result(
@@ -4555,12 +4340,7 @@ def _add_stats_file_to_db_streaming_incremental(
             on_chunk=_on_chunk,
             exclude_types_list=exclude_types,
           )
-          _join_chunk_write()
-        except _ChunkWriteStopped:
-          pass
         except Exception as e:
-          with suppress(Exception):
-            _join_chunk_write()
           _reraise_if_ingest_control_flow(e)
           return _pack_quarantine(
             _parse_failure_after_quarantine(
@@ -4607,10 +4387,6 @@ def _add_stats_file_to_db_streaming_incremental(
           error_detail="stats_file_disappeared",
         ),
       )
-    finally:
-      with suppress(Exception):
-        _join_chunk_write()
-      _stop_chunk_writer()
 
 
 def _parse_stats_file_payload_impl(
