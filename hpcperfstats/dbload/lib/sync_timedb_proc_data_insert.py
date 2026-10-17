@@ -62,6 +62,8 @@ def _stage_upsert_sql() -> str:
 
   Peak columns use ``GREATEST``, which ignores nulls. The ``WHERE`` skips
   the rewrite when no last-write field differs and no peak would rise.
+  Stage rows are read in ``(jid, host, proc)`` order so concurrent upserts
+  lock the unique index in one order.
 
   Returns:
     str: Upsert SQL string.
@@ -88,6 +90,7 @@ def _stage_upsert_sql() -> str:
       where_parts.append(f"proc_data.{field} IS DISTINCT FROM EXCLUDED.{field}")
   return (
     f"INSERT INTO proc_data ({cols}) SELECT {cols} FROM proc_data_ingest_stage "
+    f"ORDER BY jid, host, proc "
     f"ON CONFLICT (jid, host, proc) DO UPDATE SET {', '.join(set_parts)} "
     f"WHERE {' OR '.join(where_parts)}"
   )
@@ -220,7 +223,9 @@ def _write_proc_copy_payload(payload: bytes) -> None:
   COPY ``payload`` into the proc staging table and run the upsert.
 
   When write telemetry is on, records ``stage_ddl_s``, ``copy_s``, and
-  ``conflict_insert_s``.
+  ``conflict_insert_s``. One PostgreSQL deadlock retries DDL, COPY, and
+  the upsert. The stage table is ``ON COMMIT DROP``, so the retry starts
+  from DDL. A second deadlock, or any other error, propagates.
 
   Args:
     payload (bytes): UTF-8 text COPY body. Empty skips the statement.
@@ -228,34 +233,37 @@ def _write_proc_copy_payload(payload: bytes) -> None:
   Returns:
     None
 
+  Raises:
+    Exception: A second deadlock, or any other error from staging DDL,
+      COPY, or the upsert.
+
   Examples:
     >>> _write_proc_copy_payload(b"")
   """
   if not payload:
     return
-  from contextlib import nullcontext
-
   from django.db import connection, transaction
+
+  from hpcperfstats.dbload import sync_timedb as st
 
   col_list = ", ".join(PROC_DATA_COPY_COLUMNS)
   copy_sql = f"COPY proc_data_ingest_stage ({col_list}) FROM STDIN"
-  from hpcperfstats.dbload import sync_timedb as st
-
-  telem = bool(getattr(st, "_ingest_write_telem_on", False))
-  copy_cm = st._held_ingest_write_phase("copy_s") if telem else nullcontext()
-  conflict_cm = (
-    st._held_ingest_write_phase("conflict_insert_s") if telem else nullcontext()
-  )
-  ddl_cm = (
-    st._held_ingest_write_phase("stage_ddl_s") if telem else nullcontext()
-  )
-  with transaction.atomic(), connection.cursor() as cursor:
-    with ddl_cm:
-      cursor.execute(_STAGE_DDL)
-    with copy_cm, cursor.copy(copy_sql) as copy:
-      copy.write(payload)
-    with conflict_cm:
-      cursor.execute(_stage_upsert_sql())
+  for attempt in range(2):
+    try:
+      with transaction.atomic(), connection.cursor() as cursor:
+        with st._held_ingest_write_phase("stage_ddl_s"):
+          cursor.execute(_STAGE_DDL)
+        with (
+          st._held_ingest_write_phase("copy_s"),
+          cursor.copy(copy_sql) as copy,
+        ):
+          copy.write(payload)
+        with st._held_ingest_write_phase("conflict_insert_s"):
+          cursor.execute(_stage_upsert_sql())
+      return
+    except Exception as exc:
+      if attempt or "deadlock detected" not in str(exc).lower():
+        raise
 
 
 def bulk_insert_proc_rows(rows: Sequence[Any]) -> None:
@@ -301,6 +309,9 @@ def bulk_create_proc_data_update_conflicts(objs: Sequence[Any]) -> None:
   """
   Upsert ``proc_data`` via Django ``bulk_create(update_conflicts=True)``.
 
+  Instances are sorted by ``(jid, host, proc)`` before insert so the ORM
+  arm takes the same unique-index lock order as the COPY upsert.
+
   Args:
     objs (Sequence[Any]): Peak-merged instances to upsert.
 
@@ -316,8 +327,12 @@ def bulk_create_proc_data_update_conflicts(objs: Sequence[Any]) -> None:
     proc_data as proc_data_model,
   )
 
+  ordered = sorted(
+    objs,
+    key=lambda obj: (obj.jid or "", obj.host or "", obj.proc or ""),
+  )
   proc_data_model.objects.bulk_create(
-    list(objs),
+    ordered,
     update_conflicts=True,
     unique_fields=["jid", "host", "proc"],
     update_fields=list(PROC_DATA_UPDATE_FIELDS),

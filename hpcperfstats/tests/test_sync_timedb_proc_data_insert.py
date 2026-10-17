@@ -60,6 +60,161 @@ def test_proc_copy_sql_has_conflict_update():
   assert "GREATEST(proc_data.vm_peak" in sql
 
 
+def test_proc_upsert_orders_conflict_keys():
+  """Stage rows lock the unique key in (jid, host, proc) order."""
+  sql = pdi._stage_upsert_sql()
+  order_at = sql.index("ORDER BY jid, host, proc")
+  conflict_at = sql.index("ON CONFLICT (jid, host, proc)")
+  assert order_at < conflict_at
+  assert "GREATEST(proc_data.vm_peak, EXCLUDED.vm_peak)" in sql
+  assert " WHERE " in sql
+
+
+def test_orm_proc_bulk_create_sorts_conflict_key(monkeypatch):
+  """ORM bulk_create receives (jid, host, proc) order."""
+  import hpcperfstats.site.lib.machine.models as models
+
+  seen: list[list[tuple[str, str, str]]] = []
+
+  class _Manager:
+    def bulk_create(self, objs, **kwargs):
+      del kwargs
+      seen.append([(obj.jid, obj.host, obj.proc) for obj in objs])
+
+  class _Model:
+    objects = _Manager()
+
+  monkeypatch.setattr(models, "proc_data", _Model)
+  pdi.bulk_create_proc_data_update_conflicts(
+    [
+      _obj(jid="2", host="b", proc="z"),
+      _obj(jid="1", host="a", proc="m"),
+      _obj(jid="1", host="b", proc="a"),
+    ]
+  )
+  assert seen == [[("1", "a", "m"), ("1", "b", "a"), ("2", "b", "z")]]
+
+
+def _patch_proc_copy_connection(monkeypatch, execute, state):
+  """Install a Django connection double whose execute is ``execute``."""
+  import django.db as django_db
+
+  class _CopyCtx:
+    def __enter__(self):
+      state["copy"] += 1
+      return self
+
+    def __exit__(self, *args):
+      return False
+
+    def write(self, data: bytes):
+      del data
+
+  class _Cursor:
+    def __enter__(self):
+      return self
+
+    def __exit__(self, *args):
+      return False
+
+    def execute(self, sql, params=None):
+      execute(sql, params)
+
+    def copy(self, sql):
+      del sql
+      return _CopyCtx()
+
+  class _Conn:
+    def cursor(self):
+      return _Cursor()
+
+  class _Atomic:
+    def __enter__(self):
+      return self
+
+    def __exit__(self, *args):
+      return False
+
+  monkeypatch.setattr(django_db, "connection", _Conn())
+  monkeypatch.setattr(
+    django_db,
+    "transaction",
+    type("T", (), {"atomic": staticmethod(lambda: _Atomic())})(),
+  )
+
+
+def test_copy_upsert_retries_one_deadlock(monkeypatch):
+  """One deadlock reruns DDL and COPY; the second upsert succeeds."""
+  from django.db.utils import OperationalError
+
+  state = {"ddl": 0, "copy": 0, "upsert": 0}
+
+  def execute(sql, params=None):
+    del params
+    text = str(sql)
+    if "CREATE TEMP" in text:
+      state["ddl"] += 1
+      return
+    if "INSERT INTO proc_data" in text:
+      state["upsert"] += 1
+      if state["upsert"] == 1:
+        raise OperationalError("deadlock detected")
+      return
+    raise AssertionError(text)
+
+  _patch_proc_copy_connection(monkeypatch, execute, state)
+  pdi.bulk_insert_proc_data_update_conflicts([_obj()])
+  assert state == {"ddl": 2, "copy": 2, "upsert": 2}
+
+
+def test_copy_upsert_raises_second_deadlock(monkeypatch):
+  """A second deadlock propagates after DDL and COPY run twice."""
+  import pytest
+  from django.db.utils import OperationalError
+
+  state = {"ddl": 0, "copy": 0, "upsert": 0}
+
+  def execute(sql, params=None):
+    del params
+    text = str(sql)
+    if "CREATE TEMP" in text:
+      state["ddl"] += 1
+      return
+    if "INSERT INTO proc_data" in text:
+      state["upsert"] += 1
+      raise OperationalError("deadlock detected")
+    raise AssertionError(text)
+
+  _patch_proc_copy_connection(monkeypatch, execute, state)
+  with pytest.raises(OperationalError, match="deadlock detected"):
+    pdi.bulk_insert_proc_data_update_conflicts([_obj()])
+  assert state["upsert"] == 2
+
+
+def test_copy_upsert_does_not_retry_statement_timeout(monkeypatch):
+  """A statement timeout is not a deadlock and is not retried."""
+  import pytest
+  from django.db.utils import OperationalError
+
+  state = {"ddl": 0, "copy": 0, "upsert": 0}
+
+  def execute(sql, params=None):
+    del params
+    text = str(sql)
+    if "CREATE TEMP" in text:
+      state["ddl"] += 1
+      return
+    if "INSERT INTO proc_data" in text:
+      state["upsert"] += 1
+      raise OperationalError("canceling statement due to statement timeout")
+    raise AssertionError(text)
+
+  _patch_proc_copy_connection(monkeypatch, execute, state)
+  with pytest.raises(OperationalError, match="statement timeout"):
+    pdi.bulk_insert_proc_data_update_conflicts([_obj()])
+  assert state == {"ddl": 1, "copy": 1, "upsert": 1}
+
+
 def test_proc_upsert_uses_greatest_and_skips_noop_rewrite():
   """Peak SET is GREATEST. WHERE skips a conflict that changes nothing."""
   sql = pdi._stage_upsert_sql()
