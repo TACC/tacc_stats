@@ -7,13 +7,18 @@ import io
 import os
 import pstats
 import tempfile
+import time
 from pathlib import Path
 
 import pytest
 
 from hpcperfstats.dbload.lib.sync_timedb_parsing import (
+  HOST_PROC_KEYS,
+  HOST_PROC_PEAK_KEYS,
+  _nullable_int_max,
   build_stats_dataframes,
   compute_deltas_and_arc,
+  merge_proc_row_dicts,
   parse_stats_file_streaming_incremental,
   parse_stats_lines,
 )
@@ -124,3 +129,63 @@ def test_wave2_microbench_ranks_feed_line_vs_groupby():
 
   assert stats_list
   assert decision.startswith("wave2_")
+
+
+def _two_loop_merge(earlier: dict, later: dict) -> dict:
+  """Retired two-loop merge, kept only as the microbench baseline."""
+  for key, value in later.items():
+    if key not in HOST_PROC_PEAK_KEYS:
+      earlier[key] = value
+  for key in HOST_PROC_PEAK_KEYS:
+    earlier[key] = _nullable_int_max(earlier.get(key), later.get(key))
+  return earlier
+
+
+def _full_host_proc_row(seed: int) -> dict:
+  """One host_proc row that carries every HOST_PROC_KEYS field."""
+  row = {
+    "time": seed,
+    "host": "cn001",
+    "jid": "job1",
+    "proc": "python",
+    "device": "python/4242/0-7/0",
+  }
+  for offset, key in enumerate(HOST_PROC_KEYS):
+    row[key] = seed + offset + 1
+  return row
+
+
+def _mean_merge_seconds(
+  merge, earlier: dict, laters: list[dict], repeats: int
+) -> float:
+  """Mean wall time of repeated in-place merges. Dict build stays outside."""
+  samples: list[float] = []
+  for _ in range(repeats):
+    target = dict(earlier)
+    started = time.perf_counter()
+    for later in laters:
+      merge(target, later)
+    samples.append(time.perf_counter() - started)
+  return sum(samples) / len(samples)
+
+
+@pytest.mark.timeout(60)
+def test_proc_merge_one_pass_mean_below_two_loop():
+  """Candidate mean must be at least 20 percent below the two-loop mean."""
+  earlier = _full_host_proc_row(1)
+  laters = [_full_host_proc_row(i) for i in range(2, 258)]
+  _mean_merge_seconds(merge_proc_row_dicts, earlier, laters, 1)
+  _mean_merge_seconds(_two_loop_merge, earlier, laters, 1)
+  repeats = 9
+  candidate = _mean_merge_seconds(
+    merge_proc_row_dicts, earlier, laters, repeats
+  )
+  baseline = _mean_merge_seconds(_two_loop_merge, earlier, laters, repeats)
+  ratio = candidate / baseline
+  print(
+    f"proc_merge_candidate_s={candidate:.6f} "
+    f"proc_merge_two_loop_s={baseline:.6f} "
+    f"proc_merge_ratio={ratio:.4f}"
+  )
+  assert ratio <= 0.80
+  print("PROC_MERGE_MICROBENCH_OK")

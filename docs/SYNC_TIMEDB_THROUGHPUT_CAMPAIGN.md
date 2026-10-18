@@ -65,34 +65,39 @@ the baseline plan and back into this table:
 ## Ranked optimizations
 
 Rank is structural speedup on durable ingest (MiB/min and giant-file wall),
-**#1 largest**, from the 2026-10-15 soak. The 01 `feed_s` median is telem-on
-and untrusted. Ranks are not taken from the historical E-series.
+**#1 largest**, from the 2026-10-17 soak. The 01 `feed_s` median is telem-on
+and untrusted. Ranks are not taken from the historical E-series. F2 is
+rejected. `conflict_insert` and F1 are retained. The in-place proc merge is
+in the tree and waits on the 01 soak. The next untried cut is the giant-file
+`start_s` scan.
 
 | Rank | ID | Change | Estimated effect | Meter |
 | --- | --- | --- | --- | --- |
 | 1 | F2 | Overlap one parse chunk with the PostgreSQL write | Rejected 2026-10-16 and removed from the tree. 04 dense elapsed fell; 01 MiB/min fell 41 percent. | **`overlap_headroom_s`** |
-| 2 | conflict_insert | Shrink the proc `ON CONFLICT` after COPY | Next code change. 04 dense `conflict_insert_s` 64.3s. | `conflict_insert_s` |
-| 3 | F1 | COPY rows without Django model construction | 04 dense `orm_materialize_s` 36.8s. | `orm_materialize_s`, **`orm_rows`** |
-| 4 | F3 | Vectorize ARC diff, carry apply, and carry finalization | Large on long counter series. | `arc_s` |
-| 5 | F4 | Reuse the COPY temp stage on the connection | `CREATE TEMP … ON COMMIT DROP` once per batch on both insert paths. | `stage_ddl_s` |
-| 6 | F5 | Reuse the PostgreSQL session on the worker | Helps files/min of small files more than MiB/min of giants. | `reconnect_s` |
-| 7 | F6 | Stream COPY bytes with a bound | Cuts peak allocation on giant batches after F1. | `rss_mib`, `copy_s` |
-| 8 | F7 | Invalidate each job id once per successful file | Repeated cache invalidation on dense files. | `jid_invalidate_s` |
-| 9 | F8 | Coalesce job-store checkpoints | Snapshot I/O off the mutation path. | `job_store_wait_s`, `job_store_hold_s` |
-| 10 | F9 | Linearize find-buffer parsing | Removes repeated prefix copies on the stream. | `feed_s` / `decode_s` |
-| 11 | F10 | Capped discovery fast path | Stops catch-up discovery from scanning past the cap. | pending-rescan count and census `ingest=` queued depth |
-| 12 | F11 | Coalesce archive-members sidecar writes | Fewer durable sidecar writes; safety flags stay immediate. | `members_store_wait_s`, `members_store_hold_s` |
-| 13 | F12 | Adaptive heap release | Keep end-of-file trim; skip mid-file trim when pressure is low. | `heap_release_s` |
-| 14 | F13 | O(1) ingest census | One snapshot per tick instead of a walk. | `census_s` |
-| 15 | F14 | Once-per-tick cgroup admit | Stop re-reading cgroup and re-summing in-flight bytes per file. | `admit_probes`, `fill_block` |
-| 16 | F15 | Collapse microstructure (separate pairs) | DCGM slices, one partition pass, drop a redundant sort, fixed proc column order. | `collapse_*` |
-| 17 | F16 | One inode map for streaming rescan | Drops a second full fd capture. | `rescan_s` |
-| 18 | F17 | Carry-stable counter-delta categories | Stop refactorizing stable keys on every flush. | `delta_s` |
-| 19 | F18 | Collapse duplicate proc keys inside the batch | Shrinks COPY upsert work when keys repeat. | `proc_rows`, `copy_s` |
-| 20 | F19 | Positive sealed-member match | Skip full populate on a conclusive hit. | `populate_s` |
-| 21 | F20 | Single-pass sealed populate | One member feed and one sidecar write. | `populate_s` |
-| 22 | F21 | Bisect a failed bulk write | Error path only. Near zero on the steady state. | failure logs |
-| 23 | F22 | Durable retry backoff | Stability under faults, not steady MiB/min. | `dead_letter_*` |
+| 2 | conflict_insert | Shrink the proc `ON CONFLICT` after COPY | Retained 2026-10-17. 04 dense `conflict_insert_s` 38.3s (was 64.3s). | `conflict_insert_s` |
+| 3 | F1 | COPY rows without Django model construction | Retained 2026-10-17. `orm_materialize_s` 0 and `orm_rows` 0 (was 36.8s). | `orm_materialize_s`, **`orm_rows`** |
+| 4 | proc_merge | Update a repeat host_proc row in one pass | In tree 2026-10-17. Retain if 01 64 MiB–1 GiB `proc_merge_s` is at least 20 percent below 139.5s. | `proc_merge_s` |
+| 5 | start_scan | Stop the duplicate prefix scan on a head-present giant | After proc merge. 01 64 MiB–1 GiB `start_s` 129.4s. Live listend disables both DB-complete fast paths. | `start_s` |
+| 6 | F3 | Vectorize ARC diff, carry apply, and carry finalization | Large on long counter series. Behind proc merge and `start_s`. | `arc_s` |
+| 7 | F4 | Reuse the COPY temp stage on the connection | `CREATE TEMP … ON COMMIT DROP` once per batch on both insert paths. | `stage_ddl_s` |
+| 8 | F5 | Reuse the PostgreSQL session on the worker | Helps files/min of small files more than MiB/min of giants. | `reconnect_s` |
+| 9 | F6 | Stream COPY bytes with a bound | Cuts peak allocation on giant batches after F1. | `rss_mib`, `copy_s` |
+| 10 | F7 | Invalidate each job id once per successful file | Repeated cache invalidation on dense files. | `jid_invalidate_s` |
+| 11 | F8 | Coalesce job-store checkpoints | Snapshot I/O off the mutation path. | `job_store_wait_s`, `job_store_hold_s` |
+| 12 | F9 | Linearize find-buffer parsing | Removes repeated prefix copies on the stream. | `feed_s` / `decode_s` |
+| 13 | F10 | Capped discovery fast path | Stops catch-up discovery from scanning past the cap. | pending-rescan count and census `ingest=` queued depth |
+| 14 | F11 | Coalesce archive-members sidecar writes | Fewer durable sidecar writes; safety flags stay immediate. | `members_store_wait_s`, `members_store_hold_s` |
+| 15 | F12 | Adaptive heap release | Keep end-of-file trim; skip mid-file trim when pressure is low. | `heap_release_s` |
+| 16 | F13 | O(1) ingest census | One snapshot per tick instead of a walk. | `census_s` |
+| 17 | F14 | Once-per-tick cgroup admit | Stop re-reading cgroup and re-summing in-flight bytes per file. | `admit_probes`, `fill_block` |
+| 18 | F15 | Collapse microstructure (separate pairs) | DCGM slices, one partition pass, drop a redundant sort, fixed proc column order. | `collapse_*` |
+| 19 | F16 | One inode map for streaming rescan | Drops a second full fd capture. | `rescan_s` |
+| 20 | F17 | Carry-stable counter-delta categories | Stop refactorizing stable keys on every flush. | `delta_s` |
+| 21 | F18 | Collapse duplicate proc keys inside the batch | Shrinks COPY upsert work when keys repeat. | `proc_rows`, `copy_s` |
+| 22 | F19 | Positive sealed-member match | Skip full populate on a conclusive hit. | `populate_s` |
+| 23 | F20 | Single-pass sealed populate | One member feed and one sidecar write. | `populate_s` |
+| 24 | F21 | Bisect a failed bulk write | Error path only. Near zero on the steady state. | failure logs |
+| 25 | F22 | Durable retry backoff | Stability under faults, not steady MiB/min. | `dead_letter_*` |
 
 Not ranked as speedups: the harness (fresh-plan group 1) and the production
 A/B protocol (groups 25 and 26). Those are how a rank is accepted.
@@ -148,17 +153,20 @@ Append one row per soak. Leave the rank table unchanged until a row contradicts 
 | --- | --- | --- | --- | --- | --- | --- |
 | 2026-10-15 | `sync-timedb-fresh-baseline` | 04 Horizon, 01 Stampede3 | scored ~8h, telem on | master + `orm_rows` / `overlap_headroom_s` | 04 dense overlap 131.7s, conflict_insert 64.3s, orm 36.8s. 01 dense overlap 2.4s. 01 `feed_s` is telem-on and untrusted. | Re-rank: F2, then conflict_insert, then F1 |
 | 2026-10-16 | `f2-overlap-reject` | 04 Horizon, 01 Stampede3 | 8h, telem on, pool 64 | overlap image, later removed from HEAD | 04 dense elapsed 198.5s, overlap 76.3s, 15.0808 MiB/min. 01 dense elapsed 7421.6s, proc_merge 4079s, 75.1626 MiB/min (was 128.2226). Telem was on in both arms. | Reject F2. Next code change is conflict_insert |
+| 2026-10-17 | `conflict-insert-shrink` | 04 Horizon, 01 Stampede3 | 8h, telem on | conflict_insert + F1 image (no deadlock fix) | 04 dense conflict_insert 38.3s, orm 0. 01 64 MiB-1 GiB proc_merge 139.5s, start_s 129.4s. | Retain both. Next: in-place proc merge |
 
 ## Next plan after the baseline
 
 F2 was tried and rejected. The one-chunk writer is gone from the current tree.
-Both cuts in `.cursor/plans/conflict-insert-shrink.plan.md` are in the tree.
-The proc upsert is scored on `conflict_insert_s` (04 dense prior 64.3s). COPY
-without model construction is scored on `orm_materialize_s` (prior 36.8s) and
-`orm_rows`. They ship in one image. The soak row is written after that window.
-Telemetry was on in both the 2026-10-15 and 2026-10-16 windows and does not
-explain the `proc_merge` jump. The 2026-10-15 01 `feed_s` median is telem-on
-and untrusted.
+`conflict_insert` and F1 are retained on the 2026-10-17 image: 04 dense
+`conflict_insert_s` 38.3s (was 64.3s) and `orm_materialize_s` 0 with `orm_rows`
+0. That image did not contain the proc-upsert deadlock fix. The one-pass
+host_proc merge is in the tree after that baseline. Retain it only if 01
+64 MiB–1 GiB `proc_merge_s` is at least 20 percent below 139.5s with n at
+least 12, and 04 dense `conflict_insert_s` stays at or under 38.3s. The
+following untried cut is the giant-file `start_s` scan (129.4s). Telemetry
+was on in the 2026-10-15, 2026-10-16, and 2026-10-17 windows. The 01 `feed_s`
+median is telem-on and untrusted.
 
 ## Historical campaign (through 2026-10-14)
 

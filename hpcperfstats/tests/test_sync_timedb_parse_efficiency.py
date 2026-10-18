@@ -20,6 +20,7 @@ from hpcperfstats.dbload.lib.sync_timedb_parsing import (
   compute_deltas_and_arc_chunk,
   dedupe_proc_stats_peak_merge,
   exclude_types,
+  merge_proc_row_dicts,
   parse_stats_file_streaming_incremental,
   parse_stats_lines,
   reset_parse_stage_timing,
@@ -546,6 +547,48 @@ def test_columnar_take_proc_frame_equals_records():
   _s2, from_cols = build_stats_dataframes([], cols)
   assert list(from_rows["vm_peak"]) == list(from_cols["vm_peak"])
   assert list(from_rows["threads"]) == list(from_cols["threads"])
+
+
+def test_merge_proc_row_dicts_single_pass_peak_contract():
+  """Lower peak stays, higher peak replaces, omitted or None peak stays out or kept."""
+  earlier = {
+    "vm_peak": 100,
+    "vm_hwm": 80,
+    "vm_stk": 40,
+    "threads": 1,
+    "vm_rss": 20,
+    "time": 1,
+  }
+  out = merge_proc_row_dicts(
+    earlier,
+    {"vm_peak": 50, "threads": 4, "vm_rss": 9, "time": 2},
+  )
+  assert out is earlier
+  assert earlier["vm_peak"] == 100
+  assert earlier["vm_hwm"] == 80
+  assert "vm_exe" not in earlier
+  assert earlier["threads"] == 4
+  assert earlier["vm_rss"] == 9
+  assert earlier["time"] == 2
+  raised = merge_proc_row_dicts(
+    earlier,
+    {"vm_peak": 150, "vm_hwm": None, "threads": 8},
+  )
+  assert raised is earlier
+  assert earlier["vm_peak"] == 150
+  assert earlier["vm_hwm"] == 80
+  assert earlier["threads"] == 8
+  sparse = {"threads": 1, "vm_peak": 10}
+  merged = merge_proc_row_dicts(sparse, {"threads": 2, "vm_rss": 3})
+  assert merged is sparse
+  assert "vm_hwm" not in merged
+  assert "vm_stk" not in merged
+  assert "vm_exe" not in merged
+  assert "vm_lib" not in merged
+  assert merged["vm_peak"] == 10
+  assert merged["vm_rss"] == 3
+  assert merged["threads"] == 2
+  print("PROC_MERGE_CONTRACT_OK")
 
 
 def test_nullable_int_max_fastpath_and_dirty():

@@ -457,8 +457,10 @@ def merge_proc_row_dicts(
   Merge two host_proc row dicts for the same ``(jid, host, proc)``.
 
   Non-peak fields take ``later`` (last-write). Peak keys
-  (``HOST_PROC_PEAK_KEYS``) take the max of non-null values.
-  Mutates and returns ``earlier`` (no per-merge dict copy).
+  (``HOST_PROC_PEAK_KEYS``) take the max of non-null values in the
+  same ``later.items()`` pass. Integer peaks compare inline; every
+  other peak value uses ``_nullable_int_max``. A peak absent from
+  ``later`` is left untouched. Mutates and returns ``earlier``.
 
   Args:
     earlier (dict[str, Any]): Prior sample for the unique key (mutated).
@@ -484,11 +486,16 @@ def merge_proc_row_dicts(
     ... )["vm_hwm"]
     7000
   """
+  peaks = HOST_PROC_PEAK_KEYS
   for key, value in later.items():
-    if key not in HOST_PROC_PEAK_KEYS:
+    if key in peaks:
+      prev = earlier.get(key)
+      if type(prev) is int and type(value) is int:
+        earlier[key] = prev if prev >= value else value
+      else:
+        earlier[key] = _nullable_int_max(prev, value)
+    else:
       earlier[key] = value
-  for key in HOST_PROC_PEAK_KEYS:
-    earlier[key] = _nullable_int_max(earlier.get(key), later.get(key))
   return earlier
 
 
