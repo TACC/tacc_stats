@@ -1,5 +1,5 @@
 ---
-description: Shared-node %jobs/%affinity ingest, job_affinity, and dev=j:<jid> stamp
+description: Shared-node %jobs/%affinity ingest, job_affinity, host_mem_job, and dev=j:<jid> stamp
 alwaysApply: false
 globs:
   - hpcperfstats/dbload/lib/monitor_mark_side_ingest.py
@@ -12,7 +12,7 @@ globs:
 
 **Activation:** `alwaysApply: false` — when triggers in `agent-discipline-core.mdc` match, **Read this file before editing**. Triggered rules are mandatory, not optional.
 
-How (discovery, GPU index, ingest order): `.cursor/plans/shared-node-affinity-wiring.plan.md`. This rule is the consumer invariant.
+How (discovery, GPU index, ingest order): `.cursor/plans/shared-node-affinity-wiring.plan.md`. Per-job cgroup memory consumer: `.cursor/plans/shared-node-per-job-mem-consumer.plan.md`. This rule is the consumer invariant.
 
 ## Wire
 
@@ -23,7 +23,7 @@ How (discovery, GPU index, ingest order): `.cursor/plans/shared-node-affinity-wi
 
 Sample header stays one jobid token. Unknown `%` lines (`%begin`, `%end`) stay ignored.
 
-**Detect shared-node contract** from **`%jobs` with at least one jid** — not from hostname, INI, or “this host runs the shared-node RPM.” Sole full-resource jobs (monitor omits both marks when one jid has all online CPUs **and** all available GPUs) look identical to exclusive file-mode samples; do **not** invent membership or `dev=j:` for them.
+**Detect shared-node contract** from **`%jobs` with at least one jid** — not from hostname, INI, or “this host runs the shared-node RPM.” Sole full-resource jobs (monitor omits both marks when one jid has all online CPUs **and** all available GPUs) look identical to exclusive file-mode samples; do **not** invent membership or `dev=j:` for them **on CPU/host rows**. Exception: **`host_mem_job`** (below) still stamps.
 
 **Monitor mark emit (consumer expects):**
 
@@ -41,7 +41,11 @@ Sample header stays one jobid token. Unknown `%` lines (`%begin`, `%end`) stay i
 
 ## Stamp
 
-After a shared sample header whose jid is not `-`, non-GPU rows get `dev=j:<jid>` **before** collapse and collapse keeps that token in the group key. GPU types keep hardware `dev`. Exclusive payloads and sole full-resource payloads (no `%jobs`) still collapse to `dev=''`.
+After a shared sample header whose jid is not `-`, non-GPU rows get `dev=j:<jid>` **before** collapse and collapse keeps that token in the group key. GPU types keep hardware `dev`. Exclusive payloads and sole full-resource payloads (no `%jobs`) still collapse to `dev=''` **except** `host_mem_job`.
+
+## `host_mem_job` (job-scoped cgroup memory)
+
+Monitor (`--enable-shared-node-multi-jid`) emits type **`host_mem_job`** on each jid payload (including sole full-resource unmarked jobs). Wire device is the jid; consumer **always** persists **`dev=j:<jid>`** (idempotent if already `j:`-prefixed). KEYS (`U=KB`): `mem_used`, `mem_peak`, `anon_pages`, `file_pages`, `mapped`, `dirty`, `writeback`, `page_tables`. Job-cgroup semantics — **not** NUMA `host_mem`. Do **not** add `host_mem_job` to `host_mem_type_names()` / Summary mem dual-read. Idle `-` headers omit useful stamps.
 
 ## AMQP multi-header bodies
 
@@ -55,4 +59,4 @@ Listend and sync_timedb (line parse and streaming) call the same helper. Writes 
 
 ## Deploy
 
-Migration `0036` and this consumer land before a monitor built with `--enable-shared-node-multi-jid`. File-mode monitors and `/var/run/stats_jobid` stay valid.
+Migration `0036` and this consumer land before a monitor built with `--enable-shared-node-multi-jid`. File-mode monitors and `/var/run/stats_jobid` stay valid. Prefer consumer before or with monitors that emit `host_mem_job`.

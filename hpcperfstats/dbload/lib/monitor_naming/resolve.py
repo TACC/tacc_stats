@@ -405,7 +405,9 @@ def host_roofline_peak_type_names() -> tuple[str, ...]:
 
 def host_mem_type_names() -> tuple[str, ...]:
   """
-  Host mem type names.
+  Host mem type names (NUMA ``host_mem`` / legacy ``mem`` only).
+
+  Does **not** include ``host_mem_job`` (job-scoped cgroup series).
 
   Returns:
     tuple[str, ...]: tuple[str, ...] produced by this call.
@@ -416,6 +418,20 @@ def host_mem_type_names() -> tuple[str, ...]:
   return _names_canonical_then_legacy(
     canon.HOST_MEM_TYPE, leg.LEGACY_HOST_MEM_TYPE
   )
+
+
+def host_mem_job_type_names() -> tuple[str, ...]:
+  """
+  Job-scoped cgroup memory type names (``host_mem_job`` only).
+
+  Returns:
+    tuple[str, ...]: Canonical type tuple for future readers.
+
+  Examples:
+    >>> host_mem_job_type_names()
+    ('host_mem_job',)
+  """
+  return (canon.HOST_MEM_JOB_TYPE,)
 
 
 def host_cpu_type_names() -> tuple[str, ...]:

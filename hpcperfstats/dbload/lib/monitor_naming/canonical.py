@@ -29,6 +29,7 @@ Attributes:
   HOST_IB_EXT_TYPE: Attribute.
   HOST_IB_TYPE: Attribute.
   HOST_LNET_TYPE: Attribute.
+  HOST_MEM_JOB_TYPE: Attribute.
   HOST_MEM_TYPE: Attribute.
   HOST_NET_TYPE: Attribute.
   HOST_NFS_TYPE: Attribute.
@@ -150,6 +151,8 @@ MEM_FREE = "mem_free"
 
 HOST_CPU_TYPE = "host_cpu"
 HOST_MEM_TYPE = "host_mem"
+# Job-scoped cgroup memory (shared-node); not NUMA host_mem dual-read.
+HOST_MEM_JOB_TYPE = "host_mem_job"
 HOST_BLOCK_TYPE = "host_block"
 HOST_NET_TYPE = "host_net"
 HOST_NUMA_TYPE = "host_numa"

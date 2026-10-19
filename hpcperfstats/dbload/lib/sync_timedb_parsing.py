@@ -26,6 +26,7 @@ Attributes:
   _EMPTY_DELTA_ARC_COLUMNS: Attribute.
   _GPU_STATS_TYPES: Attribute.
   _HOST_CPU_HW_TYPES: Attribute.
+  _HOST_MEM_JOB_TYPE: Attribute.
   _NVIDIA_GPU_KNOWN_EVENTS: Attribute.
   _NVIDIA_GPU_MAX_EVENTS: Attribute.
   _NVIDIA_GPU_MEAN_EVENTS: Attribute.
@@ -735,6 +736,8 @@ _DCGM_CPU_POWER_SOCKET_GAUGE_EVENTS = frozenset(
 
 _HOST_CPU_HW_TYPES = frozenset({HOST_CPU_HW_TYPE, LEGACY_HOST_CPU_HW_TYPE})
 _GPU_STATS_TYPES = frozenset({"nvidia_gpu", "amd_gpu", "intel_gpu"})
+# Job-scoped cgroup memory (monitor ``host_mem_job``); always ``dev=j:<jid>``.
+_HOST_MEM_JOB_TYPE = "host_mem_job"
 
 # Non-GPU collapse drops hardware ``dev`` (sum across devices) unless the
 # token is a shared-node job stamp ``j:<jid>``, which stays in the group key.
@@ -2266,6 +2269,9 @@ def _shared_row_dev(dev: str, typ: str, jid: Any, shared: bool) -> str:
   """
   Stamp shared-node non-GPU rows with ``j:<jid>`` before collapse.
 
+  ``host_mem_job`` always stamps ``j:<jid>`` (even without ``%jobs``), because
+  sole full-resource samples still emit per-jid cgroup memory.
+
   Args:
     dev (str): Monitor device token.
     typ (str): Stats type after legacy rename.
@@ -2280,8 +2286,18 @@ def _shared_row_dev(dev: str, typ: str, jid: Any, shared: bool) -> str:
     'j:42'
     >>> _shared_row_dev("0", "nvidia_gpu", "42", True)
     '0'
+    >>> _shared_row_dev("62909", "host_mem_job", "62909", False)
+    'j:62909'
   """
-  if not shared or typ in _GPU_STATS_TYPES or not jid or jid in ("-", "0"):
+  if typ in _GPU_STATS_TYPES:
+    return dev
+  if not jid or jid in ("-", "0"):
+    return dev
+  if typ == _HOST_MEM_JOB_TYPE:
+    if isinstance(dev, str) and dev.startswith("j:"):
+      return dev[:64]
+    return f"j:{jid}"[:64]
+  if not shared:
     return dev
   return f"j:{jid}"[:64]
 

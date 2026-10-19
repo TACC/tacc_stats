@@ -2,6 +2,8 @@
 types:
   cpu: host_cpu
   mem: host_mem
+  # Additive identity: job-scoped cgroup mem (not an alias of host_mem).
+  host_mem_job: host_mem_job
   vm: host_vm
   ps: host_ps
   numa: host_numa
