@@ -1,0 +1,40 @@
+---
+description: Keep the privileged monitor systemd sandbox, device access, packaging, docs, and tests coherent
+globs:
+  - HPCPerfStats/monitor/src/hpcperfstats.service
+  - HPCPerfStats/monitor/hpcperfstats.spec
+  - HPCPerfStats/monitor/tests/test_hpcperfstats_service*.sh
+  - HPCPerfStats/monitor/tests/test_service_unit_lshw.sh
+alwaysApply: false
+---
+
+**Activation:** Read this rule before editing a matched unit, package, or service-contract test.
+
+# Monitor systemd service contract
+
+`hpcperfstatsd` remains root-by-design for perf/LIKWID, IB/OPA MAD, and GPU access. Limit its blast radius in the shipped unit without hiding required devices.
+
+## Required unit invariants
+
+- Keep `PrivateTmp=true`, `ProtectSystem=strict`, `ProtectHome=true`,
+  `ProtectKernelTunables=true`, `ProtectControlGroups=true`, and
+  `NoNewPrivileges=true`.
+- Keep `RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6 AF_NETLINK`.
+- Keep writable paths explicit with `ReadWritePaths=/var/lib/hpcperfstats /run`.
+- Do **not** add `PrivateDevices=true`: collectors require IB, GPU, and perf devices.
+- Preserve the DCGM `lshw` `BindReadOnlyPaths` mappings and stub-first `PATH`.
+- Do not claim privilege dropping or add `User=` / `CapabilityBoundingSet=` without a
+  dedicated, fleet-validated design.
+
+## Coupled updates
+
+- If writable paths change, update the RPM-owned directories, runtime defaults,
+  README privilege model, and `monitor-runtime-path-coherence.mdc`.
+- Keep `tests/test_hpcperfstats_service_sandbox.sh` and
+  `tests/test_service_unit_lshw.sh` registered in `tests/Makefile.am`.
+- Verify the shell contracts and `rpmspec -P hpcperfstats.spec`; use
+  `systemd-analyze verify` when available, then leave fleet restart/collector smoke
+  as an explicit operator handoff when it cannot run locally.
+
+Cross-links: **monitor-security-hardening**, **monitor-dcgm-integration**,
+**monitor-runtime-path-coherence**, **monitor-version-and-packaging**.

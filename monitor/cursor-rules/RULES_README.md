@@ -14,7 +14,7 @@ Loaded every agent turn. Keep these short; do not add more `alwaysApply: true` f
 | `workspace-single-cursor-directory.mdc` | Exactly one `<workspace_root>/.cursor/`; no nested `.cursor/` under git paths |
 | `out-of-monitor-hpcperfstats-rules.mdc` | Authorized non-monitor work loads `hpcperfstats/cursor-rules/` |
 
-## Domain rules (~35 files — `alwaysApply: false`)
+## Domain rules (54 files — `alwaysApply: false`)
 
 **Mandatory when triggered**, not optional. Agents must use the **Read** tool on matching rules from the router in `agent-discipline-core.mdc` before editing trigger paths.
 
@@ -28,7 +28,9 @@ Notable contracts (see filename in `HPCPerfStats/monitor/cursor-rules/`):
 - **`monitor-consumer-side-plan.mdc`** — secondary consumer plan when emit changes need ingest work
 - **`monitor-shm-validation-probe-parity.mdc`** — collector `dev` enumeration must match `host_live_probes.py`
 - **`monitor-beegfs-procfs.mdc`** — BeeGFS client detect + bounded `beegfs-ctl` (never `Sum:`); capacity via `statvfs`
-- **`monitor-security-hardening.mdc`** — privileged dump/shm/`dlopen`/exec/conf hardening (F6 unit sandbox is a separate plan)
+- **`monitor-security-hardening.mdc`** — privileged dump/shm/`dlopen`/exec/conf hardening
+- **`monitor-systemd-service-contract.mdc`** — root-daemon sandbox invariants, required device access, and unit/package/test coupling
+- **`monitor-runtime-path-coherence.mdc`** — default path synchronization across CLI, startup permissions, systemd, RPM, docs, and tests
 - **`monitor-roofline-peak-detect.mdc`** — `host_roofline_peak` NVML/smi/DRM/EDAC gaps + allowlisted GB200/Grace identity
 - **`monitor-xpum-integration.mdc`** — Intel PVC / XPU Manager (`intel_gpu`, vendored headers, libxpum dlopen)
 - **`monitor-likwid-overlay.mdc`** — aarch64 DCGM+LIKWID hybrid: LIKWID overlay cycles/inst on `host_cpu_hw` (fail-soft; CYC+INS eventset)

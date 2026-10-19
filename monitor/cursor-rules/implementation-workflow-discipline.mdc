@@ -38,7 +38,9 @@ Use these during **plan**, **implement**, **self-review**, and **verification** 
 | [monitor-consumer-schema-migration.mdc](monitor-consumer-schema-migration.mdc) | Breaking output migrations |
 | [monitor-consumer-side-plan.mdc](monitor-consumer-side-plan.mdc) | Consumer handoff plans |
 | [monitor-debug-shm.mdc](monitor-debug-shm.mdc) | DEBUG `/dev/shm` mirror (`schema`/`fast`/`full`) |
-| [monitor-security-hardening.mdc](monitor-security-hardening.mdc) | Dump/shm/`dlopen`/exec/conf path hardening (non-F6) |
+| [monitor-security-hardening.mdc](monitor-security-hardening.mdc) | Privileged dump/shm/`dlopen`/exec/conf path hardening |
+| [monitor-systemd-service-contract.mdc](monitor-systemd-service-contract.mdc) | Root-daemon systemd sandbox, device access, package/test coupling |
+| [monitor-runtime-path-coherence.mdc](monitor-runtime-path-coherence.mdc) | Default paths across CLI, startup modes, unit allowlists, RPM, docs, tests |
 | [monitor-debug-vs-symbols.mdc](monitor-debug-vs-symbols.mdc) | `--enable-debug` vs `-g`; release quiet logging policy |
 | [monitor-roofline-peak-detect.mdc](monitor-roofline-peak-detect.mdc) | `host_roofline_peak` NVML/smi/DRM/EDAC + allowlisted identity |
 | [monitor-shm-message-correctness.mdc](monitor-shm-message-correctness.mdc) | Capability slug, validators, shm goldens |

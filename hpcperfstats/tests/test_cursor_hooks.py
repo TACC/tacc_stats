@@ -2330,6 +2330,23 @@ def test_triggered_rules_for_monitor_src_path():
   assert "monitor-workspace-contract.mdc" in rules
 
 
+def test_triggered_rules_for_monitor_systemd_service_contract():
+  rules = triggered_rules_for_paths(
+    ["HPCPerfStats/monitor/src/hpcperfstats.service"],
+  )
+  assert "monitor-systemd-service-contract.mdc" in rules
+  assert "monitor-runtime-path-coherence.mdc" in rules
+  assert "monitor-security-hardening.mdc" not in rules
+
+
+def test_triggered_rules_for_monitor_runtime_path_contract():
+  rules = triggered_rules_for_paths(
+    ["HPCPerfStats/monitor/src/monitor_cli.c"],
+  )
+  assert "monitor-runtime-path-coherence.mdc" in rules
+  assert "monitor-security-hardening.mdc" not in rules
+
+
 def test_triggered_rules_for_monitor_cursor_rules_path():
   rules = triggered_rules_for_paths(
     ["HPCPerfStats/monitor/cursor-rules/plan-completion-gate.mdc"],

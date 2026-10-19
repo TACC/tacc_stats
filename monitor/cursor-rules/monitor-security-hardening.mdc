@@ -14,8 +14,6 @@ globs:
   - HPCPerfStats/monitor/src/roofline_hw_peak*
   - HPCPerfStats/monitor/hpcperfstats.spec
   - HPCPerfStats/monitor/scripts/check_unsafe_c_patterns*
-  - HPCPerfStats/monitor/src/hpcperfstats.service
-  - HPCPerfStats/monitor/src/monitor_cli.c
 alwaysApply: false
 ---
 
@@ -29,7 +27,7 @@ Root-privileged daemon paths must not trust world-writable directories, PATH loo
 
 | Area | Law |
 |------|-----|
-| Dump / stats dirs | Default dump under `/var/lib/hpcperfstats/dump` (not `/tmp`); create/validate via `ensure_private_dir(..., 0700)` |
+| Dump / stats dirs | Sensitive directories use `ensure_private_dir(..., 0700)`; default-path synchronization is governed by `monitor-runtime-path-coherence.mdc` |
 | Append / create | `O_NOFOLLOW` (+ `O_CLOEXEC`); create mode `0600` (or tighter) — never `0666` |
 | Daemon umask | Prefer restrictive `umask(0077)` after fork; do not rely on umask alone |
 | Dumpfile list | Single-pass growable list with authoritative `out_n`; no precount/`calloc(n)` TOCTOU |
@@ -39,7 +37,6 @@ Root-privileged daemon paths must not trust world-writable directories, PATH loo
 | `popen` | Absolute binary path in the command string; allowlist via `check_unsafe_c_patterns.sh` |
 | BeeGFS cfg | `beegfs_path_is_safe` rejects `.` / `..` path components |
 | Conf install | `hpcperfstats.conf` RPM install mode **`0600`** (holds broker secrets) |
-| systemd unit (F6) | Shipped **`hpcperfstats.service`** must keep `PrivateTmp`, `ProtectSystem=strict`, `ProtectHome`, `ProtectKernelTunables`, `ProtectControlGroups`, `NoNewPrivileges`, `RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6 AF_NETLINK`, `ReadWritePaths=/var/lib/hpcperfstats /run`; **do not** add `PrivateDevices=true` (IB/GPU/perf nodes). Do not remove sandbox keys without fleet justification; no in-process setuid-drop claims without a dedicated plan |
 
 ## Out of scope here
 
@@ -50,4 +47,6 @@ Root-privileged daemon paths must not trust world-writable directories, PATH loo
 - Unit: `tests/test_secure_path.c`, `tests/test_dyn_lib_path.c`, overflow cases in `test_stats_buffer_data_append.c`, BeeGFS path tests in `test_beegfs_ctl_parse.c`
 - `scripts/check_unsafe_c_patterns.sh` — forbid new `system` / `execvp` / relative `popen`
 
-Cross-links: **monitor-debug-shm**, **monitor-c-conventions**, **monitor-version-and-packaging**.
+Cross-links: **monitor-debug-shm**, **monitor-c-conventions**,
+**monitor-runtime-path-coherence**, **monitor-systemd-service-contract**,
+**monitor-version-and-packaging**.

@@ -1,0 +1,47 @@
+---
+description: Synchronize monitor runtime path defaults across CLI, security, systemd, RPM, docs, and tests
+globs:
+  - HPCPerfStats/monitor/src/monitor_cli.c
+  - HPCPerfStats/monitor/src/monitor_options.c
+  - HPCPerfStats/monitor/src/hpcperfstats.service
+  - HPCPerfStats/monitor/hpcperfstats.spec
+  - HPCPerfStats/monitor/tests/test_monitor_cli.c
+  - HPCPerfStats/monitor/tests/test_hpcperfstats_service*.sh
+alwaysApply: false
+---
+
+**Activation:** Read this rule before changing a matched runtime default, package
+path, writable-path allowlist, or path contract test.
+
+# Monitor runtime path coherence
+
+A persistent path is a cross-layer contract. A default change is incomplete until
+every producer, permission boundary, package owner, operator-facing string, and test
+agrees.
+
+## Required synchronization
+
+For a default dump, pid, config, or other persistent/runtime path, inspect and update:
+
+1. Canonical default literal in `src/monitor_cli.c`.
+2. CLI help and override behavior in `src/monitor_options.c`.
+3. Startup creation/validation and mode (`ensure_private_dir(..., 0700)` for
+   sensitive spool directories).
+4. `hpcperfstats.service` writable-path allowlists under `ProtectSystem=strict`.
+5. RPM `%install` creation, explicit mode, and `%files` ownership in
+   `hpcperfstats.spec`.
+6. README privilege/deployment text and the smallest literal/unit/spec regression
+   tests.
+
+## Safety and verification
+
+- Sensitive persistent defaults belong under `/var/lib/hpcperfstats`, not shared
+  `/tmp`; command-line overrides remain supported unless deliberately deprecated.
+- Never widen `ReadWritePaths` to `/`, `/etc`, `/home`, or an unconstrained parent to
+  make one path work.
+- Run the targeted CLI and service shell contracts plus
+  `rpmspec -P hpcperfstats.spec`; packaging/build verification remains governed by
+  `monitor-static-build-verification.mdc`.
+
+Cross-links: **monitor-security-hardening**, **monitor-systemd-service-contract**,
+**monitor-static-build-verification**, **monitor-version-and-packaging**.

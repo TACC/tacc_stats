@@ -757,10 +757,6 @@ MONITOR_ROUTER_ENTRIES: list[RouterEntry] = [
       "HPCPerfStats/monitor/src/roofline_hw_peak*",
       "HPCPerfStats/monitor/hpcperfstats.spec",
       "HPCPerfStats/monitor/scripts/check_unsafe_c_patterns*",
-      "HPCPerfStats/monitor/src/hpcperfstats.service",
-      "HPCPerfStats/monitor/src/monitor_cli.c",
-      "monitor/src/hpcperfstats.service",
-      "monitor/src/monitor_cli.c",
       "monitor/src/secure_path.*",
       "monitor/src/dyn_lib_path.*",
       "monitor/src/fileio.h",
@@ -777,6 +773,42 @@ MONITOR_ROUTER_ENTRIES: list[RouterEntry] = [
     ],
     "rules": [
       "monitor-security-hardening.mdc",
+    ],
+  },
+  {
+    "id": "monitor_systemd_service_contract",
+    "patterns": [
+      "HPCPerfStats/monitor/src/hpcperfstats.service",
+      "HPCPerfStats/monitor/hpcperfstats.spec",
+      "HPCPerfStats/monitor/tests/test_hpcperfstats_service*.sh",
+      "HPCPerfStats/monitor/tests/test_service_unit_lshw.sh",
+      "monitor/src/hpcperfstats.service",
+      "monitor/hpcperfstats.spec",
+      "monitor/tests/test_hpcperfstats_service*.sh",
+      "monitor/tests/test_service_unit_lshw.sh",
+    ],
+    "rules": [
+      "monitor-systemd-service-contract.mdc",
+    ],
+  },
+  {
+    "id": "monitor_runtime_path_coherence",
+    "patterns": [
+      "HPCPerfStats/monitor/src/monitor_cli.c",
+      "HPCPerfStats/monitor/src/monitor_options.c",
+      "HPCPerfStats/monitor/src/hpcperfstats.service",
+      "HPCPerfStats/monitor/hpcperfstats.spec",
+      "HPCPerfStats/monitor/tests/test_monitor_cli.c",
+      "HPCPerfStats/monitor/tests/test_hpcperfstats_service*.sh",
+      "monitor/src/monitor_cli.c",
+      "monitor/src/monitor_options.c",
+      "monitor/src/hpcperfstats.service",
+      "monitor/hpcperfstats.spec",
+      "monitor/tests/test_monitor_cli.c",
+      "monitor/tests/test_hpcperfstats_service*.sh",
+    ],
+    "rules": [
+      "monitor-runtime-path-coherence.mdc",
     ],
   },
   {

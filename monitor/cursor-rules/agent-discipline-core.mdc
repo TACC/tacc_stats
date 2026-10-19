@@ -58,7 +58,9 @@ Use the **Read** tool on the listed `HPCPerfStats/monitor/cursor-rules/<file>.md
 | Collector device enumeration (`net.c`, `mem.c`, …) or `host_live_probes.py` | `monitor-shm-validation-probe-parity.mdc` |
 | `HPCPerfStats/monitor/src/beegfs*`, `tests/test_beegfs*`, `tests/fixtures/beegfs/**` | `monitor-beegfs-procfs.mdc` |
 | `HPCPerfStats/monitor/src/roofline_hw_peak*`, `tests/test_roofline*` | `monitor-roofline-peak-detect.mdc` |
-| `secure_path.*`, `dyn_lib_path.*`, `fileio.h`, `daemonize.c`, `monitor_daemon.c` (dump list), `stats_buffer_debug_shm.*`, `*_dyn.c` (env dlopen), `beegfs*`, `intel_gpu_xpumcli.c`, `hwdetect.c`, `roofline_hw_peak*`, `hpcperfstats.spec` (conf mode), `hpcperfstats.service`, `monitor_cli.c`, `scripts/check_unsafe_c_patterns*` | `monitor-security-hardening.mdc` |
+| `secure_path.*`, `dyn_lib_path.*`, `fileio.h`, `daemonize.c`, `monitor_daemon.c` (dump list), `stats_buffer_debug_shm.*`, `*_dyn.c` (env dlopen), `beegfs*`, `intel_gpu_xpumcli.c`, `hwdetect.c`, `roofline_hw_peak*`, `hpcperfstats.spec` (conf mode), `scripts/check_unsafe_c_patterns*` | `monitor-security-hardening.mdc` |
+| `hpcperfstats.service`, `hpcperfstats.spec`, `tests/test_hpcperfstats_service*.sh`, `tests/test_service_unit_lshw.sh` | `monitor-systemd-service-contract.mdc` |
+| `monitor_cli.c`, `monitor_options.c`, `hpcperfstats.service`, `hpcperfstats.spec`, `tests/test_monitor_cli.c`, `tests/test_hpcperfstats_service*.sh` | `monitor-runtime-path-coherence.mdc` |
 
 ### Emit contract, RabbitMQ, schema
 
