@@ -17,6 +17,7 @@
 #include "string1.h"
 #include "monitor_log.h"
 #include "proc_status.h"
+#include "proc_filter.h"
 
 #define KEYS                                                                                       \
   X(uid, "", "user id"), X(vm_peak, "U=kB", "Peak vm size"),                                       \
@@ -146,28 +147,7 @@ out:
 
 static int proc_filter_pid(const struct dirent *dir)
 {
-  char path[32];
-  struct stat dirinfo;
-  struct passwd *pwd;
-
-  if (fnmatch("[1-9]*", dir->d_name, 0))
-    return 0;
-
-  if (snprintf(path, sizeof(path), "/proc/%s", dir->d_name) >= (int)sizeof(path))
-    return 0;
-
-  if (stat(path, &dirinfo) < 0 || dirinfo.st_uid == 0) {
-    TRACE("Do not include this proc entry %s", path);
-    return 0;
-  }
-
-  pwd = getpwuid(dirinfo.st_uid);
-  if (pwd == NULL || !strcmp("postfix", pwd->pw_name) || !strcmp("rpc", pwd->pw_name) ||
-      !strcmp("rpcuser", pwd->pw_name) || !strcmp("dbus", pwd->pw_name) ||
-      !strcmp("daemon", pwd->pw_name) || !strcmp("ntp", pwd->pw_name))
-    return 0;
-
-  return 1;
+  return proc_filter_pid_at_root("/proc", dir);
 }
 
 static void proc_collect(struct stats_type *type)

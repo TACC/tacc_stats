@@ -61,6 +61,16 @@ hpcperfstatsd_CPPFLAGS += \
 	@MONITOR_ARCH_CPPFLAG@
 endif
 
+if MONITOR_SHARED_NODE_MULTI_JID
+hpcperfstatsd_CPPFLAGS += \
+	-DMONITOR_SHARED_NODE_MULTI_JID
+endif
+
+if GPU
+hpcperfstatsd_CPPFLAGS += \
+	-DMONITOR_HAVE_NVIDIA_GPU
+endif
+
 hpcperfstatsd_SOURCES = \
 	collect.h \
 	collect.c \
@@ -157,6 +167,17 @@ hpcperfstatsd_SOURCES += \
 	stats_buffer_rows.h \
 	stats_buffer_uts.c \
 	stats_buffer_uts.h
+if MONITOR_SHARED_NODE_MULTI_JID
+hpcperfstatsd_SOURCES += \
+	job_proc_discover.c \
+	job_proc_discover.h \
+	job_sched_affinity.c \
+	job_sched_affinity.h \
+	job_gpu_assign.c \
+	job_gpu_assign.h \
+	job_shared_emit.c \
+	job_shared_emit.h
+endif
 hpcperfstatsd_CPPFLAGS += \
 	-DRABBITMQ \
 	$(MONITOR_AMQP_TIMEOUT_CPPFLAGS)
@@ -195,6 +216,8 @@ TYPES 	= \
 	host_edac_mem_topology.c \
 	host_edac_mem_topology.h \
 	proc.c \
+	proc_filter.c \
+	proc_filter.h \
 	proc_status.c \
 	proc_status.h \
 	ps.c \

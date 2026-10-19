@@ -42,6 +42,8 @@ BuildRequires: pciutils
 # Omni-Path STL MAD (--enable-opa): optional; requires Cornelis/Intel IFS liboib_utils.
 # host_opa sysfs collection is always built (hfi1_*); MAD is additive when IFS is present.
 # Intel PVC / XPU Manager (--enable-intel-gpu): vendored third_party/intel-xpum headers; runtime dlopen libxpum.
+# Shared-node multi-jid (--enable-shared-node-multi-jid): fleet opt-in only; default RPM builds
+# without the flag (file jobid / stats_jobid). Shared fleets must deploy listend first.
 # BuildRequires: libibmad-devel
 # BuildRequires: (site-specific) cornelis-opa / opa-liboib_utils devel for --enable-opa
 # RuntimeRequires (PVC nodes): xpumanager providing libxpum.so — not a BuildRequires (dlopen).

@@ -48,6 +48,10 @@ int stats_buffer_mark(struct stats_buffer *sf, const char *fmt, ...)
     __attribute__((format(printf, 2, 3)));
 int stats_buffer_write(struct stats_buffer *sf);
 int stats_buffer_collect(struct stats_buffer *sf);
+
+/*! Freeze sample header timestamp for a multi-payload burst; NULL clears.
+ *  When set, stats_buffer_collect reuses *ts instead of clock_gettime. */
+void stats_buffer_set_frozen_time(const struct timespec *ts);
 enum stats_row_tier stats_buffer_payload_row_tier(const struct stats_buffer *sf);
 int stats_wr_hdr(struct stats_buffer *sf);
 int stats_buffer_resend(struct stats_buffer *sf);

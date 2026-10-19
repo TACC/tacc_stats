@@ -13,6 +13,14 @@
 
 static char *row_line_buf;
 static size_t row_line_cap;
+static stats_buffer_row_filter_fn g_row_filter;
+static void *g_row_filter_ctx;
+
+void stats_buffer_set_row_filter(stats_buffer_row_filter_fn fn, void *ctx)
+{
+  g_row_filter = fn;
+  g_row_filter_ctx = ctx;
+}
 
 static void stats_buffer_append_fmt(struct stats_buffer *sf, const char *fmt, ...)
     __attribute__((format(printf, 2, 3)));
@@ -102,6 +110,8 @@ void stats_buffer_append_enabled_type_rows(struct stats_buffer *sf, enum stats_r
     while ((dev = dict_for_each(&type->st_current_dict, &j)) != NULL) {
       struct stats *stats = key_to_stats(dev);
 
+      if (g_row_filter != NULL && !g_row_filter(type->st_name, stats->s_dev, g_row_filter_ctx))
+        continue;
       if (stats_buffer_append_type_row(sf, type, stats, tier) < 0)
         stats_buffer_append_type_row_fallback(sf, type, stats, tier);
     }

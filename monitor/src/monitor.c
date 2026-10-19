@@ -59,10 +59,14 @@ static void monitor_rmq_io_tick_cb(struct ev_loop *loop, ev_timer *w, int revent
 
 static void monitor_load_initial_jobid(void)
 {
+#ifdef MONITOR_SHARED_NODE_MULTI_JID
+  snprintf(jobid, sizeof jobid, "%s", "-");
+#else
   if (jobid_file_path == NULL)
     snprintf(jobid, sizeof jobid, "%s", "-");
   else if (pscanf(jobid_file_path, "%79s", jobid) < 1)
     snprintf(jobid, sizeof jobid, "%s", "-");
+#endif
 }
 
 static void monitor_start_timers_and_jobid_watcher(struct sf_ring_buffer *rb)
@@ -85,11 +89,18 @@ static void monitor_start_timers_and_jobid_watcher(struct sf_ring_buffer *rb)
                    MONITOR_DAEMON_SCHEMA_ROTATE_SEC);
 #endif
 
+#ifndef MONITOR_SHARED_NODE_MULTI_JID
   fd_watcher.data = (void *)rb;
   ev_stat_init(&fd_watcher, monitor_daemon_fd_cb, jobid_file_path, EV_READ);
   ev_stat_start(EV_DEFAULT, &fd_watcher);
 #ifdef DEBUG
   monitor_log_info("Starting hpcperfstatsd watching fd %s\n", jobid_file_path);
+#endif
+#else
+  (void)fd_watcher;
+#ifdef DEBUG
+  monitor_log_info("Shared-node multi-jid build: skipping stats_jobid watcher\n");
+#endif
 #endif
 
   sample_timer.data = (void *)rb;

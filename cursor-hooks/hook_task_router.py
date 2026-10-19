@@ -756,6 +756,28 @@ MONITOR_ROUTER_ENTRIES: list[RouterEntry] = [
     ],
   },
   {
+    "id": "monitor_shared_node_affinity",
+    "patterns": [
+      "HPCPerfStats/monitor/src/job_proc_discover.*",
+      "HPCPerfStats/monitor/src/job_gpu_assign.*",
+      "HPCPerfStats/monitor/src/job_sched_affinity.*",
+      "HPCPerfStats/monitor/src/job_shared_emit.*",
+      "HPCPerfStats/monitor/src/monitor_daemon.c",
+      "HPCPerfStats/monitor/src/monitor.c",
+      "HPCPerfStats/monitor/tests/test_job_*",
+      "monitor/src/job_proc_discover.*",
+      "monitor/src/job_gpu_assign.*",
+      "monitor/src/job_sched_affinity.*",
+      "monitor/src/job_shared_emit.*",
+      "monitor/src/monitor_daemon.c",
+      "monitor/src/monitor.c",
+      "monitor/tests/test_job_*",
+    ],
+    "rules": [
+      "shared-node-affinity-monitor-contract.mdc",
+    ],
+  },
+  {
     "id": "monitor_security_hardening",
     "patterns": [
       "HPCPerfStats/monitor/src/secure_path.*",

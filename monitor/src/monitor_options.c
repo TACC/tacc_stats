@@ -9,6 +9,13 @@
 #include "monitor_daemon.h"
 #include "monitor_log.h"
 #include "monitor_options.h"
+#ifdef MONITOR_SHARED_NODE_MULTI_JID
+#include "job_shared_emit.h"
+
+int jid_require_step_id;
+int jid_discover_pid_cap = 4096;
+int affinity_pid_sample_limit = 8;
+#endif
 
 static int parse_double_arg(const char *raw, double *out)
 {
@@ -240,4 +247,27 @@ void monitor_options_apply_daemon_conf_kv(const char *key, const char *value_lin
     monitor_log_debug("%s: Setting jobid file to %s based on file %s\n", app_name, jobid_file_path,
                       conf_file_name);
   }
+#ifdef MONITOR_SHARED_NODE_MULTI_JID
+  if (strcmp(key, "jid_require_step_id") == 0) {
+    jid_require_step_id = (atoi(value_line) != 0) ? 1 : 0;
+    monitor_log_debug("%s: Setting jid_require_step_id to %d based on file %s\n", app_name,
+                      jid_require_step_id, conf_file_name);
+  }
+  if (strcmp(key, "jid_discover_pid_cap") == 0) {
+    int v = atoi(value_line);
+
+    if (v > 0)
+      jid_discover_pid_cap = v;
+    monitor_log_debug("%s: Setting jid_discover_pid_cap to %d based on file %s\n", app_name,
+                      jid_discover_pid_cap, conf_file_name);
+  }
+  if (strcmp(key, "affinity_pid_sample_limit") == 0) {
+    int v = atoi(value_line);
+
+    if (v > 0)
+      affinity_pid_sample_limit = v;
+    monitor_log_debug("%s: Setting affinity_pid_sample_limit to %d based on file %s\n", app_name,
+                      affinity_pid_sample_limit, conf_file_name);
+  }
+#endif
 }

@@ -196,6 +196,19 @@ enum stats_row_tier stats_buffer_payload_row_tier(const struct stats_buffer *sf)
                                       (int)collect_tier_get_phase());
 }
 
+static int g_have_frozen_time;
+static struct timespec g_frozen_time;
+
+void stats_buffer_set_frozen_time(const struct timespec *ts)
+{
+  if (ts == NULL) {
+    g_have_frozen_time = 0;
+    return;
+  }
+  g_frozen_time = *ts;
+  g_have_frozen_time = 1;
+}
+
 int stats_buffer_collect(struct stats_buffer *sf)
 {
   int rc = 0;
@@ -206,8 +219,11 @@ int stats_buffer_collect(struct stats_buffer *sf)
 #ifdef STATS_BUFFER_TEST_TIME_HOOK
   time.tv_sec = 1234567890;
   time.tv_nsec = 0;
+  (void)g_have_frozen_time;
 #else
-  if (clock_gettime(CLOCK_REALTIME, &time) != 0) {
+  if (g_have_frozen_time) {
+    time = g_frozen_time;
+  } else if (clock_gettime(CLOCK_REALTIME, &time) != 0) {
     monitor_log_error("cannot clock_gettime(): %m\n");
     rc = -1;
     goto out;

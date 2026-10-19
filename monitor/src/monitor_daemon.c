@@ -39,6 +39,9 @@
 #include "monitor_release_log.h"
 #include "stats_sink.h"
 #include "stats_runtime.h"
+#ifdef MONITOR_SHARED_NODE_MULTI_JID
+#include "job_shared_emit.h"
+#endif
 
 char *app_name = NULL;
 char *conf_file_name = NULL;
@@ -183,7 +186,7 @@ static void monitor_daemon_log_dumpfile_resend_line(void)
 #endif
 }
 
-static struct stats_buffer *monitor_daemon_alloc_stats_buffer(void)
+struct stats_buffer *monitor_daemon_alloc_stats_buffer(void)
 {
   struct stats_buffer *sf = malloc(sizeof(*sf));
   if (sf == NULL) {
@@ -798,7 +801,11 @@ void monitor_daemon_sample_timer_cb(struct ev_loop *loop, ev_timer *w_, int reve
    * full sample (fast + slow) is taken. When enable_slow_tier is off, phase
    * stays COLLECT_FULL (legacy single-tier behavior). */
   stats_runtime_collect_phase_for_tick(now_s, &monitor_daemon_last_slow_slot, sample_freq_slow);
+#ifdef MONITOR_SHARED_NODE_MULTI_JID
+  job_shared_emit_sample_burst(w);
+#else
   monitor_daemon_collect_to_ring(w, 0, NULL);
+#endif
   monitor_daemon_reanchor_sample_timer(loop, sample_timer_period);
   print_buffer_status(w);
 }

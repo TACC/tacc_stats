@@ -49,6 +49,7 @@ void monitor_daemon_prime_file_mode_from_dumpdir(void);
 void monitor_daemon_replay_dumpfiles_if_present(struct sf_ring_buffer *w);
 void monitor_daemon_reanchor_sample_timer(struct ev_loop *loop, double period);
 void monitor_daemon_rotate_collect_flush(struct sf_ring_buffer *w);
+struct stats_buffer *monitor_daemon_alloc_stats_buffer(void);
 
 void monitor_daemon_rotate_timer_cb(struct ev_loop *loop, ev_timer *w_, int revents);
 void monitor_daemon_sample_timer_cb(struct ev_loop *loop, ev_timer *w_, int revents);

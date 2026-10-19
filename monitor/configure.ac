@@ -605,6 +605,22 @@ esac],
 [debug=false])
 AM_CONDITIONAL([DEBUG], [test x$debug = xtrue])
 
+AC_ARG_ENABLE([shared-node-multi-jid],
+[  --enable-shared-node-multi-jid
+                          Discover Slurm jids from /proc and emit per-jid
+                          %jobs/%affinity (default is no; file stats_jobid)],
+[case "${enableval}" in
+  yes) shared_node_multi_jid=true ;;
+  no)  shared_node_multi_jid=false ;;
+  *) AC_MSG_ERROR([bad value ${enableval} for --enable-shared-node-multi-jid]) ;;
+esac],
+[shared_node_multi_jid=false])
+AM_CONDITIONAL([MONITOR_SHARED_NODE_MULTI_JID],
+  [test x$shared_node_multi_jid = xtrue])
+AS_IF([test x$shared_node_multi_jid = xtrue],
+  [AC_DEFINE([MONITOR_SHARED_NODE_MULTI_JID], [1],
+    [Define to 1 to discover multiple Slurm jids from /proc and emit %jobs/%affinity])])
+
 dnl Static libev.a (prefix-static, foreign cross) needs -lm on the probe link; try that first.
 have_libev=no
 AC_SEARCH_LIBS([ev_run], [ev], [have_libev=yes libev=yes],

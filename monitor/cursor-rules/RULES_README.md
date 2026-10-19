@@ -14,12 +14,13 @@ Loaded every agent turn. Keep these short; do not add more `alwaysApply: true` f
 | `workspace-single-cursor-directory.mdc` | Exactly one `<workspace_root>/.cursor/`; no nested `.cursor/` under git paths |
 | `out-of-monitor-hpcperfstats-rules.mdc` | Authorized non-monitor work loads `hpcperfstats/cursor-rules/` |
 
-## Domain rules (54 files — `alwaysApply: false`)
+## Domain rules (55 files — `alwaysApply: false`)
 
 **Mandatory when triggered**, not optional. Agents must use the **Read** tool on matching rules from the router in `agent-discipline-core.mdc` before editing trigger paths.
 
 Notable contracts (see filename in `HPCPerfStats/monitor/cursor-rules/`):
 
+- **`shared-node-affinity-monitor-contract.mdc`** — compile-time multi-jid `%jobs`/`%affinity`; full-resource unmarked fast path; no `scontrol`/`nvidia-smi`/`sched_setaffinity`
 - **`monitor-static-build-verification.mdc`** / **`monitor-dual-verify-cross-and-static.mdc`** — canonical static bundle; foreign cross only for portable / multi-arch diffs (skip ARM for LIKWID-only; skip x86 for DCGM CPU-only)
 - **`monitor-valgrind-cpp-linter-gate.mdc`** — plan-close Valgrind Memcheck + full-tree clang-format/clang-tidy (scripts only; no git hooks)
 - **`tacc-lmod-build-environment.mdc`** — on TACC SSH hosts: Lmod `module avail`/`module load`, fix agent MODULEPATH, Stampede3 build practices

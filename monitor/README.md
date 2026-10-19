@@ -18,7 +18,14 @@ C implementation of the **hpcperfstats** data collector: either a **RabbitMQ dae
 - **RabbitMQ build** (typical for `hpcperfstatsd`): `monitor.c`, `monitor_cli.c`, `monitor_daemon.c`, `stats_buffer.c`, AMQP + libev + LIKWID as configured.
 - **Non–RabbitMQ build**: `main.c`, `stats_file.c`, `stats_file_format.c` — local file client and archive I/O.
 
-Configure selects sources via Automake conditionals; use **`./configure --help`** for options (including **`--enable-all-static`**, **`--enable-metric-profiler`**, **`--with-metric-profiler-backend={none,ebpf}`**, **`--enable-opa`**, and **`--enable-intel-gpu`**).
+Configure selects sources via Automake conditionals; use **`./configure --help`** for options (including **`--enable-all-static`**, **`--enable-metric-profiler`**, **`--with-metric-profiler-backend={none,ebpf}`**, **`--enable-opa`**, **`--enable-intel-gpu`**, and **`--enable-shared-node-multi-jid`**).
+
+### Shared-node multi-jid (`--enable-shared-node-multi-jid`)
+
+- **Default (off):** file `jobid_file` / `/var/run/stats_jobid` with `%begin` / `%end`; no `%jobs` / `%affinity`.
+- **Shared-node build:** discovers Slurm jids from `/proc` (`slurmstepd.scope` + `SLURM_JOB_ID`), emits one RabbitMQ sample per jid with `%jobs` / `%affinity` from read-only `sched_getaffinity`. A sole jid that owns every online CPU and every available GPU uses the ordinary unmarked single-jid payload. Does **not** read `stats_jobid` and never execs `scontrol` / `nvidia-smi`.
+- **Deploy:** upgrade consumer (listend) **before** shared-node monitor RPMs on shared fleets. Conf keys (shared build only): `jid_require_step_id`, `jid_discover_pid_cap`, `affinity_pid_sample_limit`.
+- Verify shared flavor: `./scripts/run_shared_node_static_check.sh` (or `./scripts/build_static_bundle.sh --enable-shared-node-multi-jid` then `make -C .build-static check`).
 
 ### Omni-Path / Cornelis (`host_opa`)
 
