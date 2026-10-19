@@ -1,0 +1,58 @@
+---
+description: Shared-node %jobs/%affinity ingest, job_affinity, and dev=j:<jid> stamp
+alwaysApply: false
+globs:
+  - hpcperfstats/dbload/lib/monitor_mark_side_ingest.py
+  - hpcperfstats/dbload/lib/sync_timedb_parsing.py
+  - hpcperfstats/dbload/lib/listend_db_ingest.py
+  - hpcperfstats/dbload/sync_timedb.py
+---
+
+# Shared-node affinity consumer contract
+
+**Activation:** `alwaysApply: false` — when triggers in `agent-discipline-core.mdc` match, **Read this file before editing**. Triggered rules are mandatory, not optional.
+
+How (discovery, GPU index, ingest order): `.cursor/plans/shared-node-affinity-wiring.plan.md`. This rule is the consumer invariant.
+
+## Wire
+
+```text
+%jobs jids=<jid1,jid2,...>
+%affinity jid=<jid> cpus=<csv-or-ranges> gpus=<csv-or-> cg=<short-optional>
+```
+
+Sample header stays one jobid token. Unknown `%` lines (`%begin`, `%end`) stay ignored.
+
+**Detect shared-node contract** from **`%jobs` with at least one jid** — not from hostname, INI, or “this host runs the shared-node RPM.” Sole full-resource jobs (monitor omits both marks when one jid has all online CPUs **and** all available GPUs) look identical to exclusive file-mode samples; do **not** invent membership or `dev=j:` for them.
+
+**Monitor mark emit (consumer expects):**
+
+| Case | Marks |
+| --- | --- |
+| Sole jid, full CPU **and** full GPU | neither `%jobs` nor `%affinity` |
+| Full CPU but not all GPUs (or reverse) | `%jobs` + `%affinity` when known |
+| Sole partial jid | `%jobs jids=<that jid>` (+ `%affinity` when known) |
+
+## Side table
+
+- `job_affinity`: normal table, unique `(jid, host)`. `cgroup_controls` is provenance (`cg=`), not a cgroup path.
+- No second hypertable. Job membership for a sample is `host_data` itself.
+- No `host_data` UNIQUE / PK migration. Do not store a jid CSV in `host_data.jid`.
+
+## Stamp
+
+After a shared sample header whose jid is not `-`, non-GPU rows get `dev=j:<jid>` **before** collapse and collapse keeps that token in the group key. GPU types keep hardware `dev`. Exclusive payloads and sole full-resource payloads (no `%jobs`) still collapse to `dev=''`.
+
+## AMQP multi-header bodies
+
+Monitor may merge up to 10 non-`$` ring entries into one AMQP body. Attach `%jobs` / `%affinity` to the **digit header block they precede**, not to the whole body. Idle `-` blocks in the same body keep `dev=''`. Regression: `test_multi_header_amqp_body_binds_marks_per_block`.
+
+Listend and sync_timedb (line parse and streaming) call the same helper. Writes are idempotent and fail-open when `job_affinity` is absent. No `/api/affinity/ingest/`.
+
+## Read paths
+
+`LiveJidScopedDistinctHostTimeCount` matches `host_data.jid` or `host_data.dev = 'j:' || job.jid`. `update_metrics` readiness uses the same two keys via `max_host_time_by_jid`. Exclusive jobs match the `jid` column and keep `dev=''`.
+
+## Deploy
+
+Migration `0036` and this consumer land before a monitor built with `--enable-shared-node-multi-jid`. File-mode monitors and `/var/run/stats_jobid` stay valid.

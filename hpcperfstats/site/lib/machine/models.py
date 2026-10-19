@@ -1,6 +1,7 @@
 """
 The database models of hpcperfstats: job_data, metrics_data, host_data,
-proc_data, and RealField. Maps to TimescaleDB/PostgreSQL tables.
+proc_data, job_affinity, and RealField. Maps to
+TimescaleDB/PostgreSQL tables.
 """
 
 from __future__ import annotations
@@ -256,9 +257,10 @@ class host_data(models.Model):
   and job_data.host_list (FQDNs) as the primary path. ``jid`` is filled from the
   monitor sample-header jobid on live listend and archive sync_timedb ingest
   (idle ``-`` stored as NULL) and supports jid-scoped live-distinct / ad-hoc
-  queries. ``dev`` is the monitor device id for GPU types (``""`` when absent);
+  queries.   ``dev`` is the monitor device id for GPU types (``""`` when absent);
   uniqueness includes ``dev`` so multi-GPU samples at the same timestamp are
-  insertable. Table: host_data.
+  insertable. Shared-node non-GPU rows use ``dev=j:<jid>`` (ingest convention,
+  not hardware) so two jobs can share a host second. Table: host_data.
   """
 
   time = models.DateTimeField(primary_key=True)
@@ -345,6 +347,43 @@ class proc_data(models.Model):
       >>> __str__()  # doctest: +SKIP
     """
     return f"{self.jid}:{self.host}:{self.proc}"
+
+
+class job_affinity(models.Model):
+  """
+  Latest per-job CPU and GPU affinity reported by the monitor.
+
+  One row per ``(jid, host)``. ``cpu_list`` stores Linux list pieces from
+  ``%affinity cpus=`` (``sched_getaffinity`` union). ``gpu_list`` stores the
+  same 0-based index strings as ``nvidia_gpu`` ``dev``. ``cgroup_controls``
+  holds provenance such as ``cg=sched``, not a cgroup path.
+
+  Attributes:
+    pk: Composite primary key of ``jid`` and ``host``.
+    jid: Slurm job id. Not a foreign key.
+    host: Sample host name.
+    cpu_list: CPU list pieces from ``%affinity``.
+    gpu_list: GPU index strings, empty when ``gpus=-``.
+    cgroup_controls: Affinity provenance JSON.
+    reported_at: Sample time of the latest mark.
+    source: Writer name. Monitor ingest uses ``monitor``.
+  """
+
+  pk = models.CompositePrimaryKey("jid", "host")
+  jid = models.CharField(max_length=32)
+  host = models.CharField(max_length=64)
+  cpu_list = models.JSONField(default=list)
+  gpu_list = models.JSONField(default=list)
+  cgroup_controls = models.JSONField(default=dict)
+  reported_at = models.DateTimeField()
+  source = models.CharField(max_length=32, default="monitor")
+
+  class Meta:
+    """
+    Django model metadata for the enclosing model.
+    """
+
+    db_table = "job_affinity"
 
 
 class job_plot_artifact(models.Model):

@@ -81,6 +81,20 @@ HPCPERFSTATS_ROUTER_ENTRIES: list[RouterEntry] = [
     ],
   },
   {
+    "id": "shared_node_affinity_consumer",
+    "patterns": [
+      "hpcperfstats/dbload/lib/monitor_mark_side_ingest.py",
+      "hpcperfstats/dbload/lib/listend_db_ingest.py",
+      "hpcperfstats/dbload/lib/sync_timedb_parsing.py",
+      "hpcperfstats/dbload/sync_timedb.py",
+      "hpcperfstats/site/lib/machine/migrations/0036_job_affinity.py",
+      "hpcperfstats/cursor-rules/shared-node-affinity-consumer-contract.mdc",
+    ],
+    "rules": [
+      "shared-node-affinity-consumer-contract.mdc",
+    ],
+  },
+  {
     "id": "sync_timedb_regression_gate",
     "patterns": [
       "hpcperfstats/tests/test_sync_timedb*.py",

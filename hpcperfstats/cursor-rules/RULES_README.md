@@ -49,6 +49,7 @@ Notable contracts (see filename in `hpcperfstats/cursor-rules/`):
 - **`no-production-env-for-ini-config.mdc`** — production must not require `.env` / shell env flags for site config in INI or settings (e.g. TLS **`proxy_ssl_source`** mount); dual-registered with `agent-discipline-core.mdc` + `hook_task_router.py`.
 - **`syslog-cluster-ingest.mdc`** — cluster syslog under `data_dir/logs/`; **not** supervisord programs; manual root enable + render; dual-registered with `agent-discipline-core.mdc` + `hook_task_router.py`.
 - **`python-image-interpreter-contract.mdc`** — GIL `/opt/python3.14` (`/usr/local`) for web; baked `/opt/python3.14t` for `listend`/`sync_timedb`/`update_metrics`; jemalloc both ways; no INI ABI switch; dual-registered with `agent-discipline-core.mdc` + `hook_task_router.py`.
+- **`shared-node-affinity-consumer-contract.mdc`** — `%jobs` / `%affinity` side tables and `dev=j:<jid>` stamp; no `host_data` UNIQUE migration; dual-registered with `agent-discipline-core.mdc` + `hook_task_router.py`.
 
 Adding a new domain rule (same task, non-optional):
 

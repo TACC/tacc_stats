@@ -736,9 +736,10 @@ _DCGM_CPU_POWER_SOCKET_GAUGE_EVENTS = frozenset(
 _HOST_CPU_HW_TYPES = frozenset({HOST_CPU_HW_TYPE, LEGACY_HOST_CPU_HW_TYPE})
 _GPU_STATS_TYPES = frozenset({"nvidia_gpu", "amd_gpu", "intel_gpu"})
 
-# Non-GPU collapse drops device identity (sum across ``dev``).
+# Non-GPU collapse drops hardware ``dev`` (sum across devices) unless the
+# token is a shared-node job stamp ``j:<jid>``, which stays in the group key.
 _COLLAPSE_GROUP_COLS = ["host", "type", "event", "unit", "time"]
-# GPU types keep monitor ``dev`` so Job Detail can inventorize per device.
+# GPU types and ``j:`` job stamps keep ``dev`` so same-second jobs do not merge.
 _COLLAPSE_GROUP_COLS_WITH_DEV = ["host", "type", "dev", "event", "unit", "time"]
 _COUNTER_GROUP_COLS = ["host", "type", "dev", "event"]
 # Arc continuity must match counter grain (include ``dev`` for multi-GPU).
@@ -2261,6 +2262,30 @@ def tail_window_timestamps_all_present_streaming(
   return True
 
 
+def _shared_row_dev(dev: str, typ: str, jid: Any, shared: bool) -> str:
+  """
+  Stamp shared-node non-GPU rows with ``j:<jid>`` before collapse.
+
+  Args:
+    dev (str): Monitor device token.
+    typ (str): Stats type after legacy rename.
+    jid (Any): Sample-header job id.
+    shared (bool): True when this sample carried ``%jobs``.
+
+  Returns:
+    str: Device token stored on the stats row.
+
+  Examples:
+    >>> _shared_row_dev("0", "cpu", "42", True)
+    'j:42'
+    >>> _shared_row_dev("0", "nvidia_gpu", "42", True)
+    '0'
+  """
+  if not shared or typ in _GPU_STATS_TYPES or not jid or jid in ("-", "0"):
+    return dev
+  return f"j:{jid}"[:64]
+
+
 class IncrementalStatsParser:
   """
   Stateful parser for chunked/streaming stats-file ingest.
@@ -2280,6 +2305,10 @@ class IncrementalStatsParser:
     schema_fast_compiled: Attribute.
     start_idx: Attribute.
     _stats_cols: Attribute.
+    _arm_shared: True after ``%jobs`` until the next sample header.
+    _sample_shared: True when the current sample's ``%jobs`` named a jid.
+    marks: ``%jobs`` / ``%affinity`` dicts not yet flushed to side tables.
+    _pending_marks: Marks still waiting for a digit sample header.
   """
 
   def __init__(
@@ -2316,6 +2345,10 @@ class IncrementalStatsParser:
     self._proc_by_key: dict[tuple[Any, Any, Any], dict[str, Any]] = {}
     self.insert = False
     self.line_ctx = {"tags": None, "tags2": None}
+    self._arm_shared = False
+    self._sample_shared = False
+    self.marks: list[dict[str, Any]] = []
+    self._pending_marks: list[dict[str, Any]] = []
 
   @property
   def proc_stats(self) -> list[dict[str, Any]]:
@@ -2536,6 +2569,126 @@ class IncrementalStatsParser:
     self._stats_cols = _empty_stats_columns()
     return cols
 
+  def take_ready_marks(self) -> list[dict[str, Any]]:
+    """
+    Pop marks already bound to a sample time and host.
+
+    Returns:
+      list[dict[str, Any]]: Marks safe to upsert. Unbound marks stay queued.
+
+    Examples:
+      >>> IncrementalStatsParser(0).take_ready_marks()
+      []
+    """
+    ready: list[dict[str, Any]] = []
+    keep: list[dict[str, Any]] = []
+    for rec in self.marks:
+      if rec.get("time") is not None and rec.get("host"):
+        ready.append(rec)
+      else:
+        keep.append(rec)
+    self.marks = keep
+    return ready
+
+  def _note_percent_mark(self, line: str) -> None:
+    """
+    Record a ``%jobs`` or ``%affinity`` line. Other percent lines are ignored.
+
+    Args:
+      line (str): One stripped stats line starting with ``%``.
+
+    Returns:
+      None
+
+    Examples:
+      >>> p = IncrementalStatsParser(0)
+      >>> p._note_percent_mark("%jobs jids=9")
+      >>> p._arm_shared
+      True
+      >>> p._note_percent_mark("%begin 9")
+      >>> len(p.marks)
+      1
+    """
+    from hpcperfstats.dbload.lib.monitor_mark_side_ingest import (
+      parse_affinity_mark,
+      parse_jobs_jids,
+    )
+
+    if line.startswith("%jobs"):
+      jids = parse_jobs_jids(line)
+      if not jids:
+        return
+      self._arm_shared = True
+      rec: dict[str, Any] = {
+        "kind": "jobs",
+        "jids": jids,
+        "time": None,
+        "host": None,
+      }
+      self._queue_mark(rec)
+      return
+    if line.startswith("%affinity"):
+      rec_a = parse_affinity_mark(line)
+      if rec_a is None:
+        return
+      rec_a["time"] = None
+      rec_a["host"] = None
+      self._queue_mark(rec_a)
+
+  def _queue_mark(self, rec: dict[str, Any]) -> None:
+    """
+    Store a mark, binding it when a sample header is already open.
+
+    Args:
+      rec (dict[str, Any]): Jobs or affinity record with empty time/host.
+
+    Returns:
+      None
+
+    Examples:
+      >>> p = IncrementalStatsParser(0)
+      >>> p._queue_mark({"kind": "jobs", "jids": ["1"], "time": None})
+      >>> p.marks[0]["jids"]
+      ['1']
+    """
+    tags = self.line_ctx.get("tags")
+    if tags is not None:
+      rec["time"] = tags["time"]
+      rec["host"] = tags["host"]
+      if rec.get("kind") == "jobs":
+        jid = tags.get("jid")
+        self._sample_shared = bool(jid) and jid not in ("-", "0")
+    else:
+      self._pending_marks.append(rec)
+    self.marks.append(rec)
+
+  def _bind_pending_marks(self, when: float, host: str, jid: str) -> None:
+    """
+    Attach the open sample header to marks seen before it.
+
+    Args:
+      when (float): Sample unix time from the digit header.
+      host (str): Sample host token.
+      jid (str): Sample-header job id, or ``-`` when idle.
+
+    Returns:
+      None
+
+    Examples:
+      >>> p = IncrementalStatsParser(0)
+      >>> p._note_percent_mark("%jobs jids=4")
+      >>> p._bind_pending_marks(1710000001.0, "hosta", "4")
+      >>> p.marks[0]["host"]
+      'hosta'
+    """
+    self._sample_shared = self._arm_shared and jid not in ("-", "0", "")
+    self._arm_shared = False
+    for rec in self._pending_marks:
+      if rec.get("time") is None:
+        rec["time"] = when
+        rec["host"] = host
+    self._pending_marks = []
+
   def feed_line(self, line: Any) -> None:
     """
     Feed line.
@@ -2634,6 +2787,7 @@ class IncrementalStatsParser:
       if tags is None:
         return
       out_typ = legacy_parsing.legacy_output_type(typ) if use_legacy else typ
+      dev = _shared_row_dev(dev, out_typ, tags.get("jid"), self._sample_shared)
       if use_legacy:
         vals_dict = _vals_dict_from_line(
           typ, self.schema, self.schema[typ], vals, True, dev=dev
@@ -2671,6 +2825,7 @@ class IncrementalStatsParser:
       ctx = {"time": float(t), "host": host, "jid": jid}
       self.line_ctx["tags"] = ctx
       self.line_ctx["tags2"] = ctx
+      self._bind_pending_marks(float(t), host, jid)
     elif s[0] == "!":
       label, events = s.split(maxsplit=1)
       typ, events = label[1:], events.split()
@@ -2684,6 +2839,8 @@ class IncrementalStatsParser:
       self.schema_fast_bare[typ] = _compile_schema_bare_names(
         self.schema_fast[typ],
       )
+    elif s[0] == "%":
+      self._note_percent_mark(s)
 
   def feed_lines(self, lines: Any) -> None:
     """
@@ -2743,7 +2900,13 @@ def parse_stats_lines(
   del eventmaps_by_type
   parser = IncrementalStatsParser(start_idx, exclude_types_list)
   parser.feed_lines(lines)
-  return parser.finish()
+  finished = parser.finish()
+  from hpcperfstats.dbload.lib.monitor_mark_side_ingest import (
+    flush_parser_side_marks,
+  )
+
+  flush_parser_side_marks(parser)
+  return finished
 
 
 def parse_stats_file_streaming(
@@ -2798,7 +2961,13 @@ def parse_stats_file_streaming(
         del batch
   except FileNotFoundError:
     return [], []
-  return parser.finish()
+  finished = parser.finish()
+  from hpcperfstats.dbload.lib.monitor_mark_side_ingest import (
+    flush_parser_side_marks,
+  )
+
+  flush_parser_side_marks(parser)
+  return finished
 
 
 def _stats_payload_to_frame(stats_list: Any) -> Any:
@@ -3133,9 +3302,37 @@ def _normalize_collapse_dev_column(stats_df: Any) -> Any:
   return stats_df
 
 
+def _partition_job_stamped_rows(stats_df: Any) -> tuple[Any, Any]:
+  """
+  Split rows whose ``dev`` is a ``j:`` job stamp from hardware-dev rows.
+
+  Args:
+    stats_df (Any): Frame that includes a ``dev`` column.
+
+  Returns:
+    tuple[Any, Any]: ``(plain, stamped)``. ``stamped`` is empty when no
+    row uses the ``j:`` prefix, and ``plain`` is the original frame.
+
+  Examples:
+    >>> import pandas as pd
+    >>> plain, stamped = _partition_job_stamped_rows(
+    ...   pd.DataFrame({"dev": ["0", "j:9"]})
+    ... )
+    >>> list(stamped["dev"])
+    ['j:9']
+  """
+  empty = stats_df.iloc[0:0]
+  if stats_df.empty or "dev" not in getattr(stats_df, "columns", ()):
+    return stats_df, empty
+  mask = stats_df["dev"].str.startswith("j:", na=False)
+  if not bool(mask.any()):
+    return stats_df, empty
+  return stats_df.loc[~mask], stats_df.loc[mask]
+
+
 def _collapse_stats_with_deltas(stats_df: Any) -> Any:
   """
-  Collapse multi-row samples; GPU types keep ``dev``, others sum across devices.
+  Collapse multi-row samples. GPU types and ``j:`` job stamps keep ``dev``.
 
   Args:
     stats_df (Any): Stats df passed to this helper.
@@ -3163,21 +3360,36 @@ def _collapse_stats_with_deltas(stats_df: Any) -> Any:
       rest_other = rest_df[~ccm_power_mask]
   parts = []
   if not rest_other.empty:
+    rest_plain, rest_job = _partition_job_stamped_rows(rest_other)
     with _held_parse_stage("collapse_host_sum_s"):
       # Multi-dev host paths always duplicate gcols (dev dropped); skip
       # identity probe and category-cast before groupby (E8 non-transfer).
-      collapsed_rest = _groupby_sum_min_count(
-        rest_other,
-        gcols,
-        assume_duplicates=True,
-      )
-      collapsed_rest["dev"] = ""
-      parts.append(collapsed_rest)
+      # ``j:`` stamps stay on ``gcols_gpu`` so two jobs at one second do not merge.
+      if not rest_plain.empty:
+        collapsed_rest = _groupby_sum_min_count(
+          rest_plain,
+          gcols,
+          assume_duplicates=True,
+        )
+        collapsed_rest["dev"] = ""
+        parts.append(collapsed_rest)
+      if not rest_job.empty:
+        parts.append(
+          _groupby_sum_min_count(
+            rest_job,
+            gcols_gpu,
+            assume_duplicates=True,
+          )
+        )
   if not ccm_power_df.empty:
+    ccm_plain, ccm_job = _partition_job_stamped_rows(ccm_power_df)
     with _held_parse_stage("collapse_ccm_s"):
-      collapsed_ccm = _collapse_dcg_cpu_power_vectorized(ccm_power_df, gcols)
-      collapsed_ccm["dev"] = ""
-      parts.append(collapsed_ccm)
+      if not ccm_plain.empty:
+        collapsed_ccm = _collapse_dcg_cpu_power_vectorized(ccm_plain, gcols)
+        collapsed_ccm["dev"] = ""
+        parts.append(collapsed_ccm)
+      if not ccm_job.empty:
+        parts.append(_collapse_dcg_cpu_power_vectorized(ccm_job, gcols_gpu))
   if not other_gpu_df.empty or not nv_df.empty:
     with _held_parse_stage("collapse_gpu_s"):
       if not other_gpu_df.empty:
@@ -3377,6 +3589,27 @@ def _line_starts_time_sample(line: Any, line_index: Any, start_idx: Any) -> Any:
   return stripped[0].isdigit() and line_index >= start_idx
 
 
+def _flush_incremental_side_marks(parser: Any) -> None:
+  """
+  Write sample marks bound so far on the streaming parser.
+
+  Args:
+    parser (Any): Incremental stats parser holding ``%jobs`` marks.
+
+  Returns:
+    None
+
+  Examples:
+    >>> _flush_incremental_side_marks(IncrementalStatsParser(0)) is None
+    True
+  """
+  from hpcperfstats.dbload.lib.monitor_mark_side_ingest import (
+    flush_parser_side_marks,
+  )
+
+  flush_parser_side_marks(parser)
+
+
 def parse_stats_file_streaming_incremental(
   stats_file: str,
   *,
@@ -3454,11 +3687,13 @@ def parse_stats_file_streaming_incremental(
               pending_flush = True
         for stats_chunk, proc_chunk in emit:
           on_chunk(stats_chunk, proc_chunk)
+        _flush_incremental_side_marks(parser)
     if parser.stats_len or parser._proc_by_key:
       with _held_parse_stage("take_cols_s"):
         _final_stats = parser.take_stats_columns()
         _final_proc = parser.take_proc_stats_columns()
       on_chunk(_final_stats, _final_proc)
+    _flush_incremental_side_marks(parser)
     pending_flush = False
   except FileNotFoundError:
     return

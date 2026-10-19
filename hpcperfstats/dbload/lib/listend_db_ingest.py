@@ -1125,6 +1125,11 @@ def _process_sample_to_orm(
   parser.compile_injected_schema()
   try:
     parser.feed_lines(message.splitlines())
+    from hpcperfstats.dbload.lib.monitor_mark_side_ingest import (
+      flush_parser_side_marks,
+    )
+
+    flush_parser_side_marks(parser)
     stats_cols = parser.take_stats_columns()
     proc_list = parser.proc_stats
   except Exception:

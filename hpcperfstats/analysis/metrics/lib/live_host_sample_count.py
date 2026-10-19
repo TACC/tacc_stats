@@ -323,11 +323,12 @@ class LiveJidScopedDistinctHostTimeCount(Expression):
     jcol = ops.quote_name("jid")
     ht = ops.quote_name(host_data._meta.db_table)
     hj = ops.quote_name("jid")
+    hdev = ops.quote_name("dev")
     inner = (
       "SELECT COALESCE(SUM(ph.cnt), 0)::integer FROM ("
       "SELECT h.host, COUNT(DISTINCT h.time)::integer AS cnt "
       f"FROM {ht} h "
-      f"WHERE h.{hj} = {jt}.{jcol} "
+      f"WHERE (h.{hj} = {jt}.{jcol} OR h.{hdev} = ('j:' || {jt}.{jcol})) "
       f"AND h.time >= {jt}.{st} AND h.time <= {jt}.{et} "
       "GROUP BY h.host) ph"
     )

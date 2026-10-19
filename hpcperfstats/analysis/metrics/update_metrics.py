@@ -121,7 +121,6 @@ from django.db.models import (
   Count,
   Exists,
   IntegerField,
-  Max,
   OuterRef,
   Q,
   Subquery,
@@ -176,7 +175,6 @@ from hpcperfstats.site.lib.machine.job_plot_artifacts import (
   persist_job_plot_artifacts_for_jid,
 )
 from hpcperfstats.site.lib.machine.models import (
-  host_data,
   job_data,
   job_detail_artifact,
   job_plot_artifact,
@@ -4178,11 +4176,11 @@ def _proxy_readiness_for_jid(jid: Any) -> Any:
       end_time,
     )
     return _proxy_window_coverage_bucket(start_time, end_time, min_t, max_t)
-  max_time = (
-    host_data.objects.filter(jid=jid)
-    .aggregate(max_time=Max("time"))
-    .get("max_time")
+  from hpcperfstats.dbload.lib.monitor_mark_side_ingest import (
+    max_host_time_by_jid,
   )
+
+  max_time = max_host_time_by_jid(jid).get(str(jid))
   return _proxy_readiness_bucket(end_time, max_time)
 
 
@@ -4248,13 +4246,11 @@ def _proxy_reject_not_ready_jids(jids: Any) -> Any:
           unknown.append(jid)
       continue
     end_by_jid = {jid: row.get("end_time") for jid, row in job_by_jid.items()}
-    max_rows = (
-      host_data.objects.filter(jid__in=sub)
-      .values("jid")
-      .annotate(max_time=Max("time"))
-      .values("jid", "max_time")
+    from hpcperfstats.dbload.lib.monitor_mark_side_ingest import (
+      max_host_time_by_jid,
     )
-    max_by_jid = {r["jid"]: r["max_time"] for r in max_rows}
+
+    max_by_jid = max_host_time_by_jid(sub)
     for jid in sub:
       bucket = _proxy_readiness_bucket(end_by_jid.get(jid), max_by_jid.get(jid))
       if bucket == "reject":

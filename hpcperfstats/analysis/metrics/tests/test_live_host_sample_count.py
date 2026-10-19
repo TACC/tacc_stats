@@ -42,6 +42,8 @@ def test_live_jid_scoped_distinct_host_time_count_as_sql_postgresql():
   sql, params = expr.as_sql(MagicMock(), _fake_pg_connection())
   assert params == []
   assert 'h."jid" = "job_data"."jid"' in sql
+  assert """h."dev" = ('j:' || "job_data"."jid")""" in sql
+  assert "host_sample_jid" not in sql
   assert "unnest" not in sql.lower()
 
 
