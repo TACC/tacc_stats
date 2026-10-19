@@ -1964,6 +1964,10 @@ def test_job_arc_requests_sql_sum_and_nonnegative_filter(monkeypatch):
     return []
 
   monkeypatch.setattr(
+    "hpcperfstats.analysis.metrics.lib.metrics_host_data_sql.job_arc_cluster_aggregate_value",
+    lambda *_a, **_k: None,
+  )
+  monkeypatch.setattr(
     "hpcperfstats.analysis.metrics.lib.metrics._host_data_metric_rows_batched",
     fake_rows,
   )
@@ -2003,6 +2007,10 @@ def test_job_arc_issues_multiple_queries_when_many_hosts(monkeypatch):
   )
 
   monkeypatch.setattr(
+    "hpcperfstats.analysis.metrics.lib.metrics_host_data_sql.job_arc_cluster_aggregate_value",
+    lambda *_a, **_k: None,
+  )
+  monkeypatch.setattr(
     "hpcperfstats.site.lib.machine.models.host_data.objects", mgr
   )
   monkeypatch.setattr(
@@ -2014,6 +2022,204 @@ def test_job_arc_issues_multiple_queries_when_many_hosts(monkeypatch):
   assert len(calls) == 2
   assert calls[0] == METRICS_HOST_QUERY_BATCH
   assert calls[1] == 1
+
+
+class _ArcSqlCursor:
+  """Cursor double that records ``job_arc`` SQL params and canned rows."""
+
+  def __init__(self, sink, reply_for):
+    self.sink = sink
+    self.reply_for = reply_for
+    self.row = (None, 0)
+
+  def __enter__(self):
+    return self
+
+  def __exit__(self, exc_type, exc, tb):
+    return False
+
+  def execute(self, sql, params):
+    self.sink.append((sql, list(params[0]), params[1], params[2]))
+    reply = self.reply_for(params)
+    if isinstance(reply, BaseException):
+      raise reply
+    self.row = reply
+
+  def fetchone(self):
+    return self.row
+
+
+class _ArcSqlConnection:
+  """PostgreSQL connection stand-in for ``job_arc_cluster_aggregate_value``."""
+
+  vendor = "postgresql"
+
+  def __init__(self, sink, reply_for):
+    self.sink = sink
+    self.reply_for = reply_for
+
+  def cursor(self):
+    return _ArcSqlCursor(self.sink, self.reply_for)
+
+
+def _patch_arc_sql(monkeypatch, reply_for):
+  """Point Django's connection at a cursor double. Returns the call sink."""
+  sink = []
+  monkeypatch.setattr(
+    "django.db.connection",
+    _ArcSqlConnection(sink, reply_for),
+  )
+  monkeypatch.setattr("django.db.close_old_connections", lambda: None)
+  return sink
+
+
+@pytest.mark.django_db(databases=[])
+def test_job_arc_cluster_aggregate_folds_count_weighted_host_batches(
+  monkeypatch,
+):
+  """Nine nfs hosts become an 8-host batch plus one host, folded by count."""
+  from hpcperfstats.analysis.metrics.lib.gen.jid_table import (
+    TYPE_DETAIL_HOST_QUERY_BATCH,
+  )
+  from hpcperfstats.analysis.metrics.lib.metrics_host_data_sql import (
+    job_arc_cluster_aggregate_value,
+  )
+
+  t0 = 1_700_000_000
+  t1 = t0 + 9 * 3600
+  hosts = [f"h{i}.nfs" for i in range(TYPE_DETAIL_HOST_QUERY_BATCH + 1)]
+
+  def reply_for(params):
+    n = len(params[0])
+    if n == TYPE_DETAIL_HOST_QUERY_BATCH:
+      return (10.0, n)
+    if n == 1:
+      return (30.0, 1)
+    return (None, 0)
+
+  sink = _patch_arc_sql(monkeypatch, reply_for)
+  value = job_arc_cluster_aggregate_value(
+    hosts,
+    {"time__gte": t0, "time__lte": t1},
+    "nfs",
+    ["READ_ops"],
+    1.0,
+  )
+  summed = job_arc_cluster_aggregate_value(
+    hosts,
+    {"time__gte": t0, "time__lte": t1},
+    "nfs",
+    ["READ_ops"],
+    1.0,
+    host_aggregate="sum",
+  )
+  assert len(sink) == 4
+  assert [len(call[1]) for call in sink] == [
+    TYPE_DETAIL_HOST_QUERY_BATCH,
+    1,
+    TYPE_DETAIL_HOST_QUERY_BATCH,
+    1,
+  ]
+  for _sql, _hosts, seen_t0, seen_t1 in sink:
+    assert seen_t0 == t0
+    assert seen_t1 == t1
+    assert "time_bucket('5 minutes'" in _sql
+  weighted = (10.0 * TYPE_DETAIL_HOST_QUERY_BATCH + 30.0) / (
+    TYPE_DETAIL_HOST_QUERY_BATCH + 1
+  )
+  assert value == weighted
+  assert value != (10.0 + 30.0) / 2
+  assert summed == 10.0 * TYPE_DETAIL_HOST_QUERY_BATCH + 30.0
+  empty = _patch_arc_sql(monkeypatch, lambda _params: (None, 0))
+  assert (
+    job_arc_cluster_aggregate_value(
+      hosts,
+      {"time__gte": t0, "time__lte": t1},
+      "nfs",
+      ["READ_ops"],
+      1.0,
+    )
+    is None
+  )
+  assert empty
+
+
+@pytest.mark.django_db(databases=[])
+def test_job_arc_cluster_aggregate_timeout_bisects_hosts_not_time(
+  monkeypatch,
+):
+  """A timeout splits the host list. The time bounds stay the full window."""
+  from django.db import OperationalError
+
+  from hpcperfstats.analysis.metrics.lib.metrics_host_data_sql import (
+    job_arc_cluster_aggregate_value,
+  )
+
+  t0 = 1_700_000_000
+  t1 = t0 + 3600
+  hosts = ["h0.block", "h1.block"]
+
+  def reply_for(params):
+    batch = list(params[0])
+    if len(batch) > 1:
+      raise OperationalError("canceling statement due to statement timeout")
+    return (10.0 if batch[0] == "h0.block" else 30.0, 1)
+
+  sink = _patch_arc_sql(monkeypatch, reply_for)
+  value = job_arc_cluster_aggregate_value(
+    hosts,
+    {"time__gte": t0, "time__lte": t1},
+    "host_block",
+    ["rd_sectors"],
+    1.0,
+  )
+  assert value == 20.0
+  assert [call[1] for call in sink] == [hosts, ["h0.block"], ["h1.block"]]
+  for _sql, _hosts, seen_t0, seen_t1 in sink:
+    assert seen_t0 == t0
+    assert seen_t1 == t1
+  refused = _patch_arc_sql(
+    monkeypatch,
+    lambda _params: OperationalError("connection refused"),
+  )
+  with pytest.raises(OperationalError, match="connection refused"):
+    job_arc_cluster_aggregate_value(
+      hosts,
+      {"time__gte": t0, "time__lte": t1},
+      "host_block",
+      ["rd_sectors"],
+      1.0,
+    )
+  assert len(refused) == 1
+
+
+@pytest.mark.django_db(databases=[])
+def test_job_arc_cluster_aggregate_one_host_timeout_raises(monkeypatch):
+  """A one-host statement timeout is not swallowed or time-sliced."""
+  from django.db import OperationalError
+
+  from hpcperfstats.analysis.metrics.lib.metrics_host_data_sql import (
+    job_arc_cluster_aggregate_value,
+  )
+
+  t0 = 1_700_000_000
+  t1 = t0 + 3600
+
+  def reply_for(_params):
+    raise OperationalError("canceling statement due to statement timeout")
+
+  sink = _patch_arc_sql(monkeypatch, reply_for)
+  with pytest.raises(OperationalError, match="statement timeout"):
+    job_arc_cluster_aggregate_value(
+      ["only.block"],
+      {"time__gte": t0, "time__lte": t1},
+      "nfs",
+      ["READ_ops", "WRITE_ops"],
+      1.0,
+    )
+  assert len(sink) == 1
+  assert sink[0][2] == t0
+  assert sink[0][3] == t1
 
 
 def test_metric_type_events_feasible_skips_impossible_types():

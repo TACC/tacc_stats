@@ -192,7 +192,11 @@ def job_arc_cluster_aggregate_value(
   host_aggregate: str = "mean",
 ) -> float | None:
   """
-  ``job_arc`` cluster value in one SQL query (#6): 5m bucket mean, first-bucket drop.
+  Five-minute ``job_arc`` aggregate, one host batch over the full window.
+
+  Each batch keeps ``time__gte`` and ``time__lte`` so the first 5-minute
+  bucket drops once per host. Batch means fold by host count. A statement
+  timeout splits that batch's hosts. A timeout on one host is re-raised.
 
   Args:
     hosts (list[str]): Hostnames.
@@ -204,10 +208,22 @@ def job_arc_cluster_aggregate_value(
     host_aggregate (str): ``mean`` (default) or ``sum`` across per-host means.
 
   Returns:
-    float | None: Aggregated metric, or ``None`` when SQL path cannot run or no data.
+    float | None: Count-weighted mean, or the sum of per-host means, or
+    ``None`` when SQL cannot run or no host returned a mean.
+
+  Raises:
+    Exception: Re-raised ``OperationalError`` when one host still times
+    out, or when the database error is not a statement timeout.
 
   Examples:
-    >>> job_arc_cluster_aggregate_value([], {}, "t", [], 1.0)  # doctest: +SKIP
+    >>> job_arc_cluster_aggregate_value(
+    ...   [],
+    ...   {"time__gte": 0, "time__lte": 1},
+    ...   "nfs",
+    ...   ["READ_ops"],
+    ...   1.0,
+    ... )
+    None
   """
   if not hosts or not events:
     return None
@@ -215,11 +231,16 @@ def job_arc_cluster_aggregate_value(
   t1 = time_filter.get("time__lte")
   if t0 is None or t1 is None:
     return None
-  from django.db import connection
+  from django.db import OperationalError, close_old_connections, connection
 
   if connection.vendor != "postgresql":
     return None
-  cross_host = "SUM" if host_aggregate == "sum" else "AVG"
+  from hpcperfstats.analysis.metrics.lib.gen.jid_table import (
+    _aggregate_df_host_batch,
+    _is_statement_timeout_error,
+    _iter_acct_host_batches,
+  )
+
   arc_filter = " AND arc >= 0" if nonnegative_rate else ""
   sql = f"""
     WITH sample AS (
@@ -254,14 +275,35 @@ def job_arc_cluster_aggregate_value(
       FROM trimmed
       GROUP BY host
     )
-    SELECT {cross_host}(host_mean) FROM per_host
+    SELECT AVG(host_mean)::double precision, COUNT(*) FROM per_host
   """
-  with connection.cursor() as cursor:
-    cursor.execute(
-      sql,
-      [list(hosts), t0, t1, typ, list(events), float(conv)],
-    )
-    row = cursor.fetchone()
-  if not row or row[0] is None:
+  batch = _aggregate_df_host_batch(typ, events, reject_dcgm_blank=False)
+  weighted = 0.0
+  seen = 0
+  pending = [list(part) for part in _iter_acct_host_batches(list(hosts), batch)]
+  while pending:
+    chunk = pending.pop(0)
+    try:
+      with connection.cursor() as cursor:
+        cursor.execute(
+          sql,
+          [chunk, t0, t1, typ, list(events), float(conv)],
+        )
+        row = cursor.fetchone()
+    except OperationalError as exc:
+      if not _is_statement_timeout_error(exc) or len(chunk) <= 1:
+        raise
+      close_old_connections()
+      mid = len(chunk) // 2
+      pending[:0] = [chunk[:mid], chunk[mid:]]
+      continue
+    if not row or row[0] is None or not row[1]:
+      continue
+    n = int(row[1])
+    weighted += float(row[0]) * n
+    seen += n
+  if seen == 0:
     return None
-  return float(row[0])
+  if host_aggregate == "sum":
+    return weighted
+  return weighted / seen
