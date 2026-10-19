@@ -8,10 +8,14 @@
 #define JOB_PROC_JID_MAX 32
 #define JOB_PROC_GPUS_ENV_MAX 128
 #define JOB_PROC_MAX_JIDS 128
+#define JOB_PROC_CGROUP_RELPATH_MAX 512
 
 struct job_proc_jid_entry {
   char jid[JOB_PROC_JID_MAX + 1];
   char job_gpus[JOB_PROC_GPUS_ENV_MAX]; /* raw SLURM_JOB_GPUS or empty */
+  /* Path after controllers in /proc/<pid>/cgroup (e.g. /system.slice/slurmstepd.scope/TOKEN/...).
+   * Empty on environ-only fallback. Never emitted on the wire. */
+  char cgroup_relpath[JOB_PROC_CGROUP_RELPATH_MAX];
   int *pids;
   size_t npids;
 };

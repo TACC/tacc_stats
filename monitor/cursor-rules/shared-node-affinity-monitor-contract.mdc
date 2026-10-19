@@ -5,9 +5,12 @@ globs:
   - HPCPerfStats/monitor/src/job_gpu_assign.*
   - HPCPerfStats/monitor/src/job_sched_affinity.*
   - HPCPerfStats/monitor/src/job_shared_emit.*
+  - HPCPerfStats/monitor/src/job_cgroup_mem.*
+  - HPCPerfStats/monitor/src/host_mem_job.*
   - HPCPerfStats/monitor/src/monitor_daemon.c
   - HPCPerfStats/monitor/src/monitor.c
   - HPCPerfStats/monitor/tests/test_job_*
+  - HPCPerfStats/monitor/tests/test_host_mem_job*
 alwaysApply: false
 ---
 
@@ -19,23 +22,35 @@ alwaysApply: false
 
 - `--enable-shared-node-multi-jid` (default **off**) defines `MONITOR_SHARED_NODE_MULTI_JID`.
 - Shared build: no `stats_jobid` file read / `ev_stat` watcher.
-- Default file build: unchanged; **never** emit `%jobs` / `%affinity`.
+- Default file build: unchanged; **never** emit `%jobs` / `%affinity`; **no** `host_mem_job` type.
 
 ## Discovery
 
 - Group pids by cgroup v2 `slurmstepd.scope/<token>/`; name groups from `SLURM_JOB_ID` in non-root environ.
 - Token is never emitted. No cgroup `job_<id>` parse.
+- Store cgroup relpath (after `0::`) on each jid entry for memory reads; empty on environ-only fallback.
 - Never exec `scontrol` or `nvidia-smi`. Never `sched_setaffinity`.
 - Never read `CUDA_VISIBLE_DEVICES`, `ROCR_VISIBLE_DEVICES`, or `ZE_AFFINITY_MASK`.
+- Never walk `cpuset.cpus` / `cpuset.mems`.
 
 ## Wire
 
 ```text
 %jobs jids=<csv>
 %affinity jid=<jid> cpus=<list> gpus=<csv-or-> cg=<short>
+host_mem_job j:<jid> [@fast|@full] <mem_used> <mem_peak> <anon_pages> <file_pages> <mapped> <dirty> <writeback> <page_tables>
 ```
 
-- One sample block = one header jobid token (≤32).
-- Sole jid with exact online CPUs **and** exact available GPU grant: ordinary unmarked payload.
+- One sample block = one header jobid token (≤32 bare jid).
+- Sole jid with exact online CPUs **and** exact available GPU grant: ordinary unmarked payload (**still** may include `host_mem_job j:<jid>`).
 - `|J|>=2`: N jid payloads + one `-` node-wide payload; same frozen timestamp.
 - GPU `dev` = collector index; unknown inventory never takes the no-mark fast path.
+
+## `host_mem_job` (job cgroup memory)
+
+- Read **only** `…/slurmstepd.scope/<token>/memory.{current,peak,stat}` (not task leaf, not bare `slurmstepd.scope`).
+- `dev=j:<jid>` (literal `j:` prefix). Override root via `HPCPERFSTATS_CGROUP_ROOT` (tests).
+- KEYS overlap a **subset** of `host_mem` names (`mem_used`, `anon_pages`, …) plus `mem_peak`; **not** full NUMA `host_mem` parity (`mem_total` / `active` / `slab` / … absent).
+- Units `U=KB` (bytes/1024). Missing peak/stat fields → `0`. Fail-open: omit device if `memory.current` missing.
+- Filter: jid payloads keep matching `j:<jid>` only; `-` payload never includes `host_mem_job`.
+- Node-wide `host_mem` (NUMA) unchanged; never N-fold onto jid payloads when `|J|>=2`.

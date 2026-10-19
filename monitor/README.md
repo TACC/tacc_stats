@@ -22,8 +22,9 @@ Configure selects sources via Automake conditionals; use **`./configure --help`*
 
 ### Shared-node multi-jid (`--enable-shared-node-multi-jid`)
 
-- **Default (off):** file `jobid_file` / `/var/run/stats_jobid` with `%begin` / `%end`; no `%jobs` / `%affinity`.
+- **Default (off):** file `jobid_file` / `/var/run/stats_jobid` with `%begin` / `%end`; no `%jobs` / `%affinity`; no `host_mem_job`.
 - **Shared-node build:** discovers Slurm jids from `/proc` (`slurmstepd.scope` + `SLURM_JOB_ID`), emits one RabbitMQ sample per jid with `%jobs` / `%affinity` from read-only `sched_getaffinity`. A sole jid that owns every online CPU and every available GPU uses the ordinary unmarked single-jid payload. Does **not** read `stats_jobid` and never execs `scontrol` / `nvidia-smi`.
+- **`host_mem_job`:** per-jid cgroup memory at `slurmstepd.scope/<token>/` (`memory.current` / `peak` / `stat`), device `j:<jid>`, KEYS overlap a subset of `host_mem` (`mem_used`, `anon_pages`, …) plus `mem_peak` (`U=KB`). Not full NUMA `host_mem` parity. Present on jid payloads (including full-resource unmarked); omitted on `-`. Override cgroup root in tests: `HPCPERFSTATS_CGROUP_ROOT`.
 - **Deploy:** upgrade consumer (listend) **before** shared-node monitor RPMs on shared fleets. Conf keys (shared build only): `jid_require_step_id`, `jid_discover_pid_cap`, `affinity_pid_sample_limit`.
 - Verify shared flavor: `./scripts/run_shared_node_static_check.sh` (or `./scripts/build_static_bundle.sh --enable-shared-node-multi-jid` then `make -C .build-static check`).
 

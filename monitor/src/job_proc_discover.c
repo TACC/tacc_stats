@@ -23,6 +23,7 @@ struct scope_bucket {
   size_t cap;
   char jid[JOB_PROC_JID_MAX + 1];
   char job_gpus[JOB_PROC_GPUS_ENV_MAX];
+  char cgroup_relpath[JOB_PROC_CGROUP_RELPATH_MAX];
   int have_step;
   int named;
 };
@@ -134,6 +135,38 @@ static int parse_scope_token(const char *cgroup, char *token_out, size_t token_c
     return -1;
   memcpy(token_out, p, len);
   token_out[len] = '\0';
+  return 0;
+}
+
+/*! Extract absolute cgroup path after "controllers:" (v2 `0::/path`). */
+static int parse_cgroup_relpath(const char *cgroup, char *out, size_t out_cap)
+{
+  const char *p;
+  const char *colon;
+  size_t len;
+
+  if (cgroup == NULL || out == NULL || out_cap == 0)
+    return -1;
+  colon = strchr(cgroup, ':');
+  if (colon == NULL)
+    return -1;
+  colon = strchr(colon + 1, ':');
+  if (colon == NULL)
+    return -1;
+  p = colon + 1;
+  while (*p == ' ' || *p == '\t')
+    p++;
+  if (*p != '/')
+    return -1;
+  len = 0;
+  while (p[len] != '\0' && p[len] != '\n' && p[len] != '\r')
+    len++;
+  while (len > 0 && p[len - 1] == '/')
+    len--;
+  if (len == 0 || len + 1 > out_cap)
+    return -1;
+  memcpy(out, p, len);
+  out[len] = '\0';
   return 0;
 }
 
@@ -322,8 +355,13 @@ static int merge_named_into_result(struct job_proc_discover_result *out, struct 
     snprintf(e->jid, sizeof(e->jid), "%s", b->jid);
     if (b->job_gpus[0])
       snprintf(e->job_gpus, sizeof(e->job_gpus), "%s", b->job_gpus);
-  } else if (e->job_gpus[0] == '\0' && b->job_gpus[0]) {
-    snprintf(e->job_gpus, sizeof(e->job_gpus), "%s", b->job_gpus);
+    if (b->cgroup_relpath[0])
+      snprintf(e->cgroup_relpath, sizeof(e->cgroup_relpath), "%s", b->cgroup_relpath);
+  } else {
+    if (e->job_gpus[0] == '\0' && b->job_gpus[0])
+      snprintf(e->job_gpus, sizeof(e->job_gpus), "%s", b->job_gpus);
+    if (e->cgroup_relpath[0] == '\0' && b->cgroup_relpath[0])
+      snprintf(e->cgroup_relpath, sizeof(e->cgroup_relpath), "%s", b->cgroup_relpath);
   }
   for (i = 0; i < b->npids; i++) {
     size_t j;
@@ -398,10 +436,14 @@ int job_proc_discover(struct job_proc_discover_result *out, int require_step_id,
     if (read_cgroup_line(proc_root, pid, cgroup, sizeof(cgroup)) < 0)
       continue;
     if (parse_scope_token(cgroup, token, sizeof(token)) == 0) {
+      char rel[JOB_PROC_CGROUP_RELPATH_MAX];
+
       any_scope = 1;
       b = find_or_add_bucket(&buckets, &nbuckets, &bcap, token);
       if (b == NULL)
         goto oom;
+      if (b->cgroup_relpath[0] == '\0' && parse_cgroup_relpath(cgroup, rel, sizeof(rel)) == 0)
+        snprintf(b->cgroup_relpath, sizeof(b->cgroup_relpath), "%s", rel);
       if (bucket_add_pid(b, pid) < 0)
         goto oom;
       if (pid_uid_is_root(proc_root, pid))

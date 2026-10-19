@@ -175,8 +175,12 @@ hpcperfstatsd_SOURCES += \
 	job_sched_affinity.h \
 	job_gpu_assign.c \
 	job_gpu_assign.h \
+	job_cgroup_mem.c \
+	job_cgroup_mem.h \
 	job_shared_emit.c \
-	job_shared_emit.h
+	job_shared_emit.h \
+	host_mem_job.c \
+	host_mem_job.h
 endif
 hpcperfstatsd_CPPFLAGS += \
 	-DRABBITMQ \

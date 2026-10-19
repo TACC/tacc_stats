@@ -96,6 +96,8 @@ static void test_scope_token_grouping(void)
   assert(strcmp(r.entries[2].jid, "99999") == 0);
   assert(r.entries[0].npids >= 2);
   assert(strcmp(r.entries[0].job_gpus, "0") == 0);
+  assert(strstr(r.entries[0].cgroup_relpath, "/slurmstepd.scope/s4TDM5AXNE9900/") != NULL);
+  assert(r.entries[0].cgroup_relpath[0] == '/');
   job_proc_discover_result_clear(&r);
 }
 

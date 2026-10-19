@@ -41,11 +41,25 @@ static void test_full_resource_predicate_logic(void)
   assert(sole && cov == EXACT_ALL && job_gpu_set_exact_equal(&granted, &available));
 }
 
+static void test_host_mem_job_dev_format(void)
+{
+  char dev[2 + JOB_PROC_JID_MAX + 1];
+  int n;
+
+  n = snprintf(dev, sizeof(dev), "j:%s", "62909");
+  assert(n > 0 && (size_t)n < sizeof(dev));
+  assert(strcmp(dev, "j:62909") == 0);
+  assert(strncmp(dev, "j:", 2) == 0);
+  /* Bare jid is never the host_mem_job device. */
+  assert(strcmp(dev, "62909") != 0);
+}
+
 int main(void)
 {
   assert(job_proc_jid_acceptable("62909"));
   test_mark_shapes();
   test_full_resource_predicate_logic();
+  test_host_mem_job_dev_format();
   printf("test_job_discovery_marks: ok\n");
   return 0;
 }

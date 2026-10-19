@@ -4,6 +4,7 @@
 #include <string.h>
 #include <time.h>
 
+#include "job_cgroup_mem.h"
 #include "job_gpu_assign.h"
 #include "job_proc_discover.h"
 #include "job_sched_affinity.h"
@@ -38,6 +39,46 @@ static int is_gpu_type(const char *st_name)
 static int is_proc_type(const char *st_name)
 {
   return st_name != NULL && strcmp(st_name, "host_proc") == 0;
+}
+
+static int is_job_mem_type(const char *st_name)
+{
+  return st_name != NULL && strcmp(st_name, "host_mem_job") == 0;
+}
+
+static void populate_host_mem_job(const struct job_proc_discover_result *disc)
+{
+  struct stats_type *type;
+  size_t i;
+
+  if (disc == NULL)
+    return;
+  type = stats_type_get("host_mem_job");
+  if (type == NULL || !type->st_enabled)
+    return;
+  for (i = 0; i < disc->n; i++) {
+    struct job_cgroup_mem_kb kb;
+    struct stats *st;
+    char dev[2 + JOB_PROC_JID_MAX + 1];
+
+    if (disc->entries[i].cgroup_relpath[0] == '\0')
+      continue;
+    if (job_cgroup_mem_read(disc->entries[i].cgroup_relpath, &kb) < 0)
+      continue;
+    if (job_cgroup_mem_format_dev(disc->entries[i].jid, dev, sizeof(dev)) < 0)
+      continue;
+    st = get_current_stats(type, dev);
+    if (st == NULL)
+      continue;
+    stats_set(st, "mem_used", kb.mem_used);
+    stats_set(st, "mem_peak", kb.mem_peak);
+    stats_set(st, "anon_pages", kb.anon_pages);
+    stats_set(st, "file_pages", kb.file_pages);
+    stats_set(st, "mapped", kb.mapped);
+    stats_set(st, "dirty", kb.dirty);
+    stats_set(st, "writeback", kb.writeback);
+    stats_set(st, "page_tables", kb.page_tables);
+  }
 }
 
 static int proc_dev_pid(const char *dev, int *pid_out)
@@ -106,6 +147,11 @@ static int emit_row_filter(const char *st_name, const char *dev, void *ctx)
     if (!c->include_gpu)
       return 0;
     return gpu_dev_in_set(c->gpus, dev);
+  }
+  if (is_job_mem_type(st_name)) {
+    if (c->entry == NULL)
+      return 0; /* "-" / idle: omit all host_mem_job */
+    return job_cgroup_mem_keep_dev(c->entry->jid, dev);
   }
   return c->include_node_wide ? 1 : 0;
 }
@@ -203,8 +249,9 @@ void job_shared_emit_sample_burst(struct sf_ring_buffer *w)
   }
   stats_buffer_set_frozen_time(&now);
 
-  /* One metrics collect for the whole burst. */
+  /* One metrics collect for the whole burst (host_mem_job collect clears devices). */
   stats_runtime_collect_enabled_metrics(0);
+  populate_host_mem_job(&disc);
 
   if (disc.n == 0) {
     struct emit_filter_ctx ctx = {.include_node_wide = 1, .include_proc = 0, .include_gpu = 0};

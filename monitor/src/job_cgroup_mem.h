@@ -1,0 +1,36 @@
+/* Read job-scope cgroup v2 memory at slurmstepd.scope/<token>/ (shared-node). */
+#ifndef JOB_CGROUP_MEM_H
+#define JOB_CGROUP_MEM_H
+
+#include <stddef.h>
+
+struct job_cgroup_mem_kb {
+  unsigned long long mem_used;
+  unsigned long long mem_peak;
+  unsigned long long anon_pages;
+  unsigned long long file_pages;
+  unsigned long long mapped;
+  unsigned long long dirty;
+  unsigned long long writeback;
+  unsigned long long page_tables;
+};
+
+/*! Absolute cgroup fs root for tests; production uses /sys/fs/cgroup.
+ *  Ignored unless absolute and free of ".." path segments. */
+const char *job_cgroup_mem_cgroup_root(void);
+
+/*! Resolve leaf cgroup_relpath to slurmstepd.scope/<token>/ and read
+ *  memory.current (required), memory.peak, and memory.stat overlap fields.
+ *  Bytes converted to KB (/1024). Missing peak/stat keys → 0.
+ *  Never reads task leaf or bare slurmstepd.scope aggregate.
+ *  Returns 0 on success, -1 fail-open. */
+int job_cgroup_mem_read(const char *cgroup_relpath, struct job_cgroup_mem_kb *out);
+
+/*! Format host_mem_job device as j:<jid>. Returns 0 on success, -1 on error. */
+int job_cgroup_mem_format_dev(const char *jid, char *out, size_t out_cap);
+
+/*! Emit filter: keep host_mem_job when jid non-NULL and dev equals j:<jid>.
+ *  NULL jid (node-wide "-" payload) always omits. */
+int job_cgroup_mem_keep_dev(const char *jid, const char *dev);
+
+#endif

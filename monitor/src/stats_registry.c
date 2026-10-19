@@ -54,6 +54,9 @@ extern struct stats_type osc_stats_type;
 extern struct stats_type lnet_stats_type;
 
 extern struct stats_type mem_stats_type;
+#if defined(MONITOR_SHARED_NODE_MULTI_JID)
+extern struct stats_type host_mem_job_stats_type;
+#endif
 
 extern struct stats_type net_stats_type;
 extern struct stats_type nfs_stats_type;
@@ -117,6 +120,9 @@ struct stats_type *const stats_type_table[] = {
 #endif
     &lnet_stats_type,
     &mem_stats_type,
+#if defined(MONITOR_SHARED_NODE_MULTI_JID)
+    &host_mem_job_stats_type,
+#endif
     &net_stats_type,
     &nfs_stats_type,
     &numa_stats_type,
