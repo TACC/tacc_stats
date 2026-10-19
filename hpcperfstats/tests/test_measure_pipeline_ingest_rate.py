@@ -852,6 +852,23 @@ def test_nonpositive_census_slope_stops_when_ratio_wins(mod):
   assert outcomes["decision_next"] == "stop_ingest_rate_watch_archive"
 
 
+def test_write_setup_median_is_reported(mod):
+  """write_setup_s stays a per-tier median on ingest outcome lines."""
+  mib = 1024 * 1024
+  lines = [
+    _ts(0) + "startup ingest gate cleared; ingest may begin",
+    _ts(1)
+    + (
+      "ingest file path=/arch/dense outcome=ingested ingest_ok=yes "
+      "db_skip=no "
+      f"size_bytes={16 * mib} elapsed_s=100.0 postgres_s=1.0 "
+      "write_setup_s=8.75"
+    ),
+  ]
+  outcomes = mod.analyze_lines(lines, exclude_startup=False)
+  assert outcomes["tier_8mib_64mib_median_write_setup_s"] == "8.750"
+
+
 def test_campaign_detail_and_supervisor_meters_outside_write_share(mod):
   """Detail clocks and supervisor meters median without entering write share."""
   mib = 1024 * 1024
@@ -897,5 +914,6 @@ def test_campaign_detail_and_supervisor_meters_outside_write_share(mod):
   )
   assert write_sum == 0.0
   assert "stage_ddl_s" not in mod._WRITE_PHASE_TOKEN_NAMES
+  assert "write_setup_s" in mod._WRITE_PHASE_TOKEN_NAMES
   assert "reconnect_s" not in mod._WRITE_PHASE_TOKEN_NAMES
   assert "census_s" not in mod._WRITE_PHASE_TOKEN_NAMES

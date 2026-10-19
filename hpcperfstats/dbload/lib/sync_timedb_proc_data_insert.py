@@ -6,10 +6,13 @@ client-side peak-merge. A/B arm ``HPCPERFSTATS_PROC_INSERT_ARM``; default
 ``candidate`` (COPY) after Podman A/B retain; opt out with
 ``HPCPERFSTATS_SYNC_PROC_DATA_COPY=0``.
 
-Attributes:
+  Attributes:
   PROC_DATA_COPY_COLUMNS (tuple[str, ...]): Column order for COPY / INSERT.
   PROC_DATA_UPDATE_FIELDS (tuple[str, ...]): ON CONFLICT DO UPDATE columns.
-  _STAGE_DDL (str): TEMP staging table DDL (ON COMMIT DROP).
+  _STAGE_DDL (str): TEMP staging table DDL (ON COMMIT DELETE ROWS).
+  _PROC_STAGE_NAME (str): Proc COPY stage table name.
+  _PROC_PASSTHROUGH_COLUMNS (frozenset[str]): Columns copied without
+    bigint coercion.
 """
 
 from __future__ import annotations
@@ -17,6 +20,8 @@ from __future__ import annotations
 import os
 from collections.abc import Sequence
 from typing import Any
+
+import pandas as pd
 
 from hpcperfstats.dbload.lib.sync_timedb_parsing import (
   HOST_PROC_KEYS,
@@ -34,7 +39,7 @@ PROC_DATA_COPY_COLUMNS: tuple[str, ...] = (
 PROC_DATA_UPDATE_FIELDS: tuple[str, ...] = ("device", *HOST_PROC_KEYS)
 
 _STAGE_DDL = """
-CREATE TEMP TABLE proc_data_ingest_stage (
+CREATE TEMP TABLE IF NOT EXISTS proc_data_ingest_stage (
   jid varchar(32) NULL,
   host varchar(64) NULL,
   proc varchar(512) NULL,
@@ -52,8 +57,64 @@ CREATE TEMP TABLE proc_data_ingest_stage (
   vm_pte bigint NULL,
   vm_swap bigint NULL,
   threads integer NULL
-) ON COMMIT DROP
+) ON COMMIT DELETE ROWS
 """
+
+_PROC_STAGE_NAME = "proc_data_ingest_stage"
+_PROC_PASSTHROUGH_COLUMNS = frozenset(("jid", "host", "proc"))
+
+
+def _copy_stage_ready(connection: Any, name: str) -> bool:
+  """
+  Return whether this live backend already created ``name``.
+
+  The set lives on the Django connection wrapper and is ignored when the
+  socket object changes, including after a reconnect.
+
+  Args:
+    connection (Any): Django connection wrapper for this thread.
+    name (str): Temporary stage table name.
+
+  Returns:
+    bool: True when ``name`` was committed on the current socket.
+
+  Examples:
+    >>> _copy_stage_ready(object(), "proc_data_ingest_stage")
+    False
+  """
+  raw = getattr(connection, "connection", None)
+  state = getattr(connection, "_hps_copy_stages", None)
+  if not isinstance(state, tuple) or len(state) != 2:
+    return False
+  remembered, names = state
+  return remembered is raw and name in names
+
+
+def _mark_copy_stage(connection: Any, name: str) -> None:
+  """
+  Remember that ``name`` exists on the current database socket.
+
+  Args:
+    connection (Any): Django connection wrapper for this thread.
+    name (str): Temporary stage table name.
+
+  Returns:
+    None
+
+  Examples:
+    >>> conn = type("C", (), {})()
+    >>> _mark_copy_stage(conn, "proc_data_ingest_stage")
+    >>> _copy_stage_ready(conn, "proc_data_ingest_stage")
+    True
+  """
+  raw = getattr(connection, "connection", None)
+  state = getattr(connection, "_hps_copy_stages", None)
+  if not isinstance(state, tuple) or len(state) != 2 or state[0] is not raw:
+    names: set[str] = set()
+    connection._hps_copy_stages = (raw, names)
+  else:
+    names = state[1]
+  names.add(name)
 
 
 def _stage_upsert_sql() -> str:
@@ -169,12 +230,84 @@ def _sql_literal(value: Any) -> str:
   )
 
 
-def proc_rows_to_copy_bytes(rows: Sequence[Any]) -> bytes:
+def _proc_copy_scalar(value: Any) -> Any:
+  """
+  Coerce one proc COPY cell the way ``_proc_field_or_none`` does.
+
+  Args:
+    value (Any): Cell from a proc dataframe column.
+
+  Returns:
+    Any: ``None``, ``int``, or the original non-numeric value.
+
+  Examples:
+    >>> _proc_copy_scalar(0.0)
+    0
+    >>> _proc_copy_scalar(float("nan")) is None
+    True
+  """
+  if value is None:
+    return None
+  try:
+    if value != value:
+      return None
+  except Exception:
+    pass
+  if isinstance(value, float):
+    return int(value)
+  if type(value).__module__ == "numpy":
+    try:
+      return int(value)
+    except TypeError, ValueError, OverflowError:
+      return None
+  return value
+
+
+def _proc_frame_to_copy_bytes(frame: pd.DataFrame) -> bytes:
+  """
+  Serialize a proc dataframe slice to COPY text.
+
+  ``jid``, ``host``, and ``proc`` pass through. Other columns use the
+  bigint coercion shared with the namedtuple builder.
+
+  Args:
+    frame (pd.DataFrame): Slice of parsed proc stats.
+
+  Returns:
+    bytes: UTF-8 COPY body.
+
+  Examples:
+    >>> _proc_frame_to_copy_bytes(pd.DataFrame())
+    b''
+  """
+  if frame.empty:
+    return b""
+  n = len(frame)
+  columns = {
+    col: frame[col].tolist() if col in frame.columns else [None] * n
+    for col in PROC_DATA_COPY_COLUMNS
+  }
+  lines: list[str] = []
+  for i in range(n):
+    fields = []
+    for col in PROC_DATA_COPY_COLUMNS:
+      value = columns[col][i]
+      if col not in _PROC_PASSTHROUGH_COLUMNS:
+        value = _proc_copy_scalar(value)
+      fields.append(_sql_literal(value))
+    lines.append("\t".join(fields))
+  return ("\n".join(lines) + "\n").encode("utf-8")
+
+
+def proc_rows_to_copy_bytes(rows: Sequence[Any] | pd.DataFrame) -> bytes:
   """
   Serialize parsed proc rows to the same COPY body as model instances.
 
+  A dataframe is walked by column. A sequence of namedtuples keeps the
+  kwargs walk used by the ORM fallback and existing callers.
+
   Args:
-    rows (Sequence[Any]): itertuples rows with proc_data field attributes.
+    rows (Sequence[Any] | pd.DataFrame): Namedtuple rows or a proc frame.
 
   Returns:
     bytes: UTF-8 COPY body.
@@ -183,6 +316,8 @@ def proc_rows_to_copy_bytes(rows: Sequence[Any]) -> bytes:
     >>> proc_rows_to_copy_bytes([])
     b''
   """
+  if isinstance(rows, pd.DataFrame):
+    return _proc_frame_to_copy_bytes(rows)
   if not rows:
     return b""
   from hpcperfstats.dbload import sync_timedb as st
@@ -223,9 +358,10 @@ def _write_proc_copy_payload(payload: bytes) -> None:
   COPY ``payload`` into the proc staging table and run the upsert.
 
   When write telemetry is on, records ``stage_ddl_s``, ``copy_s``, and
-  ``conflict_insert_s``. One PostgreSQL deadlock retries DDL, COPY, and
-  the upsert. The stage table is ``ON COMMIT DROP``, so the retry starts
-  from DDL. A second deadlock, or any other error, propagates.
+  ``conflict_insert_s``. One PostgreSQL deadlock retries COPY and the
+  upsert. A stage created in the aborted transaction is not remembered, so
+  that retry runs DDL again. A stage committed by an earlier batch is
+  reused. A second deadlock, or any other error, propagates.
 
   Args:
     payload (bytes): UTF-8 text COPY body. Empty skips the statement.
@@ -250,9 +386,12 @@ def _write_proc_copy_payload(payload: bytes) -> None:
   copy_sql = f"COPY proc_data_ingest_stage ({col_list}) FROM STDIN"
   for attempt in range(2):
     try:
+      created = False
       with transaction.atomic(), connection.cursor() as cursor:
-        with st._held_ingest_write_phase("stage_ddl_s"):
-          cursor.execute(_STAGE_DDL)
+        if not _copy_stage_ready(connection, _PROC_STAGE_NAME):
+          with st._held_ingest_write_phase("stage_ddl_s"):
+            cursor.execute(_STAGE_DDL)
+          created = True
         with (
           st._held_ingest_write_phase("copy_s"),
           cursor.copy(copy_sql) as copy,
@@ -260,18 +399,20 @@ def _write_proc_copy_payload(payload: bytes) -> None:
           copy.write(payload)
         with st._held_ingest_write_phase("conflict_insert_s"):
           cursor.execute(_stage_upsert_sql())
+      if created:
+        _mark_copy_stage(connection, _PROC_STAGE_NAME)
       return
     except Exception as exc:
       if attempt or "deadlock detected" not in str(exc).lower():
         raise
 
 
-def bulk_insert_proc_rows(rows: Sequence[Any]) -> None:
+def bulk_insert_proc_rows(rows: Sequence[Any] | pd.DataFrame) -> None:
   """
   Upsert parsed proc rows via COPY without building ``proc_data`` models.
 
   Args:
-    rows (Sequence[Any]): itertuples rows with proc_data field attributes.
+    rows (Sequence[Any] | pd.DataFrame): Namedtuple rows or a proc frame.
 
   Returns:
     None
@@ -279,7 +420,10 @@ def bulk_insert_proc_rows(rows: Sequence[Any]) -> None:
   Examples:
     >>> bulk_insert_proc_rows([])
   """
-  if not rows:
+  if isinstance(rows, pd.DataFrame):
+    if rows.empty:
+      return
+  elif not rows:
     return
   _write_proc_copy_payload(proc_rows_to_copy_bytes(rows))
 

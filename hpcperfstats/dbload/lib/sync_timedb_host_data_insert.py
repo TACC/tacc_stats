@@ -6,10 +6,11 @@ A/B arm ``HPCPERFSTATS_HOST_INSERT_ARM=baseline|candidate`` selects Django
 (COPY) after Podman large-data A/B retain; opt out with
 ``HPCPERFSTATS_SYNC_HOST_DATA_COPY=0``.
 
-Attributes:
+  Attributes:
   HOST_DATA_COPY_COLUMNS (tuple[str, ...]): Column order for COPY / INSERT.
-  _STAGE_DDL (str): TEMP staging table DDL (ON COMMIT DROP).
+  _STAGE_DDL (str): TEMP staging table DDL (ON COMMIT DELETE ROWS).
   _STAGE_INSERT (str): INSERT...SELECT...ON CONFLICT DO NOTHING SQL.
+  _HOST_STAGE_NAME (str): Host COPY stage table name.
 """
 
 from __future__ import annotations
@@ -37,7 +38,7 @@ HOST_DATA_COPY_COLUMNS: tuple[str, ...] = (
 )
 
 _STAGE_DDL = """
-CREATE TEMP TABLE host_data_ingest_stage (
+CREATE TEMP TABLE IF NOT EXISTS host_data_ingest_stage (
   time timestamptz NULL,
   host varchar(64) NULL,
   jid varchar(32) NULL,
@@ -48,7 +49,7 @@ CREATE TEMP TABLE host_data_ingest_stage (
   value real NULL,
   delta real NULL,
   arc real NULL
-) ON COMMIT DROP
+) ON COMMIT DELETE ROWS
 """
 
 _STAGE_INSERT = """
@@ -60,6 +61,61 @@ SELECT
 FROM host_data_ingest_stage
 ON CONFLICT (time, host, type, event, dev) DO NOTHING
 """
+
+_HOST_STAGE_NAME = "host_data_ingest_stage"
+
+
+def _copy_stage_ready(connection: Any, name: str) -> bool:
+  """
+  Return whether this live backend already created ``name``.
+
+  The set lives on the Django connection wrapper and is ignored when the
+  socket object changes, including after a reconnect.
+
+  Args:
+    connection (Any): Django connection wrapper for this thread.
+    name (str): Temporary stage table name.
+
+  Returns:
+    bool: True when ``name`` was committed on the current socket.
+
+  Examples:
+    >>> _copy_stage_ready(object(), "host_data_ingest_stage")
+    False
+  """
+  raw = getattr(connection, "connection", None)
+  state = getattr(connection, "_hps_copy_stages", None)
+  if not isinstance(state, tuple) or len(state) != 2:
+    return False
+  remembered, names = state
+  return remembered is raw and name in names
+
+
+def _mark_copy_stage(connection: Any, name: str) -> None:
+  """
+  Remember that ``name`` exists on the current database socket.
+
+  Args:
+    connection (Any): Django connection wrapper for this thread.
+    name (str): Temporary stage table name.
+
+  Returns:
+    None
+
+  Examples:
+    >>> conn = type("C", (), {})()
+    >>> _mark_copy_stage(conn, "host_data_ingest_stage")
+    >>> _copy_stage_ready(conn, "host_data_ingest_stage")
+    True
+  """
+  raw = getattr(connection, "connection", None)
+  state = getattr(connection, "_hps_copy_stages", None)
+  if not isinstance(state, tuple) or len(state) != 2 or state[0] is not raw:
+    names: set[str] = set()
+    connection._hps_copy_stages = (raw, names)
+  else:
+    names = state[1]
+  names.add(name)
 
 
 def host_insert_arm() -> str:
@@ -168,12 +224,102 @@ def _host_row_value(row: Any, col: str) -> Any:
   return getattr(row, col)
 
 
-def host_rows_to_copy_bytes(rows: Sequence[Any]) -> bytes:
+def _copy_dev_text(dev_val: Any) -> str:
+  """
+  Match the namedtuple device rule for one dataframe cell.
+
+  Missing and NaN cells become a blank device, not NULL.
+
+  Args:
+    dev_val (Any): Device cell from a host stats frame.
+
+  Returns:
+    str: Device text, or ``''`` when the cell is missing.
+
+  Examples:
+    >>> _copy_dev_text(float("nan"))
+    ''
+    >>> _copy_dev_text("gpu0")
+    'gpu0'
+  """
+  if dev_val is None or (isinstance(dev_val, float) and pd.isna(dev_val)):
+    return ""
+  if pd.isna(dev_val):
+    return ""
+  text = str(dev_val).strip()
+  if not text or text.lower() == "nan":
+    return ""
+  return text
+
+
+def _host_frame_cell(col: str, value: Any) -> Any:
+  """
+  Return one host COPY field from a dataframe cell.
+
+  Args:
+    col (str): ``HOST_DATA_COPY_COLUMNS`` name.
+    value (Any): Cell from that column.
+
+  Returns:
+    Any: Scalar passed to ``_sql_literal``.
+
+  Examples:
+    >>> _host_frame_cell("jid", "-") is None
+    True
+  """
+  if col == "time":
+    return to_pydatetime_or_none(value)
+  if col == "jid":
+    if pd.notna(value) and str(value) != "-":
+      return str(value)
+    return None
+  if col == "dev":
+    return _copy_dev_text(value)
+  if col in ("value", "delta", "arc"):
+    return float(value) if pd.notna(value) else None
+  return value
+
+
+def _host_frame_to_copy_bytes(frame: pd.DataFrame) -> bytes:
+  """
+  Serialize a host dataframe slice to COPY text.
+
+  Args:
+    frame (pd.DataFrame): Slice of parsed host stats.
+
+  Returns:
+    bytes: UTF-8 COPY body.
+
+  Examples:
+    >>> _host_frame_to_copy_bytes(pd.DataFrame())
+    b''
+  """
+  if frame.empty:
+    return b""
+  n = len(frame)
+  columns = {
+    col: frame[col].tolist() if col in frame.columns else [None] * n
+    for col in HOST_DATA_COPY_COLUMNS
+  }
+  lines: list[str] = []
+  for i in range(n):
+    fields = [
+      _sql_literal(_host_frame_cell(col, columns[col][i]))
+      for col in HOST_DATA_COPY_COLUMNS
+    ]
+    lines.append("\t".join(fields))
+  return ("\n".join(lines) + "\n").encode("utf-8")
+
+
+def host_rows_to_copy_bytes(rows: Sequence[Any] | pd.DataFrame) -> bytes:
   """
   Serialize parsed host rows to the same COPY body as model instances.
 
+  A dataframe is walked by column. A sequence of namedtuples keeps the
+  attribute walk used by the ORM fallback and existing callers.
+
   Args:
-    rows (Sequence[Any]): itertuples rows with host_data field attributes.
+    rows (Sequence[Any] | pd.DataFrame): Namedtuple rows or a host frame.
 
   Returns:
     bytes: UTF-8 COPY body.
@@ -182,6 +328,8 @@ def host_rows_to_copy_bytes(rows: Sequence[Any]) -> bytes:
     >>> host_rows_to_copy_bytes([])
     b''
   """
+  if isinstance(rows, pd.DataFrame):
+    return _host_frame_to_copy_bytes(rows)
   if not rows:
     return b""
   lines: list[str] = []
@@ -251,21 +399,26 @@ def _write_host_copy_payload(payload: bytes) -> None:
     st._held_ingest_write_phase("stage_ddl_s") if telem else nullcontext()
   )
   # Django defaults to autocommit; keep TEMP visible for COPY + INSERT.
+  created = False
   with transaction.atomic(), connection.cursor() as cursor:
-    with ddl_cm:
-      cursor.execute(_STAGE_DDL)
+    if not _copy_stage_ready(connection, _HOST_STAGE_NAME):
+      with ddl_cm:
+        cursor.execute(_STAGE_DDL)
+      created = True
     with copy_cm, cursor.copy(copy_sql) as copy:
       copy.write(payload)
     with conflict_cm:
       cursor.execute(_STAGE_INSERT)
+  if created:
+    _mark_copy_stage(connection, _HOST_STAGE_NAME)
 
 
-def bulk_insert_host_rows(rows: Sequence[Any]) -> None:
+def bulk_insert_host_rows(rows: Sequence[Any] | pd.DataFrame) -> None:
   """
   Insert parsed host rows via COPY without building ``host_data`` models.
 
   Args:
-    rows (Sequence[Any]): itertuples rows with host_data field attributes.
+    rows (Sequence[Any] | pd.DataFrame): Namedtuple rows or a host frame.
 
   Returns:
     None
@@ -273,7 +426,10 @@ def bulk_insert_host_rows(rows: Sequence[Any]) -> None:
   Examples:
     >>> bulk_insert_host_rows([])
   """
-  if not rows:
+  if isinstance(rows, pd.DataFrame):
+    if rows.empty:
+      return
+  elif not rows:
     return
   _write_host_copy_payload(host_rows_to_copy_bytes(rows))
 

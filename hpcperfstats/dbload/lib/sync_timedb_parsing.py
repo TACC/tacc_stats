@@ -3051,21 +3051,23 @@ def _apply_counter_deltas(stats_df: Any, carry: Any | None = None) -> Any:
     else:
       first = stats_df.groupby(_COUNTER_GROUP_COLS, observed=True).head(1)
     if not first.empty:
-      key_cols = [
-        first[col].to_numpy(copy=False) for col in _COUNTER_GROUP_COLS
-      ]
+      keys = list(
+        zip(
+          *(first[col].tolist() for col in _COUNTER_GROUP_COLS),
+          strict=True,
+        )
+      )
       values = first["value"].to_numpy(dtype=np.float64, copy=False)
       idxs = first.index.to_numpy()
       raw = carry.raw
+      no_prev = (np.nan,)
       prev_vals = np.fromiter(
         (
-          np.nan
-          if (prev := raw.get(key)) is None
-          else (prev[0] if isinstance(prev, tuple) else prev["value"])
-          for key in zip(*key_cols, strict=True)
+          (prev[0] if isinstance(prev, tuple) else prev["value"])
+          for prev in (raw.get(key, no_prev) for key in keys)
         ),
         dtype=np.float64,
-        count=len(first),
+        count=len(keys),
       )
       hit = np.isfinite(prev_vals)
       if hit.any():
@@ -3086,22 +3088,22 @@ def _apply_counter_deltas(stats_df: Any, carry: Any | None = None) -> Any:
     else:
       last = stats_df.groupby(_COUNTER_GROUP_COLS, observed=True).tail(1)
     if not last.empty:
-      key_cols = [last[col].to_numpy(copy=False) for col in _COUNTER_GROUP_COLS]
-      vals = last["value"].to_numpy(dtype=np.float64, copy=False)
-      wids = last["wid"].to_numpy(dtype=np.int64, copy=False)
-      mults = last["mult"].to_numpy(dtype=np.float64, copy=False)
-      stamps = last["time"].to_numpy(dtype=np.float64, copy=False)
-      carry.raw.update(
-        (
-          key,
-          (float(val), int(wid), float(mult), float(stamp)),
+      keys = list(
+        zip(
+          *(last[col].tolist() for col in _COUNTER_GROUP_COLS),
+          strict=True,
         )
-        for key, val, wid, mult, stamp in zip(
-          zip(*key_cols, strict=True),
-          vals,
-          wids,
-          mults,
-          stamps,
+      )
+      carry.raw.update(
+        zip(
+          keys,
+          zip(
+            last["value"].to_numpy(dtype=np.float64, copy=False).tolist(),
+            last["wid"].to_numpy(dtype=np.int64, copy=False).tolist(),
+            last["mult"].to_numpy(dtype=np.float64, copy=False).tolist(),
+            last["time"].to_numpy(dtype=np.float64, copy=False).tolist(),
+            strict=True,
+          ),
           strict=True,
         )
       )
@@ -3230,41 +3232,27 @@ def _apply_arc_and_finalize(stats_df: Any, carry: Any | None = None) -> Any:
     first = stats_df.groupby(_ARC_GROUP_COLS, observed=True).head(1)
     if not first.empty:
       positions = stats_df.index.get_indexer(first.index)
-      hosts = first["host"].to_numpy(copy=False)
-      types = first["type"].to_numpy(copy=False)
-      events = first["event"].to_numpy(copy=False)
+      hosts = first["host"].to_numpy()
+      types = first["type"].to_numpy()
       devs = (
-        first["dev"].to_numpy(copy=False)
-        if "dev" in first.columns
-        else np.full(len(first), "", dtype=object)
+        first["dev"].to_numpy() if "dev" in first.columns else [""] * len(first)
       )
+      events = first["event"].to_numpy()
       times = first["time"].to_numpy(dtype=np.float64, copy=False)
       deltas = first["delta"].to_numpy(dtype=np.float64, copy=False)
-      arc_map = carry.arc
-      prev_time = np.fromiter(
-        (
-          np.nan
-          if (
-            prev := arc_map.get((host, typ, "" if not dev else str(dev), event))
-          )
-          is None
-          else float(prev["time"] if isinstance(prev, dict) else prev)
-          for host, typ, dev, event in zip(
-            hosts, types, devs, events, strict=True
-          )
-        ),
-        dtype=np.float64,
-        count=len(first),
-      )
-      dt = times - prev_time
-      ok = (
-        (positions >= 0)
-        & np.isfinite(prev_time)
-        & (dt > 0)
-        & np.isfinite(deltas)
-      )
-      if ok.any():
-        _arc[positions[ok]] = deltas[ok] / dt[ok]
+      for i in range(len(first)):
+        pos = int(positions[i])
+        if pos < 0:
+          continue
+        prev = carry.arc.get(
+          (hosts[i], types[i], str(devs[i] or ""), events[i])
+        )
+        if prev is None:
+          continue
+        prev_time = prev["time"] if isinstance(prev, dict) else prev
+        dt = float(times[i]) - float(prev_time)
+        if dt > 0 and np.isfinite(deltas[i]):
+          _arc[pos] = float(deltas[i]) / dt
 
   stats_df = stats_df.copy()
   stats_df["arc"] = _arc
@@ -3272,28 +3260,17 @@ def _apply_arc_and_finalize(stats_df: Any, carry: Any | None = None) -> Any:
   if carry is not None:
     last = stats_df.groupby(_ARC_GROUP_COLS, observed=True).tail(1)
     if not last.empty:
-      hosts = last["host"].to_numpy(copy=False)
-      types = last["type"].to_numpy(copy=False)
-      events = last["event"].to_numpy(copy=False)
+      hosts = last["host"].to_numpy()
+      types = last["type"].to_numpy()
       devs = (
-        last["dev"].to_numpy(copy=False)
-        if "dev" in last.columns
-        else np.full(len(last), "", dtype=object)
+        last["dev"].to_numpy() if "dev" in last.columns else [""] * len(last)
       )
-      stamps = last["time"].to_numpy(dtype=np.float64, copy=False)
-      carry.arc.update(
-        (
-          ((host, typ, "" if not dev else str(dev), event), float(stamp))
-          for host, typ, dev, event, stamp in zip(
-            hosts,
-            types,
-            devs,
-            events,
-            stamps,
-            strict=True,
-          )
+      events = last["event"].to_numpy()
+      times = last["time"].to_numpy(dtype=np.float64, copy=False)
+      for i in range(len(last)):
+        carry.arc[(hosts[i], types[i], str(devs[i] or ""), events[i])] = float(
+          times[i]
         )
-      )
 
   return stats_df.dropna(subset=["host", "type", "event", "time", "value"])
 

@@ -2,6 +2,10 @@
 
 from __future__ import annotations
 
+import os
+
+import pytest
+
 from hpcperfstats.dbload.lib import sync_timedb_proc_data_insert as pdi
 from hpcperfstats.site.lib.machine.models import proc_data
 
@@ -474,5 +478,113 @@ def test_baseline_arm_counts_orm_rows(monkeypatch):
     st._reset_ingest_write_timing(enabled=False)
 
 
-def test_zzz_proc_data_insert_unit_ok_marker():
-  print("proc_data_insert_unit_ok")
+def test_proc_stage_ddl_once_per_connection_and_deadlock_retry(monkeypatch):
+  """One CREATE across batches; a later deadlock retries the write once."""
+  from django.db.utils import OperationalError
+
+  state = {"ddl": 0, "copy": 0, "upsert": 0, "ok": 0}
+
+  def execute(sql, params=None):
+    del params
+    text = str(sql)
+    if "CREATE TEMP" in text:
+      state["ddl"] += 1
+      return
+    if "INSERT INTO proc_data" in text:
+      state["upsert"] += 1
+      if state["upsert"] == 2:
+        raise OperationalError("deadlock detected")
+      state["ok"] += 1
+      return
+    raise AssertionError(text)
+
+  _patch_proc_copy_connection(monkeypatch, execute, state)
+  import django.db as django_db
+
+  django_db.connection.connection = object()
+  pdi.bulk_insert_proc_data_update_conflicts([_obj()])
+  pdi.bulk_insert_proc_data_update_conflicts([_obj(proc="other")])
+  assert state["ddl"] == 1
+  assert state["ok"] == 2
+  assert state["upsert"] == 3
+  assert "IF NOT EXISTS" in pdi._STAGE_DDL
+  assert "ON COMMIT DELETE ROWS" in pdi._STAGE_DDL
+  assert "ON COMMIT DROP" not in pdi._STAGE_DDL
+
+
+def test_proc_copy_bytes_match_tuple_builder():
+  """Column-slice COPY bytes match the namedtuple builder, including nulls."""
+  from types import SimpleNamespace
+
+  import pandas as pd
+
+  from hpcperfstats.dbload import sync_timedb as st
+
+  row = SimpleNamespace(
+    jid=None,
+    host="h",
+    proc="bash",
+    device="",
+    uid=float("nan"),
+    vm_peak=10.0,
+    vm_size=0.0,
+    vm_lck=float("nan"),
+    vm_hwm=4.0,
+    vm_rss=1.0,
+    vm_data=float("nan"),
+    vm_stk=2.0,
+    vm_exe=3.0,
+    vm_lib=5.0,
+    vm_pte=float("nan"),
+    vm_swap=236948.0,
+    threads=1.0,
+  )
+  frame = pd.DataFrame([row.__dict__])
+  assert pdi.proc_rows_to_copy_bytes(frame) == pdi.proc_rows_to_copy_bytes(
+    list(frame.itertuples(index=False))
+  )
+  payload = pdi.proc_rows_to_copy_bytes(frame)
+  assert b"236948.0" not in payload
+  assert b"\\N" in payload
+  assert payload == pdi.proc_data_objs_to_copy_bytes(
+    [proc_data(**st._proc_data_row_kwargs(row))]
+  )
+  assert pdi.proc_rows_to_copy_bytes(frame.iloc[0:0]) == b""
+
+
+@pytest.mark.skipif(
+  os.environ.get("HPCPERFSTATS_COMPOSE_NETWORK") != "1",
+  reason="TEMP stage lifecycle needs the compose PostgreSQL workflow",
+)
+@pytest.mark.django_db(transaction=True)
+def test_proc_stage_empty_after_commit_and_rollback():
+  """A committed proc stage keeps the table and drops its rows."""
+  from django.db import connection, transaction
+
+  if connection.vendor != "postgresql":
+    pytest.skip("ON COMMIT DELETE ROWS is PostgreSQL")
+  with transaction.atomic():
+    with connection.cursor() as cursor:
+      cursor.execute(pdi._STAGE_DDL)
+      cursor.execute(
+        "INSERT INTO proc_data_ingest_stage (jid, host, proc) "
+        "VALUES ('1', 'h', 'bash')"
+      )
+      cursor.execute("SELECT count(*) FROM proc_data_ingest_stage")
+      assert cursor.fetchone()[0] == 1
+  with connection.cursor() as cursor:
+    cursor.execute("SELECT count(*) FROM proc_data_ingest_stage")
+    assert cursor.fetchone()[0] == 0
+  try:
+    with transaction.atomic():
+      with connection.cursor() as cursor:
+        cursor.execute(
+          "INSERT INTO proc_data_ingest_stage (jid, host, proc) "
+          "VALUES ('2', 'h', 'zsh')"
+        )
+        raise RuntimeError("rollback")
+  except RuntimeError:
+    pass
+  with connection.cursor() as cursor:
+    cursor.execute("SELECT count(*) FROM proc_data_ingest_stage")
+    assert cursor.fetchone()[0] == 0

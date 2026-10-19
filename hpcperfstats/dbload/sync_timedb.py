@@ -3045,6 +3045,62 @@ def _time_ingest_db_reconnect() -> None:
     connection.ensure_connection()
 
 
+def _write_copy_frame_batches(
+  frame: Any,
+  stats_file: str,
+  phase: str,
+  insert_batch: Any,
+) -> None:
+  """
+  COPY ``frame`` in ``iloc`` slices.
+
+  ``write_setup_s`` times each slice when telemetry is on. Byte encoding
+  stays inside ``insert_batch`` under ``db_execute_s``. An empty frame
+  does nothing.
+
+  Args:
+    frame (Any): Host or proc dataframe. ``len`` and ``iloc`` are required.
+    stats_file (str): Path used by the per-file deadline.
+    phase (str): Deadline phase, ``db_write_proc`` or ``db_write_host``.
+    insert_batch (Any): Callable that accepts one dataframe slice.
+
+  Returns:
+    None
+
+  Examples:
+    >>> _write_copy_frame_batches(
+    ...   type("E", (), {"__len__": lambda self: 0})(),
+    ...   "f",
+    ...   "db_write_proc",
+    ...   lambda batch: None,
+    ... )
+  """
+  step = bulk_create_batch_size()
+  total = len(frame)
+  offset = 0
+  while offset < total:
+    _raise_if_ingest_per_file_deadline_exceeded(stats_file, phase)
+    end = min(offset + step, total)
+    if _ingest_write_telem_on:
+      with _held_ingest_write_timing():
+        with _held_ingest_write_phase("write_setup_s"):
+          batch = frame.iloc[offset:end]
+        offset = end
+        if len(batch) == 0:
+          break
+        with _held_ingest_write_phase("db_execute_s"):
+          _raise_if_ingest_per_file_deadline_exceeded(stats_file, phase)
+          insert_batch(batch)
+    else:
+      batch = frame.iloc[offset:end]
+      offset = end
+      if len(batch) == 0:
+        break
+      with _held_ingest_write_timing():
+        _raise_if_ingest_per_file_deadline_exceeded(stats_file, phase)
+        insert_batch(batch)
+
+
 def _write_stats_payload_to_db(
   stats_file: str,
   stats: Any,
@@ -3078,48 +3134,47 @@ def _write_stats_payload_to_db(
   copy_proc = use_copy_proc_insert()
   try:
     _time_ingest_db_reconnect()
-    if _ingest_write_telem_on:
+    if copy_proc:
+      _write_copy_frame_batches(
+        proc_stats,
+        stats_file,
+        "db_write_proc",
+        bulk_insert_proc_rows,
+      )
+    elif _ingest_write_telem_on:
       with _held_ingest_write_timing():
         with _held_ingest_write_phase("write_setup_s"):
           proc_it = proc_stats.itertuples(index=False)
-    else:
-      proc_it = proc_stats.itertuples(index=False)
-    while True:
-      _raise_if_ingest_per_file_deadline_exceeded(stats_file, "db_write_proc")
-      if _ingest_write_telem_on:
+      while True:
+        _raise_if_ingest_per_file_deadline_exceeded(stats_file, "db_write_proc")
         with _held_ingest_write_timing():
           with _held_ingest_write_phase("batch_iter_s"):
             batch = list(itertools.islice(proc_it, bulk_create_batch_size()))
           if not batch:
             break
-          if not copy_proc:
-            with _held_ingest_write_phase("orm_materialize_s"):
-              proc_objs = [
-                proc_data(**_proc_data_row_kwargs(row)) for row in batch
-              ]
-            _add_ingest_orm_rows(len(batch))
+          with _held_ingest_write_phase("orm_materialize_s"):
+            proc_objs = [
+              proc_data(**_proc_data_row_kwargs(row)) for row in batch
+            ]
+          _add_ingest_orm_rows(len(batch))
           with _held_ingest_write_phase("db_execute_s"):
             _raise_if_ingest_per_file_deadline_exceeded(
               stats_file, "db_write_proc"
             )
-            if copy_proc:
-              bulk_insert_proc_rows(batch)
-            else:
-              insert_proc_data_batch(proc_objs)
-      else:
+            insert_proc_data_batch(proc_objs)
+    else:
+      proc_it = proc_stats.itertuples(index=False)
+      while True:
+        _raise_if_ingest_per_file_deadline_exceeded(stats_file, "db_write_proc")
         batch = list(itertools.islice(proc_it, bulk_create_batch_size()))
         if not batch:
           break
-        if not copy_proc:
-          proc_objs = [proc_data(**_proc_data_row_kwargs(row)) for row in batch]
+        proc_objs = [proc_data(**_proc_data_row_kwargs(row)) for row in batch]
         with _held_ingest_write_timing():
           _raise_if_ingest_per_file_deadline_exceeded(
             stats_file, "db_write_proc"
           )
-          if copy_proc:
-            bulk_insert_proc_rows(batch)
-          else:
-            insert_proc_data_batch(proc_objs)
+          insert_proc_data_batch(proc_objs)
   except Exception as e:
     _reraise_if_ingest_control_flow(e)
     if is_database_unavailable_error(e):
@@ -3139,51 +3194,52 @@ def _write_stats_payload_to_db(
         category=UserWarning,
       )
       copy_host = use_copy_host_insert()
-      if _ingest_write_telem_on:
+      if copy_host:
+        _write_copy_frame_batches(
+          stats,
+          stats_file,
+          "db_write_host",
+          bulk_insert_host_rows,
+        )
+      elif _ingest_write_telem_on:
         with _held_ingest_write_timing():
           with _held_ingest_write_phase("write_setup_s"):
             stats_it = stats.itertuples(index=False)
-      else:
-        stats_it = stats.itertuples(index=False)
-      while True:
-        _raise_if_ingest_per_file_deadline_exceeded(stats_file, "db_write_host")
-        if _ingest_write_telem_on:
+        while True:
+          _raise_if_ingest_per_file_deadline_exceeded(
+            stats_file, "db_write_host"
+          )
           with _held_ingest_write_timing():
             with _held_ingest_write_phase("batch_iter_s"):
               batch = list(itertools.islice(stats_it, bulk_create_batch_size()))
             if not batch:
               break
-            if not copy_host:
-              with _held_ingest_write_phase("orm_materialize_s"):
-                host_objs = [
-                  host_data_instance_from_stats_row(row) for row in batch
-                ]
-              _add_ingest_orm_rows(len(batch))
+            with _held_ingest_write_phase("orm_materialize_s"):
+              host_objs = [
+                host_data_instance_from_stats_row(row) for row in batch
+              ]
+            _add_ingest_orm_rows(len(batch))
             with _held_ingest_write_phase("db_execute_s"):
               _raise_if_ingest_per_file_deadline_exceeded(
                 stats_file,
                 "db_write_host",
               )
-              if copy_host:
-                bulk_insert_host_rows(batch)
-              else:
-                insert_host_data_batch(host_objs)
-        else:
+              insert_host_data_batch(host_objs)
+      else:
+        stats_it = stats.itertuples(index=False)
+        while True:
+          _raise_if_ingest_per_file_deadline_exceeded(
+            stats_file, "db_write_host"
+          )
           batch = list(itertools.islice(stats_it, bulk_create_batch_size()))
           if not batch:
             break
-          if not copy_host:
-            host_objs = [
-              host_data_instance_from_stats_row(row) for row in batch
-            ]
+          host_objs = [host_data_instance_from_stats_row(row) for row in batch]
           with _held_ingest_write_timing():
             _raise_if_ingest_per_file_deadline_exceeded(
               stats_file, "db_write_host"
             )
-            if copy_host:
-              bulk_insert_host_rows(batch)
-            else:
-              insert_host_data_batch(host_objs)
+            insert_host_data_batch(host_objs)
   except Exception as e:
     _reraise_if_ingest_control_flow(e)
     if is_database_unavailable_error(e):

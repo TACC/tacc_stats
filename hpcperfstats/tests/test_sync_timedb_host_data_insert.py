@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
+import os
 from datetime import UTC, datetime
+
+import pytest
 
 from hpcperfstats.dbload.lib import sync_timedb_host_data_insert as hdi
 from hpcperfstats.site.lib.machine.models import host_data
@@ -176,7 +179,7 @@ def test_bulk_insert_host_data_ignore_conflicts_uses_stage_and_conflict(
   )
   hdi.bulk_insert_host_data_ignore_conflicts([_obj(), _obj(event="idle")])
   joined = "\n".join(executes)
-  assert "CREATE TEMP TABLE host_data_ingest_stage" in joined
+  assert "CREATE TEMP TABLE IF NOT EXISTS host_data_ingest_stage" in joined
   assert "COPY host_data_ingest_stage" in joined
   assert "ON CONFLICT (time, host, type, event, dev) DO NOTHING" in joined
   assert len(copy_writes) == 1
@@ -297,6 +300,136 @@ def test_write_stats_payload_uses_insert_host_data_batch(monkeypatch):
   assert called == [1]
 
 
-# Success token for unlazy G2 EXPECT
-def test_zzz_host_data_insert_unit_ok_marker(capsys):
-  print("host_data_insert_unit_ok")
+def test_host_stage_ddl_once_per_connection(monkeypatch):
+  """Two host batches on one socket run CREATE TEMP only once."""
+  executes: list[str] = []
+
+  class _CopyCtx:
+    def __enter__(self):
+      return self
+
+    def __exit__(self, *a):
+      return False
+
+    def write(self, data: bytes):
+      del data
+
+  class _Cursor:
+    def __enter__(self):
+      return self
+
+    def __exit__(self, *a):
+      return False
+
+    def execute(self, sql, params=None):
+      del params
+      executes.append(str(sql))
+
+    def copy(self, sql):
+      executes.append(str(sql))
+      return _CopyCtx()
+
+  class _Conn:
+    connection = object()
+
+    def cursor(self):
+      return _Cursor()
+
+  class _Atomic:
+    def __enter__(self):
+      return self
+
+    def __exit__(self, *a):
+      return False
+
+  import django.db as django_db
+
+  monkeypatch.setattr(django_db, "connection", _Conn())
+  monkeypatch.setattr(
+    django_db,
+    "transaction",
+    type("T", (), {"atomic": staticmethod(lambda: _Atomic())})(),
+  )
+  hdi.bulk_insert_host_data_ignore_conflicts([_obj()])
+  hdi.bulk_insert_host_data_ignore_conflicts([_obj(event="idle")])
+  creates = [sql for sql in executes if "CREATE TEMP" in sql]
+  assert len(creates) == 1
+  assert "IF NOT EXISTS" in hdi._STAGE_DDL
+  assert "ON COMMIT DELETE ROWS" in hdi._STAGE_DDL
+  assert "ON COMMIT DROP" not in hdi._STAGE_DDL
+  assert sum("COPY host_data_ingest_stage" in sql for sql in executes) == 2
+
+
+def test_host_copy_bytes_match_tuple_builder():
+  """Column-slice COPY bytes match the namedtuple builder, including nulls."""
+  import pandas as pd
+
+  frame = pd.DataFrame(
+    [
+      {
+        "time": datetime(2026, 1, 1, 12, 0, 0, tzinfo=UTC),
+        "host": "h",
+        "jid": "-",
+        "type": "cpu",
+        "dev": float("nan"),
+        "event": "user",
+        "unit": "%",
+        "value": float("nan"),
+        "delta": None,
+        "arc": 1.5,
+      },
+      {
+        "time": datetime(2026, 1, 1, 12, 0, 1, tzinfo=UTC),
+        "host": "h2",
+        "jid": "9",
+        "type": "cpu",
+        "dev": "",
+        "event": "sys",
+        "unit": "%",
+        "value": 1.0,
+        "delta": 0.0,
+        "arc": None,
+      },
+    ]
+  )
+  tuples = list(frame.itertuples(index=False))
+  assert hdi.host_rows_to_copy_bytes(frame) == hdi.host_rows_to_copy_bytes(
+    tuples
+  )
+  assert hdi.host_rows_to_copy_bytes(frame.iloc[0:0]) == b""
+
+
+@pytest.mark.skipif(
+  os.environ.get("HPCPERFSTATS_COMPOSE_NETWORK") != "1",
+  reason="TEMP stage lifecycle needs the compose PostgreSQL workflow",
+)
+@pytest.mark.django_db(transaction=True)
+def test_host_stage_empty_after_commit_and_rollback():
+  """A committed host stage keeps the table and drops its rows."""
+  from django.db import connection, transaction
+
+  if connection.vendor != "postgresql":
+    pytest.skip("ON COMMIT DELETE ROWS is PostgreSQL")
+  with transaction.atomic():
+    with connection.cursor() as cursor:
+      cursor.execute(hdi._STAGE_DDL)
+      cursor.execute(
+        "INSERT INTO host_data_ingest_stage (host) VALUES ('keep')"
+      )
+      cursor.execute("SELECT count(*) FROM host_data_ingest_stage")
+      assert cursor.fetchone()[0] == 1
+  with connection.cursor() as cursor:
+    cursor.execute("SELECT count(*) FROM host_data_ingest_stage")
+    assert cursor.fetchone()[0] == 0
+  try:
+    with transaction.atomic():
+      with connection.cursor() as cursor:
+        cursor.execute(
+          "INSERT INTO host_data_ingest_stage (host) VALUES ('gone')"
+        )
+        raise RuntimeError("rollback")
+  except RuntimeError:
+    pass
+  with connection.cursor() as cursor:
+    cursor.execute("SELECT count(*) FROM host_data_ingest_stage")
+    assert cursor.fetchone()[0] == 0

@@ -154,6 +154,7 @@ Append one row per soak. Leave the rank table unchanged until a row contradicts 
 | 2026-10-15 | `sync-timedb-fresh-baseline` | 04 Horizon, 01 Stampede3 | scored ~8h, telem on | master + `orm_rows` / `overlap_headroom_s` | 04 dense overlap 131.7s, conflict_insert 64.3s, orm 36.8s. 01 dense overlap 2.4s. 01 `feed_s` is telem-on and untrusted. | Re-rank: F2, then conflict_insert, then F1 |
 | 2026-10-16 | `f2-overlap-reject` | 04 Horizon, 01 Stampede3 | 8h, telem on, pool 64 | overlap image, later removed from HEAD | 04 dense elapsed 198.5s, overlap 76.3s, 15.0808 MiB/min. 01 dense elapsed 7421.6s, proc_merge 4079s, 75.1626 MiB/min (was 128.2226). Telem was on in both arms. | Reject F2. Next code change is conflict_insert |
 | 2026-10-17 | `conflict-insert-shrink` | 04 Horizon, 01 Stampede3 | 8h, telem on | conflict_insert + F1 image (no deadlock fix) | 04 dense conflict_insert 38.3s, orm 0. 01 64 MiB-1 GiB proc_merge 139.5s, start_s 129.4s. | Retain both. Next: in-place proc merge |
+| 2026-10-19 | `soak-readout-next` | 04 Horizon, 01 Stampede3 | 8h, telem on, rejected parse-cut image | delta/ARC parse cut (`cda5da57`) | 04 dense conflict_insert 43.750s (bar 38.3), stage_ddl 5.500s, write_setup 8.750s, 16.4921 MiB/min. 01 48.6328 MiB/min (was 133.6808). reconnect_s 0 on every line. | Do not retain. Revert the parse cut before the next image. Next plan: `.cursor/plans/soak-readout-next.plan.md` (stage reuse and columnar COPY). |
 
 ## Next plan after the baseline
 
@@ -166,7 +167,8 @@ host_proc merge is in the tree after that baseline. Retain it only if 01
 least 12, and 04 dense `conflict_insert_s` stays at or under 38.3s. The
 following untried cut is the giant-file `start_s` scan (129.4s). Telemetry
 was on in the 2026-10-15, 2026-10-16, and 2026-10-17 windows. The 01 `feed_s`
-median is telem-on and untrusted.
+median is telem-on and untrusted. The 2026-10-19 parse-cut image is not
+retained. The next plan is `.cursor/plans/soak-readout-next.plan.md`.
 
 ## Historical campaign (through 2026-10-14)
 
