@@ -282,6 +282,25 @@ def test_0038_host_data_dev_j_prefix_idx_contracts():
   assert "WHERE (h.jid = p_jid OR h.dev" in fn_op.reverse_sql
 
 
+def test_0039_jid_scoped_distinct_host_filter_contracts():
+  """0039: DROP 3-arg; CREATE 4-arg with p_hosts on both UNION arms."""
+  mod = importlib.import_module(
+    "hpcperfstats.site.lib.machine.migrations.0039_jid_scoped_distinct_host_filter"
+  )
+  assert mod.Migration.dependencies == [
+    ("machine", "0038_host_data_dev_j_prefix_idx"),
+  ]
+  assert len(mod.Migration.operations) == 1
+  op = mod.Migration.operations[0]
+  assert isinstance(op, migrations.RunSQL)
+  assert "DROP FUNCTION IF EXISTS jid_scoped_distinct_host_time_count" in op.sql
+  assert "p_hosts text[] DEFAULT NULL" in op.sql
+  assert op.sql.count("p_hosts IS NULL OR h.host = ANY(p_hosts)") >= 2
+  assert "UNION" in op.sql
+  assert "p_hosts text[] DEFAULT NULL" not in op.reverse_sql
+  assert "UNION" in op.reverse_sql
+
+
 def test_0035_widens_job_data_jid_without_using_cast():
   """State AlterField plus typmod SQL. USING would rewrite the FK tables."""
   mod = importlib.import_module(

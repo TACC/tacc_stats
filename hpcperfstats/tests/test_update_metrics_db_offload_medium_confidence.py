@@ -97,6 +97,48 @@ def test_jid_scoped_distinct_union_parity_jid_dev_and_both():
 
 
 @pytest.mark.django_db(transaction=True)
+def test_jid_scoped_distinct_host_filter_parity():
+  """0039: p_hosts restricts count; NULL hosts matches unscoped UNION."""
+  oracles.skip_unless_compose_db()
+  from hpcperfstats.analysis.metrics.lib.metrics_host_data_sql import (
+    jid_scoped_distinct_host_time_count,
+  )
+  from hpcperfstats.site.lib.machine.models import host_data, job_data
+
+  start = datetime(2026, 8, 2, 12, 0, tzinfo=UTC)
+  end = start + timedelta(hours=1)
+  host_a = "n-hf-a.dboff.test"
+  host_b = "n-hf-b.dboff.test"
+  jid = "920020"
+  t0 = start + timedelta(minutes=5)
+  t1 = start + timedelta(minutes=10)
+  host_data.objects.filter(host__in=[host_a, host_b]).delete()
+  job_data.objects.filter(jid=jid).delete()
+  oracles.seed_minimal_job(
+    jid=jid, start=start, end=end, host_list=[host_a, host_b]
+  )
+  for host, ts in ((host_a, t0), (host_a, t1), (host_b, t0)):
+    host_data.objects.create(
+      jid=jid,
+      host=host,
+      time=ts,
+      type="cpu_counter_metrics",
+      event="APERF",
+      dev="",
+      unit="count",
+      value=1.0,
+    )
+  assert jid_scoped_distinct_host_time_count(jid, start, end) == 3
+  assert jid_scoped_distinct_host_time_count(jid, start, end, hosts=None) == 3
+  assert (
+    jid_scoped_distinct_host_time_count(jid, start, end, hosts=[host_a]) == 2
+  )
+  assert (
+    jid_scoped_distinct_host_time_count(jid, start, end, hosts=[host_b]) == 1
+  )
+
+
+@pytest.mark.django_db(transaction=True)
 def test_strided_distinct_times_db_function_matches_grouped_max_sql():
   oracles.skip_unless_compose_db()
   from hpcperfstats.analysis.metrics.lib.gen import jid_table as jt_mod

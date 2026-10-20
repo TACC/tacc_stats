@@ -26,7 +26,7 @@ from typing import Any, NamedTuple
 import bokeh
 from bokeh.embed import json_item
 from django.conf import settings
-from django.db import connection
+from django.db import DatabaseError, connection
 from django.utils import timezone as dj_tz
 
 import hpcperfstats.analysis.metrics.lib.gen.jid_table as jid_table
@@ -194,38 +194,53 @@ def _utc_iso_for_plot_fingerprint(dt: Any) -> str:
 
 def get_live_distinct_time_count_for_jid(jid: str) -> int:
   """
-  Live per-job distinct sample times (PostgreSQL); else.
+  Live per-job distinct sample times (PostgreSQL); else persisted count.
 
-    metrics_distinct_time_count.
+  Prefer ``telemetry_first_time`` / ``telemetry_last_time`` when set; pass
+  ``host_list`` into the PG function. On ``DatabaseError`` (statement
+  timeout), return persisted ``metrics_distinct_time_count`` or ``0``.
 
   Args:
-    jid (str): String for jid.
+    jid (str): Job id string.
 
   Returns:
-    int: int produced by this call.
+    int: Sum of per-host distinct sample times, or persisted / ``0``.
 
   Examples:
     >>> get_live_distinct_time_count_for_jid("x")  # doctest: +SKIP
   """
-  if connection.vendor != "postgresql":
-    v = (
-      job_data.objects.filter(jid=jid)
-      .values_list("metrics_distinct_time_count", flat=True)
-      .first()
-    )
-    return int(v) if v is not None else 0
-  bounds = (
+  row = (
     job_data.objects.filter(jid=jid)
-    .values_list("start_time", "end_time")
+    .values(
+      "start_time",
+      "end_time",
+      "telemetry_first_time",
+      "telemetry_last_time",
+      "host_list",
+      "metrics_distinct_time_count",
+    )
     .first()
   )
-  if not bounds or bounds[0] is None or bounds[1] is None:
+  if not row:
+    return 0
+  persisted = row.get("metrics_distinct_time_count")
+  if connection.vendor != "postgresql":
+    return int(persisted) if persisted is not None else 0
+  t0 = row.get("telemetry_first_time") or row.get("start_time")
+  t1 = row.get("telemetry_last_time") or row.get("end_time")
+  if t0 is None or t1 is None:
+    return 0
+  hosts = list(row.get("host_list") or [])
+  if not hosts:
     return 0
   from hpcperfstats.analysis.metrics.lib.metrics_host_data_sql import (
     jid_scoped_distinct_host_time_count,
   )
 
-  return jid_scoped_distinct_host_time_count(jid, bounds[0], bounds[1])
+  try:
+    return jid_scoped_distinct_host_time_count(jid, t0, t1, hosts=hosts)
+  except DatabaseError:
+    return int(persisted) if persisted is not None else 0
 
 
 def compute_plot_input_fingerprint(

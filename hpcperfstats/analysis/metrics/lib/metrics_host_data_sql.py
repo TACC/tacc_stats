@@ -56,6 +56,7 @@ def jid_scoped_distinct_host_time_count(
   jid: str,
   start: Any,
   end: Any,
+  hosts: list[str] | None = None,
 ) -> int:
   """
   Live distinct sample count for one job window via ``jid_scoped_distinct_host_time_count`` (#8).
@@ -64,6 +65,8 @@ def jid_scoped_distinct_host_time_count(
     jid (str): Job id.
     start (Any): Window start (timestamptz).
     end (Any): Window end (timestamptz).
+    hosts (list[str] | None): Optional ``job_data.host_list``; ``None`` keeps
+      unscoped 0038 semantics (``p_hosts`` DEFAULT NULL).
 
   Returns:
     int: Sum of per-host ``COUNT(DISTINCT time)``.
@@ -78,9 +81,10 @@ def jid_scoped_distinct_host_time_count(
     connection.vendor != "postgresql" or not jid or start is None or end is None
   ):
     return 0
-  sql = "SELECT jid_scoped_distinct_host_time_count(%s, %s, %s)"
+  host_list = list(hosts) if hosts else None
+  sql = "SELECT jid_scoped_distinct_host_time_count(%s, %s, %s, %s::text[])"
   with connection.cursor() as cursor:
-    cursor.execute(sql, [str(jid), start, end])
+    cursor.execute(sql, [str(jid), start, end, host_list])
     row = cursor.fetchone()
   if not row or row[0] is None:
     return 0
