@@ -13,8 +13,8 @@ Prioritized follow-ups from [SECURITY_AUDIT.md](SECURITY_AUDIT.md). Update this 
 ## P2 — Hardening and hygiene
 
 - **shadcn CLI transitive `braces` (npm audit):** 7 high in dev-only `shadcn` / `@shadcn/registry` tree (GHSA-vfj7-8cjw-p6xm); not shipped in production static export. 2026-10-15 audit still reports this chain after the pin refresh. Track upstream. Do not `npm audit fix --force`.
-- **`sprintf-js` via `@bokeh/bokehjs@3.10.1`:** 2 moderate npm audit findings (unbounded precision DoS). Production loads the vendored UMD script, not the npm package graph. No same-line override was applied because Bokeh owns the dependency. Revisit when Bokeh or `sprintf-js` publishes a patched line.
-- **Audit workflow:** `.github/workflows/security-audit.yaml` installs rootless Podman, stores images under `/data/podman/$USER`, and calls `tests/run_security_audit_workflow.sh`. That runner builds `web` unless `--skip-build` is set, then runs `pip-audit` in the image and `npm audit` on the host frontend tree. GitHub alert closure for Dependabot #119 and CodeQL #42–#44 waits for a default-branch rescan.
+- **`sprintf-js` via `@bokeh/bokehjs@3.10.1` (npm audit residual):** Dependabot [#120](https://github.com/TACC/HPCPerfStats/security/dependabot/120) (GHSA-hp3w-g68c-fv3c / CVE-2026-97058) dismissed **inaccurate** on 2026-10-20 — NVD marks CVE-2026-97058 **Rejected** by its CNA; no patched `sprintf-js` exists (latest 1.1.3); npm’s suggested “fix” downgrades Bokeh to 3.3.4 and would break the 3.10.1 Python/JS lockstep. `npm audit` may still report the GHSA until GitHub withdraws it. Do not override or force-downgrade Bokeh.
+- **Audit workflow:** `.github/workflows/security-audit.yaml` installs rootless Podman, stores images under `/data/podman/$USER`, and calls `tests/run_security_audit_workflow.sh`. That runner builds `web` unless `--skip-build` is set, then runs `pip-audit` in the image and `npm audit` on the host frontend tree.
 
 ## Done
 
@@ -42,11 +42,13 @@ Prioritized follow-ups from [SECURITY_AUDIT.md](SECURITY_AUDIT.md). Update this 
 | Dependabot #117 dompurify (2026-10-05) | `overrides.dompurify@^3.4.16` (lock **3.4.16**); `next@^16.3.6` (lock **16.3.8**); `test_dompurify_override_meets_dependabot_117_floor`; GitHub alert closes on default-branch rescan. |
 | CodeQL #29–#41 (2026-10-05) | Staff API opaque errors (RabbitMQ admin stats, `sacct_ingest`); OAuth path redirect guard; jobstats CLI auth help; `salted_hmac` API-key throttle fingerprint; test Redis key equality. Log: [`test_runs/code_scanning_sweep_2026-10-05.md`](../test_runs/code_scanning_sweep_2026-10-05.md). |
 | CodeQL #28 secure_path TOCTOU (2026-10-05) | `ensure_private_dir` fd + `fchmod`; extended `monitor/tests/test_secure_path.c`; alert closes on CodeQL rescan after merge. |
+| Dependabot #120 sprintf-js (2026-10-20) | Dismissed **inaccurate**: CVE-2026-97058 Rejected by CNA (NVD); no patched `sprintf-js`; transitive of `@bokeh/bokehjs@3.10.1`. Open Dependabot count **0**. Log: [`test_runs/dependabot_120_sprintf_2026-10-20.md`](../test_runs/dependabot_120_sprintf_2026-10-20.md). |
 
 ## History
 
 | Date       | Change |
 |------------|--------|
+| 2026-10-20 | Dependabot #120 (`sprintf-js` / rejected CVE-2026-97058) dismissed inaccurate; open Dependabot alerts **0**; P2 note kept for npm-audit residual until GHSA withdraws. |
 | 2026-10-05 | Dependabot #117 + Next 16.3.8 + CodeQL #28 monitor TOCTOU; P2 note for shadcn/braces dev-tree audit residual. |
 | 2026-09-02 | Dependabot #110–#116: `fast-uri` / `qs` / `@xmldom/xmldom` override floors; SECURITY_AUDIT npm snapshot updated; local `npm audit` clean (GitHub alert dismiss awaits push/rescan). |
 | 2026-08-13 | Dependabot #109: `nanoid@^3.3.18` override; SECURITY_AUDIT npm snapshot updated; local `npm audit` clean (GitHub alert dismiss awaits push/rescan). |
