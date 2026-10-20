@@ -556,10 +556,11 @@ def _status_band_ratios(client: Any) -> dict[str, dict[str, int]]:
 
 def _status_extra_meters() -> dict[str, float]:
   """
-  Build supervisor meters for the status line when ingest telemetry is on.
+  Build supervisor meters for the status line.
 
-  Store-lock totals are process-wide. Zero values are left for the formatter
-  to omit. Telemetry off returns an empty map and does not read RSS.
+  Always includes ``parse_put_block_*`` for the current 600s window. Other
+  store-lock / RSS meters require ingest telemetry. Zero values are left for
+  the formatter to omit except put-block tokens (operators size write_pool).
 
   Returns:
     dict[str, float]: Omit-zero candidates for the status line.
@@ -568,16 +569,28 @@ def _status_extra_meters() -> dict[str, float]:
     >>> isinstance(_status_extra_meters(), dict)
     True
   """
+  from hpcperfstats.dbload.lib.sync_timedb_ingest_write_stage import (
+    snapshot_put_block_window,
+  )
+
+  put_sum, put_max, put_n = snapshot_put_block_window()
+  meters: dict[str, float] = {
+    "parse_put_block_s": float(put_sum),
+    "parse_put_block_max_s": float(put_max),
+    "parse_put_block_n": float(put_n),
+  }
   if not bool(cfg.get_sync_ingest_telemetry()):
-    return {}
+    return meters
   from hpcperfstats.dbload.lib.sync_timedb_store_lock_timing import (
     snapshot_store_lock_timing,
   )
 
-  meters = {
-    str(key): float(value)
-    for key, value in snapshot_store_lock_timing().items()
-  }
+  meters.update(
+    {
+      str(key): float(value)
+      for key, value in snapshot_store_lock_timing().items()
+    }
+  )
   probes = int(_MEM_TELEM_RUNTIME.get("admit_probes") or 0)
   if probes > 0:
     meters["admit_probes"] = float(probes)
@@ -644,6 +657,10 @@ def _emit_progress_report_if_due(
     if force or state.report_due(interval_s=PROGRESS_REPORT_INTERVAL_S)
     else None
   )
+  from hpcperfstats.dbload.lib.sync_timedb_ingest_write_stage import (
+    reset_put_block_window,
+  )
+
   if force:
     lines = state.emit_lines(
       band_ratios=band,
@@ -657,8 +674,9 @@ def _emit_progress_report_if_due(
     for line in lines:
       _log(line, log_fn=log_fn)
     state.reset_window(queue_depth_start=depth_now)
+    reset_put_block_window()
     return True
-  return state.maybe_emit_and_reset(
+  emitted = state.maybe_emit_and_reset(
     interval_s=PROGRESS_REPORT_INTERVAL_S,
     band_ratios=band,
     busy_kinds=busy_kinds,
@@ -669,6 +687,9 @@ def _emit_progress_report_if_due(
     extra_meters=extra_meters,
     log_fn=lambda msg, flush=False: _log(msg, log_fn=log_fn),
   )
+  if emitted:
+    reset_put_block_window()
+  return emitted
 
 
 def _path_from_ingest_identity(identity: str) -> str:
@@ -1456,9 +1477,9 @@ def _idle_reconstruct_pass(
   return work
 
 
-def _ingest_worker(path: str) -> Any:
+def _ingest_parse_worker(path: str) -> Any:
   """
-  Spawn-pool ingest entry: parse + write one closed raw stats path.
+  Parse-pool ingest entry: parse one closed raw path; writes via write stage.
 
   Args:
     path (str): Absolute closed raw stats path.
@@ -1467,7 +1488,7 @@ def _ingest_worker(path: str) -> Any:
     Any: Packed ingest worker result from ``add_stats_file_to_db``.
 
   Examples:
-    >>> _ingest_worker("/x")  # doctest: +SKIP
+    >>> _ingest_parse_worker("/x")  # doctest: +SKIP
   """
   from hpcperfstats.dbload.sync_timedb import (
     IngestPerFileTimeoutError,
@@ -3173,6 +3194,7 @@ _FILL_BLOCK_KEYS = (
   "skip_budget_bytes",
   "skip_cgroup_headroom",
   "skip_file_cache_pressure",
+  "skip_parse_queue_full",
   "band_cap",
   "submit_err",
 )
@@ -3658,6 +3680,10 @@ def _fill_ingest_band(
     ... )
     0
   """
+  from hpcperfstats.dbload.lib.sync_timedb_ingest_write_stage import (
+    refuse_new_parse_when_queue_full,
+  )
+
   submitted_n = 0
   skipped = 0
   budget = int(
@@ -3679,6 +3705,11 @@ def _fill_ingest_band(
     used_map["catchup"] = catch_n
 
   while len(inflight) < cap:
+    if refuse_new_parse_when_queue_full():
+      stats["skip_parse_queue_full"] = (
+        int(stats.get("skip_parse_queue_full", 0) or 0) + 1
+      )
+      break
     if band_cap is not None:
       used = int(used_map.get(band, 0))
       if used >= band_cap:
@@ -3900,7 +3931,7 @@ def _fill_ingest_band(
           )
       try:
         async_res = ingest_pool.apply_async(
-          _ingest_worker,
+          _ingest_parse_worker,
           (path,),
         )
       except Exception:
@@ -6304,10 +6335,15 @@ def _reconstruct_coordinator_loop(
           with _TOTAL_INGESTED_LOCK:
             total_ingested = _TOTAL_INGESTED
             total_completed = _TOTAL_COMPLETED
+          from hpcperfstats.dbload.lib.sync_timedb_ingest_write_stage import (
+            format_parse_put_block_census_token,
+          )
+
           mem_tok = format_ingest_mem_block_census_suffix()
           writers_tok = format_append_writers_census_token()
+          put_tok = format_parse_put_block_census_token()
           _log(
-            f"queue_orchestrator census {jq.format_queue_census(census)} total_ingested={total_ingested} total_completed={total_completed}{' ' + busy_tok if busy_tok else ''}{mem_tok} {writers_tok}{census_tok}",
+            f"queue_orchestrator census {jq.format_queue_census(census)} total_ingested={total_ingested} total_completed={total_completed}{' ' + busy_tok if busy_tok else ''}{mem_tok} {writers_tok}{put_tok}{census_tok}",
             log_fn=log_fn,
           )
           snap = mem_telem.snapshot_pipeline_mem_telemetry(
@@ -6502,6 +6538,22 @@ def run_sync_timedb_queue_orchestrator(
     # Not a `with` block: a watchdog abandonment recycles the pool, and the
     # `with` statement would only ever close the pool it first entered.
     ingest_pool = _new_ingest_pool()
+    from hpcperfstats.dbload.lib.sync_timedb_ingest_write_stage import (
+      start_ingest_write_stage,
+      stop_ingest_write_stage,
+    )
+
+    write_pool_n = max(1, int(cfg.get_sync_ingest_write_pool_processes()))
+    parse_q_max = max(1, int(cfg.get_sync_ingest_parse_queue_max()))
+    start_ingest_write_stage(
+      write_workers=write_pool_n,
+      queue_max=parse_q_max,
+      process_title="sync_timedb.py",
+    )
+    _log(
+      f"queue_orchestrator ingest write stage started write_pool={write_pool_n} parse_queue_max={parse_q_max}",
+      log_fn=log_fn,
+    )
     populate = PopulatePoolController()
     set_populate_pool_controller(populate)
     try:
@@ -6740,6 +6792,8 @@ def run_sync_timedb_queue_orchestrator(
       set_process_archive_members_store(None)
       with contextlib.suppress(Exception):
         day_executor.shutdown(wait=False, cancel_futures=True)
+      with contextlib.suppress(Exception):
+        stop_ingest_write_stage()
       # Closes whichever pool object is current, including one installed by a
       # watchdog recycle (a `with` block would only close the first).
       current_pool = pool_ref.get() if "pool_ref" in locals() else ingest_pool

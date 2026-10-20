@@ -512,7 +512,7 @@ def test_copy_arm_skips_models(monkeypatch):
     "_raise_if_ingest_per_file_deadline_exceeded",
     lambda *_a, **_k: None,
   )
-  monkeypatch.setattr(st, "bulk_create_batch_size", lambda: 100)
+  monkeypatch.setattr(st, "_ingest_write_frame_slice_rows", lambda: 100)
   st._reset_ingest_write_timing(enabled=True)
   monkeypatch.setattr(st, "_ingest_write_telem_on", True)
   proc = pd.DataFrame([{"jid": "1", "host": "h", "proc": "bash"}])
@@ -560,7 +560,7 @@ def test_baseline_arm_counts_orm_rows(monkeypatch):
     "_raise_if_ingest_per_file_deadline_exceeded",
     lambda *_a, **_k: None,
   )
-  monkeypatch.setattr(st, "bulk_create_batch_size", lambda: 100)
+  monkeypatch.setattr(st, "_ingest_write_frame_slice_rows", lambda: 100)
   st._reset_ingest_write_timing(enabled=True)
   monkeypatch.setattr(st, "_ingest_write_telem_on", True)
   proc = pd.DataFrame([{"jid": "1", "host": "h", "proc": "bash"}])

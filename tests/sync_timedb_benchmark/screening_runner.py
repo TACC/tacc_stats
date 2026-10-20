@@ -50,7 +50,7 @@ KNOB_SWEEPS: tuple[tuple[str, tuple[int, ...]], ...] = (
     ("sync_day_close_max_inflight", (1, 2, 4, 8, 16)),
     ("sync_archive_pool_processes", (1, 2, 4, 8)),
     ("sync_archive_members_populate_pool_processes", (1, 2, 4, 8)),
-    ("sync_bulk_create_batch_size", (500, 1000, 2000, 4000)),
+    ("sync_ingest_parse_flush_max_mib", (64, 128, 256, 512)),
 )
 KNOB_GETTERS: dict[str, str] = {
     "sync_day_close_max_inflight": "get_sync_day_close_max_inflight",
@@ -58,7 +58,7 @@ KNOB_GETTERS: dict[str, str] = {
     "sync_archive_members_populate_pool_processes": (
         "get_sync_archive_members_populate_pool_processes"
     ),
-    "sync_bulk_create_batch_size": "get_sync_bulk_create_batch_size",
+    "sync_ingest_parse_flush_max_mib": "get_sync_ingest_parse_flush_max_mib",
 }
 ARTIFACT_SUBDIR = Path("test_runs") / "sync_timedb_bench"
 

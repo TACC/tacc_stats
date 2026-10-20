@@ -19,7 +19,8 @@ This document describes how `sync_timedb` uses **in-process thread pools**, **da
 
 | Pool | Module | Workers | Title role | Why threads |
 |------|--------|---------|------------|-------------|
-| `ingest_pool` | `sync_timedb_queue_orchestrator.py` | INI `sync_ingest_pool_processes` | `[thread:ingest-pool]` | Combined parse+DB write on 3.14t; shared job/members stores |
+| `ingest_pool` (parse) | `sync_timedb_queue_orchestrator.py` | INI `sync_ingest_pool_processes` (default **64**) | `[thread:ingest-pool]` | Parse-only on 3.14t; enqueues flush payloads onto the write stage |
+| `ingest_write_pool` | `sync_timedb_ingest_write_stage.py` | INI `sync_ingest_write_pool_processes` (default **½ parse**, e.g. **32**) | `[thread:ingest-write-pool]` | Long-lived write threads; COPY/upsert; connection reuse until `get_db_conn_max_age()` |
 | `archive_pool` | `sync_timedb.py` / orchestrator append | INI `sync_archive_pool_processes` | `[thread:archive-pool]` | One daily tar per slot; I/O-heavy append |
 | `populate_pool` | `sync_timedb_populate_pool.py` | INI `sync_archive_members_populate_pool_processes` | `[thread:populate-pool]` | Sealed/tar member scans; ingest only enqueues and waits |
 | `sealed-archive-pool` | `sync_timedb_archive.py` | INI archive worker count | `[thread:sealed-archive-pool]` | Standalone sealed-archive ingest CLI |
@@ -28,7 +29,7 @@ This document describes how `sync_timedb` uses **in-process thread pools**, **da
 
 **Archive dispatch:** append jobs use `archive_pool` with **one daily tar per slot**; concurrent slots follow **`sync_archive_pool_processes`**. Sliding-window refill on completion — never join an entire batch before the next hop.
 
-**Ingest dispatch:** orchestrator fill/drain submits `apply_async` on the ingest thread pool. Populate workers are long-lived `apply_async` loops that claim the in-process populate queue. Fill also enforces a **raw-byte in-flight budget** derived from **effective** process-tree roof MiB (``sync_process_tree_rss_limit_cgroup_pct`` × runtime ``memory.max``) divided by ``PEAK_CGROUP_PER_RAW_FILE_BYTE`` (**2.5** → **40%** of the tree roof in bytes; gate off when pct is **0** or ``memory.max`` is unknown). Oversized files wait for empty inflight then alone-admit. Census shows ``ingest_mem_blocked=…`` when fill skips for budget. Do **not** treat pool width as concurrent data volume.
+**Ingest dispatch:** orchestrator fill/drain submits `apply_async` on the **parse** thread pool (`_ingest_parse_worker`). Parse workers stream/parse and **blocking-`put`** flush chunks (~`sync_ingest_parse_flush_max_mib`, default **512 MiB**, sample-boundary overage OK) onto a bounded queue (`sync_ingest_parse_queue_max` slots). Long-lived **write** threads `get` and COPY/upsert; job-store ACK stays on drain after the parse worker returns success. Fill refuses **new** parse submit when `qsize() >= parse_queue_max`. Populate workers are long-lived `apply_async` loops that claim the in-process populate queue. Fill also enforces a **raw-byte in-flight budget** derived from **effective** process-tree roof MiB (``sync_process_tree_rss_limit_cgroup_pct`` × runtime ``memory.max``) divided by ``PEAK_CGROUP_PER_RAW_FILE_BYTE`` (**2.5** → **40%** of the tree roof in bytes; gate off when pct is **0** or ``memory.max`` is unknown). Oversized files wait for empty inflight then alone-admit. Census shows ``ingest_mem_blocked=…`` when fill skips for budget, and ``parse_put_block_s`` / ``parse_put_block_max_s`` / ``parse_put_block_n`` for the last 600s window of parse `queue.put` waits (raise **write_pool** only with Postgres headroom when those stay high). Do **not** treat parse width as concurrent DB sessions — **write_pool** is the connection budget.
 
 ## Ingest band reservation (job store)
 

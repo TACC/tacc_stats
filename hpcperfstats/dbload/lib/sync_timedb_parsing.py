@@ -3631,7 +3631,8 @@ def parse_stats_file_streaming_incremental(
   *,
   start_line_idx: int = 0,
   parse_start_idx: int = 0,
-  flush_rows: Any,
+  flush_rows: Any | None = None,
+  flush_max_bytes: Any | None = None,
   on_chunk: Any,
   line_batch_size: int = STREAM_PARSE_LINE_BATCH,
   exclude_types_list: Any | None = None,
@@ -3641,19 +3642,22 @@ def parse_stats_file_streaming_incremental(
 
   Resume offsets must feed the file prefix through the parser so ``!`` schema
   lines register; emission is gated by ``start_idx`` (same as
-    ``parse_stats_lines``).
-  Do not fast-forward with bare ``fd.readline()`` - that drops schema and
-    silently
-  discards every hardware stats line (RC-0).
+  ``parse_stats_lines``). Do not fast-forward with bare ``fd.readline()`` -
+  that drops schema and silently discards every hardware stats line (RC-0).
+
+  When ``flush_max_bytes`` is set, flush when raw bytes consumed in the
+  current window reach that soft max (sample-boundary overage allowed).
+  Otherwise ``flush_rows`` gates on parsed stats row count (tests / legacy).
 
   Args:
-    stats_file (str): String for stats file.
-    start_line_idx (int): Integer value for start line idx.
-    parse_start_idx (int): Integer value for parse start idx.
-    flush_rows (Any): Flush rows passed to this helper.
-    on_chunk (Any): On chunk passed to this helper.
-    line_batch_size (int): Integer value for line batch size.
-    exclude_types_list (Any | None): One of ``Any``, ``None``.
+    stats_file (str): Absolute stats file path.
+    start_line_idx (int): Emission start line index.
+    parse_start_idx (int): Alternate emission start (max with start_line_idx).
+    flush_rows (Any | None): Row threshold when ``flush_max_bytes`` is None.
+    flush_max_bytes (Any | None): Soft max raw bytes per flush window.
+    on_chunk (Any): Callable ``(stats_payload, proc_payload) -> None``.
+    line_batch_size (int): Decode batch size.
+    exclude_types_list (Any | None): Optional excluded event types.
 
   Returns:
     None
@@ -3666,7 +3670,9 @@ def parse_stats_file_streaming_incremental(
   emission_start = max(int(start_line_idx or 0), int(parse_start_idx or 0))
   parser = IncrementalStatsParser(emission_start, exclude_types_list)
   pending_flush = False
-  flush_rows = max(1, int(flush_rows))
+  use_bytes = flush_max_bytes is not None
+  flush_rows_n = max(1, int(flush_rows or 1))
+  flush_bytes_n = max(1, int(flush_max_bytes or 1))
   from hpcperfstats.dbload.lib.zstd_cli import (
     advise_sequential_read_for_paths,
   )
@@ -3674,6 +3680,7 @@ def parse_stats_file_streaming_incremental(
   advise_sequential_read_for_paths(stats_file)
   try:
     with open(stats_file, "rb") as fd:
+      window_start = int(fd.tell())
       while True:
         emit: list[tuple[Any, list]] = []
         batch = _read_stats_line_batch_decode_after_lock(
@@ -3683,11 +3690,17 @@ def parse_stats_file_streaming_incremental(
         )
         if not batch:
           break
+        batch_end = int(fd.tell())
         with _held_parse_stage("feed_s"):
           for line in batch:
+            over_threshold = (
+              (batch_end - window_start) >= flush_bytes_n
+              if use_bytes
+              else parser.stats_len >= flush_rows_n
+            )
             if _line_starts_time_sample(
               line, parser._line_index, parser.start_idx
-            ) and (pending_flush or parser.stats_len >= flush_rows):
+            ) and (pending_flush or over_threshold):
               if parser.stats_len or parser._proc_by_key:
                 # take_cols stays inside feed_s (must flush before next
                 # sample); mid-flush take is attributed to feed_s.
@@ -3697,9 +3710,15 @@ def parse_stats_file_streaming_incremental(
                     parser.take_proc_stats_columns(),
                   ),
                 )
+                window_start = batch_end
               pending_flush = False
             parser.feed_line(line)
-            if parser.stats_len >= flush_rows:
+            over_after = (
+              (batch_end - window_start) >= flush_bytes_n
+              if use_bytes
+              else parser.stats_len >= flush_rows_n
+            )
+            if over_after:
               pending_flush = True
         for stats_chunk, proc_chunk in emit:
           on_chunk(stats_chunk, proc_chunk)

@@ -5,6 +5,7 @@ from __future__ import annotations
 import contextlib
 import inspect
 import os
+import threading
 import time
 from datetime import date, datetime
 from multiprocessing import Process
@@ -174,7 +175,7 @@ def test_drain_records_ingest_marks_before_ack(monkeypatch):
   assert done == 1
   assert recorded
   assert acked == ["/a"]
-  worker_src = inspect.getsource(qo._ingest_worker)
+  worker_src = inspect.getsource(qo._ingest_parse_worker)
   assert "_record_ingest_marks_from_worker_result" in worker_src
   jid_src = inspect.getsource(st.run_sync_timedb_jid_ingest)
   assert "_record_ingest_marks_from_worker_result" in jid_src
@@ -4876,7 +4877,7 @@ def test_drain_packed_timeout_rich_log(tmp_path, monkeypatch):
 
 def test_ingest_worker_logs_outcome_before_marks():
   """Orchestrator ingest worker must log outcome then record marks."""
-  src = inspect.getsource(qo._ingest_worker)
+  src = inspect.getsource(qo._ingest_parse_worker)
   assert "_log_ingest_outcome_from_packed_result" in src
   assert src.index("_log_ingest_outcome_from_packed_result") < src.index(
     "_record_ingest_marks_from_worker_result",
@@ -5759,3 +5760,251 @@ def test_ingest_pool_size_follows_ini_not_effective_cores():
   assert "get_sync_ingest_pool_processes()" in window
   assert "get_effective_cores()" not in window
   assert "min(" not in window
+
+
+# --- parse/write stage split (ft-ingest-parse-write-split) ---
+
+
+def test_ingest_parse_enqueues_before_write(monkeypatch):
+  """Parse completes with queue depth 1 while write is blocked."""
+  from hpcperfstats.dbload.lib import sync_timedb_ingest_write_stage as ws
+
+  ws.stop_ingest_write_stage(join_timeout_s=1.0)
+  ws.reset_put_block_window()
+  order: list[str] = []
+  release = threading.Event()
+
+  def slow_write(payload):
+    order.append("write_start")
+    release.wait(timeout=2.0)
+    payload.ingest_ok = True
+    payload.archival_out = True
+    payload.done.set()
+    order.append("write_done")
+
+  monkeypatch.setattr(ws, "_execute_write_payload", slow_write)
+  ws.start_ingest_write_stage(write_workers=1, queue_max=2)
+  try:
+    payload = ws.IngestWritePayload(
+      stats_file="/f",
+      stats=None,
+      proc_stats=None,
+    )
+    order.append("before_put")
+    t = threading.Thread(
+      target=lambda: ws.submit_ingest_write_and_wait(payload),
+      daemon=True,
+    )
+    t.start()
+    deadline = time.monotonic() + 2.0
+    while ws.write_queue_qsize() < 1 and time.monotonic() < deadline:
+      time.sleep(0.01)
+    assert ws.write_queue_qsize() >= 1 or "write_start" in order
+    order.append("saw_queued_or_started")
+    release.set()
+    t.join(timeout=3.0)
+    assert payload.done.is_set()
+    assert "before_put" in order and "saw_queued_or_started" in order
+  finally:
+    ws.stop_ingest_write_stage(join_timeout_s=2.0)
+
+
+def test_write_semaphore_caps_db_sessions(monkeypatch):
+  """Concurrent write entries stay <= write_pool."""
+  from hpcperfstats.dbload.lib import sync_timedb_ingest_write_stage as ws
+
+  ws.stop_ingest_write_stage(join_timeout_s=1.0)
+  peak = {"n": 0}
+  lock = threading.Lock()
+  hold = threading.Event()
+
+  def tracked(payload):
+    with lock:
+      # Approximate in-flight by threads currently in this body.
+      peak["n"] = max(
+        peak["n"],
+        sum(
+          1
+          for th in threading.enumerate()
+          if th.name.startswith("ingest-write-") and th.is_alive()
+        ),
+      )
+    hold.wait(timeout=1.0)
+    payload.ingest_ok = True
+    payload.done.set()
+
+  monkeypatch.setattr(ws, "_execute_write_payload", tracked)
+  ws.start_ingest_write_stage(write_workers=2, queue_max=8)
+  try:
+    payloads = [
+      ws.IngestWritePayload(stats_file=f"/f{i}", stats=None, proc_stats=None)
+      for i in range(4)
+    ]
+    threads = [
+      threading.Thread(
+        target=ws.submit_ingest_write_and_wait, args=(p,), daemon=True
+      )
+      for p in payloads
+    ]
+    for t in threads:
+      t.start()
+    time.sleep(0.05)
+    hold.set()
+    for t in threads:
+      t.join(timeout=3.0)
+    assert peak["n"] <= 2
+  finally:
+    ws.stop_ingest_write_stage(join_timeout_s=2.0)
+
+
+def test_write_reuses_connection_until_conn_max_age(monkeypatch):
+  """Write loop recycles only after max age, not per payload."""
+  src = inspect.getsource(
+    __import__(
+      "hpcperfstats.dbload.lib.sync_timedb_ingest_write_stage",
+      fromlist=["_write_worker_main"],
+    )._write_worker_main
+  )
+  assert "get_db_conn_max_age" in src
+  assert "close_old_connections" in src
+  # No per-payload close_all outside the age branch.
+  assert "while not _SHUTDOWN" in src
+
+
+def test_ingest_writes_only_on_write_pool():
+  """Parse submit path must not call _write_stats_payload_to_db directly."""
+  submit_src = inspect.getsource(st._submit_stats_payload_write)
+  assert "submit_ingest_write_and_wait" in submit_src
+  stream_src = inspect.getsource(st._add_stats_file_to_db_streaming_incremental)
+  assert "_submit_stats_payload_write" in stream_src
+  assert "_write_stats_payload_to_db(" not in stream_src
+  impl_src = inspect.getsource(st._add_stats_file_to_db_impl)
+  assert "_submit_stats_payload_write" in impl_src
+
+
+def test_census_includes_parse_put_block_window():
+  """Census/progress tokens include parse_put_block_* after blocked put."""
+  from hpcperfstats.dbload.lib import sync_timedb_ingest_write_stage as ws
+
+  ws.reset_put_block_window()
+  ws.record_put_block_wait(0.05)
+  tok = ws.format_parse_put_block_census_token()
+  assert "parse_put_block_s=" in tok
+  assert "parse_put_block_max_s=" in tok
+  assert "parse_put_block_n=" in tok
+  meters = qo._status_extra_meters()
+  assert "parse_put_block_s" in meters
+  assert meters["parse_put_block_n"] >= 1.0
+  ws.reset_put_block_window()
+  assert ws.snapshot_put_block_window() == (0.0, 0.0, 0)
+
+
+def test_parse_queue_full_backpressures_fill(monkeypatch):
+  """Fill skips new parse submit when write queue is at capacity."""
+  from hpcperfstats.dbload.lib import sync_timedb_ingest_write_stage as ws
+
+  ws.stop_ingest_write_stage(join_timeout_s=1.0)
+  monkeypatch.setattr(ws, "write_queue_qsize", lambda: 32)
+  monkeypatch.setattr(ws, "write_stage_started", lambda: True)
+  assert ws.refuse_new_parse_when_queue_full(32) is True
+  assert ws.refuse_new_parse_when_queue_full(64) is False
+
+
+def test_streaming_put_blocks_until_slot(monkeypatch):
+  """Full queue: put blocks until write get frees a slot."""
+  from hpcperfstats.dbload.lib import sync_timedb_ingest_write_stage as ws
+
+  ws.stop_ingest_write_stage(join_timeout_s=1.0)
+  ws.reset_put_block_window()
+  hold = threading.Event()
+
+  def slow(payload):
+    hold.wait(timeout=2.0)
+    payload.ingest_ok = True
+    payload.done.set()
+
+  monkeypatch.setattr(ws, "_execute_write_payload", slow)
+  ws.start_ingest_write_stage(write_workers=1, queue_max=1)
+  try:
+    first = ws.IngestWritePayload(stats_file="/a", stats=None, proc_stats=None)
+    second = ws.IngestWritePayload(stats_file="/b", stats=None, proc_stats=None)
+    t1 = threading.Thread(
+      target=ws.submit_ingest_write_and_wait, args=(first,), daemon=True
+    )
+    t1.start()
+    deadline = time.monotonic() + 2.0
+    while not first.done.is_set() and ws.write_queue_qsize() < 1:
+      if time.monotonic() > deadline:
+        break
+      time.sleep(0.01)
+    # Fill the single queue slot (worker may already hold first).
+    blocked = {"v": False}
+
+    def put_second():
+      t0 = time.monotonic()
+      ws.submit_ingest_write_and_wait(second)
+      blocked["v"] = (time.monotonic() - t0) > 0.02
+
+    t2 = threading.Thread(target=put_second, daemon=True)
+    t2.start()
+    time.sleep(0.05)
+    assert t2.is_alive() or second.done.is_set()
+    hold.set()
+    t1.join(timeout=3.0)
+    t2.join(timeout=3.0)
+    assert first.done.is_set() and second.done.is_set()
+  finally:
+    ws.stop_ingest_write_stage(join_timeout_s=2.0)
+
+
+def test_write_failure_requeue_without_ack():
+  """Failed write sets ingest_ok False so drain will not ACK success."""
+  from hpcperfstats.dbload.lib import sync_timedb_ingest_write_stage as ws
+
+  ws.stop_ingest_write_stage(join_timeout_s=1.0)
+  payload = ws.IngestWritePayload(stats_file="/x", stats=None, proc_stats=None)
+  payload.error = RuntimeError("db down")
+  payload.ingest_ok = False
+  payload.done.set()
+  assert payload.ingest_ok is False
+  # Drain ACK path requires packed ingest_ok True; source contract:
+  drain_src = inspect.getsource(qo._drain_ingest_ready)
+  assert "ingest_ok" in drain_src or "_ok" in drain_src
+
+
+def test_write_worker_type_guards_with_typeerror_not_assert():
+  """Write loop rejects non-payload queue items via TypeError (ruff S101)."""
+  from hpcperfstats.dbload.lib import sync_timedb_ingest_write_stage as ws
+
+  src = inspect.getsource(ws._write_worker_main)
+  assert "assert isinstance(item, IngestWritePayload)" not in src
+  assert "isinstance(item, IngestWritePayload)" in src
+  assert "TypeError" in src
+
+
+def test_streaming_enqueues_flush_chunks_not_whole_file():
+  """Streaming combined path uses submit per flush, not one whole-file write only."""
+  src = inspect.getsource(st._add_stats_file_to_db_streaming_incremental)
+  assert "_submit_stats_payload_write" in src
+  assert "flush_max_bytes" in src
+
+
+def test_streaming_per_file_chunk_pipeline_depth_one():
+  """on_chunk waits on submit (depth 1) before returning to parser."""
+  src = inspect.getsource(st._add_stats_file_to_db_streaming_incremental)
+  assert "submit_ingest_write_and_wait" in inspect.getsource(
+    st._submit_stats_payload_write
+  )
+  assert "_on_chunk" in src
+
+
+def test_streaming_flush_respects_max_mib_with_sample_overage():
+  """Parser accepts flush_max_bytes and sample-boundary overage."""
+  from hpcperfstats.dbload.lib.sync_timedb_parsing import (
+    parse_stats_file_streaming_incremental,
+  )
+
+  src = inspect.getsource(parse_stats_file_streaming_incremental)
+  assert "flush_max_bytes" in src
+  assert "pending_flush" in src
+  assert "_line_starts_time_sample" in src

@@ -23,7 +23,7 @@ Supervisor/batch daemons (`sync_timedb`, `update_metrics`, `listend`, etc.) must
 | Role | Example |
 |------|---------|
 | Main daemon | `sync_timedb.py [main]` |
-| Pool worker | `sync_timedb.py [worker:ingest-pool]` |
+| Pool worker | `sync_timedb.py [worker:ingest-pool]` / `[thread:ingest-write-pool]` |
 | Metrics compute thread | `update_metrics.py [thread:metrics-pool]` |
 | Public EF thread | `update_metrics.py [thread:public-ef-pool]` |
 | listend live-DB thread | `listend.py [thread:listend-db-N]` (not `[worker:listend-db-pool]`) |

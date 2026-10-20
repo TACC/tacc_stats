@@ -446,7 +446,9 @@ def _flush_orm_batch(host_objs: list, proc_objs: list) -> None:
 
   # Do not close_old_connections() at every flush start — that fights
   # persistent connections and inflates idle conn_recycle.
-  batch_size = cfg.get_sync_bulk_create_batch_size()
+  # Internal ORM/COPY slice within a listend flush (not an INI knob;
+  # retired sync_bulk_create_batch_size).
+  batch_size = 10000
   update_fields = ("device", *HOST_PROC_KEYS)
   proc_objs = _dedupe_proc_objs_keep_last(proc_objs)
 

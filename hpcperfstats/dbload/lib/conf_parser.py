@@ -133,7 +133,9 @@ _INI_OPTION_REGISTRY_KEYS = (
   ("PIPELINE", "sync_archive_members_fnctl_read_lock_timeout_seconds"),
   ("PIPELINE", "sync_archive_members_wait_poll_seconds"),
   ("PIPELINE", "sync_archive_members_populate_pool_processes"),
-  ("PIPELINE", "sync_bulk_create_batch_size"),
+  ("PIPELINE", "sync_ingest_write_pool_processes"),
+  ("PIPELINE", "sync_ingest_parse_queue_max"),
+  ("PIPELINE", "sync_ingest_parse_flush_max_mib"),
   ("PIPELINE", "sync_supervisor_rss_limit_mb"),
   ("PIPELINE", "sync_process_tree_rss_limit_cgroup_pct"),
   ("PIPELINE", "sync_process_tree_rss_exit_cgroup_pct"),
@@ -266,6 +268,9 @@ INI_OPTION_DEFAULTS = {
   "metrics_readiness_start_margin_seconds": "600",
   "metrics_readiness_end_margin_seconds": "600",
   "sync_ingest_pool_processes": "64",
+  "sync_ingest_write_pool_processes": "0",
+  "sync_ingest_parse_queue_max": "32",
+  "sync_ingest_parse_flush_max_mib": "512",
   "sync_archive_pool_processes": "4",
   "sync_ingest_queue_max_size": "3000",
   "sync_ingest_rescan_mtime_days": "1",
@@ -293,7 +298,6 @@ INI_OPTION_DEFAULTS = {
   "sync_archive_members_fnctl_read_lock_timeout_seconds": "180",
   "sync_archive_members_wait_poll_seconds": "0.25",
   "sync_archive_members_populate_pool_processes": "4",
-  "sync_bulk_create_batch_size": "10000",
   "sync_supervisor_rss_limit_mb": "0",
   "sync_process_tree_rss_limit_cgroup_pct": "40",
   "sync_process_tree_rss_exit_cgroup_pct": "0",
@@ -2198,7 +2202,7 @@ def get_worker_process_count(divisor: int = 4) -> Any:
 
 def get_sync_ingest_pool_processes() -> Any:
   """
-  Absolute ``sync_timedb`` ingest process pool size.
+  Absolute ``sync_timedb`` ingest **parse** pool size (threads on 3.14t).
 
   Also used as the archive discovery / day-raw thread ceiling (replace,
   do not alias a separate discovery key). INI default **64** (operator
@@ -2212,6 +2216,56 @@ def get_sync_ingest_pool_processes() -> Any:
   """
   _ensure_cfg_loaded()
   return max(1, _pipeline_getint("sync_ingest_pool_processes"))
+
+
+def get_sync_ingest_write_pool_processes() -> Any:
+  """
+  Ingest write-pool width (max concurrent ingest DB sessions).
+
+  When the INI key is omitted or ``0``, returns ``max(1, parse // 2)``.
+
+  Returns:
+    int: Write thread count (>= 1).
+
+  Examples:
+    >>> get_sync_ingest_write_pool_processes() >= 1  # doctest: +SKIP
+    True
+  """
+  _ensure_cfg_loaded()
+  raw = int(_pipeline_getint("sync_ingest_write_pool_processes"))
+  if raw <= 0:
+    return max(1, int(get_sync_ingest_pool_processes()) // 2)
+  return max(1, raw)
+
+
+def get_sync_ingest_parse_queue_max() -> Any:
+  """
+  Max parse→write queue slots (payload count, not bytes).
+
+  Returns:
+    int: Queue maxsize (>= 1).
+
+  Examples:
+    >>> get_sync_ingest_parse_queue_max() >= 1  # doctest: +SKIP
+    True
+  """
+  _ensure_cfg_loaded()
+  return max(1, _pipeline_getint("sync_ingest_parse_queue_max"))
+
+
+def get_sync_ingest_parse_flush_max_mib() -> Any:
+  """
+  Soft max MiB for one streaming parse→queue→write flush chunk.
+
+  Returns:
+    int: MiB (>= 1).
+
+  Examples:
+    >>> get_sync_ingest_parse_flush_max_mib() >= 1  # doctest: +SKIP
+    True
+  """
+  _ensure_cfg_loaded()
+  return max(1, _pipeline_getint("sync_ingest_parse_flush_max_mib"))
 
 
 def get_sync_archive_pool_processes() -> Any:
@@ -3539,24 +3593,6 @@ def get_sync_timedb_tar_append_batch_size() -> Any:
   """
   _ensure_cfg_loaded()
   return max(1, _pipeline_getint("sync_timedb_tar_append_batch_size"))
-
-
-def get_sync_bulk_create_batch_size() -> Any:
-  """
-  Rows per host_data/proc_data bulk_create batch and incremental parse flush.
-
-    (default 10000).
-
-  Returns:
-    Any: Open return polymorphism from ``get_sync_bulk_create_batch_size``:
-    concrete type depends on inputs and branch (mapping, scalar, handle, or
-    ``None``-like empty).
-
-  Examples:
-    >>> get_sync_bulk_create_batch_size()  # doctest: +SKIP
-  """
-  _ensure_cfg_loaded()
-  return max(1, _pipeline_getint("sync_bulk_create_batch_size"))
 
 
 def get_sync_host_itimes_cache_max_timestamps_per_entry() -> Any:

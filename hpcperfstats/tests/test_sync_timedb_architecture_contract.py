@@ -363,7 +363,7 @@ def test_ingest_worker_raises_session_statement_timeout():
   from hpcperfstats.dbload.lib import sync_timedb_queue_orchestrator as qo
 
   assert "_apply_ingest_session_statement_timeout" in inspect.getsource(
-    qo._ingest_worker,
+    qo._ingest_parse_worker,
   )
   src = inspect.getsource(st._apply_ingest_session_statement_timeout)
   assert "SET statement_timeout" in src

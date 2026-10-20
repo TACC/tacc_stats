@@ -44,7 +44,7 @@ def _patch_write_path_no_db(monkeypatch, *, bulk_create):
     "_raise_if_ingest_per_file_deadline_exceeded",
     lambda *_a, **_k: None,
   )
-  monkeypatch.setattr(st, "bulk_create_batch_size", lambda: 100)
+  monkeypatch.setattr(st, "_ingest_write_frame_slice_rows", lambda: 100)
   monkeypatch.setattr(st.proc_data.objects, "bulk_create", bulk_create)
   monkeypatch.setattr(st, "insert_host_data_batch", lambda *_a, **_k: None)
 
@@ -68,7 +68,7 @@ def test_in_process_db_writer_lock_api_absent():
   assert "manager_lock" not in inspect.getsource(
     qo.run_sync_timedb_queue_orchestrator
   )
-  assert "manager_lock" not in inspect.getsource(qo._ingest_worker)
+  assert "manager_lock" not in inspect.getsource(qo._ingest_parse_worker)
   assert "manager_lock" not in inspect.getsource(
     st.run_sync_timedb_supervisor_from_parsed,
   )

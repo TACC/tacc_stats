@@ -116,3 +116,13 @@ def test_compat_aliases_gone():
   assert not hasattr(StartupArchiveScanCoordinator, "wait_or_build_snapshot")
   assert not hasattr(sta, "_iter_stream_tasks_chunked")
   assert not hasattr(sta, "_process_task_chunk_interruptibly")
+
+
+def test_sync_bulk_create_batch_size_leftover_gone():
+  assert not hasattr(cfg, "get_sync_bulk_create_batch_size")
+  assert "sync_bulk_create_batch_size" not in cfg.INI_OPTION_DEFAULTS
+  registry_opts = {opt for _sec, opt, *_rest in cfg.INI_OPTION_REGISTRY}
+  assert "sync_bulk_create_batch_size" not in registry_opts
+  assert not hasattr(st, "bulk_create_batch_size")
+  assert not hasattr(qo, "_ingest_worker")
+  assert hasattr(qo, "_ingest_parse_worker")

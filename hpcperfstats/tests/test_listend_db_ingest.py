@@ -693,7 +693,18 @@ def test_flush_orm_batch_dedupes_proc_before_bulk_create(monkeypatch):
 
   monkeypatch.setattr(models, "proc_data", _FakeModel)
   monkeypatch.setattr(models, "host_data", _FakeModel)
-  monkeypatch.setattr(ldi.cfg, "get_sync_bulk_create_batch_size", lambda: 10000)
+  monkeypatch.setattr(
+    ldi.cfg, "get_listend_db_ingest_flush_max_rows", lambda: 10000
+  )
+
+  def _fake_insert_proc(objs, **kwargs):
+    del kwargs
+    _FakeModel.objects.bulk_create(objs, update_conflicts=True)
+
+  monkeypatch.setattr(
+    "hpcperfstats.dbload.lib.sync_timedb_proc_data_insert.insert_proc_data_batch",
+    _fake_insert_proc,
+  )
 
   first = SimpleNamespace(
     jid="1",
@@ -884,7 +895,18 @@ def test_flush_bisects_proc_chunk_on_statement_timeout(monkeypatch):
 
   monkeypatch.setattr(models, "proc_data", _FakeModel)
   monkeypatch.setattr(models, "host_data", _FakeModel)
-  monkeypatch.setattr(ldi.cfg, "get_sync_bulk_create_batch_size", lambda: 10000)
+  monkeypatch.setattr(
+    ldi.cfg, "get_listend_db_ingest_flush_max_rows", lambda: 10000
+  )
+
+  def _fake_insert_proc(objs, **kwargs):
+    del kwargs
+    _FakeModel.objects.bulk_create(objs, update_conflicts=True)
+
+  monkeypatch.setattr(
+    "hpcperfstats.dbload.lib.sync_timedb_proc_data_insert.insert_proc_data_batch",
+    _fake_insert_proc,
+  )
 
   objs = [
     SimpleNamespace(

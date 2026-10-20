@@ -46,6 +46,7 @@ Attributes:
   _HOST_SECOND_PRESENT_CACHE_TTL_S: Attribute.
   _HEAP_RELEASE_EVERY_N_CHUNKS: Mid-chunk gc.collect / malloc_trim cadence.
   _heap_release_chunk_n: Per-task mid-chunk heap-release counter ContextVar.
+  _INGEST_WRITE_FRAME_SLICE_ROWS: Internal COPY/ORM slice width per flush.
   _PROC_DATA_UPDATE_FIELDS: Attribute.
   _SUPERVISOR_CHILD_REAP_INTERVAL_S: Attribute.
   _SYNC_STATE_TRANSITIONS: Attribute.
@@ -1854,18 +1855,82 @@ def _sealed_archive_ingest_remaining_pair() -> Any:
 _SYNC_TIMEDB_INGEST_INLINE_ENV = "HPCPERFSTATS_SYNC_TIMEDB_INGEST_INLINE"
 
 
-# Rows per bulk_create batch to limit peak memory per worker (see sync_bulk_create_batch_size).
-def bulk_create_batch_size() -> Any:
+# Internal COPY/ORM slice width within one write-stage flush (not an INI knob).
+_INGEST_WRITE_FRAME_SLICE_ROWS = 10000
+
+
+def _ingest_write_frame_slice_rows() -> int:
   """
-  Bulk create batch size.
+  Rows per COPY/ORM slice inside one write-stage flush payload.
 
   Returns:
-    Any: Value produced by this call (type depends on inputs).
+    int: Positive slice width.
 
   Examples:
-    >>> bulk_create_batch_size()  # doctest: +SKIP
+    >>> _ingest_write_frame_slice_rows() >= 1
+    True
   """
-  return cfg.get_sync_bulk_create_batch_size()
+  return max(1, int(_INGEST_WRITE_FRAME_SLICE_ROWS))
+
+
+def _ingest_parse_flush_max_bytes() -> int:
+  """
+  Soft max raw bytes for one streaming parse→write flush window.
+
+  Returns:
+    int: Bytes from ``sync_ingest_parse_flush_max_mib``.
+
+  Examples:
+    >>> _ingest_parse_flush_max_bytes() >= 1  # doctest: +SKIP
+    True
+  """
+  return max(1, int(cfg.get_sync_ingest_parse_flush_max_mib()) * 1024 * 1024)
+
+
+def _submit_stats_payload_write(
+  stats_file: str,
+  stats: Any,
+  proc_stats: Any,
+  *,
+  need_archival: bool = True,
+) -> tuple[str, bool, bool]:
+  """
+  Enqueue one flush on the ingest write stage and wait for completion.
+
+  When the write stage is not started, executes inline on the caller.
+
+  Args:
+    stats_file (str): Stats path for the payload.
+    stats (Any): Host dataframe for this flush.
+    proc_stats (Any): Proc dataframe for this flush.
+    need_archival (bool): Archive-needed flag carried across flushes.
+
+  Returns:
+    tuple[str, bool, bool]: ``(stats_file, archival_out, ingest_ok)``.
+
+  Raises:
+    err: Re-raised write-stage failure stored on the payload.
+
+  Examples:
+    >>> callable(_submit_stats_payload_write)
+    True
+  """
+  from hpcperfstats.dbload.lib.sync_timedb_ingest_write_stage import (
+    IngestWritePayload,
+    submit_ingest_write_and_wait,
+  )
+
+  payload = IngestWritePayload(
+    stats_file=stats_file,
+    stats=stats,
+    proc_stats=proc_stats,
+    need_archival=need_archival,
+  )
+  submit_ingest_write_and_wait(payload)
+  err = payload.error
+  if err is not None:
+    raise err
+  return stats_file, bool(payload.archival_out), bool(payload.ingest_ok)
 
 
 _HOST_ITIMES_CACHE = sync_timedb_host_itimes._HOST_ITIMES_CACHE
@@ -3075,7 +3140,7 @@ def _write_copy_frame_batches(
     ...   lambda batch: None,
     ... )
   """
-  step = bulk_create_batch_size()
+  step = _ingest_write_frame_slice_rows()
   total = len(frame)
   offset = 0
   while offset < total:
@@ -3149,7 +3214,9 @@ def _write_stats_payload_to_db(
         _raise_if_ingest_per_file_deadline_exceeded(stats_file, "db_write_proc")
         with _held_ingest_write_timing():
           with _held_ingest_write_phase("batch_iter_s"):
-            batch = list(itertools.islice(proc_it, bulk_create_batch_size()))
+            batch = list(
+              itertools.islice(proc_it, _ingest_write_frame_slice_rows())
+            )
           if not batch:
             break
           with _held_ingest_write_phase("orm_materialize_s"):
@@ -3166,7 +3233,9 @@ def _write_stats_payload_to_db(
       proc_it = proc_stats.itertuples(index=False)
       while True:
         _raise_if_ingest_per_file_deadline_exceeded(stats_file, "db_write_proc")
-        batch = list(itertools.islice(proc_it, bulk_create_batch_size()))
+        batch = list(
+          itertools.islice(proc_it, _ingest_write_frame_slice_rows())
+        )
         if not batch:
           break
         proc_objs = [proc_data(**_proc_data_row_kwargs(row)) for row in batch]
@@ -3211,7 +3280,9 @@ def _write_stats_payload_to_db(
           )
           with _held_ingest_write_timing():
             with _held_ingest_write_phase("batch_iter_s"):
-              batch = list(itertools.islice(stats_it, bulk_create_batch_size()))
+              batch = list(
+                itertools.islice(stats_it, _ingest_write_frame_slice_rows())
+              )
             if not batch:
               break
             with _held_ingest_write_phase("orm_materialize_s"):
@@ -3231,7 +3302,9 @@ def _write_stats_payload_to_db(
           _raise_if_ingest_per_file_deadline_exceeded(
             stats_file, "db_write_host"
           )
-          batch = list(itertools.islice(stats_it, bulk_create_batch_size()))
+          batch = list(
+            itertools.islice(stats_it, _ingest_write_frame_slice_rows())
+          )
           if not batch:
             break
           host_objs = [host_data_instance_from_stats_row(row) for row in batch]
@@ -4205,7 +4278,7 @@ def _parse_stats_file_payload_impl_streaming(stats_file: str) -> Any:
           stats_file,
           start_line_idx=start_line_idx,
           parse_start_idx=0,
-          flush_rows=bulk_create_batch_size(),
+          flush_max_bytes=_ingest_parse_flush_max_bytes(),
           on_chunk=_on_parse_chunk,
           exclude_types_list=exclude_types,
         )
@@ -4291,7 +4364,7 @@ def _add_stats_file_to_db_streaming_incremental(
   total_proc_rows = 0
   need_archival = True
   ingest_ok = True
-  flush_rows = bulk_create_batch_size()
+  flush_max_bytes = _ingest_parse_flush_max_bytes()
 
   def _parse_elapsed() -> Any:
     """
@@ -4307,7 +4380,7 @@ def _add_stats_file_to_db_streaming_incremental(
 
   def _on_chunk(stats_list: Any, proc_stats_list: Any) -> None:
     """
-    Build one chunk and write it before the next chunk is parsed.
+    Build one chunk and enqueue it on the write stage (depth-1 wait).
 
     Args:
       stats_list (Any): Stats list passed to this helper.
@@ -4347,7 +4420,7 @@ def _add_stats_file_to_db_streaming_incremental(
       del proc_chunk
       return
     try:
-      _stats_file_local, archival, chunk_ok = _write_stats_payload_to_db(
+      _stats_file_local, archival, chunk_ok = _submit_stats_payload_write(
         stats_file,
         stats_chunk,
         proc_chunk,
@@ -4416,7 +4489,7 @@ def _add_stats_file_to_db_streaming_incremental(
             stats_file,
             start_line_idx=0,
             parse_start_idx=start_line_idx,
-            flush_rows=flush_rows,
+            flush_max_bytes=flush_max_bytes,
             on_chunk=_on_chunk,
             exclude_types_list=exclude_types,
           )
@@ -4766,7 +4839,7 @@ def _add_stats_file_to_db_impl(
       stats, proc_stats = payload
       stats_rows = len(stats)
       proc_rows = len(proc_stats)
-      stats_file, need_archival, ingest_ok = _write_stats_payload_to_db(
+      stats_file, need_archival, ingest_ok = _submit_stats_payload_write(
         stats_file, stats, proc_stats, need_archival=need_archival
       )
       elapsed_total = time.time() - t0

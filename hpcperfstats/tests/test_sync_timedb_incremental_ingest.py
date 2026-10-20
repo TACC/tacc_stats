@@ -381,7 +381,7 @@ def test_streaming_incremental_combined_path_writes_multiple_chunks(
   lines = _counter_fixture_lines(extra_samples=30)
   stats_file.write_text("".join(lines), encoding="utf-8")
 
-  monkeypatch.setattr(st, "bulk_create_batch_size", lambda: 2)
+  monkeypatch.setattr(st, "_ingest_parse_flush_max_bytes", lambda: 1)
   monkeypatch.setattr(
     st,
     "_resolve_streaming_ingest_start",
@@ -421,7 +421,7 @@ def _streaming_incremental_with_fake_write(
   stats_file.parent.mkdir(parents=True)
   lines = _counter_fixture_lines(extra_samples=extra_samples)
   stats_file.write_text("".join(lines), encoding="utf-8")
-  monkeypatch.setattr(st, "bulk_create_batch_size", lambda: 2)
+  monkeypatch.setattr(st, "_ingest_parse_flush_max_bytes", lambda: 1)
   monkeypatch.setattr(
     st,
     "_resolve_streaming_ingest_start",

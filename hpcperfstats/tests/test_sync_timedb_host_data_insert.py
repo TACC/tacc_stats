@@ -354,7 +354,7 @@ def test_write_stats_payload_uses_insert_host_data_batch(monkeypatch):
     "_raise_if_ingest_per_file_deadline_exceeded",
     lambda *_a, **_k: None,
   )
-  monkeypatch.setattr(st, "bulk_create_batch_size", lambda: 100)
+  monkeypatch.setattr(st, "_ingest_write_frame_slice_rows", lambda: 100)
   monkeypatch.setattr(
     st.proc_data.objects, "bulk_create", lambda *_a, **_k: None
   )
