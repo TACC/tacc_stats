@@ -52,6 +52,8 @@ Production sources stay in `../src/`; tests are small drivers that compile and l
 | `test_stats_buffer_rows.c` | `stats_buffer_append_enabled_type_rows` (tier row assembly into `sf_data`) |
 | `test_stats_buffer_collect.c` | `stats_buffer_collect` fast/full tier payloads (`STATS_BUFFER_TEST_SEND_HOOK`; RabbitMQ build) |
 | `test_stats_buffer_debug_shm.c` | DEBUG shm write path (`fast`/`full` overwrite, legacy→full) |
+| `test_job_shared_emit_debug_shm_mirror.sh` | Shared-node: trailing node-wide `-` must not mirror into DEBUG shm |
+| `test_ib_mad_dlopen_link_deps.sh` | `IB_MAD_DLOPEN` test programs link `dyn_lib_path.c`; DEBUG shm tests link `secure_path.c` |
 | `test_debug_shm_emit_golden.c` | Golden regression for assembled `@fast`/`@full` sample payloads via debug shm (`tests/expected/debug_shm_*.txt`; DEBUG + RabbitMQ) |
 | `test_debug_shm_schema_mirror.c` | `schema` shm file + `stats_buffer_debug_shm_schema_wanted` gating (DEBUG) |
 | `test_shm_message_correctness.sh` | Python validator on `tests/expected/synthetic_fixture/`; optional slug goldens (exit 77 skip) |

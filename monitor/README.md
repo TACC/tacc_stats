@@ -398,6 +398,13 @@ outbound payloads** under **`/dev/shm/hpcperfstatsd-debug/`**:
 | `fast` | Latest `@fast` sample |
 | `full` | Latest `@full` (or legacy full-width) sample |
 
+On **shared-node** builds (`--enable-shared-node-multi-jid`), a multi-jid sample
+burst emits N jid payloads plus one node-wide `-` payload. DEBUG shm keeps the
+**last jid** sample in `fast`/`full` (the trailing `-` is still published to
+RabbitMQ but does not overwrite the mirror). Idle (`disc.n==0`) still mirrors
+`-`. Grep `fast`/`full` for `%jobs` / `host_mem_job` / bare jid headers after
+deploying a build with that skip.
+
 Override the base directory with **`HPCPERFSTATS_DEBUG_SHM_DIR`** (must be an
 absolute path under **`/dev/shm/`** with no `..` components). Payloads
 contain job id, hostname, and workload metrics — treat as sensitive on shared

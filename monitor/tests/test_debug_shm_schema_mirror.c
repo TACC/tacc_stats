@@ -15,10 +15,11 @@ static char g_shm_base[256];
 
 static int setup_shm_dir(void)
 {
+  /* HPCPERFSTATS_DEBUG_SHM_DIR must be under /dev/shm/ (env allowlist). */
   const char *tmpdir = getenv("TMPDIR");
 
-  if (tmpdir == NULL || tmpdir[0] == '\0')
-    tmpdir = "/tmp";
+  if (tmpdir == NULL || strncmp(tmpdir, "/dev/shm/", 9) != 0)
+    tmpdir = "/dev/shm";
   snprintf(g_shm_base, sizeof(g_shm_base), "%s/hpcperfstats_schema_XXXXXX", tmpdir);
   if (mkdtemp(g_shm_base) == NULL)
     return -1;

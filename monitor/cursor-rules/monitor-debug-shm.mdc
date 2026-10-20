@@ -16,6 +16,9 @@ alwaysApply: false
   - **`schema`** — complete `$` rotation payload (`write_hdr=1`)
   - **`fast`** — latest `@fast` sample
   - **`full`** — latest `@full` (or legacy full-width) sample
+- **Shared-node multi-jid:** `job_shared_emit` must not mirror the trailing
+  node-wide `-` insert into `fast`/`full` (it would hide the last jid sample).
+  Idle `-` (zero discovered jids) still mirrors.
 
 ## Implementation
 
