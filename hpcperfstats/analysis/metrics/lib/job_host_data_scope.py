@@ -227,15 +227,19 @@ def job_is_shared_node_from_jobish(jobish: Any) -> bool:
 
 def job_is_shared_node(jid: str) -> bool:
   """
-  True when the job has affinity rows or any ``dev=j:<jid>`` host_data.
+  True when the job has affinity rows or time-bounded ``dev=j:<jid>`` host_data.
 
   Used for Job Detail ``is_shared_node`` and shared-job help footers.
+  After an affinity miss, loads job time bounds in Python and probes
+  ``host_data`` with literal ``time__gte`` / ``time__lte`` (Timescale chunk
+  exclusion). Missing bounds or ``DatabaseError`` fail open to False.
 
   Args:
     jid (str): Job id.
 
   Returns:
-    bool: Shared-node signal for UI/help.
+    bool: Shared-node signal for UI/help. ``DatabaseError`` on EXISTS
+    is caught and returns False (fail-open for UI footers).
 
   Examples:
     >>> job_is_shared_node("")  # doctest: +SKIP
@@ -244,8 +248,37 @@ def job_is_shared_node(jid: str) -> bool:
   jid_s = str(jid or "").strip()
   if not jid_s:
     return False
-  from hpcperfstats.site.lib.machine.models import host_data, job_affinity
+  from django.db import DatabaseError
+
+  from hpcperfstats.site.lib.machine.models import (
+    host_data,
+    job_affinity,
+    job_data,
+  )
 
   if job_affinity.objects.filter(jid=jid_s).exists():
     return True
-  return host_data.objects.filter(dev=job_dev_token(jid_s)).exists()
+  row = (
+    job_data.objects.filter(jid=jid_s)
+    .values(
+      "start_time",
+      "end_time",
+      "telemetry_first_time",
+      "telemetry_last_time",
+    )
+    .first()
+  )
+  if not row:
+    return False
+  t0 = row.get("telemetry_first_time") or row.get("start_time")
+  t1 = row.get("telemetry_last_time") or row.get("end_time")
+  if t0 is None or t1 is None:
+    return False
+  try:
+    return host_data.objects.filter(
+      dev=job_dev_token(jid_s),
+      time__gte=t0,
+      time__lte=t1,
+    ).exists()
+  except DatabaseError:
+    return False

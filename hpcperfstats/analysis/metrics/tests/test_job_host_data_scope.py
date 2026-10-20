@@ -1,7 +1,9 @@
 """Unit tests for job_host_data_scope (shared-node co-tenant filter)."""
 
+from datetime import UTC, datetime
 from unittest.mock import MagicMock, patch
 
+from django.db import DatabaseError
 from django.db.models import Q
 
 from hpcperfstats.analysis.metrics.lib.job_host_data_scope import (
@@ -14,6 +16,31 @@ from hpcperfstats.analysis.metrics.lib.job_host_data_scope import (
   job_host_data_scope_sql,
   job_is_shared_node,
 )
+
+
+def _job_bounds_row(
+  *,
+  t0: datetime | None = None,
+  t1: datetime | None = None,
+  use_telemetry: bool = True,
+) -> dict:
+  if t0 is None:
+    t0 = datetime(2026, 10, 19, 20, 47, tzinfo=UTC)
+  if t1 is None:
+    t1 = datetime(2026, 10, 19, 20, 51, tzinfo=UTC)
+  if use_telemetry:
+    return {
+      "start_time": t0,
+      "end_time": t1,
+      "telemetry_first_time": t0,
+      "telemetry_last_time": t1,
+    }
+  return {
+    "start_time": t0,
+    "end_time": t1,
+    "telemetry_first_time": None,
+    "telemetry_last_time": None,
+  }
 
 
 def test_job_dev_token_truncates_to_64():
@@ -96,16 +123,82 @@ def test_apply_gpu_affinity_dev_filter_restricts():
 
 
 def test_job_is_shared_node_affinity_or_j_dev():
+  bounds = _job_bounds_row()
   with (
     patch("hpcperfstats.site.lib.machine.models.job_affinity") as ja,
     patch("hpcperfstats.site.lib.machine.models.host_data") as hd,
+    patch("hpcperfstats.site.lib.machine.models.job_data") as jd,
   ):
     ja.objects.filter.return_value.exists.return_value = True
     assert job_is_shared_node("5") is True
+    hd.objects.filter.assert_not_called()
+
     ja.objects.filter.return_value.exists.return_value = False
+    jd.objects.filter.return_value.values.return_value.first.return_value = (
+      bounds
+    )
     hd.objects.filter.return_value.exists.return_value = True
     assert job_is_shared_node("5") is True
+    kwargs = hd.objects.filter.call_args.kwargs
+    assert kwargs["dev"] == "j:5"
+    assert kwargs["time__gte"] == bounds["telemetry_first_time"]
+    assert kwargs["time__lte"] == bounds["telemetry_last_time"]
+
     hd.objects.filter.return_value.exists.return_value = False
+    assert job_is_shared_node("5") is False
+
+
+def test_job_is_shared_node_missing_job_data_or_bounds_false():
+  with (
+    patch("hpcperfstats.site.lib.machine.models.job_affinity") as ja,
+    patch("hpcperfstats.site.lib.machine.models.host_data") as hd,
+    patch("hpcperfstats.site.lib.machine.models.job_data") as jd,
+  ):
+    ja.objects.filter.return_value.exists.return_value = False
+    jd.objects.filter.return_value.values.return_value.first.return_value = None
+    assert job_is_shared_node("5") is False
+    hd.objects.filter.assert_not_called()
+
+    jd.objects.filter.return_value.values.return_value.first.return_value = {
+      "start_time": None,
+      "end_time": None,
+      "telemetry_first_time": None,
+      "telemetry_last_time": None,
+    }
+    assert job_is_shared_node("5") is False
+    hd.objects.filter.assert_not_called()
+
+
+def test_job_is_shared_node_uses_start_end_when_telemetry_null():
+  bounds = _job_bounds_row(use_telemetry=False)
+  with (
+    patch("hpcperfstats.site.lib.machine.models.job_affinity") as ja,
+    patch("hpcperfstats.site.lib.machine.models.host_data") as hd,
+    patch("hpcperfstats.site.lib.machine.models.job_data") as jd,
+  ):
+    ja.objects.filter.return_value.exists.return_value = False
+    jd.objects.filter.return_value.values.return_value.first.return_value = (
+      bounds
+    )
+    hd.objects.filter.return_value.exists.return_value = True
+    assert job_is_shared_node("9") is True
+    kwargs = hd.objects.filter.call_args.kwargs
+    assert kwargs["time__gte"] == bounds["start_time"]
+    assert kwargs["time__lte"] == bounds["end_time"]
+
+
+def test_job_is_shared_node_database_error_fail_open():
+  bounds = _job_bounds_row()
+  with (
+    patch("hpcperfstats.site.lib.machine.models.job_affinity") as ja,
+    patch("hpcperfstats.site.lib.machine.models.host_data") as hd,
+    patch("hpcperfstats.site.lib.machine.models.job_data") as jd,
+  ):
+    ja.objects.filter.return_value.exists.return_value = False
+    jd.objects.filter.return_value.values.return_value.first.return_value = (
+      bounds
+    )
+    hd.objects.filter.return_value.exists.side_effect = DatabaseError("cancel")
     assert job_is_shared_node("5") is False
 
 

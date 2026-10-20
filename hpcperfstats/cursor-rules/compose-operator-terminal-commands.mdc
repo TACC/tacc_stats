@@ -572,6 +572,8 @@ if host0 and t0 and t1:
 
 **Anti-pattern — assume telemetry+LIMIT always finishes:** even the corrected one-host `ORDER BY time DESC LIMIT 20` probe can still hit **`statement timeout`** at 60s on large hypertables (hpcperfstats03, 2026-07-23, finding #7). When **`metrics_data` already shows poison** (e.g. `max_gpu_link_gbps≈2^63/1e9` or `≈2^64/1e9`, `max_packetrate≫1e11`, `detail_gpu_count` N×N, `avg_gpu_mem_bw_gbps` ≫1e5), **abandon raw `host_data`** for that diagnosis and continue from **`metrics_data` / web ORM** only.
 
+**Anti-pattern — `EXPLAIN ANALYZE` / JOIN+COALESCE for `host_data.dev = 'j:…'` EXISTS (hpcperfstats04 2026-10-20):** unbounded `EXPLAIN (COSTS)` Append-scans all compressed chunks (bloom ColumnarScan; partial `host_data_dev_j_prefix_idx` unused). `EXPLAIN ANALYZE` of `JOIN job_data` + `COALESCE(telemetry_*, start/end)` hit **`canceling statement due to statement timeout`**. For Pending **db** proofs of shared-node EXISTS: use **`EXPLAIN (COSTS, BUFFERS)` only** (no ANALYZE) with **literal** `time >= … AND time <= …` from a prior `job_data` row paste — not runtime JOIN/COALESCE under prod `statement_timeout`. Literal bounds plan as Index Only Scan on one chunk (jid 62901, cost ~2835).
+
 ### Anti-pattern — Admin Monitor / freshness: 8-day `GROUP BY host, max(time)` (hpcperfstats04)
 
 On large hypertables, **`SELECT host, max(time) FROM host_data WHERE time >= now() - interval '8 days' GROUP BY host`** costs ~**2e7+** and can hang ~10 minutes under a **600s** statement timeout. Admin Monitor now uses Redis **`recent_host:*`** + LATERAL **`ORDER BY time DESC LIMIT 1`**, with a **3h** `GROUP BY` only when Redis is empty.
