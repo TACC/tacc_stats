@@ -11,6 +11,8 @@ A/B arm ``HPCPERFSTATS_HOST_INSERT_ARM=baseline|candidate`` selects Django
   _STAGE_DDL (str): TEMP staging table DDL (ON COMMIT DELETE ROWS).
   _STAGE_INSERT (str): INSERT...SELECT...ON CONFLICT DO NOTHING SQL.
   _HOST_STAGE_NAME (str): Host COPY stage table name.
+  _HOST_CONFLICT_COLS (tuple[str, ...]): Unique key columns for pre-COPY
+    collapse (same as Timescale ON CONFLICT target).
 """
 
 from __future__ import annotations
@@ -63,6 +65,75 @@ ON CONFLICT (time, host, type, event, dev) DO NOTHING
 """
 
 _HOST_STAGE_NAME = "host_data_ingest_stage"
+_HOST_CONFLICT_COLS: tuple[str, ...] = (
+  "time",
+  "host",
+  "type",
+  "event",
+  "dev",
+)
+
+
+def _collapse_host_conflict_keys(
+  rows: Sequence[Any] | pd.DataFrame,
+) -> Sequence[Any] | pd.DataFrame:
+  """
+  Keep one row per Timescale conflict key ``(time, host, type, event, dev)``.
+
+  Duplicate keys keep the last row in batch order. Already-unique inputs are
+  returned unchanged.
+
+  Args:
+    rows (Sequence[Any] | pd.DataFrame): Namedtuple rows or a host frame.
+
+  Returns:
+    Sequence[Any] | pd.DataFrame: Collapsed rows of the same kind as ``rows``.
+
+  Examples:
+    >>> import pandas as pd
+    >>> from datetime import UTC, datetime
+    >>> t = datetime(2026, 1, 1, tzinfo=UTC)
+    >>> f = pd.DataFrame(
+    ...   [
+    ...     {
+    ...       "time": t,
+    ...       "host": "h",
+    ...       "type": "cpu",
+    ...       "event": "user",
+    ...       "dev": "",
+    ...       "value": 1.0,
+    ...     },
+    ...     {
+    ...       "time": t,
+    ...       "host": "h",
+    ...       "type": "cpu",
+    ...       "event": "user",
+    ...       "dev": "",
+    ...       "value": 9.0,
+    ...     },
+    ...   ]
+    ... )
+    >>> len(_collapse_host_conflict_keys(f))
+    1
+  """
+  if isinstance(rows, pd.DataFrame):
+    if rows.empty:
+      return rows
+    subset = [c for c in _HOST_CONFLICT_COLS if c in rows.columns]
+    if len(subset) != len(_HOST_CONFLICT_COLS):
+      return rows
+    if not rows.duplicated(subset=subset, keep=False).any():
+      return rows
+    return rows.drop_duplicates(subset=subset, keep="last")
+  if not rows:
+    return rows
+  by_key: dict[tuple[Any, ...], Any] = {}
+  for row in rows:
+    key = tuple(_host_row_value(row, col) for col in _HOST_CONFLICT_COLS)
+    by_key[key] = row
+  if len(by_key) == len(rows):
+    return rows
+  return list(by_key.values())
 
 
 def _copy_stage_ready(connection: Any, name: str) -> bool:
@@ -328,6 +399,7 @@ def host_rows_to_copy_bytes(rows: Sequence[Any] | pd.DataFrame) -> bytes:
     >>> host_rows_to_copy_bytes([])
     b''
   """
+  rows = _collapse_host_conflict_keys(rows)
   if isinstance(rows, pd.DataFrame):
     return _host_frame_to_copy_bytes(rows)
   if not rows:
@@ -357,6 +429,7 @@ def host_data_objs_to_copy_bytes(objs: Sequence[Any]) -> bytes:
   """
   if not objs:
     return b""
+  objs = _collapse_host_conflict_keys(objs)
   lines: list[str] = []
   for obj in objs:
     fields = [_sql_literal(getattr(obj, col)) for col in HOST_DATA_COPY_COLUMNS]

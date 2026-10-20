@@ -13,6 +13,8 @@ client-side peak-merge. A/B arm ``HPCPERFSTATS_PROC_INSERT_ARM``; default
   _PROC_STAGE_NAME (str): Proc COPY stage table name.
   _PROC_PASSTHROUGH_COLUMNS (frozenset[str]): Columns copied without
     bigint coercion.
+  _PROC_CONFLICT_COLS (tuple[str, ...]): Unique key columns for pre-COPY
+    peak-merge collapse (same as ON CONFLICT target).
 """
 
 from __future__ import annotations
@@ -26,6 +28,7 @@ import pandas as pd
 from hpcperfstats.dbload.lib.sync_timedb_parsing import (
   HOST_PROC_KEYS,
   HOST_PROC_PEAK_KEYS,
+  dedupe_proc_stats_peak_merge,
 )
 
 PROC_DATA_COPY_COLUMNS: tuple[str, ...] = (
@@ -62,6 +65,68 @@ CREATE TEMP TABLE IF NOT EXISTS proc_data_ingest_stage (
 
 _PROC_STAGE_NAME = "proc_data_ingest_stage"
 _PROC_PASSTHROUGH_COLUMNS = frozenset(("jid", "host", "proc"))
+_PROC_CONFLICT_COLS: tuple[str, ...] = ("jid", "host", "proc")
+
+
+def _collapse_proc_conflict_keys(
+  rows: Sequence[Any] | pd.DataFrame,
+) -> Sequence[Any] | pd.DataFrame:
+  """
+  Keep one row per ``(jid, host, proc)`` with peak-aware merge.
+
+  Dataframe slices use ``dedupe_proc_stats_peak_merge``. Model sequences
+  merge attribute dicts with the same helper. Already-unique inputs are
+  returned unchanged.
+
+  Args:
+    rows (Sequence[Any] | pd.DataFrame): Namedtuple rows, models, or a frame.
+
+  Returns:
+    Sequence[Any] | pd.DataFrame: Collapsed rows of the same kind as ``rows``.
+
+  Examples:
+    >>> import pandas as pd
+    >>> f = pd.DataFrame(
+    ...   [
+    ...     {"jid": "1", "host": "h", "proc": "p", "vm_stk": 9, "threads": 1},
+    ...     {"jid": "1", "host": "h", "proc": "p", "vm_stk": 3, "threads": 8},
+    ...   ]
+    ... )
+    >>> out = _collapse_proc_conflict_keys(f)
+    >>> len(out), int(out.iloc[0]["vm_stk"]), int(out.iloc[0]["threads"])
+    (1, 9, 8)
+  """
+  if isinstance(rows, pd.DataFrame):
+    if rows.empty:
+      return rows
+    subset = [c for c in _PROC_CONFLICT_COLS if c in rows.columns]
+    if len(subset) != len(_PROC_CONFLICT_COLS):
+      return rows
+    if not rows.duplicated(subset=subset, keep=False).any():
+      return rows
+    merged = dedupe_proc_stats_peak_merge(rows.to_dict(orient="records"))
+    return pd.DataFrame(merged)
+  if not rows:
+    return rows
+  first = rows[0]
+  if hasattr(first, "keys") and callable(getattr(first, "keys", None)):
+    as_dicts = [dict(row) for row in rows]
+  else:
+    as_dicts = []
+    for row in rows:
+      as_dicts.append(
+        {col: getattr(row, col, None) for col in PROC_DATA_COPY_COLUMNS}
+      )
+  keys = [(d.get("jid"), d.get("host"), d.get("proc")) for d in as_dicts]
+  if len(set(keys)) == len(keys):
+    return rows
+  merged = dedupe_proc_stats_peak_merge(as_dicts)
+  if hasattr(first, "keys") and callable(getattr(first, "keys", None)):
+    return merged
+  # Model / namedtuple path: rebuild via SimpleNamespace for COPY kwargs.
+  from types import SimpleNamespace
+
+  return [SimpleNamespace(**row) for row in merged]
 
 
 def _copy_stage_ready(connection: Any, name: str) -> bool:
@@ -316,6 +381,7 @@ def proc_rows_to_copy_bytes(rows: Sequence[Any] | pd.DataFrame) -> bytes:
     >>> proc_rows_to_copy_bytes([])
     b''
   """
+  rows = _collapse_proc_conflict_keys(rows)
   if isinstance(rows, pd.DataFrame):
     return _proc_frame_to_copy_bytes(rows)
   if not rows:
@@ -324,8 +390,11 @@ def proc_rows_to_copy_bytes(rows: Sequence[Any] | pd.DataFrame) -> bytes:
 
   lines: list[str] = []
   for row in rows:
-    kwargs = st._proc_data_row_kwargs(row)
-    fields = [_sql_literal(kwargs[col]) for col in PROC_DATA_COPY_COLUMNS]
+    if isinstance(row, dict):
+      fields = [_sql_literal(row.get(col)) for col in PROC_DATA_COPY_COLUMNS]
+    else:
+      kwargs = st._proc_data_row_kwargs(row)
+      fields = [_sql_literal(kwargs[col]) for col in PROC_DATA_COPY_COLUMNS]
     lines.append("\t".join(fields))
   return ("\n".join(lines) + "\n").encode("utf-8")
 
@@ -346,9 +415,15 @@ def proc_data_objs_to_copy_bytes(objs: Sequence[Any]) -> bytes:
   """
   if not objs:
     return b""
+  objs = _collapse_proc_conflict_keys(objs)
   lines: list[str] = []
   for obj in objs:
-    fields = [_sql_literal(getattr(obj, col)) for col in PROC_DATA_COPY_COLUMNS]
+    if isinstance(obj, dict):
+      fields = [_sql_literal(obj.get(col)) for col in PROC_DATA_COPY_COLUMNS]
+    else:
+      fields = [
+        _sql_literal(getattr(obj, col)) for col in PROC_DATA_COPY_COLUMNS
+      ]
     lines.append("\t".join(fields))
   return ("\n".join(lines) + "\n").encode("utf-8")
 

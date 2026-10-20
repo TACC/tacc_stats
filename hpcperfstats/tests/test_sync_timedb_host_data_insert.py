@@ -63,6 +63,86 @@ def test_host_stage_insert_unchanged():
   assert "WHERE" not in hdi._STAGE_INSERT
 
 
+def test_host_copy_batch_collapses_conflict_keys():
+  """Duplicate conflict keys keep the last row before COPY."""
+  import pandas as pd
+
+  t = datetime(2026, 1, 1, 12, 0, 0, tzinfo=UTC)
+  frame = pd.DataFrame(
+    [
+      {
+        "time": t,
+        "host": "h",
+        "jid": "1",
+        "type": "cpu",
+        "dev": "",
+        "event": "user",
+        "unit": "%",
+        "value": 1.0,
+        "delta": 0.0,
+        "arc": 0.0,
+      },
+      {
+        "time": t,
+        "host": "h",
+        "jid": "1",
+        "type": "cpu",
+        "dev": "",
+        "event": "user",
+        "unit": "%",
+        "value": 9.0,
+        "delta": 0.0,
+        "arc": 0.0,
+      },
+    ]
+  )
+  payload = hdi.host_rows_to_copy_bytes(frame)
+  lines = [ln for ln in payload.split(b"\n") if ln]
+  assert len(lines) == 1
+  assert b"9.0" in lines[0] or b"9" in lines[0]
+  assert (
+    "ON CONFLICT (time, host, type, event, dev) DO NOTHING" in hdi._STAGE_INSERT
+  )
+
+
+def test_host_unique_key_batch_non_inferior():
+  """Already-unique host frames stay one COPY line per row."""
+  import pandas as pd
+
+  t = datetime(2026, 1, 1, 12, 0, 0, tzinfo=UTC)
+  frame = pd.DataFrame(
+    [
+      {
+        "time": t,
+        "host": "h",
+        "jid": "1",
+        "type": "cpu",
+        "dev": "",
+        "event": "user",
+        "unit": "%",
+        "value": 1.0,
+        "delta": 0.0,
+        "arc": 0.0,
+      },
+      {
+        "time": t,
+        "host": "h",
+        "jid": "1",
+        "type": "cpu",
+        "dev": "",
+        "event": "system",
+        "unit": "%",
+        "value": 2.0,
+        "delta": 0.0,
+        "arc": 0.0,
+      },
+    ]
+  )
+  payload = hdi.host_rows_to_copy_bytes(frame)
+  lines = [ln for ln in payload.split(b"\n") if ln]
+  assert len(lines) == 2
+
+
 def test_host_rows_copy_bytes_match_model_tokens():
   """Namedtuple COPY tokens match host_data_instance_from_stats_row."""
   from types import SimpleNamespace

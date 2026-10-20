@@ -64,6 +64,117 @@ def test_proc_copy_sql_has_conflict_update():
   assert "GREATEST(proc_data.vm_peak" in sql
 
 
+def test_proc_copy_batch_peak_merges_duplicate_keys():
+  """Duplicate (jid, host, proc) keep peak oracle in one COPY row."""
+  import pandas as pd
+
+  frame = pd.DataFrame(
+    [
+      {
+        "jid": "1",
+        "host": "h",
+        "proc": "bash",
+        "device": "bash/1",
+        "uid": 1000,
+        "vm_peak": 100,
+        "vm_size": 50,
+        "vm_lck": 0,
+        "vm_hwm": 40,
+        "vm_rss": 40,
+        "vm_data": 10,
+        "vm_stk": 9,
+        "vm_exe": 1,
+        "vm_lib": 1,
+        "vm_pte": 1,
+        "vm_swap": 0,
+        "threads": 1,
+      },
+      {
+        "jid": "1",
+        "host": "h",
+        "proc": "bash",
+        "device": "bash/1",
+        "uid": 1000,
+        "vm_peak": 80,
+        "vm_size": 60,
+        "vm_lck": 0,
+        "vm_hwm": 50,
+        "vm_rss": 50,
+        "vm_data": 20,
+        "vm_stk": 3,
+        "vm_exe": 1,
+        "vm_lib": 1,
+        "vm_pte": 1,
+        "vm_swap": 0,
+        "threads": 8,
+      },
+    ]
+  )
+  payload = pdi.proc_rows_to_copy_bytes(frame)
+  lines = [ln for ln in payload.split(b"\n") if ln]
+  assert len(lines) == 1
+  # Peak vm_stk stays 9; last-write threads is 8.
+  fields = lines[0].split(b"\t")
+  # Columns: jid host proc device uid vm_peak ... vm_stk ... threads
+  assert fields[0] == b"1"
+  assert b"9" in fields  # vm_stk peak
+  assert fields[-1] == b"8"  # threads last-write
+  sql = pdi._stage_upsert_sql()
+  assert "GREATEST(proc_data.vm_peak" in sql
+  assert " WHERE " in sql
+
+
+def test_proc_unique_key_batch_non_inferior():
+  """Already-unique proc frames stay one COPY line per row."""
+  import pandas as pd
+
+  frame = pd.DataFrame(
+    [
+      {
+        "jid": "1",
+        "host": "h",
+        "proc": "bash",
+        "device": "bash/1",
+        "uid": 1,
+        "vm_peak": 1,
+        "vm_size": 1,
+        "vm_lck": 0,
+        "vm_hwm": 1,
+        "vm_rss": 1,
+        "vm_data": 1,
+        "vm_stk": 1,
+        "vm_exe": 1,
+        "vm_lib": 1,
+        "vm_pte": 1,
+        "vm_swap": 0,
+        "threads": 1,
+      },
+      {
+        "jid": "1",
+        "host": "h",
+        "proc": "zsh",
+        "device": "zsh/2",
+        "uid": 1,
+        "vm_peak": 2,
+        "vm_size": 2,
+        "vm_lck": 0,
+        "vm_hwm": 2,
+        "vm_rss": 2,
+        "vm_data": 2,
+        "vm_stk": 2,
+        "vm_exe": 2,
+        "vm_lib": 2,
+        "vm_pte": 2,
+        "vm_swap": 0,
+        "threads": 2,
+      },
+    ]
+  )
+  payload = pdi.proc_rows_to_copy_bytes(frame)
+  lines = [ln for ln in payload.split(b"\n") if ln]
+  assert len(lines) == 2
+
+
 def test_proc_upsert_orders_conflict_keys():
   """Stage rows lock the unique key in (jid, host, proc) order."""
   sql = pdi._stage_upsert_sql()

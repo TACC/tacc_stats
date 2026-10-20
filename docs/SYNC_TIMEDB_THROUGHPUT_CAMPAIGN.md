@@ -79,8 +79,8 @@ in the tree and waits on the 01 soak. The next untried cut is the giant-file
 | 4 | proc_merge | Update a repeat host_proc row in one pass | In tree 2026-10-17. Retain if 01 64 MiB–1 GiB `proc_merge_s` is at least 20 percent below 139.5s. | `proc_merge_s` |
 | 5 | start_scan | Stop the duplicate prefix scan on a head-present giant | After proc merge. 01 64 MiB–1 GiB `start_s` 129.4s. Live listend disables both DB-complete fast paths. | `start_s` |
 | 6 | F3 | Vectorize ARC diff, carry apply, and carry finalization | Large on long counter series. Behind proc merge and `start_s`. | `arc_s` |
-| 7 | F4 | Reuse the COPY temp stage on the connection | `CREATE TEMP … ON COMMIT DROP` once per batch on both insert paths. | `stage_ddl_s` |
-| 8 | F5 | Reuse the PostgreSQL session on the worker | Helps files/min of small files more than MiB/min of giants. | `reconnect_s` |
+| 7 | F4 | Reuse the COPY temp stage on the connection | Retained 2026-10-20 (operator keep). 04 dense `stage_ddl_s` 0.000 (was 5.500); nz `stage_ddl_s=` lines 302 (was 2917). Columnar COPY body also retained: dense `write_setup_s` 0.000 (was 8.750). | `stage_ddl_s`, `write_setup_s` |
+| 8 | F5 | Reuse the PostgreSQL session on the worker | Dropped as a candidate: `reconnect_s` is 0 on every line (socket opens before the reconnect meter). | `reconnect_s` |
 | 9 | F6 | Stream COPY bytes with a bound | Cuts peak allocation on giant batches after F1. | `rss_mib`, `copy_s` |
 | 10 | F7 | Invalidate each job id once per successful file | Repeated cache invalidation on dense files. | `jid_invalidate_s` |
 | 11 | F8 | Coalesce job-store checkpoints | Snapshot I/O off the mutation path. | `job_store_wait_s`, `job_store_hold_s` |
@@ -155,6 +155,7 @@ Append one row per soak. Leave the rank table unchanged until a row contradicts 
 | 2026-10-16 | `f2-overlap-reject` | 04 Horizon, 01 Stampede3 | 8h, telem on, pool 64 | overlap image, later removed from HEAD | 04 dense elapsed 198.5s, overlap 76.3s, 15.0808 MiB/min. 01 dense elapsed 7421.6s, proc_merge 4079s, 75.1626 MiB/min (was 128.2226). Telem was on in both arms. | Reject F2. Next code change is conflict_insert |
 | 2026-10-17 | `conflict-insert-shrink` | 04 Horizon, 01 Stampede3 | 8h, telem on | conflict_insert + F1 image (no deadlock fix) | 04 dense conflict_insert 38.3s, orm 0. 01 64 MiB-1 GiB proc_merge 139.5s, start_s 129.4s. | Retain both. Next: in-place proc merge |
 | 2026-10-19 | `soak-readout-next` | 04 Horizon, 01 Stampede3 | 8h, telem on, rejected parse-cut image | delta/ARC parse cut (`cda5da57`) | 04 dense conflict_insert 43.750s (bar 38.3), stage_ddl 5.500s, write_setup 8.750s, 16.4921 MiB/min. 01 48.6328 MiB/min (was 133.6808). reconnect_s 0 on every line. | Do not retain. Revert the parse cut before the next image. Next plan: `.cursor/plans/soak-readout-next.plan.md` (stage reuse and columnar COPY). |
+| 2026-10-20 | `soak-readout-next` | 04 Horizon, 01 Stampede3 | 8h, telem on, stage-reuse + columnar image | F4 stage reuse + columnar COPY bodies (parse cut reverted) | 04 dense n=483: stage_ddl 0.000 (was 5.500), write_setup 0.000 (was 8.750), conflict_insert 64.500, copy 3.200, db_execute 103.800, gap_proxy 36.100, 18.0079 MiB/min. nz stage_ddl lines 302/4169 (was 2917/6169). 01 MiB/min 142.8009 (bar 133.6808); dense/giant feed_s 498.850 / 1666.350; nz stage_ddl 2/1912. decision_next 04=`write_timescale_path`, 01=`parse_hold_feed_s`. | Operator retain both cuts (meters passed; conflict_insert guardrail miss overridden). Next cut: 04 conflict_insert / Timescale write path. |
 
 ## Next plan after the baseline
 
@@ -168,7 +169,10 @@ least 12, and 04 dense `conflict_insert_s` stays at or under 38.3s. The
 following untried cut is the giant-file `start_s` scan (129.4s). Telemetry
 was on in the 2026-10-15, 2026-10-16, and 2026-10-17 windows. The 01 `feed_s`
 median is telem-on and untrusted. The 2026-10-19 parse-cut image is not
-retained. The next plan is `.cursor/plans/soak-readout-next.plan.md`.
+retained. Stage reuse and columnar COPY are retained on the 2026-10-20 soak
+(operator keep): 04 dense `stage_ddl_s` and `write_setup_s` are both 0.000;
+nz `stage_ddl_s=` lines fell from 2917 to 302. The next cut is 04
+`conflict_insert_s` / Timescale write path (`decision_next=write_timescale_path`).
 
 ## Historical campaign (through 2026-10-14)
 
