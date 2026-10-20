@@ -26,7 +26,8 @@ Supervisor/batch daemons (`sync_timedb`, `update_metrics`, `listend`, etc.) must
 | Pool worker | `sync_timedb.py [worker:ingest-pool]` / `[thread:ingest-write-pool]` |
 | Metrics compute thread | `update_metrics.py [thread:metrics-pool]` |
 | Public EF thread | `update_metrics.py [thread:public-ef-pool]` |
-| listend live-DB thread | `listend.py [thread:listend-db-N]` (not `[worker:listend-db-pool]`) |
+| listend live-DB parse thread | `listend.py [thread:listend-db-N]` (not `[worker:listend-db-pool]`) |
+| listend / sync ingest write thread | `listend.py` / `sync_timedb.py` `[thread:ingest-write-pool]` (`sync_timedb_ingest_write_stage`) |
 | listend AMQP consume thread | `listend.py [thread:amqp-consumer-N]` (one BlockingConnection each) |
 | listend archive thread | `listend.py [thread:archive-N]` |
 | Post-chunk hygiene thread | `sync_timedb.py [thread:archive-post-chunk-hygiene]` |

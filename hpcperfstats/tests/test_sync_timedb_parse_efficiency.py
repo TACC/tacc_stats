@@ -307,23 +307,24 @@ def test_incremental_flush_holds_compiled_schema(tmp_path):
 
 
 def test_listend_one_sample_matches_chunk_kernel():
-  """listend one-sample ORM path must share compute_deltas_and_arc_chunk."""
-  from hpcperfstats.dbload.lib import listend_db_ingest as ldi
+  """Shared sample ingest must share compute_deltas_and_arc_chunk."""
   from hpcperfstats.dbload.lib.sync_timedb_parsing import DeltaCarryState
+  from hpcperfstats.dbload.lib.sync_timedb_sample_ingest import (
+    ingest_monitor_sample_text,
+  )
 
   schema = {"cpu": ["user,W=48", "sys,W=48"]}
   schema_fast = {"cpu": ["user,W=48", "sys,W=48"]}
   sample = "1710000001.0 job42 host.example.edu\ncpu 0 10 20\n"
   carry = DeltaCarryState()
-  host_objs, proc_objs = ldi._process_sample_to_orm(
+  stats_out, proc_out = ingest_monitor_sample_text(
     sample,
-    host="host.example.edu",
     schema=schema,
     schema_fast=schema_fast,
     carry=carry,
   )
-  assert proc_objs == []
-  assert host_objs
+  assert proc_out.empty
+  assert not stats_out.empty
   parser = IncrementalStatsParser(0)
   parser.schema = dict(schema)
   parser.schema_fast = dict(schema_fast)
@@ -331,9 +332,9 @@ def test_listend_one_sample_matches_chunk_kernel():
   cols = parser.take_stats_columns()
   stats_df, _ = build_stats_dataframes(cols, [])
   finalized = compute_deltas_and_arc_chunk(stats_df, carry=DeltaCarryState())
-  assert len(finalized) == len(host_objs)
-  assert {o.event for o in host_objs} == set(finalized["event"].tolist())
-  assert all(o.jid == "job42" for o in host_objs)
+  assert len(finalized) == len(stats_out)
+  assert set(stats_out["event"].tolist()) == set(finalized["event"].tolist())
+  assert set(stats_out["jid"].astype(str)) == {"job42"}
 
 
 def test_host_microbench_parse_fixture_runs():

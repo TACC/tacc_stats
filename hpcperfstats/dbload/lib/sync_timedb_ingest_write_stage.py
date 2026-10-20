@@ -16,6 +16,8 @@ Attributes:
   _WRITE_THREADS: Live write worker threads.
   _SHUTDOWN: Event set during stage stop.
   _STARTED: True after ``start_ingest_write_stage`` succeeds.
+  _WORKER_SETUP: Optional zero-arg callable run after write-thread title
+    and after connection recycle (for example listend statement_timeout).
 """
 
 from __future__ import annotations
@@ -39,6 +41,7 @@ _WRITE_QUEUE: queue.Queue[Any] | None = None
 _WRITE_THREADS: list[threading.Thread] = []
 _SHUTDOWN = threading.Event()
 _STARTED = False
+_WORKER_SETUP: Any | None = None
 
 
 @dataclass
@@ -186,6 +189,7 @@ def start_ingest_write_stage(
   write_workers: int,
   queue_max: int,
   process_title: str = "sync_timedb.py",
+  worker_setup: Any | None = None,
 ) -> None:
   """
   Start the bounded write queue and long-lived write threads.
@@ -194,6 +198,9 @@ def start_ingest_write_stage(
     write_workers (int): Number of write threads (DB sessions).
     queue_max (int): ``queue.Queue`` maxsize (payload slots).
     process_title (str): Daemon script name for thread titles.
+    worker_setup (Any | None): Optional zero-arg callable run on each
+      write thread after title/libpq setup and after connection recycle
+      (for example listend ``statement_timeout``).
 
   Returns:
     None
@@ -202,12 +209,13 @@ def start_ingest_write_stage(
     >>> callable(start_ingest_write_stage)
     True
   """
-  global _WRITE_QUEUE, _STARTED
+  global _WRITE_QUEUE, _STARTED, _WORKER_SETUP
   with _STAGE_LOCK:
     if _STARTED:
       return
     n = max(1, int(write_workers))
     qmax = max(1, int(queue_max))
+    _WORKER_SETUP = worker_setup
     _SHUTDOWN.clear()
     _WRITE_QUEUE = queue.Queue(maxsize=qmax)
     _WRITE_THREADS.clear()
@@ -237,7 +245,7 @@ def stop_ingest_write_stage(*, join_timeout_s: float = 30.0) -> None:
     >>> callable(stop_ingest_write_stage)
     True
   """
-  global _WRITE_QUEUE, _STARTED
+  global _WRITE_QUEUE, _STARTED, _WORKER_SETUP
   with _STAGE_LOCK:
     if not _STARTED:
       return
@@ -254,6 +262,7 @@ def stop_ingest_write_stage(*, join_timeout_s: float = 30.0) -> None:
     _WRITE_THREADS.clear()
     _WRITE_QUEUE = None
     _STARTED = False
+    _WORKER_SETUP = None
     _SHUTDOWN.clear()
 
 
@@ -362,6 +371,10 @@ def _write_worker_main(worker_idx: int, process_title: str) -> None:
   )
   apply_libpq_application_name()
   close_old_connections()
+  setup = _WORKER_SETUP
+  if callable(setup):
+    with __import__("contextlib").suppress(Exception):
+      setup()
   conn_opened_mono = time.monotonic()
   max_age = max(30.0, float(cfg.get_db_conn_max_age()))
 
@@ -389,6 +402,10 @@ def _write_worker_main(worker_idx: int, process_title: str) -> None:
           connections.close_all()
         close_old_connections()
         apply_libpq_application_name()
+        setup = _WORKER_SETUP
+        if callable(setup):
+          with __import__("contextlib").suppress(Exception):
+            setup()
         conn_opened_mono = time.monotonic()
 
 

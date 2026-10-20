@@ -521,81 +521,91 @@ def test_archive_gate_live_on_requires_file_complete_mark(
 
 
 def test_process_sample_skips_without_schema():
-  from hpcperfstats.dbload.lib import listend_db_ingest as ldi
   from hpcperfstats.dbload.lib.sync_timedb_parsing import (
     DeltaCarryState as DCS,
   )
+  from hpcperfstats.dbload.lib.sync_timedb_sample_ingest import (
+    ingest_monitor_sample_text,
+  )
 
   sample = "1710000001.0 1 host.example.edu\ncpuuser - 1 2 3\n"
-  host_objs, proc_objs = ldi._process_sample_to_orm(
+  stats, proc = ingest_monitor_sample_text(
     sample,
-    host="host.example.edu",
     schema={},
     schema_fast={},
     carry=DCS(),
   )
-  assert host_objs == []
-  assert proc_objs == []
+  assert stats.empty
+  assert proc.empty
 
 
 def test_process_sample_sets_host_data_jid_from_header():
   """Live listend path: sample-header jobid must reach host_data.jid."""
-  from hpcperfstats.dbload.lib import listend_db_ingest as ldi
+  from hpcperfstats.dbload.lib.io_helpers import (
+    host_data_instance_from_stats_row,
+  )
   from hpcperfstats.dbload.lib.sync_timedb_parsing import (
     DeltaCarryState as DCS,
   )
+  from hpcperfstats.dbload.lib.sync_timedb_sample_ingest import (
+    ingest_monitor_sample_text,
+  )
 
   schema = {"cpu": ["user", "sys"]}
-  schema_fast = {"cpu": ["user", "sys"]}
   sample = "1710000001.0 job42 host.example.edu\ncpu 0 10 20\n"
-  host_objs, proc_objs = ldi._process_sample_to_orm(
+  stats, proc = ingest_monitor_sample_text(
     sample,
-    host="host.example.edu",
     schema=schema,
-    schema_fast=schema_fast,
+    schema_fast=schema,
     carry=DCS(),
   )
+  assert not stats.empty
+  assert proc.empty
+  host_objs = [
+    host_data_instance_from_stats_row(r) for r in stats.itertuples(index=False)
+  ]
   assert host_objs
   assert all(o.jid == "job42" for o in host_objs)
-  assert proc_objs == []
 
 
 def test_process_sample_idle_jid_dash_maps_to_none():
   """Idle header '-' must become NULL on host_data ORM instances."""
-  from hpcperfstats.dbload.lib import listend_db_ingest as ldi
+  from hpcperfstats.dbload.lib.io_helpers import (
+    host_data_instance_from_stats_row,
+  )
   from hpcperfstats.dbload.lib.sync_timedb_parsing import (
     DeltaCarryState as DCS,
   )
+  from hpcperfstats.dbload.lib.sync_timedb_sample_ingest import (
+    ingest_monitor_sample_text,
+  )
 
   schema = {"cpu": ["user", "sys"]}
-  schema_fast = {"cpu": ["user", "sys"]}
   sample = "1710000001.0 - host.example.edu\ncpu 0 10 20\n"
-  host_objs, _ = ldi._process_sample_to_orm(
+  stats, _ = ingest_monitor_sample_text(
     sample,
-    host="host.example.edu",
     schema=schema,
-    schema_fast=schema_fast,
+    schema_fast=schema,
     carry=DCS(),
   )
+  host_objs = [
+    host_data_instance_from_stats_row(r) for r in stats.itertuples(index=False)
+  ]
   assert host_objs
   assert all(o.jid is None for o in host_objs)
 
 
-def test_flush_clears_batch_lists():
-  """Document memory contract: flush clears ORM batch (unit via mock write)."""
+def test_flush_clears_pending_frames_on_success():
+  """Successful write-stage flush clears pending frame lists (source contract)."""
+  import inspect
+
   from hpcperfstats.dbload.lib import listend_db_ingest as ldi
 
-  pending_host = [object(), object()]
-  pending_proc = [object()]
-  with mock.patch.object(ldi, "_flush_orm_batch", autospec=True):
-    # Simulate worker flush clearing pattern
-    try:
-      ldi._flush_orm_batch(pending_host, pending_proc)
-    finally:
-      pending_host = []
-      pending_proc = []
-  assert pending_host == []
-  assert pending_proc == []
+  src = inspect.getsource(ldi._worker_main)
+  assert "pending_stats = []" in src
+  assert "pending_proc = []" in src
+  assert "_submit_listend_write_frames" in src
+  assert "_flush_orm_batch" not in src
 
 
 def test_flush_retains_pending_on_transient_db_error():
@@ -611,156 +621,62 @@ def test_flush_retains_pending_on_transient_db_error():
     is True
   )
   src = __import__("inspect").getsource(ldi)
-  assert "pending_host = []" in src
+  assert "pending_stats = []" in src
   assert "_listend_flush_error_is_poison" in src
 
 
-def test_dedupe_proc_objs_keep_last_for_upsert_batch():
-  """Regression: duplicate (jid,host,proc) in one bulk_create upsert fails on Postgres."""
-  from types import SimpleNamespace
-
+def test_listend_pool_wires_sync_write_stage(monkeypatch):
+  """Pool start/stop must use sync write stage with sync write/queue INI."""
   from hpcperfstats.dbload.lib import listend_db_ingest as ldi
 
-  first = SimpleNamespace(
-    jid="1",
-    host="h",
-    proc="bash",
-    vm_rss=1,
-    vm_peak=9000,
-    vm_hwm=7000,
-    vm_stk=100,
-    vm_exe=10,
-    vm_lib=5,
-  )
-  second = SimpleNamespace(
-    jid="1",
-    host="h",
-    proc="bash",
-    vm_rss=99,
-    vm_peak=0,
-    vm_hwm=100,
-    vm_stk=40,
-    vm_exe=20,
-    vm_lib=1,
-  )
-  other = SimpleNamespace(
-    jid="1", host="h", proc="python", vm_rss=5, vm_stk=1, vm_exe=1, vm_lib=1
-  )
-  out = ldi._dedupe_proc_objs_keep_last([first, other, second])
-  assert len(out) == 2
-  by_proc = {o.proc: o for o in out}
-  assert by_proc["bash"].vm_rss == 99
-  assert by_proc["bash"].vm_peak == 9000
-  assert by_proc["bash"].vm_hwm == 7000
-  assert by_proc["bash"].vm_stk == 100
-  assert by_proc["bash"].vm_exe == 20
-  assert by_proc["bash"].vm_lib == 5
-  assert by_proc["python"].vm_rss == 5
+  calls = {}
 
+  def _start(**kwargs):
+    calls["start"] = kwargs
 
-def test_flush_orm_batch_dedupes_proc_before_bulk_create(monkeypatch):
-  """Ensure flush collapses duplicate proc keys before update_conflicts write."""
-  from types import SimpleNamespace
+  def _stop(**kwargs):
+    calls["stop"] = kwargs
 
-  from hpcperfstats.dbload.lib import listend_db_ingest as ldi
-
-  captured = {}
-
-  class _FakeManager:
-    def bulk_create(self, objs, **kwargs):
-      captured.setdefault("calls", []).append((list(objs), kwargs))
-
-    def filter(self, *args, **kwargs):
-      return self
-
-    def only(self, *args, **kwargs):
-      return []
-
-  class _FakeModel:
-    objects = _FakeManager()
-
+  monkeypatch.setattr(ldi.cfg, "get_listend_db_ingest_enabled", lambda: True)
   monkeypatch.setattr(
-    "django.db.close_old_connections",
+    ldi.cfg, "get_sync_ingest_write_pool_processes", lambda: 3
+  )
+  monkeypatch.setattr(ldi.cfg, "get_sync_ingest_parse_queue_max", lambda: 7)
+  monkeypatch.setattr(
+    "hpcperfstats.dbload.lib.blas_thread_env.configure_blas_thread_env",
     lambda: None,
   )
   monkeypatch.setattr(
-    "django.db.connections.close_all",
+    "hpcperfstats.dbload.lib.django_bootstrap.ensure_django",
     lambda: None,
-    raising=False,
   )
-  # Patch models imported inside _flush_orm_batch.
-  import hpcperfstats.site.lib.machine.models as models
-
-  monkeypatch.setattr(models, "proc_data", _FakeModel)
-  monkeypatch.setattr(models, "host_data", _FakeModel)
   monkeypatch.setattr(
-    ldi.cfg, "get_listend_db_ingest_flush_max_rows", lambda: 10000
+    "hpcperfstats.dbload.lib.sync_timedb_ingest_write_stage.start_ingest_write_stage",
+    _start,
   )
-
-  def _fake_insert_proc(objs, **kwargs):
-    del kwargs
-    _FakeModel.objects.bulk_create(objs, update_conflicts=True)
-
   monkeypatch.setattr(
-    "hpcperfstats.dbload.lib.sync_timedb_proc_data_insert.insert_proc_data_batch",
-    _fake_insert_proc,
+    "hpcperfstats.dbload.lib.sync_timedb_ingest_write_stage.stop_ingest_write_stage",
+    _stop,
+  )
+  # Avoid starting real parse threads.
+  monkeypatch.setattr(
+    ldi.ListendDbIngestPool,
+    "_make_worker_thread",
+    lambda self, i: mock.Mock(start=lambda: None, is_alive=lambda: True),
   )
 
-  first = SimpleNamespace(
-    jid="1",
-    host="h",
-    proc="bash",
-    device="bash/1/0/0",
-    **dict.fromkeys(
-      (
-        "uid",
-        "vm_peak",
-        "vm_size",
-        "vm_lck",
-        "vm_hwm",
-        "vm_rss",
-        "vm_data",
-        "vm_stk",
-        "vm_exe",
-        "vm_lib",
-        "vm_pte",
-        "vm_swap",
-        "threads",
-      )
-    ),
+  pool = ldi.ListendDbIngestPool(pool_processes=2, enabled=True)
+  pool.start()
+  assert calls["start"]["write_workers"] == 3
+  assert calls["start"]["queue_max"] == 7
+  assert calls["start"]["process_title"] == "listend.py"
+  assert (
+    calls["start"]["worker_setup"]
+    is ldi._apply_listend_db_ingest_statement_timeout
   )
-  second = SimpleNamespace(
-    jid="1",
-    host="h",
-    proc="bash",
-    device="bash/1/0/0",
-    **dict.fromkeys(
-      (
-        "uid",
-        "vm_peak",
-        "vm_size",
-        "vm_lck",
-        "vm_hwm",
-        "vm_rss",
-        "vm_data",
-        "vm_stk",
-        "vm_exe",
-        "vm_lib",
-        "vm_pte",
-        "vm_swap",
-        "threads",
-      )
-    ),
-  )
-  second.vm_rss = 42
-
-  ldi._flush_orm_batch([], [first, second])
-  assert "calls" in captured
-  # First call is proc_data (only proc objs were passed).
-  objs, kwargs = captured["calls"][0]
-  assert len(objs) == 1
-  assert objs[0].proc == "bash"
-  assert kwargs.get("update_conflicts") is True
+  pool._started = True
+  pool.stop(join_timeout=0.1)
+  assert "stop" in calls
 
 
 def test_peak_merge_uses_jid_host_in_fast_path(monkeypatch):
@@ -859,98 +775,15 @@ def test_peak_merge_subchunks_large_mixed_batch(monkeypatch):
   assert sizes == [256, 256, 88]
 
 
-def test_flush_bisects_proc_chunk_on_statement_timeout(monkeypatch):
-  """Statement timeout on a large proc chunk must bisect until writes succeed."""
-  from types import SimpleNamespace
-
-  from django.db.utils import OperationalError
-
-  from hpcperfstats.dbload.lib import listend_db_ingest as ldi
-
-  written = []
-
-  class _FakeManager:
-    def bulk_create(self, objs, **kwargs):
-      if len(objs) > 2:
-        raise OperationalError("canceling statement due to statement timeout")
-      written.append(list(objs))
-
-    def filter(self, *args, **kwargs):
-      return self
-
-    def only(self, *args, **kwargs):
-      return []
-
-  class _FakeModel:
-    objects = _FakeManager()
-
-  monkeypatch.setattr("django.db.close_old_connections", lambda: None)
-  monkeypatch.setattr(
-    "django.db.connections.close_all", lambda: None, raising=False
-  )
-  monkeypatch.setattr(
-    ldi, "_apply_listend_db_ingest_statement_timeout", lambda: None
-  )
-  import hpcperfstats.site.lib.machine.models as models
-
-  monkeypatch.setattr(models, "proc_data", _FakeModel)
-  monkeypatch.setattr(models, "host_data", _FakeModel)
-  monkeypatch.setattr(
-    ldi.cfg, "get_listend_db_ingest_flush_max_rows", lambda: 10000
-  )
-
-  def _fake_insert_proc(objs, **kwargs):
-    del kwargs
-    _FakeModel.objects.bulk_create(objs, update_conflicts=True)
-
-  monkeypatch.setattr(
-    "hpcperfstats.dbload.lib.sync_timedb_proc_data_insert.insert_proc_data_batch",
-    _fake_insert_proc,
-  )
-
-  objs = [
-    SimpleNamespace(
-      jid="1",
-      host="h",
-      proc=f"p{i}",
-      device="d",
-      **dict.fromkeys(
-        (
-          "uid",
-          "vm_peak",
-          "vm_size",
-          "vm_lck",
-          "vm_hwm",
-          "vm_rss",
-          "vm_data",
-          "vm_stk",
-          "vm_exe",
-          "vm_lib",
-          "vm_pte",
-          "vm_swap",
-          "threads",
-        )
-      ),
-    )
-    for i in range(4)
-  ]
-  ldi._flush_orm_batch([], objs)
-  assert sum(len(c) for c in written) == 4
-  assert all(len(c) <= 2 for c in written)
-
-
-def test_worker_applies_listend_statement_timeout(monkeypatch):
-  """Worker startup must apply listend statement_timeout after ensure_django."""
+def test_write_stage_applies_listend_statement_timeout(monkeypatch):
+  """Write-stage worker_setup must apply listend statement_timeout INI."""
   import inspect
 
   from hpcperfstats.dbload.lib import listend_db_ingest as ldi
 
-  src = inspect.getsource(ldi._worker_main)
-  ensure_pos = src.find("ensure_django()")
-  timeout_pos = src.find("_apply_listend_db_ingest_statement_timeout()")
-  assert ensure_pos != -1
-  assert timeout_pos != -1
-  assert ensure_pos < timeout_pos
+  src = inspect.getsource(ldi.ListendDbIngestPool.start)
+  assert "worker_setup=_apply_listend_db_ingest_statement_timeout" in src
+  assert "start_ingest_write_stage" in src
 
   executed = []
 
@@ -1500,21 +1333,25 @@ def test_worker_uses_thread_title_not_process_pool_title():
   assert "set_daemon_process_title" not in src
 
 
-def test_idle_empty_does_not_recycle_when_under_max_age(monkeypatch):
-  """Source contract: Empty path recycles only after max age."""
+def test_idle_empty_flushes_without_parse_conn_recycle():
+  """Parse Empty must flush frames; DB session recycle lives on write stage."""
   import inspect
 
-  from hpcperfstats.dbload.lib import listend_db_ingest as ldi
+  from hpcperfstats.dbload.lib import (
+    listend_db_ingest as ldi,
+    sync_timedb_ingest_write_stage as ws,
+  )
 
   src = inspect.getsource(ldi._worker_main)
   assert "except queue.Empty:" in src
-  # Must flush on idle.
   assert "_flush(force_memory_release=True)" in src
-  # Must not unconditionally recycle on every Empty.
   empty_block = src.split("except queue.Empty:")[1].split("continue")[0]
   assert '_recycle_conn(reason="idle")' not in empty_block
-  assert "_conn_max_age_s()" in empty_block
-  assert '_recycle_conn(reason="age")' in empty_block
+  assert "_conn_max_age_s()" not in empty_block
+  assert "close_old_connections" not in empty_block
+  write_src = inspect.getsource(ws._write_worker_main)
+  assert "get_db_conn_max_age" in write_src
+  assert "close_old_connections" in write_src
 
 
 def test_worker_drops_payload_refs_on_skip_and_parse_paths():

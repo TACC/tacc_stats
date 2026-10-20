@@ -16,10 +16,12 @@ Attributes:
   _SHUTDOWN_JOIN_TIMEOUT_S: Worker ``join`` budget on ``stop()``.
   _FlushWindowStats: Window avg/max flush rows and elapsed for idle monitor.
   _listend_flush_error_is_poison: Classify flush errors that drop the batch.
-  _is_listend_statement_timeout: Detect PostgreSQL statement timeout cancels.
-  _apply_listend_db_ingest_statement_timeout: Apply listend INI statement_timeout.
+  _apply_listend_db_ingest_statement_timeout: Apply listend INI statement_timeout
+    on write-stage workers via ``worker_setup``.
   _should_flush_pending: Row-cap / hold-age / batch_samples flush policy.
-  _write_proc_chunk_with_timeout_bisect: Peak-merge write with timeout bisect.
+  _concat_pending_frames: Concatenate pending host/proc frames for one flush.
+  _pending_frame_rows: Row count across pending frame lists.
+  _submit_listend_write_frames: Blocking ``submit_ingest_write_and_wait``.
   _ARCHIVE_HINT_PEEK_BYTES: Max bytes scanned for archive host/ts/dollar peek.
   _MIN_PLAUSIBLE_UNIX_SECONDS: Lowest unix seconds accepted as a stats timestamp.
 """
@@ -276,11 +278,11 @@ def _listend_flush_error_is_poison(exc: BaseException) -> bool:
   """
   True when a flush error is classified poison and the batch must be dropped.
 
-  Transient Postgres/network errors keep ``pending_host`` / ``pending_proc``
+  Transient Postgres/network errors keep ``pending_stats`` / ``pending_proc``
   so the next flush can retry. Schema/data/integrity errors are poison.
 
   Args:
-    exc (BaseException): Exception raised from ``_flush_orm_batch``.
+    exc (BaseException): Exception raised from the write-stage flush.
 
   Returns:
     bool: True when the pending batch should be discarded.
@@ -293,28 +295,6 @@ def _listend_flush_error_is_poison(exc: BaseException) -> bool:
   """
   name = type(exc).__name__
   return name in ("DataError", "ProgrammingError", "IntegrityError")
-
-
-def _is_listend_statement_timeout(exc: BaseException) -> bool:
-  """
-  True when ``exc`` looks like a PostgreSQL statement timeout cancel.
-
-  Args:
-    exc (BaseException): Exception from a flush/peak-merge DB call.
-
-  Returns:
-    bool: True when the message indicates statement timeout.
-
-  Examples:
-    >>> _is_listend_statement_timeout(
-    ...   Exception("canceling statement due to statement timeout")
-    ... )
-    True
-    >>> _is_listend_statement_timeout(Exception("connection reset"))
-    False
-  """
-  text = str(exc).lower()
-  return "statement timeout" in text or "canceling statement" in text
 
 
 def _apply_listend_db_ingest_statement_timeout() -> None:
@@ -346,141 +326,108 @@ def _apply_listend_db_ingest_statement_timeout() -> None:
     return
 
 
-def _peak_merge_proc_chunk_with_existing(chunk: list) -> list:
+def _concat_pending_frames(parts: list) -> Any:
   """
-  Raise peak fields on ``chunk`` from matching ``proc_data`` DB rows.
-
-  Delegates to shared ``peak_merge_proc_objs_with_existing`` (jid+host
-  ``proc__in`` slices).
+  Concatenate non-empty pending sample dataframes for one write-stage flush.
 
   Args:
-    chunk (list): ``proc_data`` instances for one bulk_create.
+    parts (list): Sequence of host or proc dataframes (may include empties).
 
   Returns:
-    list: Same chunk list (objs mutated when DB peers exist).
+    Any: One dataframe (possibly empty).
 
   Examples:
-    >>> _peak_merge_proc_chunk_with_existing([])
-    []
+    >>> import pandas as pd
+    >>> _concat_pending_frames([pd.DataFrame(), pd.DataFrame({"a": [1]})])[
+    ...   "a"
+    ... ].tolist()
+    [1]
   """
-  from hpcperfstats.dbload.lib.sync_timedb_parsing import (
-    peak_merge_proc_objs_with_existing,
-  )
+  import pandas as pd
 
-  return peak_merge_proc_objs_with_existing(chunk)
+  nonempty = [
+    frame
+    for frame in parts
+    if frame is not None and not getattr(frame, "empty", True)
+  ]
+  if not nonempty:
+    return pd.DataFrame()
+  if len(nonempty) == 1:
+    return nonempty[0]
+  return pd.concat(nonempty, ignore_index=True)
 
 
-def _write_proc_chunk_with_timeout_bisect(
-  chunk: list,
-  *,
-  update_fields: tuple,
-) -> None:
+def _pending_frame_rows(parts: list) -> int:
   """
-  Peak-merge and ``bulk_create`` one proc chunk; bisect on statement timeout.
+  Return total row count across pending host/proc frame lists.
 
   Args:
-    chunk (list): Deduped ``proc_data`` instances for one write.
-    update_fields (tuple): Fields passed to ``bulk_create`` update_conflicts.
+    parts (list): Sequence of dataframes.
+
+  Returns:
+    int: Sum of ``len`` for non-empty frames.
+
+  Examples:
+    >>> import pandas as pd
+    >>> _pending_frame_rows([pd.DataFrame({"a": [1, 2]})])
+    2
+  """
+  total = 0
+  for frame in parts:
+    if frame is None or getattr(frame, "empty", True):
+      continue
+    total += len(frame)
+  return total
+
+
+def _submit_listend_write_frames(
+  *,
+  worker_idx: int,
+  stats_frames: list,
+  proc_frames: list,
+) -> None:
+  """
+  Blocking write-stage flush of accumulated listend parse frames.
+
+  Args:
+    worker_idx (int): Affine shard index (synthetic stats_file suffix).
+    stats_frames (list): Pending host dataframes.
+    proc_frames (list): Pending proc dataframes.
 
   Returns:
     None
 
   Raises:
-    OperationalError: Re-raised when timeout persists at chunk size 1 or the
-      error is not a statement timeout.
-    Exception: Propagated from connection recycle / peak-merge helpers during
-      bisect recovery.
+    err: Re-raised write-stage ``payload.error`` (any ``BaseException``).
+    RuntimeError: When the write stage reports ``ingest_ok`` False.
 
   Examples:
-    >>> _write_proc_chunk_with_timeout_bisect(
-    ...   [], update_fields=()
-    ... )  # doctest: +SKIP
+    >>> callable(_submit_listend_write_frames)
+    True
   """
-  from django.db import close_old_connections, connections
-  from django.db.utils import OperationalError
+  from hpcperfstats.dbload.lib.sync_timedb_ingest_write_stage import (
+    IngestWritePayload,
+    submit_ingest_write_and_wait,
+  )
 
-  if not chunk:
+  stats = _concat_pending_frames(stats_frames)
+  proc = _concat_pending_frames(proc_frames)
+  if getattr(stats, "empty", True) and getattr(proc, "empty", True):
     return
-  try:
-    from hpcperfstats.dbload.lib.sync_timedb_proc_data_insert import (
-      insert_proc_data_batch,
+  payload = IngestWritePayload(
+    stats_file=f"listend://db-{int(worker_idx)}",
+    stats=stats,
+    proc_stats=proc,
+    need_archival=False,
+  )
+  submit_ingest_write_and_wait(payload)
+  err = payload.error
+  if err is not None:
+    raise err
+  if not payload.ingest_ok:
+    raise RuntimeError(
+      f"listend write stage ingest_ok=False worker={worker_idx}"
     )
-
-    insert_proc_data_batch(chunk)
-  except OperationalError as exc:
-    if _is_listend_statement_timeout(exc) and len(chunk) > 1:
-      with contextlib.suppress(Exception):
-        connections.close_all()
-      close_old_connections()
-      _apply_listend_db_ingest_statement_timeout()
-      mid = len(chunk) // 2
-      _write_proc_chunk_with_timeout_bisect(
-        chunk[:mid], update_fields=update_fields
-      )
-      _write_proc_chunk_with_timeout_bisect(
-        chunk[mid:], update_fields=update_fields
-      )
-      return
-    raise
-
-
-def _flush_orm_batch(host_objs: list, proc_objs: list) -> None:
-  """
-  Write pending ORM instances; clear caller lists on success.
-
-  Args:
-    host_objs (list): Sequence for host objs.
-    proc_objs (list): Sequence for proc objs.
-
-  Returns:
-    None
-
-  Examples:
-    >>> _flush_orm_batch([], [])  # doctest: +SKIP
-  """
-  from django.db import close_old_connections, connections
-  from django.db.utils import OperationalError
-
-  from hpcperfstats.dbload.lib.sync_timedb_parsing import HOST_PROC_KEYS
-  from hpcperfstats.site.lib.machine.models import host_data
-
-  # Do not close_old_connections() at every flush start — that fights
-  # persistent connections and inflates idle conn_recycle.
-  # Internal ORM/COPY slice within a listend flush (not an INI knob;
-  # retired sync_bulk_create_batch_size).
-  batch_size = 10000
-  update_fields = ("device", *HOST_PROC_KEYS)
-  proc_objs = _dedupe_proc_objs_keep_last(proc_objs)
-
-  def _write_once() -> None:
-    """
-    Internal helper to write the once.
-
-    Returns:
-      None
-
-    Examples:
-      >>> _write_once()  # doctest: +SKIP
-    """
-    for i in range(0, len(proc_objs), batch_size):
-      chunk = proc_objs[i : i + batch_size]
-      if not chunk:
-        continue
-      _write_proc_chunk_with_timeout_bisect(chunk, update_fields=update_fields)
-    for i in range(0, len(host_objs), batch_size):
-      chunk = host_objs[i : i + batch_size]
-      if not chunk:
-        continue
-      host_data.objects.bulk_create(chunk, ignore_conflicts=True)
-
-  try:
-    _write_once()
-  except OperationalError:
-    with contextlib.suppress(Exception):
-      connections.close_all()
-    close_old_connections()
-    _apply_listend_db_ingest_statement_timeout()
-    _write_once()
 
 
 def compute_listend_db_queue_budgets(
@@ -790,49 +737,48 @@ def sample_measurement_types(message: str) -> list[str]:
   """
   Alpha-leading typed measurement names after a digit timestamp header.
 
+  Re-exports shared :func:`sync_timedb_sample_ingest.sample_measurement_types`.
+
   Args:
-    message (str): String for message.
+    message (str): Raw monitor sample text.
 
   Returns:
-    list[str]: list[str] produced by this call.
+    list[str]: Measurement type tokens.
 
   Examples:
-    >>> sample_measurement_types("x")  # doctest: +SKIP
+    >>> sample_measurement_types("1710000001.0 1 h\\ncpuuser - 1\\n")
+    ['cpuuser']
   """
-  types: list[str] = []
-  saw_ts = False
-  for line in message.splitlines():
-    s = line.lstrip()
-    if not s:
-      continue
-    if s[0].isdigit():
-      saw_ts = True
-      continue
-    if saw_ts and s[0].isalpha():
-      types.append(s.split(maxsplit=1)[0])
-  return types
+  from hpcperfstats.dbload.lib.sync_timedb_sample_ingest import (
+    sample_measurement_types as _shared,
+  )
+
+  return _shared(message)
 
 
 def schema_covers_measurement_types(schema: dict, types: list[str]) -> bool:
   """
-  Schema covers measurement types.
+  Return True when ``schema`` covers every non-proc measurement in ``types``.
+
+  Re-exports shared
+  :func:`sync_timedb_sample_ingest.schema_covers_measurement_types`.
 
   Args:
-    schema (dict): Mapping for schema.
-    types (list[str]): Sequence for types.
+    schema (dict): Host measurement schema map.
+    types (list[str]): Measurement types from :func:`sample_measurement_types`.
 
   Returns:
-    bool: True or False for this check.
+    bool: False when any required type is missing.
 
   Examples:
-    >>> schema_covers_measurement_types({}, [])  # doctest: +SKIP
+    >>> schema_covers_measurement_types({"cpu": ["user"]}, ["cpu"])
+    True
   """
-  for typ in types:
-    if typ in ("proc", "host_proc"):
-      continue
-    if typ not in schema:
-      return False
-  return True
+  from hpcperfstats.dbload.lib.sync_timedb_sample_ingest import (
+    schema_covers_measurement_types as _shared,
+  )
+
+  return _shared(schema, types)
 
 
 def parse_schema_from_bang_lines(message: str) -> tuple[dict, dict]:
@@ -960,217 +906,6 @@ def _release_listend_db_worker_memory() -> None:
   release_spawn_pool_worker_memory()
 
 
-def _conn_max_age_s() -> float:
-  """
-  Internal helper to handle conn max age s.
-
-  Returns:
-    float: float produced by this call.
-
-  Examples:
-    >>> _conn_max_age_s()  # doctest: +SKIP
-  """
-  try:
-    return max(30.0, float(cfg.get_db_conn_max_age()))
-  except Exception:
-    return 90.0
-
-
-def _proc_field_or_none(row: Any, key: Any) -> Any:
-  """
-  Return a scalar proc_data field from an itertuples row.
-
-  Maps NaN to None and coerces pandas/numpy floats to ``int`` for bigint
-  HOST_PROC_KEYS. String ``device`` attributes stay unchanged.
-
-  Args:
-    row (Any): Named row (itertuples / SimpleNamespace) with field attrs.
-    key (Any): Attribute name to read from ``row``.
-
-  Returns:
-    Any: ``None``, ``int``, or unchanged non-numeric value (e.g. device str).
-
-  Examples:
-    >>> from types import SimpleNamespace
-    >>> _proc_field_or_none(SimpleNamespace(uid=0.0), "uid")
-    0
-  """
-  try:
-    val = getattr(row, key)
-  except AttributeError:
-    return None
-  if val is None:
-    return None
-  try:
-    if val != val:  # NaN
-      return None
-  except Exception:
-    pass
-  # Coerce pandas/numpy floats to int for bigint fields; keep str (device).
-  if isinstance(val, float):
-    return int(val)
-  if type(val).__module__ == "numpy":
-    try:
-      return int(val)
-    except TypeError, ValueError, OverflowError:
-      return None
-  return val
-
-
-def _proc_data_row_kwargs(row: Any) -> Any:
-  """
-  Internal helper to handle proc data row kwargs.
-
-  Args:
-    row (Any): Value to inspect (typically a numeric scalar).
-
-  Returns:
-    Any: Value produced by this call (type depends on inputs).
-
-  Examples:
-    >>> _proc_data_row_kwargs(None)  # doctest: +SKIP
-  """
-  from hpcperfstats.dbload.lib.sync_timedb_parsing import HOST_PROC_KEYS
-
-  kwargs = {
-    "jid": row.jid,
-    "host": row.host,
-    "proc": row.proc,
-    "device": _proc_field_or_none(row, "device"),
-  }
-  for key in HOST_PROC_KEYS:
-    kwargs[key] = _proc_field_or_none(row, key)
-  return kwargs
-
-
-def _dedupe_proc_objs_keep_last(proc_objs: list) -> list:
-  """
-  Collapse duplicate ``(jid, host, proc)`` rows for one bulk_create upsert.
-
-  Postgres rejects ``ON CONFLICT DO UPDATE`` when the same unique key appears
-  twice in a single statement. Later samples last-write non-peak fields;
-  ``vm_stk`` / ``vm_exe`` / ``vm_lib`` take GREATEST across the batch.
-
-  Args:
-    proc_objs (list): Sequence of ``proc_data`` instances (or namespaces).
-
-  Returns:
-    list: One object per unique key.
-
-  Examples:
-    >>> _dedupe_proc_objs_keep_last([])
-    []
-  """
-  from hpcperfstats.dbload.lib.sync_timedb_parsing import (
-    apply_proc_peak_attrs_from_earlier,
-  )
-
-  if len(proc_objs) <= 1:
-    return list(proc_objs)
-  by_key: dict = {}
-  for obj in proc_objs:
-    key = (
-      getattr(obj, "jid", None),
-      getattr(obj, "host", None),
-      getattr(obj, "proc", None),
-    )
-    if key in by_key:
-      apply_proc_peak_attrs_from_earlier(by_key[key], obj)
-    by_key[key] = obj
-  return list(by_key.values())
-
-
-def _process_sample_to_orm(
-  message: str,
-  *,
-  host: str,
-  schema: dict,
-  schema_fast: dict,
-  carry: Any,
-) -> tuple[list, list]:
-  """
-  Parse one complete sample → host_data / proc_data instances. Empty on skip.
-
-  Args:
-    message (str): String for message.
-    host (str): String for host.
-    schema (dict): Mapping for schema.
-    schema_fast (dict): Mapping for schema fast.
-    carry (Any): Carry passed to this helper.
-
-  Returns:
-    Tuple[list, list]: Tuple[list, list] produced by this call.
-
-  Examples:
-    >>> _process_sample_to_orm("x", "x", {}, {}, None)  # doctest: +SKIP
-  """
-  from hpcperfstats.dbload.lib.io_helpers import (
-    host_data_instance_from_stats_row,
-  )
-  from hpcperfstats.dbload.lib.sync_timedb_parsing import (
-    DeltaCarryState,
-    IncrementalStatsParser,
-    build_stats_dataframes,
-    compute_deltas_and_arc_chunk,
-    stats_payload_row_count,
-  )
-
-  types = sample_measurement_types(message)
-  if not types:
-    return [], []
-  if not schema_covers_measurement_types(schema, types):
-    return [], []
-
-  parser = IncrementalStatsParser(0)
-  parser.schema = dict(schema)
-  parser.schema_fast = dict(schema_fast)
-  parser.compile_injected_schema()
-  try:
-    parser.feed_lines(message.splitlines())
-    from hpcperfstats.dbload.lib.monitor_mark_side_ingest import (
-      flush_parser_side_marks,
-    )
-
-    flush_parser_side_marks(parser)
-    stats_cols = parser.take_stats_columns()
-    proc_list = parser.proc_stats
-  except Exception:
-    return [], []
-
-  # All-or-nothing: non-proc typed lines must produce host stats rows.
-  non_proc = [t for t in types if t not in ("proc", "host_proc")]
-  if non_proc and stats_payload_row_count(stats_cols) == 0:
-    return [], []
-  if stats_payload_row_count(stats_cols) == 0 and not proc_list:
-    return [], []
-
-  stats_df, proc_df = build_stats_dataframes(stats_cols, proc_list)
-  del stats_cols, proc_list
-  host_objs: list = []
-  proc_objs: list = []
-  try:
-    if not stats_df.empty:
-      if carry is None:
-        carry = DeltaCarryState()
-      finalized = compute_deltas_and_arc_chunk(stats_df, carry=carry)
-      del stats_df
-      if not finalized.empty:
-        for row in finalized.itertuples(index=False):
-          host_objs.append(host_data_instance_from_stats_row(row))
-      del finalized
-    if not proc_df.empty:
-      for row in proc_df.itertuples(index=False):
-        from hpcperfstats.site.lib.machine.models import proc_data
-
-        proc_objs.append(proc_data(**_proc_data_row_kwargs(row)))
-  finally:
-    with contextlib.suppress(Exception):
-      del stats_df
-    with contextlib.suppress(Exception):
-      del proc_df
-  return host_objs, proc_objs
-
-
 def _worker_main(
   worker_idx: int,
   work_queue: Any,
@@ -1185,18 +920,19 @@ def _worker_main(
   flush_window: Any = None,
 ) -> None:
   """
-  Host-affine listend DB worker: parse queued samples and flush ORM batches.
+  Host-affine listend parse worker: sample→frames, flush via write stage.
 
   Flushes when ``batch_samples`` is reached, when pending host+proc rows
   reach ``flush_max_rows``, when pending has been held for
   ``flush_hold_s`` (even if the queue is never empty), on idle
   ``queue.get`` timeout, or on shutdown. ``$`` schema lines do not count
-  toward ``batch_samples``.
+  toward ``batch_samples``. Timescale COPY/upsert runs on the shared
+  ingest write stage (not this thread).
 
   Args:
     worker_idx (int): Affine shard index (also the thread title suffix).
     work_queue (Any): In-process ``queue.Queue`` of
-      ``(host, message, nbytes)`` tuples, or ``None`` to stop.
+      ``(host, fd, offset, length, size)`` tuples, or ``None`` to stop.
     stop_event (Any): Shared stop flag; the loop exits when set.
     byte_count (Any): Per-shard queued-byte counter (``.value``).
     byte_lock (Any): Mutex guarding ``byte_count``.
@@ -1228,54 +964,30 @@ def _worker_main(
   from hpcperfstats.dbload.lib.django_bootstrap import ensure_django
   from hpcperfstats.dbload.lib.process_title import set_daemon_thread_title
   from hpcperfstats.dbload.lib.sync_timedb_parsing import DeltaCarryState
+  from hpcperfstats.dbload.lib.sync_timedb_sample_ingest import (
+    ingest_monitor_sample_text,
+  )
 
   set_daemon_thread_title(
     "",
     script_name="listend.py",
     role=f"listend-db-{int(worker_idx)}",
   )
+  # Side-mark flush may touch Django; host/proc COPY stays on write stage.
   ensure_django()
-  from django.db import close_old_connections, connections
-
-  close_old_connections()
-  _apply_listend_db_ingest_statement_timeout()
 
   schema_by_host: dict[str, dict] = {}
   schema_fast_by_host: dict[str, dict] = {}
   carry_by_host: dict[str, DeltaCarryState] = {}
-  pending_host: list = []
+  pending_stats: list = []
   pending_proc: list = []
   sample_count = 0
   hold_started_mono: float | None = None
-  conn_opened_at = time.monotonic()
   seeded_hosts: set = set()
-
-  def _recycle_conn(*, reason: str = "idle") -> None:
-    """
-    Internal helper to handle recycle conn.
-
-    Args:
-      reason (str): String for reason.
-
-    Returns:
-      None
-
-    Examples:
-      >>> _recycle_conn("x")  # doctest: +SKIP
-    """
-    del reason
-    with contextlib.suppress(Exception):
-      close_old_connections()
-    with contextlib.suppress(Exception):
-      connections.close_all()
-    nonlocal conn_opened_at
-    conn_opened_at = time.monotonic()
-    _apply_listend_db_ingest_statement_timeout()
-    _inc_counter(counters, "conn_recycle")
 
   def _flush(*, force_memory_release: bool = True) -> None:
     """
-    Write pending ORM rows, reset the hold clock, and record flush elapsed.
+    Enqueue pending frames on the write stage and clear on success.
 
     Args:
       force_memory_release (bool): When True, drop heap after a successful
@@ -1288,15 +1000,21 @@ def _worker_main(
       >>> callable(_flush)
       True
     """
-    nonlocal sample_count, pending_host, pending_proc, hold_started_mono
-    if not pending_host and not pending_proc:
+    nonlocal sample_count, pending_stats, pending_proc, hold_started_mono
+    if not pending_stats and not pending_proc:
       sample_count = 0
       hold_started_mono = None
       return
-    rows = len(pending_host) + len(pending_proc)
+    rows = _pending_frame_rows(pending_stats) + _pending_frame_rows(
+      pending_proc
+    )
     started = time.monotonic()
     try:
-      _flush_orm_batch(pending_host, pending_proc)
+      _submit_listend_write_frames(
+        worker_idx=worker_idx,
+        stats_frames=pending_stats,
+        proc_frames=pending_proc,
+      )
       _inc_counter(counters, "db_ok")
       _inc_counter(counters, "batch_flush")
     except Exception as exc:
@@ -1306,7 +1024,7 @@ def _worker_main(
         flush=True,
       )
       if _listend_flush_error_is_poison(exc):
-        pending_host = []
+        pending_stats = []
         pending_proc = []
         sample_count = 0
         hold_started_mono = None
@@ -1317,14 +1035,12 @@ def _worker_main(
     if flush_window is not None:
       with contextlib.suppress(Exception):
         flush_window.record(rows, elapsed)
-    pending_host = []
+    pending_stats = []
     pending_proc = []
     sample_count = 0
     hold_started_mono = None
     if force_memory_release:
       _release_listend_db_worker_memory()
-    if (time.monotonic() - conn_opened_at) >= _conn_max_age_s():
-      _recycle_conn(reason="age")
 
   def _maybe_flush_pending() -> None:
     """
@@ -1339,7 +1055,8 @@ def _worker_main(
     """
     if _should_flush_pending(
       sample_count=sample_count,
-      pending_rows=len(pending_host) + len(pending_proc),
+      pending_rows=_pending_frame_rows(pending_stats)
+      + _pending_frame_rows(pending_proc),
       batch_samples=batch_samples,
       flush_max_rows=flush_max_rows,
       hold_started_mono=hold_started_mono,
@@ -1376,9 +1093,6 @@ def _worker_main(
       item = work_queue.get(timeout=_QUEUE_GET_TIMEOUT_S)
     except queue.Empty:
       _flush(force_memory_release=True)
-      # Recycle only on max age — not every idle Empty (avoids conn_recycle ≫ db_ok).
-      if (time.monotonic() - conn_opened_at) >= _conn_max_age_s():
-        _recycle_conn(reason="age")
       continue
     if item is None:
       break
@@ -1452,21 +1166,22 @@ def _worker_main(
 
       schema_fast = schema_fast_by_host.get(host) or {}
       carry = carry_by_host.setdefault(host, DeltaCarryState())
-      host_objs, proc_objs = _process_sample_to_orm(
+      stats_df, proc_df = ingest_monitor_sample_text(
         message,
-        host=host,
         schema=schema,
         schema_fast=schema_fast,
         carry=carry,
       )
       message = None  # drop payload ref after parse
-      if not host_objs and not proc_objs:
+      if getattr(stats_df, "empty", True) and getattr(proc_df, "empty", True):
         # Covered schema but unusable / incomplete → treat as schema_miss class skip.
         _inc_counter(counters, "schema_miss")
         continue
-      pending_host.extend(host_objs)
-      pending_proc.extend(proc_objs)
-      del host_objs, proc_objs
+      if not getattr(stats_df, "empty", True):
+        pending_stats.append(stats_df)
+      if not getattr(proc_df, "empty", True):
+        pending_proc.append(proc_df)
+      del stats_df, proc_df
       sample_count += 1
       if hold_started_mono is None:
         hold_started_mono = time.monotonic()
@@ -1477,7 +1192,7 @@ def _worker_main(
         f"ERROR: listend db ingest sample failed worker={worker_idx} host={host}: {exc}",
         flush=True,
       )
-      pending_host = []
+      pending_stats = []
       pending_proc = []
       sample_count = 0
       hold_started_mono = None
@@ -1490,10 +1205,6 @@ def _worker_main(
         fd = None
 
   _flush(force_memory_release=True)
-  with contextlib.suppress(Exception):
-    close_old_connections()
-  with contextlib.suppress(Exception):
-    connections.close_all()
 
 
 class ListendDbIngestPool:
@@ -1649,6 +1360,18 @@ class ListendDbIngestPool:
 
     configure_blas_thread_env()
     ensure_django()
+    from hpcperfstats.dbload.lib.sync_timedb_ingest_write_stage import (
+      start_ingest_write_stage,
+    )
+
+    write_n = max(1, int(cfg.get_sync_ingest_write_pool_processes()))
+    parse_q_max = max(1, int(cfg.get_sync_ingest_parse_queue_max()))
+    start_ingest_write_stage(
+      write_workers=write_n,
+      queue_max=parse_q_max,
+      process_title="listend.py",
+      worker_setup=_apply_listend_db_ingest_statement_timeout,
+    )
     with self._worker_lock:
       for i in range(self.pool_processes):
         q: queue.Queue = queue.Queue(maxsize=self.queue_maxsize)
@@ -1669,7 +1392,13 @@ class ListendDbIngestPool:
         flush=True,
       )
     log_print(
-      f"listend db ingest pool started workers={self.pool_processes} queue_maxsize={self.queue_maxsize} per_worker_budget_bytes={self.per_worker_budget_bytes} batch_samples={self.batch_samples} flush_max_rows={self.flush_max_rows} flush_hold_s={self.flush_hold_s:.3f}",
+      f"listend db ingest pool started workers={self.pool_processes} "
+      f"write_pool={write_n} write_queue_max={parse_q_max} "
+      f"queue_maxsize={self.queue_maxsize} "
+      f"per_worker_budget_bytes={self.per_worker_budget_bytes} "
+      f"batch_samples={self.batch_samples} "
+      f"flush_max_rows={self.flush_max_rows} "
+      f"flush_hold_s={self.flush_hold_s:.3f}",
       flush=True,
     )
 
@@ -1784,6 +1513,12 @@ class ListendDbIngestPool:
     self._byte_locks = []
     self._workers = []
     self._started = False
+    with contextlib.suppress(Exception):
+      from hpcperfstats.dbload.lib.sync_timedb_ingest_write_stage import (
+        stop_ingest_write_stage,
+      )
+
+      stop_ingest_write_stage(join_timeout_s=max(0.1, float(join_timeout)))
 
   def queued_bytes(self) -> int:
     """

@@ -70,8 +70,11 @@ HPCPERFSTATS_ROUTER_ENTRIES: list[RouterEntry] = [
     "patterns": [
       "hpcperfstats/listend.py",
       "hpcperfstats/dbload/lib/listend_db_ingest.py",
+      "hpcperfstats/dbload/lib/sync_timedb_sample_ingest.py",
+      "hpcperfstats/dbload/lib/sync_timedb_ingest_write_stage.py",
       "hpcperfstats/dbload/lib/sync_timedb_file_complete_ingest_mark.py",
       "hpcperfstats/tests/test_listend_db_ingest.py",
+      "hpcperfstats/tests/test_sync_timedb_sample_ingest.py",
     ],
     "rules": [
       "listend-live-db-ingest-contract.mdc",

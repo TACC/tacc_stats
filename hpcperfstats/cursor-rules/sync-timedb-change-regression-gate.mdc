@@ -104,6 +104,7 @@ Do not ship an INI-only thread-count change without that evidence trail. A risin
 ## Overlap
 
 - **`sync-timedb-archive-janitor-contract.mdc`** — two-queue model; cites battery script
+- **`listend-live-db-ingest-contract.mdc`** — listend reuses ``sync_timedb_sample_ingest`` + ``sync_timedb_ingest_write_stage``; any change to shared sample ingest or the write stage **must** update listend wiring (`listend_db_ingest.py`) and that contract in the **same task**
 - **`every-error-regression-test.mdc`** — failing-first tests for each fixed RC
 - **`bugfix-and-perf-change-playbook.mdc`** — smallest root-cause patch after battery baseline
 - **`compose-operator-terminal-commands.mdc`** — operator greps for T1/T2 verify; no `--tail` before grep on pipeline logs

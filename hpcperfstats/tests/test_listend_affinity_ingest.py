@@ -1,19 +1,23 @@
 """listend live path stamps shared-node dev and leaves exclusive rows alone."""
 
-from hpcperfstats.dbload.lib.listend_db_ingest import _process_sample_to_orm
+from hpcperfstats.dbload.lib.io_helpers import host_data_instance_from_stats_row
 from hpcperfstats.dbload.lib.sync_timedb_parsing import DeltaCarryState
+from hpcperfstats.dbload.lib.sync_timedb_sample_ingest import (
+  ingest_monitor_sample_text,
+)
 
 
 def _host_rows(sample, schema):
-  host_objs, proc_objs = _process_sample_to_orm(
+  stats, proc = ingest_monitor_sample_text(
     sample,
-    host="host.example.edu",
     schema=schema,
     schema_fast=schema,
     carry=DeltaCarryState(),
   )
-  assert proc_objs == []
-  return host_objs
+  assert proc.empty
+  return [
+    host_data_instance_from_stats_row(r) for r in stats.itertuples(index=False)
+  ]
 
 
 def test_listend_shared_sample_stamps_cpu_and_keeps_gpu_dev():

@@ -101,3 +101,4 @@ Startup enqueues janitor debt (mtime scan) without blocking ingest. With the gat
 - Complements **`sync-timedb-lock-and-archive-contract.mdc`** (locks, zstd seal/read, corrupt-tar recovery).
 - Complements **`runtime-resource-and-metrics-safety.mdc`** for ingest/metrics paths.
 - Complements **`sync-timedb-archive-janitor-contract.mdc`** (cold-path seal/raw/`.tar` and disqualification union).
+- Complements **`listend-live-db-ingest-contract.mdc`** — live dual-write shares sample ingest + write stage; gate semantics when ``listend_db_ingest_enabled`` is on remain as above; shared write-path changes must keep listend wiring current.

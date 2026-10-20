@@ -412,7 +412,6 @@ def test_proc_field_or_none_coerces_float_keeps_device_str():
   from types import SimpleNamespace
 
   from hpcperfstats.dbload import sync_timedb as st
-  from hpcperfstats.dbload.lib import listend_db_ingest as ldi
 
   row = SimpleNamespace(
     uid=0.0, vm_size=236948.0, device="bash/1", bog=float("nan")
@@ -421,8 +420,6 @@ def test_proc_field_or_none_coerces_float_keeps_device_str():
   assert st._proc_field_or_none(row, "vm_size") == 236948
   assert st._proc_field_or_none(row, "device") == "bash/1"
   assert st._proc_field_or_none(row, "bog") is None
-  assert ldi._proc_field_or_none(row, "uid") == 0
-  assert ldi._proc_field_or_none(row, "device") == "bash/1"
 
 
 def test_bulk_insert_proc_copy_s_and_conflict_insert_under_write_telem(
