@@ -442,8 +442,11 @@ int job_proc_discover(struct job_proc_discover_result *out, int require_step_id,
       b = find_or_add_bucket(&buckets, &nbuckets, &bcap, token);
       if (b == NULL)
         goto oom;
-      if (b->cgroup_relpath[0] == '\0' && parse_cgroup_relpath(cgroup, rel, sizeof(rel)) == 0)
-        snprintf(b->cgroup_relpath, sizeof(b->cgroup_relpath), "%s", rel);
+      if (parse_cgroup_relpath(cgroup, rel, sizeof(rel)) == 0) {
+        /* Prefer non-root (job) leaf path; first scope pid may be root stepd. */
+        if (b->cgroup_relpath[0] == '\0' || !pid_uid_is_root(proc_root, pid))
+          snprintf(b->cgroup_relpath, sizeof(b->cgroup_relpath), "%s", rel);
+      }
       if (bucket_add_pid(b, pid) < 0)
         goto oom;
       if (pid_uid_is_root(proc_root, pid))

@@ -20,4 +20,16 @@ int job_sched_affinity_read_online(cpu_set_t **out_set, size_t *out_size, size_t
 int job_sched_affinity_union_cpulist(const int *pids, size_t npids, int sample_limit, char *out,
                                      size_t out_cap, enum job_cpu_coverage *cov);
 
+/*! Return 1 if cpu_dev (decimal CPU index string) is a member of Linux cpulist. */
+int job_sched_affinity_cpu_dev_in_list(const char *cpulist, const char *cpu_dev);
+
+/*! Subtract claimed cpulists from online_list; write remainder cpulist to out.
+ *  Pure string helper for tests; empty claimed → copy of online_list. */
+int job_sched_affinity_cpulist_subtract(const char *online_list, const char *const *claimed,
+                                        size_t nclaimed, char *out, size_t out_cap);
+
+/*! online CPUs minus union of claimed job cpulists → out (node-wide remainder). */
+int job_sched_affinity_remainder_cpulist(const char *const *claimed, size_t nclaimed, char *out,
+                                         size_t out_cap);
+
 #endif

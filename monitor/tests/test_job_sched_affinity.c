@@ -74,10 +74,38 @@ static void test_full_resource_table(void)
   assert(job_gpu_set_exact_equal(&granted, &available));
 }
 
+static void test_cpu_dev_in_list(void)
+{
+  assert(job_sched_affinity_cpu_dev_in_list("0-2,4", "0") == 1);
+  assert(job_sched_affinity_cpu_dev_in_list("0-2,4", "2") == 1);
+  assert(job_sched_affinity_cpu_dev_in_list("0-2,4", "4") == 1);
+  assert(job_sched_affinity_cpu_dev_in_list("0-2,4", "3") == 0);
+  assert(job_sched_affinity_cpu_dev_in_list("", "0") == 0);
+  assert(job_sched_affinity_cpu_dev_in_list("0-2", "cpu0") == 0);
+  assert(job_sched_affinity_cpu_dev_in_list(NULL, "0") == 0);
+}
+
+static void test_cpulist_subtract(void)
+{
+  char out[128];
+  const char *claimed[] = {"0-1", "3"};
+
+  assert(job_sched_affinity_cpulist_subtract("0-7", claimed, 2, out, sizeof(out)) == 0);
+  assert(strstr(out, "2") != NULL);
+  assert(strstr(out, "4") != NULL);
+  assert(strstr(out, "7") != NULL);
+  assert(job_sched_affinity_cpu_dev_in_list(out, "0") == 0);
+  assert(job_sched_affinity_cpu_dev_in_list(out, "1") == 0);
+  assert(job_sched_affinity_cpu_dev_in_list(out, "3") == 0);
+  assert(job_sched_affinity_cpu_dev_in_list(out, "2") == 1);
+}
+
 int main(void)
 {
   test_union_cpulist();
   test_full_resource_table();
+  test_cpu_dev_in_list();
+  test_cpulist_subtract();
   printf("test_job_sched_affinity: ok\n");
   return 0;
 }

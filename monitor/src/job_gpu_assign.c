@@ -377,6 +377,35 @@ void job_gpu_set_union(const struct job_gpu_set *a, const struct job_gpu_set *b,
   set_sort_unique(out);
 }
 
+void job_gpu_set_diff(const struct job_gpu_set *universe, const struct job_gpu_set *subtract,
+                      struct job_gpu_set *out)
+{
+  size_t i;
+  size_t j;
+
+  if (out == NULL)
+    return;
+  memset(out, 0, sizeof(*out));
+  if (universe == NULL)
+    return;
+  out->inventory_known = universe->inventory_known;
+  for (i = 0; i < universe->n; i++) {
+    int found = 0;
+
+    if (subtract != NULL) {
+      for (j = 0; j < subtract->n; j++) {
+        if (strcmp(universe->devs[i], subtract->devs[j]) == 0) {
+          found = 1;
+          break;
+        }
+      }
+    }
+    if (!found)
+      set_add_dev(out, universe->devs[i]);
+  }
+  set_sort_unique(out);
+}
+
 int job_gpu_assign_available(struct job_gpu_set *available)
 {
   if (available == NULL)

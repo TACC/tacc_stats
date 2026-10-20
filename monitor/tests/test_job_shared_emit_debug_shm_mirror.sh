@@ -46,4 +46,21 @@ grep -q 'stats_buffer_debug_shm_burst_commit' "${SRC}" \
     exit 1
   }
 
+# |J|>=2 host '-' must emit unscheduled GPUs (remainder) and affinity-split CPUs.
+grep -q 'job_gpu_set_diff' "${SRC}" \
+  || {
+    echo "job_shared_emit must compute GPU remainder via job_gpu_set_diff" >&2
+    exit 1
+  }
+grep -q 'job_sched_affinity_remainder_cpulist' "${SRC}" \
+  || {
+    echo "job_shared_emit must compute CPU remainder via job_sched_affinity_remainder_cpulist" >&2
+    exit 1
+  }
+grep -q 'is_cpu_type' "${SRC}" \
+  || {
+    echo "job_shared_emit must filter host_cpu/host_cpu_hw by affinity" >&2
+    exit 1
+  }
+
 echo "test_job_shared_emit_debug_shm_mirror passed"

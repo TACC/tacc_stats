@@ -253,8 +253,7 @@ void stats_buffer_debug_shm_burst_commit(enum stats_row_tier tier)
     return;
   }
 
-  if (g_burst_truncated &&
-      stats_buffer_debug_shm_burst_reserve(sizeof(trunc_note) - 1) == 0) {
+  if (g_burst_truncated && stats_buffer_debug_shm_burst_reserve(sizeof(trunc_note) - 1) == 0) {
     memcpy(g_burst_data + g_burst_len, trunc_note, sizeof(trunc_note) - 1);
     g_burst_len += sizeof(trunc_note) - 1;
   }

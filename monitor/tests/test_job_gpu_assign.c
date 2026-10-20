@@ -67,6 +67,32 @@ static void test_nvml_grant_and_off(void)
   unlink(gres);
 }
 
+static void test_set_diff(void)
+{
+  struct job_gpu_set avail = {.n = 0, .inventory_known = 1};
+  struct job_gpu_set claimed = {.n = 0, .inventory_known = 0};
+  struct job_gpu_set rem;
+
+  snprintf(avail.devs[0], JOB_GPU_DEV_STR, "0");
+  snprintf(avail.devs[1], JOB_GPU_DEV_STR, "1");
+  snprintf(avail.devs[2], JOB_GPU_DEV_STR, "2");
+  snprintf(avail.devs[3], JOB_GPU_DEV_STR, "3");
+  avail.n = 4;
+  snprintf(claimed.devs[0], JOB_GPU_DEV_STR, "0");
+  snprintf(claimed.devs[1], JOB_GPU_DEV_STR, "1");
+  snprintf(claimed.devs[2], JOB_GPU_DEV_STR, "2");
+  claimed.n = 3;
+
+  job_gpu_set_diff(&avail, &claimed, &rem);
+  assert(rem.inventory_known == 1);
+  assert(rem.n == 1);
+  assert(strcmp(rem.devs[0], "3") == 0);
+
+  job_gpu_set_diff(&avail, &avail, &rem);
+  assert(rem.n == 0);
+  assert(rem.inventory_known == 1);
+}
+
 static void test_wire_and_equal(void)
 {
   struct job_gpu_set a = {.n = 0, .inventory_known = 1};
@@ -89,6 +115,7 @@ static void test_wire_and_equal(void)
 int main(void)
 {
   test_nvml_grant_and_off();
+  test_set_diff();
   test_wire_and_equal();
   printf("test_job_gpu_assign: ok\n");
   return 0;

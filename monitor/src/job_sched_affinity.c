@@ -238,3 +238,174 @@ int job_sched_affinity_union_cpulist(const int *pids, size_t npids, int sample_l
   CPU_FREE(online);
   return 0;
 }
+
+int job_sched_affinity_cpu_dev_in_list(const char *cpulist, const char *cpu_dev)
+{
+  char *end = NULL;
+  long cpu;
+  const char *p;
+
+  if (cpulist == NULL || cpulist[0] == '\0' || cpu_dev == NULL || cpu_dev[0] == '\0')
+    return 0;
+  errno = 0;
+  cpu = strtol(cpu_dev, &end, 10);
+  if (end == cpu_dev || *end != '\0' || errno || cpu < 0)
+    return 0;
+  p = cpulist;
+  while (*p) {
+    char *e = NULL;
+    long a;
+    long b;
+
+    while (*p == ',' || *p == ' ' || *p == '\t')
+      p++;
+    if (*p == '\0')
+      break;
+    a = strtol(p, &e, 10);
+    if (e == p || a < 0)
+      return 0;
+    p = e;
+    if (*p == '-') {
+      p++;
+      b = strtol(p, &e, 10);
+      if (e == p || b < a)
+        return 0;
+      p = e;
+    } else {
+      b = a;
+    }
+    if (cpu >= a && cpu <= b)
+      return 1;
+  }
+  return 0;
+}
+
+int job_sched_affinity_cpulist_subtract(const char *online_list, const char *const *claimed,
+                                        size_t nclaimed, char *out, size_t out_cap)
+{
+  cpu_set_t *online = NULL;
+  cpu_set_t *claim = NULL;
+  size_t ncpus = 1024;
+  size_t i;
+  long max_cpu = -1;
+  const char *p;
+
+  if (out == NULL || out_cap == 0)
+    return -1;
+  out[0] = '\0';
+  if (online_list == NULL || online_list[0] == '\0')
+    return -1;
+
+  /* Bound ncpus from the highest index referenced in any list. */
+  p = online_list;
+  while (*p) {
+    char *e = NULL;
+    long v;
+
+    while (*p == ',' || *p == ' ' || *p == '-' || *p == '\t' || *p == '\n')
+      p++;
+    if (*p == '\0')
+      break;
+    v = strtol(p, &e, 10);
+    if (e == p)
+      break;
+    if (v > max_cpu)
+      max_cpu = v;
+    p = e;
+  }
+  if (claimed != NULL) {
+    for (i = 0; i < nclaimed; i++) {
+      if (claimed[i] == NULL)
+        continue;
+      p = claimed[i];
+      while (*p) {
+        char *e = NULL;
+        long v;
+
+        while (*p == ',' || *p == ' ' || *p == '-' || *p == '\t' || *p == '\n')
+          p++;
+        if (*p == '\0')
+          break;
+        v = strtol(p, &e, 10);
+        if (e == p)
+          break;
+        if (v > max_cpu)
+          max_cpu = v;
+        p = e;
+      }
+    }
+  }
+  if (max_cpu >= 0 && (size_t)max_cpu + 1 > ncpus)
+    ncpus = (size_t)max_cpu + 1;
+  if (ncpus < 1024)
+    ncpus = 1024;
+
+  online = CPU_ALLOC(ncpus);
+  claim = CPU_ALLOC(ncpus);
+  if (online == NULL || claim == NULL) {
+    CPU_FREE(online);
+    CPU_FREE(claim);
+    return -1;
+  }
+  if (parse_cpulist_into(online_list, online, ncpus) < 0) {
+    CPU_FREE(online);
+    CPU_FREE(claim);
+    return -1;
+  }
+  CPU_ZERO_S(CPU_ALLOC_SIZE(ncpus), claim);
+  if (claimed != NULL) {
+    for (i = 0; i < nclaimed; i++) {
+      cpu_set_t *tmp;
+
+      if (claimed[i] == NULL || claimed[i][0] == '\0')
+        continue;
+      tmp = CPU_ALLOC(ncpus);
+      if (tmp == NULL) {
+        CPU_FREE(online);
+        CPU_FREE(claim);
+        return -1;
+      }
+      if (parse_cpulist_into(claimed[i], tmp, ncpus) == 0) {
+        size_t c;
+
+        for (c = 0; c < ncpus; c++) {
+          if (CPU_ISSET_S(c, CPU_ALLOC_SIZE(ncpus), tmp))
+            CPU_SET_S(c, CPU_ALLOC_SIZE(ncpus), claim);
+        }
+      }
+      CPU_FREE(tmp);
+    }
+  }
+  for (i = 0; i < ncpus; i++) {
+    if (CPU_ISSET_S(i, CPU_ALLOC_SIZE(ncpus), claim))
+      CPU_CLR_S(i, CPU_ALLOC_SIZE(ncpus), online);
+  }
+  if (format_cpulist(online, ncpus, out, out_cap) < 0) {
+    CPU_FREE(online);
+    CPU_FREE(claim);
+    return -1;
+  }
+  CPU_FREE(online);
+  CPU_FREE(claim);
+  return 0;
+}
+
+int job_sched_affinity_remainder_cpulist(const char *const *claimed, size_t nclaimed, char *out,
+                                         size_t out_cap)
+{
+  char online_buf[4096];
+  FILE *f;
+
+  if (out == NULL || out_cap == 0)
+    return -1;
+  out[0] = '\0';
+  f = fopen("/sys/devices/system/cpu/online", "re");
+  if (f == NULL)
+    return -1;
+  if (fgets(online_buf, sizeof(online_buf), f) == NULL) {
+    fclose(f);
+    return -1;
+  }
+  fclose(f);
+  return job_sched_affinity_cpulist_subtract(online_buf, claimed, nclaimed, out, out_cap);
+}
