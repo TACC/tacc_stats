@@ -1,5 +1,5 @@
 ---
-description: How static bundle configure flags map to collectors (IB sysfs vs MAD, GPU, Stampede3/LS6 fleet)
+description: How static bundle configure flags map to collectors (IB sysfs vs MAD, GPU, Stampede3/LS6/Horizon fleet)
 globs:
   - HPCPerfStats/monitor/scripts/build_static_bundle.sh
   - HPCPerfStats/monitor/configure.ac
@@ -26,8 +26,12 @@ alwaysApply: false
   - **intel-gpu on aarch64:** static bundle does **not** auto `--enable-intel-gpu` from vendored XPUM alone; requires fleet, or **`HPCS_BUNDLE_ENABLE_INTEL_GPU=1`**. x86 keeps vendored-header auto-enable.
 - **Lonestar6 one-build RPM**:
   - Entrypoint: **`scripts/prepare_rpmbuild_ls6.sh`** → same **`prepare_rpmbuild_dirs.sh`** footer pattern as Stampede3.
-  - Fleet signal (opt-in only): **`HPCS_BUNDLE_FLEET=ls6`** and/or **`scripts/fleet/ls6.force`** (created by prepare; embedded by **`dist-hook`**; never commit). Explicit **`HPCS_BUNDLE_FLEET`** wins if both fleet markers exist.
+  - Fleet signal (opt-in only): **`HPCS_BUNDLE_FLEET=ls6`** and/or **`scripts/fleet/ls6.force`** (created by prepare; embedded by **`dist-hook`**; never commit). Explicit **`HPCS_BUNDLE_FLEET`** wins if multiple fleet markers exist.
   - Matrix: `--enable-ib-mad-dlopen`, `--disable-amd-gpu`, **`--disable-intel-gpu`** (forced even when vendored XPUM headers exist on x86); **do not** `--enable-opa-mad-dlopen`; never auto `--disable-infiniband`. NVIDIA stays on default x86 DCGM runtime-dlopen (covers `a100`; idle on CPU-only `genoa`/`milan`).
+- **Horizon one-build RPM** (first shared-node fleet):
+  - Entrypoint: **`scripts/prepare_rpmbuild_horizon.sh`** → same **`prepare_rpmbuild_dirs.sh`** footer pattern.
+  - Fleet signal (opt-in only): **`HPCS_BUNDLE_FLEET=horizon`** and/or **`scripts/fleet/horizon.force`** (created by prepare; embedded by **`dist-hook`**; never commit).
+  - Matrix: **`--enable-shared-node-multi-jid`**, `--enable-ib-mad-dlopen`, `--disable-amd-gpu`, **`--disable-intel-gpu`**; **do not** `--enable-opa-mad-dlopen`; never auto `--disable-infiniband`. Deploy consumer (listend) before Horizon shared-node monitor RPMs.
 - **GPU paths**: NVIDIA vs AMD have separate disable flags; **`--disable-gpu`** vs vendor-specific options must stay consistent with **`configure.ac`** and **`build_static_bundle.sh`**.
 - **CPU counters / DCGM / LIKWID**: x86 uses exclusive LIKWID; aarch64 `auto` uses DCGM util/power plus LIKWID overlay (`MONITOR_CPU_LIKWID_OVERLAY`; CYC+INS). Bundle builds LIKWID static archives on **both** arches. See **monitor-dcgm-integration** and **monitor-likwid-overlay** when touching `cpu_counter_metrics*`.
 - **Docs**: If behavior changes, update **`README.md`** or packaging notes per **monitor-readme-maintenance** when user-visible flags or outputs change.

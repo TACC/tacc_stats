@@ -26,6 +26,7 @@ Configure selects sources via Automake conditionals; use **`./configure --help`*
 - **Shared-node build:** discovers Slurm jids from `/proc` (`slurmstepd.scope` + `SLURM_JOB_ID`), emits one RabbitMQ sample per jid with `%jobs` / `%affinity` from read-only `sched_getaffinity`. A sole jid that owns every online CPU and every available GPU uses the ordinary unmarked single-jid payload. Does **not** read `stats_jobid` and never execs `scontrol` / `nvidia-smi`.
 - **`host_mem_job`:** per-jid cgroup memory at `slurmstepd.scope/<token>/` (`memory.current` / `peak` / `stat`), device `j:<jid>`, KEYS overlap a subset of `host_mem` (`mem_used`, `anon_pages`, …) plus `mem_peak` (`U=KB`). Not full NUMA `host_mem` parity. Present on jid payloads (including full-resource unmarked); omitted on `-`. Override cgroup root in tests: `HPCPERFSTATS_CGROUP_ROOT`.
 - **Deploy:** upgrade consumer (listend) **before** shared-node monitor RPMs on shared fleets. Conf keys (shared build only): `jid_require_step_id`, `jid_discover_pid_cap`, `affinity_pid_sample_limit`.
+- **Horizon RPM (first shared fleet):** `./scripts/prepare_rpmbuild_horizon.sh` then the printed `rpmbuild -ba …` footer (`HPCS_BUNDLE_FLEET=horizon` / `scripts/fleet/horizon.force` — never commit the force file).
 - Verify shared flavor: `./scripts/run_shared_node_static_check.sh` (or `./scripts/build_static_bundle.sh --enable-shared-node-multi-jid` then `make -C .build-static check`).
 
 ### Omni-Path / Cornelis (`host_opa`)
@@ -82,6 +83,20 @@ are vendored for a future Vista path; the Stampede3 wrapper rejects `gg`/`gh`.
 
 **Horizon LSPCI fixtures (inventory):** `tests/fixtures/horizon_lspci_profiles/gb`
 (GB200 / HGX) are vendored for roofline / fleet inventory; not wired into Stampede3 shm validate.
+
+### Horizon one-build RPM (shared-node)
+
+First fleet with **`--enable-shared-node-multi-jid`** (`%jobs` / `%affinity` / `host_mem_job`). aarch64 Grace + GB200; IB MAD dlopen; no OPA / AMD / Intel GPU collectors.
+
+```bash
+cd HPCPerfStats/monitor
+./scripts/prepare_rpmbuild_horizon.sh              # or --debug-build
+rpmbuild -ba --define "_topdir ${PWD}/rpmbuild" "${PWD}/rpmbuild/SPECS/hpcperfstats.spec"
+```
+
+Fleet matrix (opt-in via `prepare_rpmbuild_horizon.sh`: `HPCS_BUNDLE_FLEET=horizon` and/or `scripts/fleet/horizon.force` — never commit the force file): `--enable-shared-node-multi-jid`, `--enable-ib-mad-dlopen`, `--disable-amd-gpu`, `--disable-intel-gpu`. Does **not** enable OPA MAD. Never auto `--disable-infiniband`. Binary `NEEDED` must not list `libibmad`. **Deploy listend before** installing this RPM on Horizon.
+
+LSPCI dumps: `tests/fixtures/horizon_lspci_profiles/gb`.
 
 ### Lonestar6 one-build RPM
 

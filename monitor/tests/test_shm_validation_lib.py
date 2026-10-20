@@ -1361,6 +1361,41 @@ class EmitBuildCapabilitiesFleetTests(unittest.TestCase):
                 features={"GPU"},
             )
         )
+        self.assertIsNone(
+            ebc._fleet_ls6(
+                ib_mad_dlopen=True,
+                opa_mad_dlopen=False,
+                features={"GPU"},
+                shared_node=True,
+            )
+        )
+
+    def test_fleet_horizon_signature(self) -> None:
+        self.assertEqual(
+            ebc._fleet_horizon(
+                ib_mad_dlopen=True,
+                opa_mad_dlopen=False,
+                features={"GPU"},
+                shared_node=True,
+            ),
+            "horizon",
+        )
+        self.assertIsNone(
+            ebc._fleet_horizon(
+                ib_mad_dlopen=True,
+                opa_mad_dlopen=False,
+                features={"GPU"},
+                shared_node=False,
+            )
+        )
+        self.assertIsNone(
+            ebc._fleet_horizon(
+                ib_mad_dlopen=True,
+                opa_mad_dlopen=True,
+                features={"GPU"},
+                shared_node=True,
+            )
+        )
 
     def test_parse_makefile_dyn_macros(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -1373,13 +1408,16 @@ class EmitBuildCapabilitiesFleetTests(unittest.TestCase):
                 "-DMONITOR_OPA_MAD_DLOPEN -DMONITOR_CPU_BACKEND_LIKWID -DDEBUG\n",
                 encoding="utf-8",
             )
-            features, cpu, debug, ibdyn, opadyn, overlay = ebc._parse_src_makefile(td)
+            features, cpu, debug, ibdyn, opadyn, overlay, shared = ebc._parse_src_makefile(
+                td
+            )
             self.assertIn("INTEL_GPU", features)
             self.assertTrue(ibdyn)
             self.assertTrue(opadyn)
             self.assertTrue(debug)
             self.assertEqual(cpu, "likwid")
             self.assertFalse(overlay)
+            self.assertFalse(shared)
 
     def test_parse_makefile_likwid_overlay(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -1390,9 +1428,25 @@ class EmitBuildCapabilitiesFleetTests(unittest.TestCase):
                 "DEFS = -DMONITOR_CPU_BACKEND_DCGM -DMONITOR_CPU_LIKWID_OVERLAY\n",
                 encoding="utf-8",
             )
-            _f, cpu, _d, _i, _o, overlay = ebc._parse_src_makefile(td)
+            _f, cpu, _d, _i, _o, overlay, shared = ebc._parse_src_makefile(td)
             self.assertEqual(cpu, "dcgm")
             self.assertTrue(overlay)
+            self.assertFalse(shared)
+
+    def test_parse_makefile_shared_node(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            td = Path(tmp)
+            src = td / "src"
+            src.mkdir()
+            (src / "Makefile").write_text(
+                "DEFS = -DMONITOR_WITH_GPU -DMONITOR_IB_MAD_DLOPEN "
+                "-DMONITOR_SHARED_NODE_MULTI_JID\n",
+                encoding="utf-8",
+            )
+            _f, _c, _d, ibdyn, opadyn, _o, shared = ebc._parse_src_makefile(td)
+            self.assertTrue(ibdyn)
+            self.assertFalse(opadyn)
+            self.assertTrue(shared)
 
 
 if __name__ == "__main__":

@@ -89,10 +89,10 @@ STATIC_BUNDLE_FEAT_FLAGS=()
 # Stampede3 fleet: HPCS_BUNDLE_FLEET=stampede3 (prepare_rpmbuild_stampede3.sh) and/or
 # scripts/fleet/stampede3.force when that prepare created it and dist-hook embedded it.
 # Default prepare must not ship the force file (opt-in only; never commit the marker).
-# Explicit HPCS_BUNDLE_FLEET wins when both fleet markers exist.
+# Explicit HPCS_BUNDLE_FLEET wins when multiple fleet markers exist.
 fleet_stampede3_enabled() {
   case "${HPCS_BUNDLE_FLEET:-}" in
-  ls6) return 1 ;;
+  ls6 | horizon) return 1 ;;
   stampede3) return 0 ;;
   esac
   test -f "${MONITOR_DIR}/scripts/fleet/stampede3.force"
@@ -102,17 +102,28 @@ fleet_stampede3_enabled() {
 # scripts/fleet/ls6.force when that prepare created it and dist-hook embedded it.
 fleet_ls6_enabled() {
   case "${HPCS_BUNDLE_FLEET:-}" in
-  stampede3) return 1 ;;
+  stampede3 | horizon) return 1 ;;
   ls6) return 0 ;;
   esac
   test -f "${MONITOR_DIR}/scripts/fleet/ls6.force"
 }
 
+# Horizon fleet: HPCS_BUNDLE_FLEET=horizon (prepare_rpmbuild_horizon.sh) and/or
+# scripts/fleet/horizon.force when that prepare created it and dist-hook embedded it.
+# First shared-node multi-jid fleet (--enable-shared-node-multi-jid).
+fleet_horizon_enabled() {
+  case "${HPCS_BUNDLE_FLEET:-}" in
+  stampede3 | ls6) return 1 ;;
+  horizon) return 0 ;;
+  esac
+  test -f "${MONITOR_DIR}/scripts/fleet/horizon.force"
+}
+
 # Vendored XPUM headers alone must not enable intel_gpu on aarch64 (Grace/Vista).
 # Enable when: Stampede3 fleet, x86 build host, or HPCS_BUNDLE_ENABLE_INTEL_GPU=1.
-# Lonestar6 fleet never auto-enables (no Intel PVC); see fleet_ls6 branch.
+# Lonestar6 / Horizon fleets never auto-enable (no Intel PVC); see fleet branches.
 intel_gpu_bundle_auto_enable() {
-  if fleet_ls6_enabled; then
+  if fleet_ls6_enabled || fleet_horizon_enabled; then
     return 1
   fi
   if fleet_stampede3_enabled; then
@@ -340,6 +351,13 @@ static_bundle_print_detection_summary() {
     STATIC_BUNDLE_FEAT_FLAGS+=(--enable-ib-mad-dlopen)
     STATIC_BUNDLE_FEAT_FLAGS+=(--disable-amd-gpu)
     amd_ok="disabled (Lonestar6 profiles have no AMD GPUs)"
+  elif fleet_horizon_enabled; then
+    ib_ok="fleet-dlopen (Horizon; vendored ibmad-shim; no -libmad)"
+    opa_ok="not enabled (Horizon has no OPA/Cornelis)"
+    STATIC_BUNDLE_FEAT_FLAGS+=(--enable-ib-mad-dlopen)
+    STATIC_BUNDLE_FEAT_FLAGS+=(--disable-amd-gpu)
+    STATIC_BUNDLE_FEAT_FLAGS+=(--enable-shared-node-multi-jid)
+    amd_ok="disabled (Horizon profiles have no AMD GPUs)"
   else
     if monitor_probe_infiniband_stack; then
       ib_ok=detected
@@ -385,9 +403,12 @@ EOF
   fi
 
   # Intel GPU: vendored XPUM headers + arch/fleet/opt-in gate (see intel_gpu_bundle_auto_enable).
-  # Lonestar6 fleet always disables intel_gpu (no PVC), even when XPUM headers exist on x86.
+  # Lonestar6 / Horizon fleets always disable intel_gpu (no PVC), even when XPUM headers exist.
   if fleet_ls6_enabled; then
     intel_ok="disabled (Lonestar6 fleet; no Intel PVC)"
+    STATIC_BUNDLE_FEAT_FLAGS+=(--disable-intel-gpu)
+  elif fleet_horizon_enabled; then
+    intel_ok="disabled (Horizon fleet; NVIDIA GB200 only)"
     STATIC_BUNDLE_FEAT_FLAGS+=(--disable-intel-gpu)
   elif test -f "${MONITOR_DIR}/third_party/intel-xpum/xpum_api.h" && intel_gpu_bundle_auto_enable; then
     intel_ok="vendored-hdr (runtime libxpum dlopen)"
@@ -409,6 +430,8 @@ EOF
     printf '%-36s %s\n' "Fleet matrix:" "stampede3 (HPCS_BUNDLE_FLEET or scripts/fleet/stampede3.force)"
   elif fleet_ls6_enabled; then
     printf '%-36s %s\n' "Fleet matrix:" "ls6 (HPCS_BUNDLE_FLEET or scripts/fleet/ls6.force)"
+  elif fleet_horizon_enabled; then
+    printf '%-36s %s\n' "Fleet matrix:" "horizon (HPCS_BUNDLE_FLEET or scripts/fleet/horizon.force; shared-node)"
   else
     printf '%-36s %s\n' "Fleet matrix:" "(none)"
   fi

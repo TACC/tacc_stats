@@ -33,6 +33,8 @@ alwaysApply: false
 - `make capabilities` in configured build tree; `BUILT_SOURCES` regenerates the header before linking `hpcperfstatsd`; `build_static_bundle.sh` invokes `make capabilities` unless `SKIP_CAPABILITIES=1`.
 - Slug tokens (omit absent): `arch`, `ver`, `debug`, `hw`, `ib`, `ibdyn`, `nvgpu`, `amdgpu`, `intelgpu`, `lustre`, `opa`, `opadyn`, `dcgm|likwid|none`, `slowtier0|slowtier1`.
 - Stampede3 fleet signature → JSON `fleet: "stampede3"` when `ib_mad_dlopen` + `opa_mad_dlopen` + `intel_gpu` and not `amd_gpu` (not a slug token).
+- Lonestar6 → `fleet: "ls6"` when `ib_mad_dlopen` and not `opa_mad_dlopen` / `intel_gpu` / `amd_gpu` / `shared_node`.
+- Horizon → `fleet: "horizon"` when `shared_node_multi_jid` + same IB/GPU shape as ls6 (first shared-node fleet).
 - **Fixtures** use slug in filename: `expectations_<slug>.json`, `tests/expected/shm_{schema,fast,full}_<slug>.txt`.
 - **Profile-scoped** (Stampede3 one-binary × queue): `expectations_<slug>__<profile>.json`, `shm_*_<slug>__<profile>.txt` — profile is host/run identity, not compile identity.
 - Validator **layer 0**: manifest slug must match capabilities JSON; exit 2 on mismatch. Optional `$build` in schema body must match manifest when present.

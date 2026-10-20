@@ -45,7 +45,7 @@ if echo "${fleet_flags}" | grep -q -- '--disable-infiniband'; then
   exit 1
 fi
 
-# Without fleet env and without stampede3.force / ls6.force, do not apply MAD dlopen matrix.
+# Without fleet env and without stampede3/ls6/horizon.force, do not apply MAD dlopen matrix.
 if test -f ./scripts/fleet/stampede3.force; then
   echo "scripts/fleet/stampede3.force must not be present for default-flag regression" >&2
   exit 1
@@ -54,12 +54,20 @@ if test -f ./scripts/fleet/ls6.force; then
   echo "scripts/fleet/ls6.force must not be present for default-flag regression" >&2
   exit 1
 fi
+if test -f ./scripts/fleet/horizon.force; then
+  echo "scripts/fleet/horizon.force must not be present for default-flag regression" >&2
+  exit 1
+fi
 if echo "${flags}" | grep -q -- '--enable-ib-mad-dlopen'; then
   echo "default prepare must not pass --enable-ib-mad-dlopen without fleet" >&2
   exit 1
 fi
 if echo "${flags}" | grep -q -- '--enable-opa-mad-dlopen'; then
   echo "default prepare must not pass --enable-opa-mad-dlopen without fleet" >&2
+  exit 1
+fi
+if echo "${flags}" | grep -q -- '--enable-shared-node-multi-jid'; then
+  echo "default prepare must not pass --enable-shared-node-multi-jid without fleet" >&2
   exit 1
 fi
 
@@ -77,6 +85,29 @@ echo "${ls6_flags}" | grep -q -- '--disable-intel-gpu' \
   || { echo "ls6 fleet must pass --disable-intel-gpu" >&2; exit 1; }
 if echo "${ls6_flags}" | grep -q -- '--disable-infiniband'; then
   echo "ls6 fleet must not pass --disable-infiniband" >&2
+  exit 1
+fi
+if echo "${ls6_flags}" | grep -q -- '--enable-shared-node-multi-jid'; then
+  echo "ls6 fleet must not pass --enable-shared-node-multi-jid" >&2
+  exit 1
+fi
+
+# Horizon fleet: shared-node + IB MAD dlopen, no OPA MAD, disable amd+intel GPU.
+horizon_flags="$(HPCS_BUNDLE_FLEET=horizon ./scripts/build_static_bundle.sh --print-configure-flags 2>/dev/null)"
+echo "${horizon_flags}" | grep -q -- '--enable-shared-node-multi-jid' \
+  || { echo "horizon fleet must pass --enable-shared-node-multi-jid" >&2; exit 1; }
+echo "${horizon_flags}" | grep -q -- '--enable-ib-mad-dlopen' \
+  || { echo "horizon fleet must pass --enable-ib-mad-dlopen" >&2; exit 1; }
+if echo "${horizon_flags}" | grep -q -- '--enable-opa-mad-dlopen'; then
+  echo "horizon fleet must not pass --enable-opa-mad-dlopen" >&2
+  exit 1
+fi
+echo "${horizon_flags}" | grep -q -- '--disable-amd-gpu' \
+  || { echo "horizon fleet must pass --disable-amd-gpu" >&2; exit 1; }
+echo "${horizon_flags}" | grep -q -- '--disable-intel-gpu' \
+  || { echo "horizon fleet must pass --disable-intel-gpu" >&2; exit 1; }
+if echo "${horizon_flags}" | grep -q -- '--disable-infiniband'; then
+  echo "horizon fleet must not pass --disable-infiniband" >&2
   exit 1
 fi
 

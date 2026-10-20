@@ -28,6 +28,7 @@ _RE_CPU_BACKEND = re.compile(r"-DMONITOR_CPU_BACKEND_([A-Z]+)")
 _RE_IB_MAD_DLOPEN = re.compile(r"-DMONITOR_IB_MAD_DLOPEN\b")
 _RE_OPA_MAD_DLOPEN = re.compile(r"-DMONITOR_OPA_MAD_DLOPEN\b")
 _RE_LIKWID_OVERLAY = re.compile(r"-DMONITOR_CPU_LIKWID_OVERLAY\b")
+_RE_SHARED_NODE = re.compile(r"-DMONITOR_SHARED_NODE_MULTI_JID\b")
 
 
 def _read_text(path: Path) -> str:
@@ -55,7 +56,7 @@ def _parse_config_log(build_dir: Path) -> dict[str, bool]:
 
 def _parse_src_makefile(
     build_dir: Path,
-) -> tuple[set[str], str | None, bool, bool, bool, bool]:
+) -> tuple[set[str], str | None, bool, bool, bool, bool, bool]:
     text = _read_text(build_dir / "src" / "Makefile")
     features = set(_RE_MONITOR_WITH.findall(text))
     cpu_m = _RE_CPU_BACKEND.search(text)
@@ -64,7 +65,16 @@ def _parse_src_makefile(
     ib_mad_dlopen = bool(_RE_IB_MAD_DLOPEN.search(text))
     opa_mad_dlopen = bool(_RE_OPA_MAD_DLOPEN.search(text))
     likwid_overlay = bool(_RE_LIKWID_OVERLAY.search(text))
-    return features, cpu_backend, debug, ib_mad_dlopen, opa_mad_dlopen, likwid_overlay
+    shared_node = bool(_RE_SHARED_NODE.search(text))
+    return (
+        features,
+        cpu_backend,
+        debug,
+        ib_mad_dlopen,
+        opa_mad_dlopen,
+        likwid_overlay,
+        shared_node,
+    )
 
 
 def _package_version(build_dir: Path) -> str:
@@ -167,8 +177,11 @@ def _fleet_ls6(
     ib_mad_dlopen: bool,
     opa_mad_dlopen: bool,
     features: set[str],
+    shared_node: bool = False,
 ) -> str | None:
     """Return 'ls6' when compiled matrix matches Lonestar6 fleet signature."""
+    if shared_node:
+        return None
     if (
         ib_mad_dlopen
         and not opa_mad_dlopen
@@ -177,6 +190,26 @@ def _fleet_ls6(
         and "AMD_GPU" not in features
     ):
         return "ls6"
+    return None
+
+
+def _fleet_horizon(
+    *,
+    ib_mad_dlopen: bool,
+    opa_mad_dlopen: bool,
+    features: set[str],
+    shared_node: bool,
+) -> str | None:
+    """Return 'horizon' when compiled matrix matches Horizon shared-node fleet."""
+    if (
+        shared_node
+        and ib_mad_dlopen
+        and not opa_mad_dlopen
+        and "GPU" in features
+        and "INTEL_GPU" not in features
+        and "AMD_GPU" not in features
+    ):
+        return "horizon"
     return None
 
 
@@ -196,9 +229,15 @@ def write_capability_slug_header(path: Path, slug: str) -> None:
 
 def emit_capabilities(build_dir: Path, tier: str) -> dict:
     cfg_log = _parse_config_log(build_dir)
-    features, cpu_backend, debug_from_make, ib_mad_dlopen, opa_mad_dlopen, likwid_overlay = (
-        _parse_src_makefile(build_dir)
-    )
+    (
+        features,
+        cpu_backend,
+        debug_from_make,
+        ib_mad_dlopen,
+        opa_mad_dlopen,
+        likwid_overlay,
+        shared_node,
+    ) = _parse_src_makefile(build_dir)
     debug = cfg_log.get("debug", False) or debug_from_make
     version = _package_version(build_dir)
     host_cpu = _host_cpu(build_dir)
@@ -222,10 +261,18 @@ def emit_capabilities(build_dir: Path, tier: str) -> dict:
         features=features,
     )
     if fleet is None:
+        fleet = _fleet_horizon(
+            ib_mad_dlopen=ib_mad_dlopen,
+            opa_mad_dlopen=opa_mad_dlopen,
+            features=features,
+            shared_node=shared_node,
+        )
+    if fleet is None:
         fleet = _fleet_ls6(
             ib_mad_dlopen=ib_mad_dlopen,
             opa_mad_dlopen=opa_mad_dlopen,
             features=features,
+            shared_node=shared_node,
         )
 
     doc: dict = {
@@ -245,6 +292,7 @@ def emit_capabilities(build_dir: Path, tier: str) -> dict:
             "intel_gpu": intel_gpu,
             "ib_mad_dlopen": ib_mad_dlopen,
             "opa_mad_dlopen": opa_mad_dlopen,
+            "shared_node_multi_jid": shared_node,
             "cpu_backend": cpu_backend or "none",
             "likwid_overlay": likwid_overlay,
             "papi_hybrid": likwid_overlay,  # alias for older shm validators

@@ -446,6 +446,7 @@ EXTRA_DIST = hpcperfstats.conf hpcperfstats.service hpcperfstatsd.sysconfig \
 	$(top_srcdir)/scripts/ensure_dotbuild_prefix_static.sh \
 	$(top_srcdir)/scripts/prepare_rpmbuild_stampede3.sh \
 	$(top_srcdir)/scripts/prepare_rpmbuild_ls6.sh \
+	$(top_srcdir)/scripts/prepare_rpmbuild_horizon.sh \
 	$(top_srcdir)/scripts/run_valgrind_check.sh \
 	$(top_srcdir)/scripts/valgrind.supp \
 	$(top_srcdir)/scripts/run_cpp_linter.sh \

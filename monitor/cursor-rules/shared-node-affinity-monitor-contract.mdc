@@ -23,6 +23,7 @@ alwaysApply: false
 - `--enable-shared-node-multi-jid` (default **off**) defines `MONITOR_SHARED_NODE_MULTI_JID`.
 - Shared build: no `stats_jobid` file read / `ev_stat` watcher.
 - Default file build: unchanged; **never** emit `%jobs` / `%affinity`; **no** `host_mem_job` type.
+- **Fleet RPM:** Horizon is the first shared-node cluster — `scripts/prepare_rpmbuild_horizon.sh` (`HPCS_BUNDLE_FLEET=horizon` / `scripts/fleet/horizon.force`) passes the flag via `build_static_bundle.sh`. Deploy listend before Horizon shared-node monitor RPMs.
 
 ## Discovery
 
