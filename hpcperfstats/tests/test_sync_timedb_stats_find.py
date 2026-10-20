@@ -38,8 +38,7 @@ def _assert_fd_x_stat_contract(
   assert argv[argv.index("--threads") + 1] == "4"
   assert "--no-ignore" in argv
   assert "--absolute-path" in argv
-  assert "--batch-size" in argv
-  assert argv[argv.index("--batch-size") + 1] == "1000"
+  assert "--batch-size" not in argv
   assert "-X" in argv
   x_idx = argv.index("-X")
   assert argv[x_idx + 1] == stat_bin
@@ -59,7 +58,7 @@ def _assert_fd_x_stat_contract(
   assert "--exec" not in argv
   assert "--print0" not in argv
   assert "--hidden" not in argv
-  assert x_idx > argv.index("--batch-size")
+  assert not hasattr(sf, "FD_BATCH_SIZE")
 
 
 def test_find_stats_argv_uses_fd_x_gnu_stat():

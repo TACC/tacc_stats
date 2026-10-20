@@ -9,7 +9,6 @@ On macOS host tests, prefer Homebrew ``fd`` via PATH order or
 ``HPCPERFSTATS_FIND_BIN``; the image ships Debian ``fdfind``.
 
 Attributes:
-  FD_BATCH_SIZE: Attribute.
   FD_THREADS: Attribute.
   JID_NEIGHBOR_FILES: Attribute.
   STAT_CURRENT_INODE_PRINTF: Attribute.
@@ -43,7 +42,6 @@ from hpcperfstats.dbload.lib.file_locking import LOCK_SUFFIX
 STAT_PRINTF_FORMAT = "%n\\0%Y\\0%s\\0%i\\0"
 STAT_CURRENT_INODE_PRINTF = "%n\\0%i\\0"
 FD_THREADS = 4
-FD_BATCH_SIZE = 1000
 
 _FNCTL_LOCK_ENOENT_RE = re.compile(
   r"No such file or directory.*\.fnctl\.lock|"
@@ -275,8 +273,6 @@ def _fd_x_stat_argv(
     argv.extend(["--changed-within", f"{int(mtime_days)}d"])
   argv.extend(
     [
-      "--batch-size",
-      str(int(FD_BATCH_SIZE)),
       pattern,
       os.path.abspath(search_path),
       "-X",
