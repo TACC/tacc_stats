@@ -1917,9 +1917,11 @@ def _submit_stats_payload_write(
   """
   from hpcperfstats.dbload.lib.sync_timedb_ingest_write_stage import (
     IngestWritePayload,
+    ingest_write_stage_started,
     submit_ingest_write_and_wait,
   )
 
+  queued = ingest_write_stage_started()
   payload = IngestWritePayload(
     stats_file=stats_file,
     stats=stats,
@@ -1927,6 +1929,8 @@ def _submit_stats_payload_write(
     need_archival=need_archival,
   )
   submit_ingest_write_and_wait(payload)
+  if queued:
+    _apply_ingest_write_timing_from_payload(payload.write_timing)
   err = payload.error
   if err is not None:
     raise err
@@ -2388,6 +2392,47 @@ def _snapshot_ingest_write_timing() -> dict[str, float]:
     out[key] = float(acc.get(key, 0.0))
   out["orm_rows"] = float(_ingest_orm_rows.get())
   return out
+
+
+def _apply_ingest_write_timing_from_payload(
+  timing: dict[str, float] | None,
+) -> None:
+  """
+  Add a write-thread timing snapshot into this thread's per-file ContextVars.
+
+  Does not bump process-wide campaign totals (those were already updated on
+  the write thread during COPY/upsert). Used after
+  ``submit_ingest_write_and_wait`` when the write stage ran on another thread.
+
+  Args:
+    timing (dict[str, float] | None): Snapshot from
+      ``IngestWritePayload.write_timing``, or ``None``/empty to no-op.
+
+  Returns:
+    None
+
+  Examples:
+    >>> _reset_ingest_write_timing(enabled=True)
+    >>> _apply_ingest_write_timing_from_payload({"postgres_s": 0.1})
+    >>> _snapshot_ingest_write_timing()["postgres_s"] >= 0.1
+    True
+  """
+  if not timing:
+    return
+  pg = float(timing.get("postgres_s", 0.0) or 0.0)
+  if pg > 0.0:
+    _ingest_postgres_s.set(float(_ingest_postgres_s.get()) + pg)
+  if not _ingest_write_telem_on:
+    return
+  acc = dict(_ingest_write_phases_acc())
+  for key in INGEST_WRITE_LOG_KEYS:
+    delta = float(timing.get(key, 0.0) or 0.0)
+    if delta > 0.0:
+      acc[key] = float(acc.get(key, 0.0)) + delta
+  _ingest_write_phases.set(acc)
+  orm = float(timing.get("orm_rows", 0.0) or 0.0)
+  if orm > 0.0:
+    _ingest_orm_rows.set(int(_ingest_orm_rows.get()) + int(orm))
 
 
 def _snapshot_ingest_write_campaign_timing() -> dict[str, float]:

@@ -59,6 +59,8 @@ class IngestWritePayload:
     error: Exception from the write path, or None.
     archival_out: Archive-needed flag after the write.
     ingest_ok: True when the write succeeded.
+    write_timing: Snapshot of write-thread ContextVar timers for the
+      parse thread to apply after ``done`` (empty when unset).
   """
 
   stats_file: str
@@ -70,6 +72,7 @@ class IngestWritePayload:
   error: BaseException | None = None
   archival_out: bool = True
   ingest_ok: bool = False
+  write_timing: dict[str, float] = field(default_factory=dict)
 
 
 def record_put_block_wait(wait_s: float) -> None:
@@ -305,9 +308,27 @@ def submit_ingest_write_and_wait(
   return payload
 
 
+def ingest_write_stage_started() -> bool:
+  """
+  Return True when the long-lived write stage is running.
+
+  Returns:
+    bool: True after a successful ``start_ingest_write_stage``.
+
+  Examples:
+    >>> isinstance(ingest_write_stage_started(), bool)
+    True
+  """
+  return bool(_STARTED)
+
+
 def _execute_write_payload(payload: IngestWritePayload) -> None:
   """
   Run COPY/upsert for one payload and set ``done``.
+
+  When the write stage is started, isolate write-thread ContextVar timers
+  onto ``payload.write_timing`` so the parse thread can apply them after
+  ``done`` without ambient cross-thread ContextVar leakage.
 
   Args:
     payload (IngestWritePayload): Work unit.
@@ -319,18 +340,33 @@ def _execute_write_payload(payload: IngestWritePayload) -> None:
     >>> callable(_execute_write_payload)
     True
   """
+  isolate = bool(_STARTED)
   try:
-    from hpcperfstats.dbload.sync_timedb import _write_stats_payload_to_db
-
-    _path, archival, ok = _write_stats_payload_to_db(
-      payload.stats_file,
-      payload.stats,
-      payload.proc_stats,
-      need_archival=payload.need_archival,
+    from hpcperfstats.dbload.sync_timedb import (
+      _reset_ingest_write_timing,
+      _snapshot_ingest_write_timing,
+      _write_stats_payload_to_db,
     )
-    del _path
-    payload.archival_out = bool(archival)
-    payload.ingest_ok = bool(ok)
+
+    if isolate:
+      _reset_ingest_write_timing()
+    try:
+      _path, archival, ok = _write_stats_payload_to_db(
+        payload.stats_file,
+        payload.stats,
+        payload.proc_stats,
+        need_archival=payload.need_archival,
+      )
+      del _path
+      payload.archival_out = bool(archival)
+      payload.ingest_ok = bool(ok)
+    except BaseException as exc:
+      payload.error = exc
+      payload.ingest_ok = False
+    finally:
+      payload.write_timing = dict(_snapshot_ingest_write_timing())
+      if isolate:
+        _reset_ingest_write_timing()
   except BaseException as exc:
     payload.error = exc
     payload.ingest_ok = False
