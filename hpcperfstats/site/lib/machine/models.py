@@ -293,6 +293,11 @@ class host_data(models.Model):
         fields=["jid", "type", "event", "time"],
         name="host_data_jid_type_ev_time_idx",
       ),
+      models.Index(
+        fields=["dev"],
+        name="host_data_dev_j_prefix_idx",
+        condition=Q(dev__startswith="j:"),
+      ),
     ]
 
 

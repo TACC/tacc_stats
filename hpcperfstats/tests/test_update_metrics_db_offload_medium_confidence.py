@@ -59,6 +59,44 @@ def test_live_distinct_host_time_count_compose_seed():
 
 
 @pytest.mark.django_db(transaction=True)
+def test_jid_scoped_distinct_union_parity_jid_dev_and_both():
+  """0038 UNION: jid-only, dev=j: only, and both must not double-count."""
+  oracles.skip_unless_compose_db()
+  from hpcperfstats.analysis.metrics.lib.metrics_host_data_sql import (
+    jid_scoped_distinct_host_time_count,
+  )
+  from hpcperfstats.site.lib.machine.models import host_data, job_data
+
+  start = datetime(2026, 8, 1, 12, 0, tzinfo=UTC)
+  end = start + timedelta(hours=1)
+  host = "n-union.dboff.test"
+  t0 = start + timedelta(minutes=5)
+  t1 = start + timedelta(minutes=10)
+
+  cases = (
+    ("920010", "920010", "", 2),
+    ("920011", None, "j:920011", 2),
+    ("920012", "920012", "j:920012", 2),
+  )
+  for jid, row_jid, row_dev, expect in cases:
+    host_data.objects.filter(host=host).delete()
+    job_data.objects.filter(jid=jid).delete()
+    oracles.seed_minimal_job(jid=jid, start=start, end=end, host_list=[host])
+    for ts in (t0, t1):
+      host_data.objects.create(
+        jid=row_jid,
+        host=host,
+        time=ts,
+        type="cpu_counter_metrics",
+        event="APERF",
+        dev=row_dev,
+        unit="count",
+        value=1.0,
+      )
+    assert jid_scoped_distinct_host_time_count(jid, start, end) == expect
+
+
+@pytest.mark.django_db(transaction=True)
 def test_strided_distinct_times_db_function_matches_grouped_max_sql():
   oracles.skip_unless_compose_db()
   from hpcperfstats.analysis.metrics.lib.gen import jid_table as jt_mod

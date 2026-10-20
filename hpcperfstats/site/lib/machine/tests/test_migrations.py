@@ -252,6 +252,36 @@ def test_0032_restores_compression_policy_8d():
   assert "compress_after => INTERVAL '8d'" in sql
 
 
+def test_0038_host_data_dev_j_prefix_idx_contracts():
+  """Partial j: index + UNION live-distinct (no OR body; timeout 0 create)."""
+  mod = importlib.import_module(
+    "hpcperfstats.site.lib.machine.migrations.0038_host_data_dev_j_prefix_idx"
+  )
+  assert mod.Migration.dependencies == [
+    ("machine", "0037_jid_scoped_distinct_or_dev"),
+  ]
+  assert mod.Migration.atomic is False
+  assert len(mod.Migration.operations) == 2
+  sep = mod.Migration.operations[0]
+  assert isinstance(sep, migrations.SeparateDatabaseAndState)
+  db_sql = "\n".join(
+    op.sql
+    for op in sep.database_operations
+    if isinstance(op, migrations.RunSQL) and isinstance(op.sql, str)
+  )
+  assert "SET statement_timeout = 0" in db_sql
+  assert "CREATE INDEX IF NOT EXISTS host_data_dev_j_prefix_idx" in db_sql
+  assert "WHERE dev LIKE 'j:%'" in db_sql
+  assert len(sep.state_operations) == 1
+  assert isinstance(sep.state_operations[0], migrations.AddIndex)
+  assert sep.state_operations[0].index.name == "host_data_dev_j_prefix_idx"
+  fn_op = mod.Migration.operations[1]
+  assert isinstance(fn_op, migrations.RunSQL)
+  assert "UNION" in fn_op.sql
+  assert "WHERE (h.jid = p_jid OR h.dev" not in fn_op.sql
+  assert "WHERE (h.jid = p_jid OR h.dev" in fn_op.reverse_sql
+
+
 def test_0035_widens_job_data_jid_without_using_cast():
   """State AlterField plus typmod SQL. USING would rewrite the FK tables."""
   mod = importlib.import_module(
