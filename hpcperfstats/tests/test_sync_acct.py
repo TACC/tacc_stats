@@ -433,13 +433,31 @@ def test_sync_acct_from_content_bad_timestamp_reason():
   _assert_load_reason(content, "could not parse Start, End, or Submit")
 
 
+@override_settings(DEBUG=True)
+@patch("hpcperfstats.dbload.sync_acct._notify_job_cache_after_acct_ingest")
+@patch("hpcperfstats.dbload.sync_acct.job_data")
 @patch(
   "hpcperfstats.dbload.sync_acct.cfg.get_restricted_queue_keywords",
   return_value=["secret"],
 )
-def test_sync_acct_restricted_queue_non_text_names_jid(_keywords):
+def test_sync_acct_restricted_queue_nan_partition_still_inserts(
+  _keywords, mock_jd, _notify
+):
+  """Empty Partition (pandas NaN) must not abort ingest when keywords are set."""
+  from hpcperfstats.dbload.sync_acct import sync_acct_from_content
+
   content = _sacct_content(_sacct_row(jid="8804", queue=""))
-  _assert_load_reason(content, "queue value is not text", "8804")
+  filter_qs = MagicMock()
+  filter_qs.values_list.side_effect = [[], ["8804"]]
+  mock_jd.objects.filter.return_value = filter_qs
+
+  inserted = sync_acct_from_content(content, jobs_in_db=set())
+
+  assert inserted == 1
+  created = mock_jd.objects.bulk_create.call_args[0][0]
+  assert len(created) == 1
+  assert created[0].jid == "8804"
+  assert created[0].queue is None
 
 
 @patch("hpcperfstats.dbload.sync_acct._notify_job_cache_after_acct_ingest")

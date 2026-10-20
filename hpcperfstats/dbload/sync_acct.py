@@ -654,8 +654,8 @@ def _sync_acct_dataframe(df: Any, jobs_in_db: Any) -> Any:
     Any: Value produced by this call (type depends on inputs).
 
   Raises:
-    AccountingFileLoadError: When required columns, queues, times,
-    NodeList, node hours, row build, or the job-count queries fail.
+    AccountingFileLoadError: When required columns, times, NodeList,
+    node hours, row build, or the job-count queries fail.
 
   Examples:
     >>> _sync_acct_dataframe(None, None)  # doctest: +SKIP
@@ -706,11 +706,9 @@ def _sync_acct_dataframe(df: Any, jobs_in_db: Any) -> Any:
     if not restricted_queue_keywords:
       break
     cell = df.iloc[i, queue_col_index]
+    # Empty/missing Partition is pandas NaN; it cannot match a keyword.
     if not isinstance(cell, str):
-      _fail_acct_load(
-        "queue value is not text for jid="
-        f"{df.iloc[i, job_id_col_index]}: {cell!r}"
-      )
+      continue
     for q in restricted_queue_keywords:
       if q in cell and settings.DEBUG:
         restricted_job_ids.append(df.iloc[i, job_id_col_index])
