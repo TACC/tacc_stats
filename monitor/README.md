@@ -395,15 +395,17 @@ outbound payloads** under **`/dev/shm/hpcperfstatsd-debug/`**:
 | File | Content |
 |------|---------|
 | `schema` | Complete `$` rotation payload (`write_hdr=1`) |
-| `fast` | Latest `@fast` sample |
-| `full` | Latest `@full` (or legacy full-width) sample |
+| `fast` | Latest `@fast` sample (one payload) |
+| `full` | Latest `@full` (or legacy full-width) sample (one payload) |
+| `fast.burst` / `full.burst` | **All** payloads from the latest sample tick, concatenated (shared-node: N jid + host `-`) |
 
 On **shared-node** builds (`--enable-shared-node-multi-jid`), a multi-jid sample
 burst emits N jid payloads plus one node-wide `-` payload. DEBUG shm keeps the
 **last jid** sample in `fast`/`full` (the trailing `-` is still published to
-RabbitMQ but does not overwrite the mirror). Idle (`disc.n==0`) still mirrors
-`-`. Grep `fast`/`full` for `%jobs` / `host_mem_job` / bare jid headers after
-deploying a build with that skip.
+RabbitMQ but does not overwrite those single-slot mirrors). The same tick’s
+complete set is in `fast.burst` / `full.burst` (parts separated by
+`#---burst-part---`). Idle (`disc.n==0`) still mirrors `-` into `fast`/`full`
+and the matching `.burst` file.
 
 Override the base directory with **`HPCPERFSTATS_DEBUG_SHM_DIR`** (must be an
 absolute path under **`/dev/shm/`** with no `..` components). Payloads

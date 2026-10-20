@@ -14,11 +14,14 @@ alwaysApply: false
 - **DEBUG builds only** (`--enable-debug`); release uses inline no-ops in `stats_buffer_debug_shm.h`.
 - Mirrors latest full payloads under `HPCPERFSTATS_DEBUG_SHM_DIR` (default `/dev/shm/hpcperfstatsd-debug`):
   - **`schema`** — complete `$` rotation payload (`write_hdr=1`)
-  - **`fast`** — latest `@fast` sample
-  - **`full`** — latest `@full` (or legacy full-width) sample
+  - **`fast`** — latest `@fast` sample (single payload)
+  - **`full`** — latest `@full` (or legacy full-width) sample (single payload)
+  - **`fast.burst` / `full.burst`** — all payloads from the latest sample tick
+    (shared-node: every jid + node-wide `-`), parts separated by `#---burst-part---`
 - **Shared-node multi-jid:** `job_shared_emit` must not mirror the trailing
   node-wide `-` insert into `fast`/`full` (it would hide the last jid sample).
-  Idle `-` (zero discovered jids) still mirrors.
+  Idle `-` (zero discovered jids) still mirrors. Burst files always include every
+  insert from the tick (`burst_begin` / `burst_append` / `burst_commit`).
 
 ## Implementation
 

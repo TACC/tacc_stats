@@ -195,10 +195,11 @@ static void format_jobs_csv(const struct job_proc_discover_result *disc, char *o
 /* mirror_shm: 0 = still ring-insert, but do not overwrite DEBUG fast/full (trailing
  * multi-jid node-wide '-' would otherwise hide the last jid sample in shm). */
 static int insert_serialized(struct sf_ring_buffer *w, const char *hdr_jobid, const char *mark1,
-                             const char *mark2, int mirror_shm)
+                             const char *mark2, int mirror_shm, enum stats_row_tier *tier_out)
 {
   struct stats_buffer *sf;
   int rc;
+  enum stats_row_tier tier;
 
   if (w == NULL)
     return -1;
@@ -217,8 +218,14 @@ static int insert_serialized(struct sf_ring_buffer *w, const char *hdr_jobid, co
     free(sf);
     return -1;
   }
-  if (mirror_shm && stats_buffer_debug_shm_sample_wanted(0, 1))
-    stats_buffer_debug_shm_write_sample(sf, stats_buffer_payload_row_tier(sf));
+  tier = stats_buffer_payload_row_tier(sf);
+  if (tier_out != NULL)
+    *tier_out = tier;
+  if (stats_buffer_debug_shm_sample_wanted(0, 1)) {
+    stats_buffer_debug_shm_burst_append(sf);
+    if (mirror_shm)
+      stats_buffer_debug_shm_write_sample(sf, tier);
+  }
   rc = ring_buffer_insert(sf, w, max_buffer_size, allow_ring_buffer_overwrite);
   if (rc < 0) {
     stats_buffer_close(sf);
@@ -236,6 +243,7 @@ void job_shared_emit_sample_burst(struct sf_ring_buffer *w)
   char jobs_csv[JOB_PROC_MAX_JIDS * (JOB_PROC_JID_MAX + 1)];
   size_t i;
   int full_resource = 0;
+  enum stats_row_tier burst_tier = STATS_ROW_FULL;
 
   memset(&disc, 0, sizeof(disc));
   if (job_proc_discover(&disc, jid_require_step_id, jid_discover_pid_cap) < 0) {
@@ -250,6 +258,7 @@ void job_shared_emit_sample_burst(struct sf_ring_buffer *w)
     now.tv_nsec = 0;
   }
   stats_buffer_set_frozen_time(&now);
+  stats_buffer_debug_shm_burst_begin();
 
   /* One metrics collect for the whole burst (host_mem_job collect clears devices). */
   stats_runtime_collect_enabled_metrics(0);
@@ -259,11 +268,8 @@ void job_shared_emit_sample_burst(struct sf_ring_buffer *w)
     struct emit_filter_ctx ctx = {.include_node_wide = 1, .include_proc = 0, .include_gpu = 0};
 
     stats_buffer_set_row_filter(emit_row_filter, &ctx);
-    insert_serialized(w, "-", NULL, NULL, 1);
-    stats_buffer_set_row_filter(NULL, NULL);
-    stats_buffer_set_frozen_time(NULL);
-    job_proc_discover_result_clear(&disc);
-    return;
+    insert_serialized(w, "-", NULL, NULL, 1, &burst_tier);
+    goto done;
   }
 
   if (disc.n == 1) {
@@ -291,11 +297,8 @@ void job_shared_emit_sample_burst(struct sf_ring_buffer *w)
                                     .include_gpu = 1};
 
       stats_buffer_set_row_filter(emit_row_filter, &ctx);
-      insert_serialized(w, disc.entries[0].jid, NULL, NULL, 1);
-      stats_buffer_set_row_filter(NULL, NULL);
-      stats_buffer_set_frozen_time(NULL);
-      job_proc_discover_result_clear(&disc);
-      return;
+      insert_serialized(w, disc.entries[0].jid, NULL, NULL, 1, &burst_tier);
+      goto done;
     }
 
     {
@@ -317,12 +320,10 @@ void job_shared_emit_sample_burst(struct sf_ring_buffer *w)
       else
         aff_mark[0] = '\0';
       stats_buffer_set_row_filter(emit_row_filter, &ctx);
-      insert_serialized(w, disc.entries[0].jid, jobs_mark, aff_mark[0] ? aff_mark : NULL, 1);
-      stats_buffer_set_row_filter(NULL, NULL);
+      insert_serialized(w, disc.entries[0].jid, jobs_mark, aff_mark[0] ? aff_mark : NULL, 1,
+                        &burst_tier);
     }
-    stats_buffer_set_frozen_time(NULL);
-    job_proc_discover_result_clear(&disc);
-    return;
+    goto done;
   }
 
   /* N >= 2: per-jid payloads + one node-wide '-' payload. */
@@ -356,15 +357,19 @@ void job_shared_emit_sample_burst(struct sf_ring_buffer *w)
     else
       aff_mark[0] = '\0';
     stats_buffer_set_row_filter(emit_row_filter, &ctx);
-    insert_serialized(w, disc.entries[i].jid, jobs_mark, aff_mark[0] ? aff_mark : NULL, 1);
+    insert_serialized(w, disc.entries[i].jid, jobs_mark, aff_mark[0] ? aff_mark : NULL, 1,
+                      &burst_tier);
   }
   {
     struct emit_filter_ctx ctx = {.include_node_wide = 1, .include_proc = 0, .include_gpu = 0};
 
     stats_buffer_set_row_filter(emit_row_filter, &ctx);
     /* Do not mirror: would clobber last jid sample in DEBUG shm fast/full. */
-    insert_serialized(w, "-", NULL, NULL, 0);
+    insert_serialized(w, "-", NULL, NULL, 0, &burst_tier);
   }
+
+done:
+  stats_buffer_debug_shm_burst_commit(burst_tier);
   stats_buffer_set_row_filter(NULL, NULL);
   stats_buffer_set_frozen_time(NULL);
   job_proc_discover_result_clear(&disc);

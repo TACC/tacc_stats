@@ -45,6 +45,7 @@ host_mem_job j:<jid> [@fast|@full] <mem_used> <mem_peak> <anon_pages> <file_page
 - One sample block = one header jobid token (≤32 bare jid).
 - Sole jid with exact online CPUs **and** exact available GPU grant: ordinary unmarked payload (**still** may include `host_mem_job j:<jid>`).
 - `|J|>=2`: N jid payloads + one `-` node-wide payload; same frozen timestamp.
+- DEBUG shm: `fast`/`full` keep last jid only; `fast.burst`/`full.burst` hold the full tick.
 - GPU `dev` = collector index; unknown inventory never takes the no-mark fast path.
 
 ## `host_mem_job` (job cgroup memory)

@@ -257,6 +257,44 @@ static void test_schema_writes_schema_file(void)
   free(sf.sf_data);
 }
 
+/* Shared-node: one tick's N jid + node-wide payloads land in full.burst. */
+static void test_burst_concatenates_parts(void)
+{
+  struct stats_buffer a, b, c;
+  char burst_path[512];
+  char buf[1024];
+
+  memset(&a, 0, sizeof(a));
+  memset(&b, 0, sizeof(b));
+  memset(&c, 0, sizeof(c));
+  a.sf_data = strdup("1.0 111 host\nrow_a\n");
+  b.sf_data = strdup("1.0 222 host\nrow_b\n");
+  c.sf_data = strdup("1.0 - host\nrow_host\n");
+  assert(a.sf_data && b.sf_data && c.sf_data);
+  a.sf_data_len = strlen(a.sf_data);
+  b.sf_data_len = strlen(b.sf_data);
+  c.sf_data_len = strlen(c.sf_data);
+
+  stats_buffer_debug_shm_burst_begin();
+  stats_buffer_debug_shm_burst_append(&a);
+  stats_buffer_debug_shm_burst_append(&b);
+  stats_buffer_debug_shm_burst_append(&c);
+  stats_buffer_debug_shm_burst_commit(STATS_ROW_FULL);
+
+  snprintf(burst_path, sizeof(burst_path), "%s/full.burst", g_shm_base);
+  assert(path_exists(burst_path));
+  assert(read_file_text(burst_path, buf, sizeof(buf)) > 0);
+  assert(strstr(buf, "1.0 111 host") != NULL);
+  assert(strstr(buf, "1.0 222 host") != NULL);
+  assert(strstr(buf, "1.0 - host") != NULL);
+  assert(strstr(buf, "#---burst-part---") != NULL);
+  assert(strstr(buf, "row_host") != NULL);
+
+  free(a.sf_data);
+  free(b.sf_data);
+  free(c.sf_data);
+}
+
 #endif /* DEBUG */
 
 int main(void)
@@ -274,6 +312,7 @@ int main(void)
   test_fast_writes_fast_only();
   test_full_writes_full_only();
   test_legacy_writes_full();
+  test_burst_concatenates_parts();
   printf("test_stats_buffer_debug_shm passed\n");
   return 0;
 #endif
