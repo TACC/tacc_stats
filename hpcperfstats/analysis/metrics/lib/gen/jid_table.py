@@ -10,6 +10,7 @@ Attributes:
   JID_TABLE_HOST_QUERY_BATCH: ``JID_TABLE_HOST_QUERY_BATCH``.
   TYPE_DETAIL_HOST_QUERY_BATCH: ``TYPE_DETAIL_HOST_QUERY_BATCH``.
   _DENSE_PLOT_AGG_TYPES: NFS/llite type names that use the dense (8) host batch.
+  _GPU_AFF_UNSET: Sentinel for unloaded ``job_affinity`` GPU cache.
   _STATEMENT_TIMEOUT_ERROR_MARKERS: ``_STATEMENT_TIMEOUT_ERROR_MARKERS``.
   _logger: ``_logger``.
   _summary_agg_count: ``_summary_agg_count``.
@@ -51,6 +52,11 @@ from django.db.models.functions import Coalesce
 
 import hpcperfstats.dbload.lib.conf_parser as cfg
 from hpcperfstats.analysis.metrics.lib.gen.utils import queryset_to_dataframe
+from hpcperfstats.analysis.metrics.lib.job_host_data_scope import (
+  apply_gpu_affinity_dev_filter,
+  apply_job_host_data_scope,
+  gpu_devs_for_job,
+)
 from hpcperfstats.dbload.lib.monitor_naming.resolve import (
   canonical_event_name_for_type,
   events_probe_names,
@@ -78,6 +84,9 @@ from hpcperfstats.site.lib.machine.cache_utils import (
   make_cache_key_bounded,
 )
 from hpcperfstats.site.lib.machine.models import host_data, job_data
+
+# Sentinel: affinity GPU list not loaded yet (distinct from None = unrestricted).
+_GPU_AFF_UNSET: object = object()
 
 # Chunk host__in on host_data for large jobs; single queries with thousands of
 # hosts often hit PostgreSQL statement_timeout during metrics and plots.
@@ -2302,6 +2311,7 @@ class jid_table:
 
   Attributes:
     _base_filter: ``_base_filter``.
+    _gpu_affinity_devs_cache: Cached ``gpu_devs_for_job`` result or unset.
     _large_job_plot_cache_token: ``_large_job_plot_cache_token``.
     acct_host_list: ``acct_host_list``.
     end_time: ``end_time``.
@@ -2331,6 +2341,7 @@ class jid_table:
     _logger.debug("Initializing jid_table for job %s", jid)
 
     self.jid = jid
+    self._gpu_affinity_devs_cache: list[str] | object | None = _GPU_AFF_UNSET
     self._large_job_plot_cache_token = "full"
 
     try:
@@ -2393,10 +2404,13 @@ class jid_table:
       found = set()
       for host_chunk in _iter_acct_host_batches(self.acct_host_list):
         host_qs = (
-          host_data.objects.filter(
-            time__gte=self._base_filter["time__gte"],
-            time__lte=self._base_filter["time__lte"],
-            host__in=host_chunk,
+          apply_job_host_data_scope(
+            host_data.objects.filter(
+              time__gte=self._base_filter["time__gte"],
+              time__lte=self._base_filter["time__lte"],
+              host__in=host_chunk,
+            ),
+            self.jid,
           )
           .values_list("host", flat=True)
           .distinct()
@@ -2450,10 +2464,13 @@ class jid_table:
         return pd.DataFrame(columns=["type", "event"])
 
       raw_rows = list(
-        host_data.objects.filter(
-          host=str(self.host_list[0]),
-          time__gte=self._base_filter["time__gte"],
-          time__lte=self._base_filter["time__lte"],
+        apply_job_host_data_scope(
+          host_data.objects.filter(
+            host=str(self.host_list[0]),
+            time__gte=self._base_filter["time__gte"],
+            time__lte=self._base_filter["time__lte"],
+          ),
+          self.jid,
         )
         .values_list("type", "event")
         .distinct()
@@ -2485,6 +2502,24 @@ class jid_table:
         )
     _logger.debug("jid_table schema time: %.1fs", time.time() - etime)
     self._apply_large_job_time_sampling_if_needed()
+
+  def _gpu_affinity_devs_cached(self) -> list[str] | None:
+    """
+    Return ``job_affinity`` GPU ``dev`` list for this jid (cached per instance).
+
+    ``None`` means no affinity rows (unrestricted). An empty list means
+    affinity exists but no GPUs are assigned.
+
+    Returns:
+      list[str] | None: Allowed hardware GPU device ids, or ``None``.
+
+    Examples:
+      >>> jid_table("1")._gpu_affinity_devs_cached()  # doctest: +SKIP
+      None
+    """
+    if self._gpu_affinity_devs_cache is _GPU_AFF_UNSET:
+      self._gpu_affinity_devs_cache = gpu_devs_for_job(str(self.jid or ""))
+    return self._gpu_affinity_devs_cache  # type: ignore[return-value]
 
   def _host_data_time_filter_kwargs(self) -> Any:
     """
@@ -2602,10 +2637,13 @@ class jid_table:
     if not self._base_filter:
       return host_data.objects.none()
     tkw = self._host_data_time_filter_kwargs()
-    return host_data.objects.filter(
-      host__in=self._base_filter["host__in"],
-      **tkw,
-      **extra_filters,
+    return apply_job_host_data_scope(
+      host_data.objects.filter(
+        host__in=self._base_filter["host__in"],
+        **tkw,
+        **extra_filters,
+      ),
+      self.jid,
     )
 
   def _full_host_data_rows_batched(self, cols: Any) -> Any:
@@ -2648,9 +2686,12 @@ class jid_table:
         True
       """
       qs = (
-        host_data.objects.filter(
-          host__in=hosts_list,
-          **(tf_cur or {}),
+        apply_job_host_data_scope(
+          host_data.objects.filter(
+            host__in=hosts_list,
+            **(tf_cur or {}),
+          ),
+          self.jid,
         )
         .values_list(*cols)
         .order_by("host", "time")
@@ -2733,9 +2774,12 @@ class jid_table:
           True
         """
         return (
-          host_data.objects.filter(
-            host__in=host_chunk,
-            **(tf or {}),
+          apply_job_host_data_scope(
+            host_data.objects.filter(
+              host__in=host_chunk,
+              **(tf or {}),
+            ),
+            self.jid,
           )
           .values("host", "time")
           .distinct()
@@ -2857,11 +2901,14 @@ class jid_table:
             >>> True
             True
           """
-          qs = host_data.objects.filter(
-            host__in=host_chunk,
-            **tf,
-            type=ct,
-            event__in=probed_events,
+          qs = apply_job_host_data_scope(
+            host_data.objects.filter(
+              host__in=host_chunk,
+              **tf,
+              type=ct,
+              event__in=probed_events,
+            ),
+            self.jid,
           )
           if reject_dcgm_blank and val_col in (
             "value",
@@ -2869,6 +2916,12 @@ class jid_table:
             "arc",
           ):
             qs = qs.filter(**{f"{val_col}__lt": DCGM_FP64_BLANK})
+          if group_by_dev:
+            qs = apply_gpu_affinity_dev_filter(
+              qs,
+              self.jid,
+              affinity_devs=self._gpu_affinity_devs_cached(),
+            )
           return qs.values(*value_cols)
 
         df_raw = _fetch_host_data_values_frames(
@@ -2970,6 +3023,7 @@ class jid_table:
                     candidate_typ,
                     list(probed_events),
                     val_col,
+                    jid=str(self.jid) if self.jid else None,
                   )
                   if fn_rows:
                     chunk_df = host_data_restore_time_column(
@@ -2998,17 +3052,25 @@ class jid_table:
                   >>> True
                   True
                 """
-                qs_base = host_data.objects.filter(
-                  host__in=host_subchunk,
-                  **tf_cur,
-                  type=ct,
-                  event__in=probed_events,
+                qs_base = apply_job_host_data_scope(
+                  host_data.objects.filter(
+                    host__in=host_subchunk,
+                    **tf_cur,
+                    type=ct,
+                    event__in=probed_events,
+                  ),
+                  self.jid,
                 )
                 if reject_dcgm_blank:
                   qs_base = qs_base.filter(
                     **{f"{val_col}__lt": DCGM_FP64_BLANK}
                   )
                 if group_by_dev:
+                  qs_base = apply_gpu_affinity_dev_filter(
+                    qs_base,
+                    self.jid,
+                    affinity_devs=self._gpu_affinity_devs_cached(),
+                  )
                   return host_data_sum_val_per_sample_dev_queryset(
                     qs_base, val_col
                   )
@@ -3200,11 +3262,14 @@ class jid_table:
             True
           """
           qs = (
-            host_data.objects.filter(
-              host__in=hosts_list,
-              **(tf_cur or {}),
-              type=_typ,
-              event__in=_probed,
+            apply_job_host_data_scope(
+              host_data.objects.filter(
+                host__in=hosts_list,
+                **(tf_cur or {}),
+                type=_typ,
+                event__in=_probed,
+              ),
+              self.jid,
             )
             .values("event")
             .annotate(delta_sum=Sum("delta"))
@@ -3314,11 +3379,14 @@ class jid_table:
             True
           """
           qs = (
-            host_data.objects.filter(
-              host__in=hosts_list,
-              **(tf_cur or {}),
-              type=_typ,
-              event__in=all_events,
+            apply_job_host_data_scope(
+              host_data.objects.filter(
+                host__in=hosts_list,
+                **(tf_cur or {}),
+                type=_typ,
+                event__in=all_events,
+              ),
+              self.jid,
             )
             .values("event")
             .annotate(delta_sum=Sum("delta"))
@@ -3434,11 +3502,14 @@ class jid_table:
             True
           """
           qs = (
-            host_data.objects.filter(
-              host__in=hosts_list,
-              **(tf_cur or {}),
-              type=_typ,
-              event__in=_probed,
+            apply_job_host_data_scope(
+              host_data.objects.filter(
+                host__in=hosts_list,
+                **(tf_cur or {}),
+                type=_typ,
+                event__in=_probed,
+              ),
+              self.jid,
             )
             .values("event")
             .annotate(delta_sum=Sum("delta"))
@@ -3549,11 +3620,8 @@ class jid_table:
 
 class TypeDetailDataProvider:
   """
-  ORM-based provider for type-detail view: host_data scoped by job start/end.
-
-  and.
-
-    accounting host_list (no host_data.jid).
+  ORM-based provider for type-detail view: host_data scoped by job start/end,
+  accounting host_list, and jid / ``dev=j:<jid>`` (shared-node isolation).
 
   Attributes:
     end_time: ``end_time``.
@@ -3572,14 +3640,10 @@ class TypeDetailDataProvider:
     host_list: Any,
   ) -> None:
     """
-    Build base filter for type_name, time range, and optional host_list.
-
-      ``jid``.
-
-      is only for cache keys / API identity.
+    Build base filter for type_name, time range, host_list, and job scope.
 
     Args:
-      jid (Any): Jid passed to this helper.
+      jid (Any): Job id (also used for jid / ``j:`` scope and cache keys).
       type_name (Any): Type name passed to this helper.
       start_time (Any): Start time passed to this helper.
       end_time (Any): End time passed to this helper.
@@ -3599,9 +3663,7 @@ class TypeDetailDataProvider:
 
   def _qs(self, **extra: Any) -> Any:
     """
-    Base host_data queryset for this provider (type, time range, optional.
-
-      host_list).
+    Base host_data queryset scoped by type, time, hosts, and job jid/``j:``.
 
     Args:
       **extra (Any): Extra keyword arguments (``extra``); keys are ``str`` and
@@ -3621,7 +3683,10 @@ class TypeDetailDataProvider:
     }
     if self.host_list:
       flt["host__in"] = self.host_list
-    return host_data.objects.filter(**flt, **extra)
+    return apply_job_host_data_scope(
+      host_data.objects.filter(**flt, **extra),
+      self.jid,
+    )
 
   def get_host_time_df(self) -> Any:
     """
@@ -3686,10 +3751,13 @@ class TypeDetailDataProvider:
           True
         """
         return (
-          host_data.objects.filter(
-            type=type_name,
-            host__in=host_chunk,
-            **(tf or {}),
+          apply_job_host_data_scope(
+            host_data.objects.filter(
+              type=type_name,
+              host__in=host_chunk,
+              **(tf or {}),
+            ),
+            self.jid,
           )
           .values("host", "time")
           .distinct()
@@ -3840,11 +3908,14 @@ class TypeDetailDataProvider:
                 True
               """
               return host_data_sum_val_per_sample_queryset(
-                host_data.objects.filter(
-                  type=type_name,
-                  host__in=host_subchunk,
-                  event=ev,
-                  **(tf_cur or {}),
+                apply_job_host_data_scope(
+                  host_data.objects.filter(
+                    type=type_name,
+                    host__in=host_subchunk,
+                    event=ev,
+                    **(tf_cur or {}),
+                  ),
+                  self.jid,
                 ),
                 met,
               )
@@ -3900,11 +3971,14 @@ class TypeDetailDataProvider:
           >>> True
           True
         """
-        return host_data.objects.filter(
-          type=type_name,
-          host__in=host_chunk,
-          event=ev,
-          **(tf or {}),
+        return apply_job_host_data_scope(
+          host_data.objects.filter(
+            type=type_name,
+            host__in=host_chunk,
+            event=ev,
+            **(tf or {}),
+          ),
+          self.jid,
         ).values("host", "time", met)
 
       df_raw = _fetch_host_data_values_frames(

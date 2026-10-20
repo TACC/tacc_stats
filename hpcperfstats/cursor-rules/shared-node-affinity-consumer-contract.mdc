@@ -57,6 +57,14 @@ Listend and sync_timedb (line parse and streaming) call the same helper. Writes 
 
 `LiveJidScopedDistinctHostTimeCount` matches `host_data.jid` or `host_data.dev = 'j:' || job.jid`. `update_metrics` readiness uses the same two keys via `max_host_time_by_jid`. Exclusive jobs match the `jid` column and keep `dev=''`.
 
+**Analysis choke point:** `hpcperfstats.analysis.metrics.lib.job_host_data_scope` (`job_host_data_scope_q` / `apply_job_host_data_scope` / SQL fragment). Wire every job-scoped `host_data` read through it (`jid_table`, TypeDetail, metrics row fetches, `metrics_host_data_sql` when `jid=` is set). PG `jid_scoped_distinct_host_time_count` must use the same OR (migration `0037+`).
+
+**GPU:** keep hardware `dev`; when `job_affinity.gpu_list` exists for the jid, restrict with `apply_gpu_affinity_dev_filter` / `gpu_devs_for_job`. Empty list → no devices; no affinity rows → unrestricted.
+
+**Memory:** Summary mem / `mem_hwm` prefer `host_mem_job` when present; never add it to `host_mem_type_names()`.
+
+**UI:** Job Detail `is_shared_node` from `job_is_shared_node(jid)` (affinity rows or any `dev=j:<jid>`). Shared jobs append the red host-wide help footer (`SHARED_HOST_WIDE_HELP_FOOTER`); exclusive jobs omit it.
+
 ## Deploy
 
 Migration `0036` and this consumer land before a monitor built with `--enable-shared-node-multi-jid`. File-mode monitors and `/var/run/stats_jobid` stay valid. Prefer consumer before or with monitors that emit `host_mem_job`.

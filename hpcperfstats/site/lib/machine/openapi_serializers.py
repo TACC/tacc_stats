@@ -532,6 +532,7 @@ class JobDetailResponseSerializer(serializers.Serializer):
     required=False, allow_null=True
   )
   staff_artifact_contract = StaffArtifactContractSerializer(required=False)
+  is_shared_node = serializers.BooleanField(required=False)
 
 
 class JobPlotsResponseSerializer(serializers.Serializer):

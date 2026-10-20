@@ -762,6 +762,71 @@ describe("JobDetail", () => {
     expect(container.querySelectorAll(".job-detail-metrics-table")).toHaveLength(1);
   });
 
+  it("shows the shared-node help footer on Metrics tab rows when is_shared_node is true", async () => {
+    const sharedNodeDetail = {
+      ...minimalJobDetailResponse,
+      metrics_list: [
+        {
+          metric: "avg_freq",
+          type: "pmc",
+          units: "GHz",
+          value: 2.5,
+          no_data_reason: null,
+        },
+      ],
+      is_shared_node: true,
+    };
+    setJobDetailQueryMock({ data: sharedNodeDetail });
+
+    renderJobDetail("12345");
+    await waitFor(() => {
+      expect(screen.getByRole("heading", { name: "CPU", level: 3 })).toBeInTheDocument();
+    });
+    fireEvent.click(screen.getByRole("button", { name: /help: avg_freq/i }));
+    expect(
+      screen.getByTestId("variable-info-shared-node-footer"),
+    ).toHaveTextContent(/shared node/i);
+  });
+
+  it("omits the shared-node help footer on Metrics tab rows when is_shared_node is false", async () => {
+    const exclusiveDetail = {
+      ...minimalJobDetailResponse,
+      metrics_list: [
+        {
+          metric: "avg_freq",
+          type: "pmc",
+          units: "GHz",
+          value: 2.5,
+          no_data_reason: null,
+        },
+      ],
+      is_shared_node: false,
+    };
+    setJobDetailQueryMock({ data: exclusiveDetail });
+
+    renderJobDetail("12345");
+    await waitFor(() => {
+      expect(screen.getByRole("heading", { name: "CPU", level: 3 })).toBeInTheDocument();
+    });
+    fireEvent.click(screen.getByRole("button", { name: /help: avg_freq/i }));
+    expect(screen.queryByTestId("variable-info-shared-node-footer")).not.toBeInTheDocument();
+  });
+
+  it("shows the shared-node help footer in the Summary plot metric-help strip when is_shared_node is true", async () => {
+    setJobDetailQueryMock({
+      data: { ...minimalJobDetailResponse, is_shared_node: true },
+    });
+
+    renderJobDetail("12345", { is_staff: false }, "tab=summary");
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: /^help: cpu$/i })).toBeInTheDocument();
+    });
+    fireEvent.click(screen.getByRole("button", { name: /^help: cpu$/i }));
+    expect(
+      screen.getByTestId("variable-info-shared-node-footer"),
+    ).toHaveTextContent(/shared node/i);
+  });
+
   it("splits job-level metrics row-major into two tables for wide layout when more than one metric", async () => {
     const fourMetrics = {
       ...minimalJobDetailResponse,

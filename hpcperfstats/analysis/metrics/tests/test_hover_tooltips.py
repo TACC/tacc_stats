@@ -29,7 +29,12 @@ class _SummaryJt:
   host_list = ["h1", "h2"]
 
 
-def test_summaryplot_hover_uses_html_with_separators():
+def test_summaryplot_hover_uses_html_with_separators(monkeypatch):
+  # plot_metric imports this helper late; patch the defining module.
+  monkeypatch.setattr(
+    "hpcperfstats.analysis.metrics.lib.job_host_data_scope.job_is_shared_node_from_jobish",
+    lambda _jt: False,
+  )
   sp = SummaryPlot(_SummaryJt())
   sp.hc = {"h1": "#111111", "h2": "#222222"}
   df = pd.DataFrame(

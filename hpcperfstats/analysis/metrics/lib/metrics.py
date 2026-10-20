@@ -68,6 +68,7 @@ from hpcperfstats.dbload.lib.monitor_naming.canonical import (
   HOST_CPU_TYPE,
   HOST_IB_TYPE,
   HOST_LNET_TYPE,
+  HOST_MEM_JOB_TYPE,
   HOST_MEM_TYPE,
   HOST_NUMA_TYPE,
   HOST_OPA_TYPE,
@@ -94,6 +95,8 @@ from hpcperfstats.dbload.lib.monitor_naming.resolve import (
   grace_fp_scalar_single_event_names,
   hbm_cas_read_write_pairs,
   host_cpu_hw_type_names,
+  host_mem_job_type_names,
+  host_mem_type_names,
   imc_types_probe_order,
   resolve_get_type,
   type_probe_names,
@@ -1798,6 +1801,7 @@ def _host_data_row_cache_key(
   *,
   sum_per_sample: bool = False,
   nonnegative_only: bool = False,
+  jid: Any | None = None,
 ) -> Any:
   """
   Hashable key for one batched host_data fetch within a single.
@@ -1811,6 +1815,7 @@ def _host_data_row_cache_key(
     metric_column (Any): Metric column passed to this helper.
     sum_per_sample (bool): Boolean flag for sum per sample.
     nonnegative_only (bool): Boolean flag for nonnegative only.
+    jid (Any | None): Job id when the fetch is jid-scoped.
 
   Returns:
     Any: Value produced by this call (type depends on inputs).
@@ -1839,6 +1844,7 @@ def _host_data_row_cache_key(
     bool(nonnegative_only),
     _hashable_metric_events_signature(events),
     t_part,
+    None if jid is None else str(jid),
   )
 
 
@@ -1851,6 +1857,7 @@ def _host_data_metric_rows_queryset(
   *,
   sum_per_sample: bool = False,
   nonnegative_only: bool = False,
+  jid: Any | None = None,
 ) -> Any:
   """
   Rows for metric bucketing: raw samples, or one SQL-summed row per (host,.
@@ -1873,6 +1880,7 @@ def _host_data_metric_rows_queryset(
     metric_column (Any): Metric column passed to this helper.
     sum_per_sample (bool): Boolean flag for sum per sample.
     nonnegative_only (bool): Boolean flag for nonnegative only.
+    jid (Any | None): When set, restrict to jid / ``dev=j:<jid>`` rows.
 
   Returns:
     Any: Value produced by this call (type depends on inputs).
@@ -1880,6 +1888,9 @@ def _host_data_metric_rows_queryset(
   Examples:
     >>> _host_data_metric_rows_queryset(0)  # doctest: +SKIP
   """
+  from hpcperfstats.analysis.metrics.lib.job_host_data_scope import (
+    apply_job_host_data_scope,
+  )
   from hpcperfstats.site.lib.machine.models import host_data
 
   qs = host_data.objects.filter(
@@ -1888,6 +1899,8 @@ def _host_data_metric_rows_queryset(
     type=typename,
     event__in=events,
   )
+  if jid:
+    qs = apply_job_host_data_scope(qs, str(jid))
   if sum_per_sample:
     return jid_table.host_data_sum_val_per_sample_queryset(
       qs, metric_column, nonnegative_only=nonnegative_only
@@ -1932,6 +1945,7 @@ def _host_data_metric_rows_with_host_chunk_retry(
   max_attempts: int = 2,
   sum_per_sample: bool = False,
   nonnegative_only: bool = False,
+  jid: Any | None = None,
 ) -> Any:
   """
   Materialize metric ``values()`` rows; split hosts or retry on statement.
@@ -1951,6 +1965,7 @@ def _host_data_metric_rows_with_host_chunk_retry(
     max_attempts (int): Integer value for max attempts.
     sum_per_sample (bool): Boolean flag for sum per sample.
     nonnegative_only (bool): Boolean flag for nonnegative only.
+    jid (Any | None): Optional job id for shared-node scope.
 
   Returns:
     Any: Value produced by this call (type depends on inputs).
@@ -1980,6 +1995,7 @@ def _host_data_metric_rows_with_host_chunk_retry(
           metric_column,
           sum_per_sample=sum_per_sample,
           nonnegative_only=nonnegative_only,
+          jid=jid,
         )
       )
       if sum_per_sample:
@@ -2001,6 +2017,7 @@ def _host_data_metric_rows_with_host_chunk_retry(
           max_attempts=max_attempts,
           sum_per_sample=sum_per_sample,
           nonnegative_only=nonnegative_only,
+          jid=jid,
         )
         right = _host_data_metric_rows_with_host_chunk_retry(
           hosts[mid:],
@@ -2012,6 +2029,7 @@ def _host_data_metric_rows_with_host_chunk_retry(
           max_attempts=max_attempts,
           sum_per_sample=sum_per_sample,
           nonnegative_only=nonnegative_only,
+          jid=jid,
         )
         return left + right
       if attempt + 1 >= max_attempts:
@@ -2039,6 +2057,7 @@ def _host_data_metric_rows_batched(
   *,
   sum_per_sample: bool = False,
   nonnegative_only: bool = False,
+  jid: Any | None = None,
 ) -> Any:
   """
   Fetch host_data rows for metrics bucketing via hostxtime chunks.
@@ -2057,6 +2076,7 @@ def _host_data_metric_rows_batched(
     rows_cache (Any | None): Optional dict cache keyed by probe identity.
     sum_per_sample (bool): When True, SQL-SUM per (host, sample time).
     nonnegative_only (bool): When True, SUM only nonnegative samples.
+    jid (Any | None): Optional job id for shared-node scope.
 
   Returns:
     Any: List of row dicts (possibly empty).
@@ -2078,6 +2098,7 @@ def _host_data_metric_rows_batched(
       metric_column,
       sum_per_sample=sum_per_sample,
       nonnegative_only=nonnegative_only,
+      jid=jid,
     )
     if cache_key is not None and cache_key in rows_cache:
       return rows_cache[cache_key]
@@ -2111,6 +2132,7 @@ def _host_data_metric_rows_batched(
       metric_column,
       sum_per_sample=sum_per_sample,
       nonnegative_only=nonnegative_only,
+      jid=jid,
     )
 
   for host_chunk, tf in jid_table._iter_host_time_query_chunks(
@@ -2640,6 +2662,7 @@ class Metrics:
         float(conv),
         nonnegative_rate=nonnegative_rate,
         host_aggregate=agg,
+        jid=getattr(jt, "jid", None),
       )
       if sql_value is not None:
         if cache is not None:
@@ -2657,6 +2680,7 @@ class Metrics:
         rows_cache=rows_cache,
         sum_per_sample=True,
         nonnegative_only=nonnegative_rate,
+        jid=getattr(jt, "jid", None),
       )
       if rows:
         break
@@ -2767,7 +2791,13 @@ class Metrics:
       if not _metric_type_events_feasible(schema, typ, events):
         continue
       rows = _host_data_metric_rows_batched(
-        tkw, hosts, typ, events, "value", rows_cache=rows_cache
+        tkw,
+        hosts,
+        typ,
+        events,
+        "value",
+        rows_cache=rows_cache,
+        jid=getattr(jt, "jid", None),
       )
       if rows:
         break
@@ -2905,6 +2935,7 @@ class Metrics:
           "arc",
           rows_cache=rows_cache,
           sum_per_sample=True,
+          jid=getattr(jt, "jid", None),
         )
         if rows:
           break
@@ -4705,31 +4736,80 @@ class max_packetrate:
 # may miss high water marks in between.
 class mem_hwm:
   """
-  Memory high-water mark (GiB) from host_mem/mem used - slab - file pages.
+  Memory high-water mark (GiB): prefer ``host_mem_job``, else NUMA ``host_mem``.
 
-  Monitor emits KB (``mem_used`` / ``slab`` / ``file_pages``); dual-read also
-  accepts legacy PascalCase event names. Peak KB is scaled by ``1024**2``
-  (Summary-aligned), not treated as bytes.
+  Job-scoped cgroup series uses ``mem_used`` / ``mem_peak`` (KB). NUMA path
+  uses MemUsed - Slab - FilePages. Peak KB is scaled by ``1024**2``.
   """
 
   def compute_metric(self, u: Any) -> Any:
     """
-    Peak (MemUsed - Slab - FilePages) over hosts, in GiB.
+    Peak memory over hosts, in GiB (job cgroup when present).
 
     Args:
-      u (Any): Job utils view with ``get_type`` for ``host_mem`` / ``mem``.
+      u (Any): Job utils view with ``get_type`` for mem types.
+
+    Returns:
+      Any: ``(value_or_None, type_name, 'GiB')``.
+
+    Examples:
+      >>> mem_hwm().compute_metric(None)  # doctest: +SKIP
+    """
+    job_peak = self._peak_host_mem_job(u)
+    if job_peak is not None:
+      return job_peak
+    return self._peak_host_mem_numa(u)
+
+  def _peak_host_mem_job(self, u: Any) -> Any:
+    """
+    Peak from ``host_mem_job`` ``mem_used`` or ``mem_peak`` (KB → GiB).
+
+    Args:
+      u (Any): Job utils view.
+
+    Returns:
+      Any: ``(value, HOST_MEM_JOB_TYPE, 'GiB')`` or ``None`` when absent.
+
+    Examples:
+      >>> mem_hwm()._peak_host_mem_job(None)  # doctest: +SKIP
+    """
+    schema, stats, resolved_typ = resolve_get_type(u, host_mem_job_type_names())
+    typ = resolved_typ or HOST_MEM_JOB_TYPE
+    if schema is None or stats is None:
+      return None
+    event_col = None
+    for candidate in ("mem_peak", "mem_used"):
+      if _schema_has_events_for_type(schema, typ, candidate):
+        event_col = candidate
+        break
+    if event_col is None:
+      return None
+    col_i = _schema_event_index(schema, typ, event_col)
+    max_memusage = 0.0
+    for _hostname, arr in stats.items():
+      peak = _finite_amax(arr[:, col_i])
+      if peak is not None:
+        max_memusage = max(max_memusage, peak)
+    if max_memusage == 0:
+      return None
+    return max_memusage / (1024.0**2), typ, "GiB"
+
+  def _peak_host_mem_numa(self, u: Any) -> Any:
+    """
+    Peak (MemUsed - Slab - FilePages) from NUMA ``host_mem`` / legacy ``mem``.
+
+    Args:
+      u (Any): Job utils view.
 
     Returns:
       Any: ``(value_or_None, HOST_MEM_TYPE, 'GiB')``.
 
     Examples:
-      >>> mem_hwm().compute_metric(None)  # doctest: +SKIP
+      >>> mem_hwm()._peak_host_mem_numa(None)  # doctest: +SKIP
     """
     max_memusage = 0.0
     typename = HOST_MEM_TYPE
-    schema, _stats, resolved_typ = resolve_get_type(
-      u, type_probe_names(typename)
-    )
+    schema, _stats, resolved_typ = resolve_get_type(u, host_mem_type_names())
     typ = resolved_typ or typename
     if schema is None or not _schema_has_events_for_type(
       schema, typ, "MemUsed", "Slab", "FilePages"
@@ -4745,9 +4825,8 @@ class mem_hwm:
         max_memusage = max(max_memusage, peak)
     if max_memusage == 0:
       return None, typename, "GiB"
-    # Monitor host_mem values are KB (see Summary mem_used scale).
     value = max_memusage / (1024.0**2)
-    return value, typename, "GiB"
+    return value, typ, "GiB"
 
 
 def _flops_weighted_events_for_schema(schema: Any) -> Any:

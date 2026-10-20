@@ -692,6 +692,7 @@ class TestJobDetailApi:
     jt.end_time = job.end_time
     with (
       patch.object(api, "_require_auth", return_value=None),
+      patch.object(api, "job_is_shared_node", return_value=False),
       patch.object(
         api,
         "_get_visible_job_or_error_response",

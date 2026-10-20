@@ -882,6 +882,7 @@ export default function JobDetail() {
     proc_list = [],
     staff_metrics_distinct_time_count: staffMetricsDistinctTimeCount,
     staff_artifact_contract: staffArtifactContract,
+    is_shared_node: isSharedNode = false,
   } = detailData;
 
   const mpCpuItemForPanel =
@@ -997,6 +998,7 @@ export default function JobDetail() {
                   : getJobMetricShortLabel(obj.metric)
             }
             enableHelp
+            isSharedNode={isSharedNode}
             suffixBeforeHelp={
               showMetricUnitsSuffix(obj) ? (
                 <span className="font-normal whitespace-nowrap text-muted-foreground">
@@ -1608,15 +1610,41 @@ export default function JobDetail() {
                 ) : null}
                 <div className="mb-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-muted-foreground job-detail-print-hide">
                   <span>Metric help (also hover the blue ? on each subplot):</span>
-                  <VariableInfoLabel variableName="cpu" labelText="CPU" enableHelp />
-                  <VariableInfoLabel variableName="mem" labelText="Memory" enableHelp />
-                  <VariableInfoLabel variableName="nv_gpu_util" labelText="GPU util" enableHelp />
-                  <VariableInfoLabel variableName="nv_gpu_link_gbs" labelText="GPU link" enableHelp />
-                  <VariableInfoLabel variableName="node_power_est_w" labelText="Node power" enableHelp />
+                  <VariableInfoLabel
+                    variableName="cpu"
+                    labelText="CPU"
+                    enableHelp
+                    isSharedNode={isSharedNode}
+                  />
+                  <VariableInfoLabel
+                    variableName="mem"
+                    labelText="Memory"
+                    enableHelp
+                    isSharedNode={isSharedNode}
+                  />
+                  <VariableInfoLabel
+                    variableName="nv_gpu_util"
+                    labelText="GPU util"
+                    enableHelp
+                    isSharedNode={isSharedNode}
+                  />
+                  <VariableInfoLabel
+                    variableName="nv_gpu_link_gbs"
+                    labelText="GPU link"
+                    enableHelp
+                    isSharedNode={isSharedNode}
+                  />
+                  <VariableInfoLabel
+                    variableName="node_power_est_w"
+                    labelText="Node power"
+                    enableHelp
+                    isSharedNode={isSharedNode}
+                  />
                   <VariableInfoLabel
                     variableName="summary_hardware_error_rates"
                     labelText="Hardware errors"
                     enableHelp
+                    isSharedNode={isSharedNode}
                   />
                 </div>
                 {renderSinglePlotPanel(
@@ -2076,6 +2104,7 @@ export default function JobDetail() {
                                     variableName={ev}
                                     labelText={ev}
                                     enableHelp
+                                    isSharedNode={isSharedNode}
                                   />
                                 </span>
                               ))

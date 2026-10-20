@@ -200,6 +200,24 @@ describe("parse-api-response", () => {
     expect(parseApiResponse("GET", "/api/jobs/745355/", wire)).toEqual(wire);
   });
 
+  it("accepts job detail with is_shared_node true (shared-node help footer gate)", () => {
+    const wire = {
+      job_data: { jid: "745356" },
+      derived_data_status: "ready",
+      is_shared_node: true,
+    };
+    expect(parseApiResponse("GET", "/api/jobs/745356/", wire)).toEqual(wire);
+  });
+
+  it("accepts job detail with is_shared_node false", () => {
+    const wire = {
+      job_data: { jid: "745357" },
+      derived_data_status: "ready",
+      is_shared_node: false,
+    };
+    expect(parseApiResponse("GET", "/api/jobs/745357/", wire)).toEqual(wire);
+  });
+
   it("accepts type detail artifact wire keys", () => {
     const wire = {
       type_name: "cpu",

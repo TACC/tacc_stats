@@ -14,6 +14,10 @@ from typing import Any
 
 from bokeh.models import ColumnDataSource, HoverTool, Label, LogScale
 
+from hpcperfstats.analysis.metrics.lib.job_host_data_scope import (
+  SHARED_HOST_WIDE_HELP_FOOTER,
+)
+
 
 def _span_x_numeric(plot: Any) -> Any:
   """
@@ -110,6 +114,8 @@ def add_job_detail_bokeh_help_marker(
   plot: Any,
   description: str,
   researcher_use: str | None = None,
+  *,
+  is_shared_node: bool = False,
 ) -> None:
   """
   Add a top-right ``?`` with HTML hover; safe to call with empty.
@@ -120,6 +126,8 @@ def add_job_detail_bokeh_help_marker(
     plot (Any): Plot passed to this helper.
     description (str): String for description.
     researcher_use (Optional[str]): Researcher use, or None when absent.
+    is_shared_node (bool): When True, append ``SHARED_HOST_WIDE_HELP_FOOTER``
+      in red (shared-node co-tenant disclaimer). Omitted when False.
 
   Returns:
     None
@@ -141,6 +149,13 @@ def add_job_detail_bokeh_help_marker(
       '<hr style="margin:0.5em 0;border:0;'
       'border-top:1px solid rgba(0,0,0,0.12);"/>'
       f'<span style="color:#333;">{html.escape(ru_str)}</span>'
+    )
+  if is_shared_node:
+    inner += (
+      '<hr style="margin:0.5em 0;border:0;'
+      'border-top:1px solid rgba(0,0,0,0.12);"/>'
+      '<span style="color:#b02a37;font-weight:600;">'
+      f"{html.escape(SHARED_HOST_WIDE_HELP_FOOTER)}</span>"
     )
   tip = (
     '<div style="max-width:28em; white-space:normal; font-weight:400;">'

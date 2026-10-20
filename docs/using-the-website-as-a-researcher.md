@@ -1,7 +1,7 @@
 # Using HPCPerfStats on the Web — Guide for Researchers and HPC Users
 
 
-This guide is for users and researchers working on clusters tracked by HPCPerfStats and focuses on using HPCPerfStats website data to understand application runtime performance and diagnostics; it was last updated on 2026-09-08.
+This guide is for users and researchers working on clusters tracked by HPCPerfStats and focuses on using HPCPerfStats website data to understand application runtime performance and diagnostics; it was last updated on 2026-10-19.
 
 
 This document is ordered so the **most decision-relevant ideas come first**. Deeper catalog-style detail appears in later sections.
@@ -48,6 +48,8 @@ This document is ordered so the **most decision-relevant ideas come first**. Dee
 5. **Open the Metrics tab** for scalar job-level summaries (averages, peaks, imbalance percentages, detail GPU/FSIO rows). Many rows have a **help icon** for definitions.
 6. **Use Device data tab** to jump into per-type detail pages (`/job/<jid>/<type>/`) for raw event families and type-level plots/tables.
 7. **Use Processes and Execution and hosts tabs** when you need command-line provenance, XALT library context, and host list verification.
+
+**Shared nodes:** When a job shared a node with other jobs, metrics and plots are filtered to that job’s samples (and GPU devices from affinity when known). Memory summaries prefer job cgroup memory. Every **?** help popover on that job ends with a **red** note that some residual signals can still be host-wide—not only this job’s share. Exclusive (sole-occupancy) jobs omit that footer.
 
 ---
 
@@ -166,7 +168,7 @@ On the page, rows are grouped under source subsections in fixed order **CPU → 
 | `avg_node_power_est_w` | Mean estimated node power | Mean estimated node power | Energy-to-solution comparisons across runs/configurations. |
 | `max_gpu_link_gbps` | Peak GPU PCIe and NVLink data rate | Peak GPU link bandwidth (PCIe/NVLink aggregate path) | Host-device/device-device transfer pressure indicator. |
 | `max_gpu_clock_event_reasons` | Peak GPU clock throttling reasons | DCGM clock-event bitmask (Job Detail shows decoded flag names; API/search stay numeric) | Named flags (power cap, thermal, sync boost, …) explain why clocks were limited; correlate with power/temp traces. |
-| `mem_hwm` | Peak process resident memory (high water mark) | High-water memory estimate from host memory telemetry (used − slab − file pages), in GiB | Compare with node RAM for host OOM risk<sup>[14](#ref-14)</sup>. |
+| `mem_hwm` | Peak process resident memory (high water mark) | Prefers job-scoped cgroup memory (`host_mem_job`) when present; otherwise NUMA host memory (used − slab − file pages), in GiB | Compare with node RAM for host OOM risk<sup>[14](#ref-14)</sup>. On shared nodes this is the job’s cgroup share, not whole-node RAM. |
 | `node_imbalance` | CPU utilization imbalance across nodes | Node-level CPU rate imbalance | High values indicate decomposition/rank imbalance. |
 | `time_imbalance` | CPU rate imbalance over job timeline | Temporal CPU imbalance across job timeline | Flags long underutilized windows or phase imbalance over time. |
 | `flops_node_imbalance` | Floating-point rate imbalance across nodes | Node-level FLOP rate imbalance | Compute work unevenly distributed across nodes. |
@@ -342,5 +344,6 @@ Use these numbered references when you want background on terms used throughout 
 | 2026-08-13 | Metrics tab: each CPU/GPU/File System/Network/Misc section keeps valued rows visible and moves non-value rows into a default-collapsed **Metrics not computed** table. |
 | 2026-08-07 | Job Detail: removed page h1 and **Full scheduling record**; **Print** sits beside breadcrumbs. `mem_hwm` reads canonical `host_mem` snake_case events (KB→GiB). |
 | 2026-09-08 | Job list: after **Project**, columns are **nodes**, **cores**, then **runtime** as **HH:MM:SS** (not seconds). |
+| 2026-10-19 | Shared-node jobs: metrics/plots job-scoped; `mem_hwm`/Summary mem prefer `host_mem_job`; red host-wide `?` footer when shared. |
 
 

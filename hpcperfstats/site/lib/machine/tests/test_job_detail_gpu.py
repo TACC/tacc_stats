@@ -87,6 +87,7 @@ def _patch_job_detail_context(api_module, jid, gpu_agg, gpu_count_cached=None):
     )
   return (
     patch.object(api_module, "_require_auth", return_value=None),
+    patch.object(api_module, "job_is_shared_node", return_value=False),
     patch.object(
       api_module, "_apply_non_staff_job_visibility", return_value=vis
     ),
@@ -366,6 +367,7 @@ def test_job_detail_gpu_from_metrics_data_skips_host_data_cache():
   vis.exists.return_value = True
   ctx = (
     patch.object(api, "_require_auth", return_value=None),
+    patch.object(api, "job_is_shared_node", return_value=False),
     patch.object(api, "_apply_non_staff_job_visibility", return_value=vis),
     patch.object(api, "get_site_content_cache_timeout", return_value=3600),
     patch.object(api, "build_job_metrics_display_list", return_value=[]),

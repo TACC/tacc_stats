@@ -33,6 +33,9 @@ from hpcperfstats.analysis.metrics.lib.gen.utils import (
   timestamps_as_cluster_naive,
   tz_aware_bokeh_tick_formatter,
 )
+from hpcperfstats.analysis.metrics.lib.job_host_data_scope import (
+  job_is_shared_node_from_jobish,
+)
 from hpcperfstats.analysis.metrics.lib.plot.bokeh_job_detail_help_marker import (
   add_job_detail_bokeh_help_marker,
 )
@@ -150,6 +153,7 @@ class DevPlot:
         f"rate or value for event {event}."
       ),
       researcher_use_for_job_detail_bokeh_plot(help_key),
+      is_shared_node=job_is_shared_node_from_jobish(self.data_provider),
     )
     log.debug("time to plot %s: %s", event, time.time() - s)
     return plot

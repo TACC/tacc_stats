@@ -1915,6 +1915,8 @@ components:
           nullable: true
         staff_artifact_contract:
           $ref: '#/components/schemas/StaffArtifactContract'
+        is_shared_node:
+          type: boolean
     JobListAggregates:
       type: object
       description: |-

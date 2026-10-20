@@ -50,6 +50,9 @@ from hpcperfstats.analysis.metrics.lib.job_detail_fsio import (
   extend_fsio_payload_lists_with_peaks,
   fsio_job_detail_catalog,
 )
+from hpcperfstats.analysis.metrics.lib.job_host_data_scope import (
+  job_is_shared_node,
+)
 from hpcperfstats.analysis.metrics.lib.plot.bokeh_job_detail_help_marker import (
   add_job_detail_bokeh_help_marker,
 )
@@ -80,7 +83,7 @@ _GPU_MULTIPRECISION_MIX_UNAVAILABLE_REASON = (
   "Missing GPU precision-width mix metrics in job metrics "
   "(need positive avg_*_active shares)."
 )
-APP_DETAIL_ARTIFACT_SCHEMA_VERSION = 12
+APP_DETAIL_ARTIFACT_SCHEMA_VERSION = 13
 
 _FSIO_FINGERPRINT_METRIC_NAMES = tuple(
   sorted(name for name, _t, _u in fsio_job_detail_catalog())
@@ -607,6 +610,7 @@ def _pie_item_from_precision_mix(
   empty_reason: str,
   help_plot_key: str,
   label_order: tuple[str, ...],
+  is_shared_node: bool = False,
 ) -> tuple[dict[str, Any] | None, str | None]:
   """
   Internal helper to handle pie item from precision mix.
@@ -617,6 +621,8 @@ def _pie_item_from_precision_mix(
     empty_reason (str): String for empty reason.
     help_plot_key (str): String for help plot key.
     label_order (tuple[str, ...]): Sequence for label order.
+    is_shared_node (bool): When True, append the shared-node host-wide
+      telemetry disclaimer to the Bokeh ``?`` help hover.
 
   Returns:
     tuple[Optional[Dict[str, Any]], Optional[str]]: tuple[Optional[Dict[str,
@@ -703,18 +709,23 @@ def _pie_item_from_precision_mix(
     p,
     description_for_job_detail_bokeh_plot(help_plot_key),
     researcher_use_for_job_detail_bokeh_plot(help_plot_key),
+    is_shared_node=is_shared_node,
   )
   return json_item(p), None
 
 
 def _multiprecision_mix_payload(
   metric_values: dict[str, float | None],
+  *,
+  is_shared_node: bool = False,
 ) -> dict[str, Any]:
   """
   Internal helper to handle multiprecision mix payload.
 
   Args:
     metric_values (Dict[str, Optional[float]]): Mapping for metric values.
+    is_shared_node (bool): When True, both pies' Bokeh ``?`` help hovers
+      append the shared-node host-wide telemetry disclaimer.
 
   Returns:
     Dict[str, Any]: Dict[str, Any] produced by this call.
@@ -732,6 +743,7 @@ def _multiprecision_mix_payload(
     empty_reason=_CPU_MULTIPRECISION_MIX_UNAVAILABLE_REASON,
     help_plot_key="jobDetailPlot_multiprecision_cpu",
     label_order=_CPU_PRECISION_LABEL_ORDER,
+    is_shared_node=is_shared_node,
   )
   gpu_plot_item, gpu_reason = _pie_item_from_precision_mix(
     precision_mix=gpu_mix,
@@ -739,6 +751,7 @@ def _multiprecision_mix_payload(
     empty_reason=_GPU_MULTIPRECISION_MIX_UNAVAILABLE_REASON,
     help_plot_key="jobDetailPlot_multiprecision_gpu",
     label_order=_GPU_PRECISION_LABEL_ORDER,
+    is_shared_node=is_shared_node,
   )
   return {
     "cpu_plot_item": cpu_plot_item,
@@ -956,7 +969,9 @@ def persist_job_detail_artifacts_for_jid(
     artifact_kind=ARTIFACT_KIND_MULTIPRECISION_MIX,
     artifact_scope="",
     input_fingerprint=fingerprint,
-    payload=_multiprecision_mix_payload(metric_values),
+    payload=_multiprecision_mix_payload(
+      metric_values, is_shared_node=job_is_shared_node(jid)
+    ),
   )
 
   for type_name in sorted((schema or {}).keys()):

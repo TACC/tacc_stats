@@ -133,9 +133,14 @@ def host_data_sum_metric_per_sample_rows(
   typ: str,
   events: list[str],
   val_col: str,
+  *,
+  jid: str | None = None,
 ) -> list[dict[str, Any]]:
   """
   Per-(host, sample time) sums via ``host_data_sum_metric_per_sample`` (#10).
+
+  When ``jid`` is set, uses inline SQL with jid / ``dev=j:<jid>`` scope
+  instead of the unscoped PG helper (shared-node co-tenant isolation).
 
   Args:
     hosts (list[str]): Hostnames.
@@ -143,6 +148,7 @@ def host_data_sum_metric_per_sample_rows(
     typ (str): ``host_data.type``.
     events (list[str]): Event names.
     val_col (str): ``arc`` or ``value``.
+    jid (str | None): Optional job id for shared-node scope.
 
   Returns:
     list[dict[str, Any]]: Rows with ``host``, ``sample_time``, ``sum_val``.
@@ -165,16 +171,42 @@ def host_data_sum_metric_per_sample_rows(
 
   if connection.vendor != "postgresql":
     return []
-  sql = (
-    "SELECT host, sample_time, sum_val "
-    "FROM host_data_sum_metric_per_sample("
-    "%s::text[], %s, %s, %s, %s::text[], %s)"
-  )
-  with connection.cursor() as cursor:
-    cursor.execute(
-      sql,
-      [list(hosts), t0, t1, typ, list(events), val_col],
+  jid_s = str(jid).strip() if jid else ""
+  if jid_s:
+    from hpcperfstats.analysis.metrics.lib.job_host_data_scope import (
+      job_host_data_scope_sql,
     )
+
+    scope = job_host_data_scope_sql(table_alias="h")
+    sql = f"""
+      SELECT h.host::text AS host,
+             h.time AS sample_time,
+             SUM(h.{val_col})::double precision AS sum_val
+      FROM host_data h
+      WHERE h.host = ANY(%s::text[])
+        AND h.time >= %s AND h.time <= %s
+        AND h.type = %s AND h.event = ANY(%s::text[])
+        AND {scope}
+      GROUP BY h.host, h.time
+    """
+    params: list[Any] = [
+      list(hosts),
+      t0,
+      t1,
+      typ,
+      list(events),
+      jid_s,
+      jid_s,
+    ]
+  else:
+    sql = (
+      "SELECT host, sample_time, sum_val "
+      "FROM host_data_sum_metric_per_sample("
+      "%s::text[], %s, %s, %s, %s::text[], %s)"
+    )
+    params = [list(hosts), t0, t1, typ, list(events), val_col]
+  with connection.cursor() as cursor:
+    cursor.execute(sql, params)
     return [
       {"host": h, "time": st, "sum_val": float(sv) if sv is not None else 0.0}
       for h, st, sv in cursor.fetchall()
@@ -190,6 +222,7 @@ def job_arc_cluster_aggregate_value(
   *,
   nonnegative_rate: bool = False,
   host_aggregate: str = "mean",
+  jid: str | None = None,
 ) -> float | None:
   """
   Five-minute ``job_arc`` aggregate, one host batch over the full window.
@@ -206,6 +239,7 @@ def job_arc_cluster_aggregate_value(
     conv (float): Unit conversion applied after per-bucket mean.
     nonnegative_rate (bool): Drop negative ``arc`` before aggregation.
     host_aggregate (str): ``mean`` (default) or ``sum`` across per-host means.
+    jid (str | None): Optional job id for shared-node jid / ``j:`` scope.
 
   Returns:
     float | None: Count-weighted mean, or the sum of per-host means, or
@@ -240,8 +274,18 @@ def job_arc_cluster_aggregate_value(
     _is_statement_timeout_error,
     _iter_acct_host_batches,
   )
+  from hpcperfstats.analysis.metrics.lib.job_host_data_scope import (
+    job_host_data_scope_sql,
+  )
 
   arc_filter = " AND arc >= 0" if nonnegative_rate else ""
+  jid_s = str(jid).strip() if jid else ""
+  if jid_s:
+    scope = " AND " + job_host_data_scope_sql(table_alias="")
+    scope_params: list[Any] = [jid_s, jid_s]
+  else:
+    scope = ""
+    scope_params = []
   sql = f"""
     WITH sample AS (
       SELECT host, time, SUM(arc)::double precision AS arc
@@ -250,6 +294,7 @@ def job_arc_cluster_aggregate_value(
         AND time >= %s AND time <= %s
         AND type = %s AND event = ANY(%s::text[])
         {arc_filter}
+        {scope}
       GROUP BY host, time
     ),
     bucketed AS (
@@ -287,7 +332,7 @@ def job_arc_cluster_aggregate_value(
       with connection.cursor() as cursor:
         cursor.execute(
           sql,
-          [chunk, t0, t1, typ, list(events), float(conv)],
+          [chunk, t0, t1, typ, list(events), *scope_params, float(conv)],
         )
         row = cursor.fetchone()
     except OperationalError as exc:

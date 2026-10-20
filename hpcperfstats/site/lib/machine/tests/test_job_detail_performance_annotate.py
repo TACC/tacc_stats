@@ -117,6 +117,9 @@ def test_job_detail_serializes_annotated_job_row():
     )
     stack.enter_context(patch.object(api, "_require_auth", return_value=None))
     stack.enter_context(
+      patch.object(api, "job_is_shared_node", return_value=False)
+    )
+    stack.enter_context(
       patch.object(api, "_apply_non_staff_job_visibility", return_value=vis)
     )
     stack.enter_context(

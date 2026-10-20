@@ -15,6 +15,12 @@ describe("jobMetricSourceSectionId", () => {
     ).toBe("cpu");
   });
 
+  it("maps host_mem_job (shared-node job-scoped cgroup memory) to CPU", () => {
+    expect(jobMetricSourceSectionId({ type: "host_mem_job", metric: "mem_hwm" })).toBe(
+      "cpu",
+    );
+  });
+
   it("maps legacy mem/numa/opa types out of Misc", () => {
     expect(jobMetricSourceSectionId({ type: "mem", metric: "mem_hwm" })).toBe("cpu");
     expect(

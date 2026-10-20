@@ -342,6 +342,7 @@ export const WIRE_AUDIT_CASES: WireAuditCase[] = [
       multiprecision_cpu_unavailable_reason: null,
       multiprecision_gpu_unavailable_reason: null,
       derived_data_status: "ready",
+      is_shared_node: false,
       staff_metrics_distinct_time_count: null,
       staff_artifact_contract: {
         current_plot: 11,

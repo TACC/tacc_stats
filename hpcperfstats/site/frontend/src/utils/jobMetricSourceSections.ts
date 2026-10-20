@@ -46,6 +46,8 @@ const EXACT_TYPE_SECTION: Record<string, JobMetricSourceSectionId> = {
   host_cpu: "cpu",
   host_cpu_hw: "cpu",
   host_mem: "cpu",
+  /** Shared-node job-scoped cgroup memory (dev=j:<jid>); not NUMA host_mem. */
+  host_mem_job: "cpu",
   host_numa: "cpu",
   /** Legacy persisted metrics_data types (pre host_* rename). */
   mem: "cpu",

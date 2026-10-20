@@ -1,6 +1,7 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { VariableInfoLabel } from "./VariableInfoLabel";
+import { SHARED_HOST_WIDE_HELP_FOOTER } from "../utils/sharedNodeHelpFooter";
 
 describe("VariableInfoLabel", () => {
   beforeEach(() => {
@@ -145,6 +146,43 @@ describe("VariableInfoLabel", () => {
     );
     expect(screen.queryByTestId("variable-info-close")).not.toBeInTheDocument();
     expect(screen.queryByTestId("variable-info-tooltip")).not.toBeInTheDocument();
+  });
+
+  it("appends the shared-node host-wide-telemetry footer when isSharedNode is true", () => {
+    render(
+      <VariableInfoLabel
+        variableName="avg_cpuusage"
+        labelText="avg_cpuusage"
+        enableHelp
+        isSharedNode
+      />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: /help: avg_cpuusage/i }));
+    const panel = screen.getByTestId("variable-info-tooltip");
+    const footer = screen.getByTestId("variable-info-shared-node-footer");
+    expect(footer).toHaveTextContent(SHARED_HOST_WIDE_HELP_FOOTER);
+    expect(panel).toContainElement(footer);
+  });
+
+  it("omits the shared-node footer when isSharedNode is false (exclusive job)", () => {
+    render(
+      <VariableInfoLabel
+        variableName="avg_cpuusage"
+        labelText="avg_cpuusage"
+        enableHelp
+        isSharedNode={false}
+      />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: /help: avg_cpuusage/i }));
+    expect(screen.queryByTestId("variable-info-shared-node-footer")).not.toBeInTheDocument();
+  });
+
+  it("omits the shared-node footer by default when isSharedNode is not passed", () => {
+    render(
+      <VariableInfoLabel variableName="avg_cpuusage" labelText="avg_cpuusage" enableHelp />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: /help: avg_cpuusage/i }));
+    expect(screen.queryByTestId("variable-info-shared-node-footer")).not.toBeInTheDocument();
   });
 
   it("closes pinned help panel on Escape", async () => {

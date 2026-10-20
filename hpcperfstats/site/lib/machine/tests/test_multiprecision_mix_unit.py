@@ -101,7 +101,26 @@ def test_multiprecision_cpu_pie_includes_grace_int_wedges():
   )
   assert mix == {"FP64": 10.0, "FP32": 20.0, "INT16": 30.0, "INT8": 40.0}
   assert jda._CPU_PRECISION_LABEL_ORDER == ("FP64", "FP32", "INT16", "INT8")
-  assert jda.APP_DETAIL_ARTIFACT_SCHEMA_VERSION == 12
+  assert jda.APP_DETAIL_ARTIFACT_SCHEMA_VERSION == 13
+
+
+def test_multiprecision_mix_payload_appends_shared_node_footer_to_both_pies():
+  metric_values = {
+    "avg_flops64b": 30.0,
+    "avg_flops32b": 70.0,
+    "avg_tensor_active": 12.0,
+  }
+  payload = jda._multiprecision_mix_payload(metric_values, is_shared_node=True)
+  cpu_doc = json.dumps(payload["cpu_plot_item"])
+  gpu_doc = json.dumps(payload["gpu_plot_item"])
+  assert "shared node" in cpu_doc
+  assert "shared node" in gpu_doc
+
+  payload_exclusive = jda._multiprecision_mix_payload(
+    metric_values, is_shared_node=False
+  )
+  assert "shared node" not in json.dumps(payload_exclusive["cpu_plot_item"])
+  assert "shared node" not in json.dumps(payload_exclusive["gpu_plot_item"])
 
 
 def test_multiprecision_pie_legend_below_frame_with_long_labels():

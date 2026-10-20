@@ -567,6 +567,7 @@ class TestJobDetailView:
 
     with (
       patch.object(api, "_require_auth", return_value=None),
+      patch.object(api, "job_is_shared_node", return_value=False),
       patch.object(
         api,
         "_get_visible_job_or_error_response",
@@ -608,6 +609,7 @@ class TestJobDetailView:
     ser_data = {"jid": "j1"}
     with (
       patch.object(api, "_require_auth", return_value=None),
+      patch.object(api, "job_is_shared_node", return_value=False),
       patch.object(
         api,
         "_get_visible_job_or_error_response",
@@ -1249,6 +1251,7 @@ class TestJobDetailXaltFetch:
 
     with (
       patch.object(api, "_require_auth", return_value=None),
+      patch.object(api, "job_is_shared_node", return_value=False),
       patch.object(
         api,
         "_get_visible_job_or_error_response",
@@ -1305,6 +1308,7 @@ class TestJobDetailXaltFetch:
 
     with (
       patch.object(api, "_require_auth", return_value=None),
+      patch.object(api, "job_is_shared_node", return_value=False),
       patch.object(
         api,
         "_get_visible_job_or_error_response",
@@ -1734,6 +1738,7 @@ class TestJobDetailCoverageClosure:
 
     with (
       patch.object(api, "_require_auth", return_value=None),
+      patch.object(api, "job_is_shared_node", return_value=False),
       patch.object(
         api,
         "_get_visible_job_or_error_response",
@@ -1770,6 +1775,7 @@ class TestJobDetailCoverageClosure:
 
     with (
       patch.object(api, "_require_auth", return_value=None),
+      patch.object(api, "job_is_shared_node", return_value=False),
       patch.object(
         api,
         "_get_visible_job_or_error_response",
@@ -1841,6 +1847,7 @@ class TestJobDetailCoverageClosure:
 
     with (
       patch.object(api, "_require_auth", return_value=None),
+      patch.object(api, "job_is_shared_node", return_value=False),
       patch.object(
         api,
         "_get_visible_job_or_error_response",
@@ -1908,6 +1915,7 @@ class TestJobDetailCoverageClosure:
 
     with (
       patch.object(api, "_require_auth", return_value=None),
+      patch.object(api, "job_is_shared_node", return_value=False),
       patch.object(
         api,
         "_get_visible_job_or_error_response",
@@ -1964,6 +1972,7 @@ class TestJobDetailCoverageClosure:
 
     with (
       patch.object(api, "_require_auth", return_value=None),
+      patch.object(api, "job_is_shared_node", return_value=False),
       patch.object(
         api,
         "_get_visible_job_or_error_response",
@@ -2213,6 +2222,7 @@ class TestJobDetailRemainingKeysClosure:
 
     with (
       patch.object(api, "_require_auth", return_value=None),
+      patch.object(api, "job_is_shared_node", return_value=False),
       patch.object(
         api,
         "_get_visible_job_or_error_response",

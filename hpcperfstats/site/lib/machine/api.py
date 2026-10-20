@@ -109,6 +109,9 @@ class _JSONResponse(Response):
 
 
 from hpcperfstats.analysis.metrics.lib.gen.jid_table import _as_host_data_fqdn
+from hpcperfstats.analysis.metrics.lib.job_host_data_scope import (
+  job_is_shared_node,
+)
 from hpcperfstats.analysis.metrics.lib.metrics import (
   build_job_metrics_display_list,
   job_metrics_catalog_entries,
@@ -3926,6 +3929,7 @@ def job_detail(request: Any, pk: Any) -> Any:
     "metrics_list": metrics_list,
     "proc_list": proc_list,
     "derived_data_status": "ready" if detail_payload else "loading",
+    "is_shared_node": job_is_shared_node(job.jid),
   }
   if "multiprecision" not in defer_set:
     payload["multiprecision_cpu_plot_item"] = multiprecision_payload.get(

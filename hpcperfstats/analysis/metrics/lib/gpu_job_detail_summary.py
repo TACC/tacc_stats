@@ -21,12 +21,43 @@ from typing import Any
 from django.db.models import Avg, Count, Max
 
 from hpcperfstats.analysis.metrics.lib.gen import jid_table as jid_table_mod
+from hpcperfstats.analysis.metrics.lib.job_host_data_scope import (
+  apply_gpu_affinity_dev_filter,
+  apply_job_host_data_scope,
+  gpu_devs_for_job,
+)
 from hpcperfstats.dbload.lib import conf_parser as cfg
 from hpcperfstats.lib.dcgm_blank import DCGM_FP64_BLANK, is_dcgm_numeric_blank
 from hpcperfstats.site.lib.machine.models import host_data
 
 GPU_TYPE_PRECEDENCE: tuple[str, ...] = ("nvidia_gpu", "amd_gpu", "intel_gpu")
 _GPU_UTIL_EVENTS = ("gpu_util", "utilization")
+
+
+def _coerce_job_jid(j: Any) -> str | None:
+  """
+  Return a real job id string from a job-like object, or ``None``.
+
+  Ignores non-string/int stubs (for example bare ``MagicMock`` attributes)
+  so unit tests without a jid do not trigger affinity ORM lookups.
+
+  Args:
+    j (Any): Job record or mapping.
+
+  Returns:
+    str | None: Stripped jid, or ``None`` when unset/invalid.
+
+  Examples:
+    >>> _coerce_job_jid(type("J", (), {"jid": "42"})())
+    '42'
+  """
+  jid = getattr(j, "jid", None)
+  if jid is None and isinstance(j, dict):
+    jid = j.get("jid")
+  if not isinstance(jid, (str, int)):
+    return None
+  s = str(jid).strip()
+  return s or None
 
 
 def _blank_excluded_value_q(field: str = "value") -> Any:
@@ -69,9 +100,14 @@ def _collect_gpu_annotate_rows(
   events: Any,
   group_fields: Any,
   annotate_kwargs: Any,
+  jid: Any | None = None,
+  affinity_devs: list[str] | None = None,
 ) -> list[dict]:
   """
   Hostxtime chunked annotate query with statement_timeout split/retry.
+
+  When ``jid`` is set, rows are restricted to that job's ``jid`` /
+  ``dev=j:<jid>`` scope and optional ``job_affinity.gpu_list`` devices.
 
   Args:
     hosts (Any): Accounting hosts.
@@ -80,6 +116,8 @@ def _collect_gpu_annotate_rows(
     events (Any): Event name or list for ``event`` / ``event__in``.
     group_fields (Any): ``.values(...)`` grouping fields.
     annotate_kwargs (Any): Annotate kwargs (Count/Max/Avg).
+    jid (Any | None): Optional job id for shared-node scope.
+    affinity_devs (list[str] | None): Precomputed ``gpu_devs_for_job`` result.
 
   Returns:
     List[dict]: Folded annotate rows across chunks.
@@ -103,6 +141,10 @@ def _collect_gpu_annotate_rows(
   else:
     event_filter = {"event": events}
   group = list(group_fields)
+  jid_s = str(jid) if jid else ""
+  aff = affinity_devs
+  if aff is None and jid_s:
+    aff = gpu_devs_for_job(jid_s)
 
   def run(hosts_list: Any, tf_cur: Any) -> Any:
     """
@@ -119,18 +161,17 @@ def _collect_gpu_annotate_rows(
       >>> True
       True
     """
-    qs = (
-      host_data.objects.filter(
-        type=gpu_typ,
-        host__in=hosts_list,
-        **_blank_excluded_value_q("value"),
-        **event_filter,
-        **(tf_cur or {}),
-      )
-      .values(*group)
-      .annotate(**annotate_kwargs)
+    qs = host_data.objects.filter(
+      type=gpu_typ,
+      host__in=hosts_list,
+      **_blank_excluded_value_q("value"),
+      **event_filter,
+      **(tf_cur or {}),
     )
-    return list(qs)
+    if jid_s:
+      qs = apply_job_host_data_scope(qs, jid_s)
+      qs = apply_gpu_affinity_dev_filter(qs, jid_s, affinity_devs=aff)
+    return list(qs.values(*group).annotate(**annotate_kwargs))
 
   all_rows: list[dict] = []
   for host_chunk, tf in jid_table_mod._iter_host_time_query_chunks(
@@ -180,6 +221,8 @@ def gpu_agg_rows_for_job_window(j: Any) -> list[dict]:
   if not hosts:
     return []
   tkw = _job_window_time_filter(j)
+  jid = _coerce_job_jid(j)
+  aff = gpu_devs_for_job(jid) if jid else None
   for gpu_typ in GPU_TYPE_PRECEDENCE:
     out = _collect_gpu_annotate_rows(
       hosts,
@@ -192,6 +235,8 @@ def gpu_agg_rows_for_job_window(j: Any) -> list[dict]:
         "vmax": Max("value"),
         "vmean": Avg("value"),
       },
+      jid=jid,
+      affinity_devs=aff,
     )
     if out:
       return out
@@ -215,6 +260,8 @@ def gpu_count_total_for_job_window(j: Any) -> int | None:
   if not hosts:
     return None
   tkw = _job_window_time_filter(j)
+  jid = _coerce_job_jid(j)
+  aff = gpu_devs_for_job(jid) if jid else None
   for gpu_typ in GPU_TYPE_PRECEDENCE:
     rows = _collect_gpu_annotate_rows(
       hosts,
@@ -223,6 +270,8 @@ def gpu_count_total_for_job_window(j: Any) -> int | None:
       events="gpu_count",
       group_fields=["host"],
       annotate_kwargs={"mv": Max("value")},
+      jid=jid,
+      affinity_devs=aff,
     )
     if not rows:
       continue
@@ -260,6 +309,8 @@ def gpu_inventory_for_job_window(j: Any) -> list[dict]:
   if not hosts:
     return []
   tkw = _job_window_time_filter(j)
+  jid = _coerce_job_jid(j)
+  aff = gpu_devs_for_job(jid) if jid else None
   for gpu_typ in GPU_TYPE_PRECEDENCE:
     util_rows = _collect_gpu_annotate_rows(
       hosts,
@@ -272,6 +323,8 @@ def gpu_inventory_for_job_window(j: Any) -> list[dict]:
         "vmax": Max("value"),
         "vmean": Avg("value"),
       },
+      jid=jid,
+      affinity_devs=aff,
     )
     if not util_rows:
       continue
@@ -282,6 +335,8 @@ def gpu_inventory_for_job_window(j: Any) -> list[dict]:
       events="power_usage",
       group_fields=["host", "dev"],
       annotate_kwargs={"pmax": Max("value")},
+      jid=jid,
+      affinity_devs=aff,
     )
     per_device: dict = {}
     for r in util_rows:

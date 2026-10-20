@@ -75,6 +75,7 @@ JOB_DETAIL_WIRE_BASE = {
   "fsio": {},
   "schema": {},
   "derived_data_status": "ready",
+  "is_shared_node": False,
   "client_url": "https://example.test/logs",
   "server_url": "https://example.test/server-logs",
   "multiprecision_cpu_plot_item": None,
@@ -156,3 +157,17 @@ def test_job_detail_wire_with_staff_artifact_contract_matches_openapi_serializer
     data=JOB_DETAIL_WIRE_STAFF_ARTIFACT_CONTRACT
   )
   assert ser.is_valid(), ser.errors
+
+
+JOB_DETAIL_WIRE_SHARED_NODE = {
+  **JOB_DETAIL_WIRE_BASE,
+  "is_shared_node": True,
+}
+
+
+@pytest.mark.django_db(databases=[])
+def test_job_detail_wire_with_shared_node_true_matches_openapi_serializers():
+  """job_is_shared_node(jid)=True wire shape (shared-node help footer gate)."""
+  ser = JobDetailResponseSerializer(data=JOB_DETAIL_WIRE_SHARED_NODE)
+  assert ser.is_valid(), ser.errors
+  assert ser.validated_data["is_shared_node"] is True

@@ -58,6 +58,7 @@ def _patch_job_detail_for_staff_count(
 
   return (
     patch.object(api_module, "_require_auth", return_value=None),
+    patch.object(api_module, "job_is_shared_node", return_value=False),
     patch.object(
       api_module, "_apply_non_staff_job_visibility", return_value=vis_qs
     ),

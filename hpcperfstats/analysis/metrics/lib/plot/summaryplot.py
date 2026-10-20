@@ -796,20 +796,13 @@ _SUMMARY_SINGLE_SPECS = [
     _BYTES_TO_GB,
     "GPU link [GB/s]",
   ),
-  (
-    "host_mem",
-    "value",
-    ["mem_used"],
-    "mem",
-    1 / (1024 * 1024),
-    "CPU mem [GB]",
-  ),
 ]
 
 # Metrics that may be sampled on a sparse (host, time) grid vs the union grid from
 # get_host_time_df(); do not drop the column when a left-merge leaves NaN gaps.
 _SUMMARY_ALLOW_PARTIAL_NULL = frozenset(
   {
+    "mem",
     "nv_gpu_util",
     "nv_mem_used_mb",
     "nv_mem_total_mb",
@@ -1101,6 +1094,43 @@ def _merge_amd_df_mbw(df: Any, jt: Any) -> Any:
   return df
 
 
+def _merge_summary_mem_prefer_job(df: Any, jt: Any) -> Any:
+  """
+  Left-merge Summary ``mem``: prefer ``host_mem_job``, else NUMA ``host_mem``.
+
+  Accepts partial coverage (shared-node cgroup samples need not fill every
+  host/time cell). Does not fold ``host_mem_job`` into ``host_mem_type_names``.
+
+  Args:
+    df (Any): Summary base DataFrame (host, time, …).
+    jt (Any): ``jid_table`` with ``get_aggregate_df``.
+
+  Returns:
+    Any: ``df`` with ``mem`` column when any series is present.
+
+  Examples:
+    >>> _merge_summary_mem_prefer_job(None, None)  # doctest: +SKIP
+  """
+  conv = 1 / (1024 * 1024)
+  for typ, events in (
+    ("host_mem_job", ["mem_used"]),
+    ("host_mem", ["mem_used"]),
+  ):
+    agg = _get_agg_if_feasible(jt, typ, "value", events, conv)
+    if agg.empty or "sum_val" not in agg.columns:
+      continue
+    merged = df.merge(
+      agg[["host", "time", "sum_val"]],
+      on=["host", "time"],
+      how="left",
+    )
+    merged["mem"] = merged["sum_val"]
+    merged.drop(columns=["sum_val"], inplace=True)
+    if "mem" in merged.columns and merged["mem"].notna().any():
+      return merged
+  return df
+
+
 def _merge_first_full_coverage(
   df: Any,
   jt: Any,
@@ -1367,6 +1397,22 @@ def iter_summary_aggregate_attempts() -> Iterator[Any]:
       yield "nvidia_gpu", "value", ["utilization"], name, conv, label
       continue
     yield typ, val, events, name, conv, label
+  yield (
+    "host_mem_job",
+    "value",
+    ["mem_used"],
+    "mem",
+    1 / (1024 * 1024),
+    "CPU mem [GB]",
+  )
+  yield (
+    "host_mem",
+    "value",
+    ["mem_used"],
+    "mem",
+    1 / (1024 * 1024),
+    "CPU mem [GB]",
+  )
   for fw in _SUMMARY_FIRST_WIN_SPECS:
     for typ, events, conv in fw["tries"]:
       yield typ, fw["val_col"], events, fw["name"], conv, fw["label"]
@@ -1389,6 +1435,16 @@ def _summary_metric_specs() -> Any:
     >>> _summary_metric_specs()  # doctest: +SKIP
   """
   out = list(_SUMMARY_SINGLE_SPECS)
+  out.append(
+    (
+      "host_mem_job",
+      "value",
+      ["mem_used"],
+      "mem",
+      1 / (1024 * 1024),
+      "CPU mem [GB]",
+    )
+  )
   for fw in _SUMMARY_FIRST_WIN_SPECS:
     out.append(("", fw["val_col"], [], fw["name"], 0, fw["label"]))
   out.append(("intel_imc", "arc", [], "mbw", _CAS_BW_CONV, "CPU DRAMBW[GB/s]"))
@@ -1765,7 +1821,16 @@ class SummaryPlot:
       f"Time: sample timestamp (cluster timezone) on the X axis. "
       f"Y ({label_text}): {doc_text}"
     )
-    add_job_detail_bokeh_help_marker(plot, help_body, researcher_use)
+    from hpcperfstats.analysis.metrics.lib.job_host_data_scope import (
+      job_is_shared_node_from_jobish,
+    )
+
+    add_job_detail_bokeh_help_marker(
+      plot,
+      help_body,
+      researcher_use,
+      is_shared_node=job_is_shared_node_from_jobish(self.jt),
+    )
     log.debug("time to plot %s: %s", metric, time.time() - s)
     return plot
 
@@ -1832,6 +1897,7 @@ class SummaryPlot:
       log.debug("time to compute %s: %s", name, time.time() - s)
 
     df = _merge_nvidia_gpu_util_column(df, self.jt)
+    df = _merge_summary_mem_prefer_job(df, self.jt)
 
     for fw in _SUMMARY_FIRST_WIN_SPECS:
       s = time.time()
