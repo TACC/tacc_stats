@@ -205,6 +205,8 @@ def test_job_is_shared_node_database_error_fail_open():
 def test_shared_host_wide_help_footer_copy():
   assert "shared node" in SHARED_HOST_WIDE_HELP_FOOTER.lower()
   assert "host-wide" in SHARED_HOST_WIDE_HELP_FOOTER.lower()
+  assert "cpu" in SHARED_HOST_WIDE_HELP_FOOTER.lower()
+  assert "affinity" in SHARED_HOST_WIDE_HELP_FOOTER.lower()
 
 
 def test_co_tenant_q_excludes_other_job_children():

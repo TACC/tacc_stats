@@ -8,5 +8,6 @@
  * ``?`` help marker server-side) only when the job ran on a shared node.
  */
 export const SHARED_HOST_WIDE_HELP_FOOTER: string =
-  "This job ran on a shared node. Values may include host-wide telemetry, " +
-  "not only this job's share.";
+  "This job ran on a shared node. CPU, GPU, and job memory are scoped to " +
+  "this job when affinity or cgroup data is available; some other counters " +
+  "may still be host-wide.";

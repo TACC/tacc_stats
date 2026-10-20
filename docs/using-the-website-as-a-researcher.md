@@ -49,7 +49,7 @@ This document is ordered so the **most decision-relevant ideas come first**. Dee
 6. **Use Device data tab** to jump into per-type detail pages (`/job/<jid>/<type>/`) for raw event families and type-level plots/tables.
 7. **Use Processes and Execution and hosts tabs** when you need command-line provenance, XALT library context, and host list verification.
 
-**Shared nodes:** When a job shared a node with other jobs, metrics and plots are filtered to that job’s samples (and GPU devices from affinity when known). Memory summaries prefer job cgroup memory. Every **?** help popover on that job ends with a **red** note that some residual signals can still be host-wide—not only this job’s share. Exclusive (sole-occupancy) jobs omit that footer.
+**Shared nodes:** When a job shared a node with other jobs, metrics and plots are filtered to that job’s samples (CPU via affinity-filtered jid payloads, GPU devices from affinity when known). Memory summaries prefer job cgroup memory. Every **?** help popover on that job ends with a **red** note that CPU/GPU/job memory are job-scoped when affinity or cgroup data exists, while some other counters may still be host-wide. Exclusive (sole-occupancy) jobs omit that footer.
 
 ---
 
@@ -345,5 +345,6 @@ Use these numbered references when you want background on terms used throughout 
 | 2026-08-07 | Job Detail: removed page h1 and **Full scheduling record**; **Print** sits beside breadcrumbs. `mem_hwm` reads canonical `host_mem` snake_case events (KB→GiB). |
 | 2026-09-08 | Job list: after **Project**, columns are **nodes**, **cores**, then **runtime** as **HH:MM:SS** (not seconds). |
 | 2026-10-19 | Shared-node jobs: metrics/plots job-scoped; `mem_hwm`/Summary mem prefer `host_mem_job`; red host-wide `?` footer when shared. |
+| 2026-10-20 | Shared-node `?` footer: CPU/GPU/job memory job-scoped when affinity/cgroup present; residual counters may still be host-wide. |
 
 

@@ -725,7 +725,7 @@ def _multiprecision_mix_payload(
   Args:
     metric_values (Dict[str, Optional[float]]): Mapping for metric values.
     is_shared_node (bool): When True, both pies' Bokeh ``?`` help hovers
-      append the shared-node host-wide telemetry disclaimer.
+      append the shared-node help footer (job-scoped CPU/GPU/mem note).
 
   Returns:
     Dict[str, Any]: Dict[str, Any] produced by this call.
