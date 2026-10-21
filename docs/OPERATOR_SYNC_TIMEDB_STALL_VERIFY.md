@@ -201,7 +201,7 @@ See also (listend note retained):
 
 When `hpcperfstats_codon_parse` pyext is **not** on `PYTHONPATH` / `LD_LIBRARY_PATH`, ingest stays on CPython `IncrementalStatsParser` (fail-closed). No stall signature change.
 
-**FT ABI note (2026-10-21):** Codon 0.20.4 class-free pyext loads under GIL `/opt/python3.14` after post-link (`codon_pyext_gil=pass`). Import under free-threaded `/opt/python3.14t` currently segfaults in `PyInit_*` (`codon_pyext_314t=fail_ft_abi`). Pipeline daemons stay on 3.14t with fail-closed CPython until that ABI gap is fixed — do **not** put the GIL-only `.so` on the pipeline `PYTHONPATH`.
+**FT ABI note (2026-10-21):** Free-threaded `/opt/python3.14t` loads the class-free Codon module only when built with `experiments/codon/build_codon_ext_in_pipeline.sh` (`codon_pyext_314t=pass`: multi-phase `Py_MOD_GIL_USED` wrapper + `--lib` C-ABI fingerprint, both `.so` files on `PYTHONPATH`). Do **not** deploy stock Codon `--pyext` `PyInit` artifacts (GIL-ABI; FT import/call failures). Pipeline stays fail-closed CPython until those two artifacts are present and the FT smoke passes.
 
 When the extension **is** loaded on a compatible ABI (fingerprint API or full `parse_stats_lines_codon`):
 

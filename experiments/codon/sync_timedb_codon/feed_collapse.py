@@ -493,7 +493,7 @@ def feed_and_collapse(lines: List[str]) -> Tuple[int, int, float, float]:
 def feed_and_collapse_fingerprint(
     lines: List[str],
 ) -> Tuple[int, int, float, float]:
-  """pyext export used by sync_timedb_codon_bridge."""
+  """Fingerprint API used by sync_timedb_codon_bridge / CPython tests."""
   return feed_and_collapse(lines)
 
 
