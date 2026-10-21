@@ -10,6 +10,8 @@ Attributes:
   JOB_PLOT_KIND_SPECS: Attribute.
   JOB_PLOT_LAYOUT_NORMAL: Attribute.
   JOB_PLOT_LAYOUT_ZOOM_V3: Attribute.
+  LIVE_DISTINCT_MAX_HOSTS: Max hosts for optional live-distinct SQL probe.
+  LIVE_DISTINCT_MAX_HOST_HOURS: Max host-hours for optional live-distinct probe.
   PAYLOAD_ENCODING_GZIP_JSON: Attribute.
   logger: Attribute.
 """
@@ -40,6 +42,10 @@ from .bokeh_plot_layout import (
 from .models import job_data, job_plot_artifact
 
 logger = logging.getLogger(__name__)
+
+# Circuit-break optional live-distinct freshen before expensive host_data SQL.
+LIVE_DISTINCT_MAX_HOSTS = 8
+LIVE_DISTINCT_MAX_HOST_HOURS = 96.0
 
 
 class JobPlotKindSpec(NamedTuple):
@@ -197,8 +203,11 @@ def get_live_distinct_time_count_for_jid(jid: str) -> int:
   Live per-job distinct sample times (PostgreSQL); else persisted count.
 
   Prefer ``telemetry_first_time`` / ``telemetry_last_time`` when set; pass
-  ``host_list`` into the PG function. On ``DatabaseError`` (statement
-  timeout), return persisted ``metrics_distinct_time_count`` or ``0``.
+  ``host_list`` into the PG function. Skip the SQL probe when
+  ``len(hosts) > LIVE_DISTINCT_MAX_HOSTS`` or host-hours exceeds
+  ``LIVE_DISTINCT_MAX_HOST_HOURS`` (same outcome as fail-open, no DB burn).
+  On ``DatabaseError`` (statement timeout), return persisted
+  ``metrics_distinct_time_count`` or ``0``.
 
   Args:
     jid (str): Job id string.
@@ -224,8 +233,9 @@ def get_live_distinct_time_count_for_jid(jid: str) -> int:
   if not row:
     return 0
   persisted = row.get("metrics_distinct_time_count")
+  persisted_i = int(persisted) if persisted is not None else 0
   if connection.vendor != "postgresql":
-    return int(persisted) if persisted is not None else 0
+    return persisted_i
   t0 = row.get("telemetry_first_time") or row.get("start_time")
   t1 = row.get("telemetry_last_time") or row.get("end_time")
   if t0 is None or t1 is None:
@@ -233,6 +243,12 @@ def get_live_distinct_time_count_for_jid(jid: str) -> int:
   hosts = list(row.get("host_list") or [])
   if not hosts:
     return 0
+  hours = max(0.0, (t1 - t0).total_seconds() / 3600.0)
+  if (
+    len(hosts) > LIVE_DISTINCT_MAX_HOSTS
+    or len(hosts) * hours > LIVE_DISTINCT_MAX_HOST_HOURS
+  ):
+    return persisted_i
   from hpcperfstats.analysis.metrics.lib.metrics_host_data_sql import (
     jid_scoped_distinct_host_time_count,
   )
@@ -240,7 +256,7 @@ def get_live_distinct_time_count_for_jid(jid: str) -> int:
   try:
     return jid_scoped_distinct_host_time_count(jid, t0, t1, hosts=hosts)
   except DatabaseError:
-    return int(persisted) if persisted is not None else 0
+    return persisted_i
 
 
 def compute_plot_input_fingerprint(

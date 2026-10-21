@@ -1,8 +1,17 @@
-"""Set-based PostgreSQL helpers for metrics / update_metrics offload paths."""
+"""
+Set-based PostgreSQL helpers for metrics / update_metrics offload paths.
+
+Attributes:
+  LIVE_DISTINCT_STATEMENT_TIMEOUT_MS: Local statement_timeout (ms) for live
+    distinct freshen probes.
+"""
 
 from __future__ import annotations
 
 from typing import Any
+
+# Short budget for optional live-distinct freshen (not portal default ~120s).
+LIVE_DISTINCT_STATEMENT_TIMEOUT_MS = 15000
 
 
 def in_window_per_host_min_max_rows(
@@ -61,6 +70,9 @@ def jid_scoped_distinct_host_time_count(
   """
   Live distinct sample count for one job window via ``jid_scoped_distinct_host_time_count`` (#8).
 
+  Runs under ``SET LOCAL statement_timeout`` of
+  ``LIVE_DISTINCT_STATEMENT_TIMEOUT_MS`` so soft-fail cancels quickly.
+
   Args:
     jid (str): Job id.
     start (Any): Window start (timestamptz).
@@ -75,7 +87,7 @@ def jid_scoped_distinct_host_time_count(
     >>> jid_scoped_distinct_host_time_count("", None, None)  # doctest: +SKIP
     0
   """
-  from django.db import connection
+  from django.db import connection, transaction
 
   if (
     connection.vendor != "postgresql" or not jid or start is None or end is None
@@ -83,7 +95,11 @@ def jid_scoped_distinct_host_time_count(
     return 0
   host_list = list(hosts) if hosts else None
   sql = "SELECT jid_scoped_distinct_host_time_count(%s, %s, %s, %s::text[])"
-  with connection.cursor() as cursor:
+  with transaction.atomic(), connection.cursor() as cursor:
+    cursor.execute(
+      "SET LOCAL statement_timeout = %s",
+      [LIVE_DISTINCT_STATEMENT_TIMEOUT_MS],
+    )
     cursor.execute(sql, [str(jid), start, end, host_list])
     row = cursor.fetchone()
   if not row or row[0] is None:
