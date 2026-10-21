@@ -197,6 +197,16 @@ See also (listend note retained):
 
 **After listend Redis `monitor_identity` on `$` rotation (2026-08):** identity SET is **Redis-only** on the existing `$` schema-rotation / `recent_host` worker path. It must **not** change RabbitMQ ack timing, pause/resume watermarks, sample completeness, or the archive/DB-ingest gate. Pre-deploy still run `tests/run_sync_timedb_regression_battery.sh` as a **no-regression guard** when `listend.py` touched the `$` branch; post-deploy **no T2 stall campaign** is required for this feature alone — confirm listend still acks and archives `$` payloads, and Admin Monitor can join `monitor_identity:{fqdn}` when present (`$build` optional until monitor RPM).
 
+## Codon parse bridge (optional hot path)
+
+When `hpcperfstats_codon_parse` pyext is **not** on `PYTHONPATH` / `LD_LIBRARY_PATH`, ingest stays on CPython `IncrementalStatsParser` (fail-closed). No stall signature change.
+
+When the extension **is** loaded (fingerprint API or full `parse_stats_lines_codon`):
+
+1. Confirm process ABI is still **`/opt/python3.14t/bin/python`** (`readlink /proc/<sync_timedb pid>/exe`).
+2. Grep for Codon fallback warnings: `codon feed_and_collapse failed` / `codon parse extension unavailable` — sustained flood means disable via `HPCPERFSTATS_CODON_PARSE_DISABLE=1` (test/soak) or remove the `.so` and redeploy CPython-only.
+3. A/B proof remains offline: `experiments/codon/run_codon_ab_baseline.sh` → `test_runs/codon_ab_*.log` with `gate_1p25x=True` (see `docs/plans/CODON_SYNC_TIMEDB_COMPILE_BASELINE.md`). Do **not** treat Codon as a stall fix for day_close / lock / discover hangs.
+
 ## Pre-deploy (every PR touching sync_timedb)
 
 ```bash

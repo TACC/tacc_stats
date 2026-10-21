@@ -3010,6 +3010,16 @@ def parse_stats_lines(
     >>> parse_stats_lines(None, None, None, None)  # doctest: +SKIP
   """
   del eventmaps_by_type
+  # Fail-closed Codon pyext (optional): full parse only when extension
+  # exposes parse_stats_lines_codon; otherwise CPython IncrementalStatsParser.
+  if exclude_types_list is None and int(start_idx or 0) == 0:
+    from hpcperfstats.dbload.lib.sync_timedb_codon_bridge import (
+      try_codon_parse_collapse,
+    )
+
+    codon_finished = try_codon_parse_collapse(list(lines))
+    if codon_finished is not None:
+      return codon_finished
   parser = IncrementalStatsParser(start_idx, exclude_types_list)
   parser.feed_lines(lines)
   finished = parser.finish()

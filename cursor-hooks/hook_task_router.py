@@ -119,6 +119,21 @@ HPCPERFSTATS_ROUTER_ENTRIES: list[RouterEntry] = [
     ],
   },
   {
+    "id": "codon_sync_timedb_parse",
+    "patterns": [
+      "hpcperfstats/dbload/lib/sync_timedb_codon_bridge.py",
+      "hpcperfstats/dbload/lib/sync_timedb_parsing.py",
+      "experiments/codon/**",
+      "hpcperfstats/tests/test_codon_*.py",
+      "hpcperfstats/tests/test_sync_timedb_codon_bridge.py",
+    ],
+    "rules": [
+      "codon-sync-timedb-parse-contract.mdc",
+      "sync-timedb-parsing-collapse-vectorization.mdc",
+      "python-image-interpreter-contract.mdc",
+    ],
+  },
+  {
     "id": "sync_timedb_startup",
     "patterns": [
       "hpcperfstats/dbload/lib/sync_timedb_startup_*.py",
