@@ -46,7 +46,16 @@ def test_python_build_uses_bake_clang_flags_and_cpython_helpers() -> None:
   """ThinLTO bake helper + CPython --enable-optimizations path (no custom PGO)."""
   build = _stage_body((_repo_root() / "Dockerfile").read_text(), "python-build")
   assert "bake_clang_flags.sh" in build
+  # CPython configure --enable-optimizations requires llvm-profdata on PATH
+  # (upstream mini profile merge). Not custom Clang -fprofile-instr.
+  assert "llvm-profdata-22" in build
+  assert (
+    "update-alternatives --install /usr/bin/llvm-profdata llvm-profdata"
+    in build
+  )
+  assert "command -v llvm-profdata >/dev/null" in build
   assert "from=pgo," not in build
+  assert "libclang_rt.profile.a" not in build
   for needle in (
     "web/shared/jemalloc",
     "web/shared/zlib-ng",

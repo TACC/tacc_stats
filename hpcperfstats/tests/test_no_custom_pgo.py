@@ -67,3 +67,7 @@ def test_bake_clang_flags_and_enable_optimizations_present() -> None:
   dockerfile = (root / "Dockerfile").read_text()
   assert "bake_clang_flags.sh" in dockerfile
   assert "hpcperfstats_cpython_enable_optimizations_for_configure" in dockerfile
+  # Upstream --enable-optimizations needs llvm-profdata; keep it without
+  # restoring Clang instrumented-profile bake.
+  assert "llvm-profdata" in dockerfile
+  assert ("f" + "profile-instr") not in dockerfile

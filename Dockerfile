@@ -92,10 +92,13 @@ RUN /bin/bash -o pipefail -c '\
   command -v llvm-ar-22 >/dev/null; \
   command -v llvm-ranlib-22 >/dev/null; \
   command -v llvm-nm-22 >/dev/null; \
+  command -v llvm-profdata-22 >/dev/null; \
   update-alternatives --install /usr/bin/llvm-ar llvm-ar /usr/bin/llvm-ar-22 100; \
   update-alternatives --install /usr/bin/llvm-ranlib llvm-ranlib /usr/bin/llvm-ranlib-22 100; \
   update-alternatives --install /usr/bin/llvm-nm llvm-nm /usr/bin/llvm-nm-22 100; \
+  update-alternatives --install /usr/bin/llvm-profdata llvm-profdata /usr/bin/llvm-profdata-22 100; \
   command -v llvm-ar >/dev/null; \
+  command -v llvm-profdata >/dev/null; \
   apt-get clean; \
   rm -rf /var/lib/apt/lists/*'
 
