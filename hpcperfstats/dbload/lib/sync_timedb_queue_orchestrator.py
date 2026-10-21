@@ -3875,8 +3875,9 @@ def _fill_ingest_band(
             break
           continue
         headroom_mib = int(cfg.get_sync_cgroup_admit_headroom_mib())
+        alone_progress = inflight_sum == 0
         alone_oversized = (
-          inflight_sum == 0 and budget_bytes > 0 and size_bytes > budget_bytes
+          alone_progress and budget_bytes > 0 and size_bytes > budget_bytes
         )
         if not alone_oversized and not cgroup_admit_headroom_ok(headroom_mib):
           _requeue_ingest_fill_skip(
@@ -3899,9 +3900,8 @@ def _fill_ingest_band(
             break
           continue
         file_cache_cap_mib = int(effective_cgroup_admit_max_file_cache_mib())
-        if not alone_oversized and not cgroup_admit_file_cache_ok(
-          file_cache_cap_mib
-        ):
+        file_cache_ok = cgroup_admit_file_cache_ok(file_cache_cap_mib)
+        if not alone_progress and not file_cache_ok:
           _requeue_ingest_fill_skip(
             client,
             claim=claim,
@@ -3928,6 +3928,14 @@ def _fill_ingest_band(
             inflight_sizes=inflight_sizes,
             submitted=submitted,
             alone_oversized=True,
+          )
+        elif alone_progress and not file_cache_ok:
+          _emit_mem_telem_event(
+            "admit_alone",
+            log_fn,
+            inflight_sizes=inflight_sizes,
+            submitted=submitted,
+            alone_progress=True,
           )
       try:
         async_res = ingest_pool.apply_async(
@@ -4706,15 +4714,19 @@ def _fill_append_slots(
   if not cgroup_admit_headroom_ok(cfg.get_sync_cgroup_admit_headroom_mib()):
     _emit_mem_telem_event("skip_cgroup_headroom", None)
     return 0
+  fill_cap = int(cap)
   if not cgroup_admit_file_cache_ok(
     effective_cgroup_admit_max_file_cache_mib()
   ):
-    _emit_mem_telem_event("skip_file_cache_pressure", None)
-    return 0
-  while len(inflight) < cap:
+    if inflight:
+      _emit_mem_telem_event("skip_file_cache_pressure", None)
+      return 0
+    fill_cap = 1
+    _emit_mem_telem_event("admit_alone", None, alone_progress=True)
+  while len(inflight) < fill_cap:
     submitted += _try_submit_pending_append_days(
       client=client,
-      cap=cap,
+      cap=fill_cap,
       inflight=inflight,
       claims=claims,
       archive_pool=archive_pool,
@@ -4722,7 +4734,7 @@ def _fill_append_slots(
       batch_size=batch_size,
       allow_partial=store_exhausted,
     )
-    if len(inflight) >= cap:
+    if len(inflight) >= fill_cap:
       break
     if store_exhausted:
       break

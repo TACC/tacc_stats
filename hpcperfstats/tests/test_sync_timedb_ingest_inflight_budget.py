@@ -483,6 +483,7 @@ def test_alone_oversized_still_admits_when_headroom_blocked(
 
 
 def test_fill_cgroup_file_cache_blocks_when_over_cap(monkeypatch, tmp_path):
+  """Non-empty inflight still blocks multi-file admit under file-cache pressure."""
   p = tmp_path / "ok"
   p.write_bytes(b"z" * 10)
   identity = str(p)
@@ -530,15 +531,17 @@ def test_fill_cgroup_file_cache_blocks_when_over_cap(monkeypatch, tmp_path):
       raise AssertionError("must not submit under file-cache block")
 
   stats = qo._empty_ingest_fill_stats()
+  inflight = {"hold": SimpleNamespace(ready=lambda: False)}
+  sizes = {"hold": 10}
   n = qo._fill_ingest_band(
     SyncTimedbJobStore(""),
     band="hot",
-    cap=1,
-    inflight={},
+    cap=2,
+    inflight=inflight,
     claims={},
-    submitted={},
+    submitted={"hold": time.monotonic()},
     ingest_pool=_Pool(),
-    inflight_sizes={},
+    inflight_sizes=sizes,
     fill_stats=stats,
     tgz_archive_dir=str(tmp_path),
   )
@@ -547,7 +550,69 @@ def test_fill_cgroup_file_cache_blocks_when_over_cap(monkeypatch, tmp_path):
   assert requeued
 
 
+def test_empty_inflight_admits_one_when_file_cache_blocked(
+  monkeypatch, tmp_path
+):
+  """Alone-progress: normal-sized empty inflight admits 1 under file-cache pressure."""
+  p = tmp_path / "ok"
+  p.write_bytes(b"z" * 10)
+  identity = str(p)
+  claim = jq.ClaimedJob(
+    kind=jq.JOB_KIND_INGEST,
+    identity=identity,
+    owner_token="n:h:b:1",
+    deadline=1e9,
+    score=1.0,
+    fingerprint=jq.ingest_fingerprint(
+      os.stat(identity).st_size,
+      os.stat(identity).st_mtime_ns,
+    ),
+  )
+  monkeypatch.setattr(
+    jq,
+    "claim_ingest_jobs",
+    lambda *_a, **_k: [claim],
+  )
+  monkeypatch.setattr(jq, "requeue_job", lambda *_a, **_k: None)
+  monkeypatch.setattr(
+    wm,
+    "compute_ingest_inflight_raw_bytes_budget",
+    lambda: 10**12,
+  )
+  monkeypatch.setattr(
+    "hpcperfstats.dbload.lib.conf_parser.get_sync_cgroup_admit_headroom_mib",
+    lambda: 0,
+  )
+  monkeypatch.setattr(
+    "hpcperfstats.dbload.lib.process_memory.effective_cgroup_admit_max_file_cache_mib",
+    lambda: 81920,
+  )
+  monkeypatch.setattr(qo, "cgroup_admit_headroom_ok", lambda *_a, **_k: True)
+  monkeypatch.setattr(qo, "cgroup_admit_file_cache_ok", lambda *_a, **_k: False)
+
+  class _Pool:
+    def apply_async(self, fn, args):
+      return SimpleNamespace(ready=lambda: False)
+
+  inflight = {}
+  sizes = {}
+  n = qo._fill_ingest_band(
+    SyncTimedbJobStore(""),
+    band="hot",
+    cap=4,
+    inflight=inflight,
+    claims={},
+    submitted={},
+    ingest_pool=_Pool(),
+    inflight_sizes=sizes,
+    tgz_archive_dir=str(tmp_path),
+  )
+  assert n == 1
+  assert identity in inflight
+
+
 def test_fill_append_returns_zero_when_file_cache_blocked(monkeypatch):
+  """Append with non-empty inflight hard-returns under file-cache pressure."""
   monkeypatch.setattr(
     "hpcperfstats.dbload.lib.conf_parser.get_sync_cgroup_admit_headroom_mib",
     lambda: 0,
@@ -565,12 +630,69 @@ def test_fill_append_returns_zero_when_file_cache_blocked(monkeypatch):
   n = qo._fill_append_slots(
     SyncTimedbJobStore(""),
     cap=4,
-    inflight={},
+    inflight={"/daily/2026-08-01.tar": SimpleNamespace(ready=lambda: False)},
     claims={},
     archive_pool=None,
     tgz_archive_dir="/d",
   )
   assert n == 0
+
+
+def test_append_admits_one_when_file_cache_blocked_and_idle(monkeypatch):
+  """Alone-progress: idle append fill admits one tar under file-cache pressure."""
+  submitted = []
+
+  class _Pool:
+    def apply_async(self, fn, args):
+      submitted.append(args[0])
+
+      class _Pending:
+        def ready(self):
+          return False
+
+      return _Pending()
+
+  monkeypatch.setattr(
+    "hpcperfstats.dbload.lib.conf_parser.get_sync_cgroup_admit_headroom_mib",
+    lambda: 0,
+  )
+  monkeypatch.setattr(
+    "hpcperfstats.dbload.lib.process_memory.effective_cgroup_admit_max_file_cache_mib",
+    lambda: 81920,
+  )
+  monkeypatch.setattr(
+    qo.cfg,
+    "get_sync_timedb_tar_append_batch_size",
+    lambda: 8,
+  )
+  monkeypatch.setattr(qo, "cgroup_admit_headroom_ok", lambda *_a, **_k: True)
+  monkeypatch.setattr(qo, "cgroup_admit_file_cache_ok", lambda *_a, **_k: False)
+  monkeypatch.setattr(
+    qo,
+    "daily_tar_path_for_stats_path",
+    lambda path, daily: f"{daily}/2026-08-01.tar",
+  )
+  qo.reset_append_day_lists_for_tests()
+  client = SyncTimedbJobStore("")
+  jq.reset_job_queue_script_cache_for_tests()
+  for name in ("/raw/a", "/raw/b"):
+    jq.enqueue_list_job(client, kind="append", identity=name, dedupe=True)
+  monkeypatch.setattr(
+    qo.os.path, "isfile", lambda path: str(path).startswith("/raw/")
+  )
+  inflight = {}
+  claims = {}
+  n = qo._fill_append_slots(
+    client,
+    cap=4,
+    inflight=inflight,
+    claims=claims,
+    archive_pool=_Pool(),
+    tgz_archive_dir="/daily",
+  )
+  assert n == 1
+  assert len(submitted) == 1
+  assert list(inflight) == ["/daily/2026-08-01.tar"]
 
 
 def test_alone_oversized_still_admits_when_file_cache_blocked(
