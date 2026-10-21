@@ -19,6 +19,7 @@ Attributes:
   JOB_KINDS_LIST: Tuple of kinds that use FIFO lists.
   JOB_LEASE_TTL_FLOOR_S: Minimum claim deadline seconds.
   JOB_STORE_PERSIST_INTERVAL_S: Default snapshot write interval.
+  _JOB_STORE_PERSIST_FORCE_TIMEOUT_S: Max seconds to wait for a forced flush.
   JOB_STORE_SNAPSHOT_KIND: Persistence registry kind for the job snapshot.
   JOB_STORE_SNAPSHOT_RELPATH: Sidecar basename for the job snapshot.
   LEASE_CONFLICT_SCORE_PENALTY: Score bump applied on retry requeue.
@@ -37,6 +38,7 @@ import heapq
 import os
 import secrets
 import socket
+import threading
 import time
 from collections import deque
 from collections.abc import Iterable
@@ -46,6 +48,7 @@ from itertools import islice
 from typing import Any
 
 from hpcperfstats.dbload.lib import conf_parser as cfg
+from hpcperfstats.dbload.lib.process_title import set_daemon_thread_title
 from hpcperfstats.dbload.lib.sync_timedb_persistence import (
   artifact_path,
   load_persistence_document,
@@ -70,9 +73,10 @@ QUEUE_DEAD_LETTER_KIND = "queue_dead_letter"
 JOB_STORE_SNAPSHOT_KIND = "job_store_snapshot"
 JOB_STORE_SNAPSHOT_RELPATH = ".sync_timedb_job_store.json"
 ARCHIVE_MEMBERS_STORE_DIR_RELPATH = ".sync_timedb_archive_members"
-JOB_STORE_PERSIST_INTERVAL_S = 5.0
+JOB_STORE_PERSIST_INTERVAL_S = 60.0
 JOB_LEASE_TTL_FLOOR_S = 60
 INFLIGHT_REAP_GRACE_FLOOR_S = 30
+_JOB_STORE_PERSIST_FORCE_TIMEOUT_S = 120.0
 
 _BOOT_ID_CACHE: str | None = None
 
@@ -139,6 +143,19 @@ class SyncTimedbJobStore:
     _lock: Re-entrant lock covering every mutation.
     _payloads: Fingerprint and attempt fields by (kind, identity).
     _pending: Dedupe sets mirroring queued LIST identities.
+    _persist_cv: Condition waking the dedicated persist writer.
+    _persist_error: Exception from the latest forced persist write.
+    _persist_force: True when a caller requested an immediate flush.
+    _persist_force_done: Set when a forced flush attempt finishes.
+    _persist_gen: Bumped on every durable dirty mark for coalesce.
+    _persist_stop: True when ``close()`` asked the writer to exit.
+    _persist_thread: Dedicated daemon thread that owns sidecar writes.
+    _shadow_ingest: Incremental durable ingest score map for persist.
+    _shadow_lists: Incremental durable LIST queues for persist.
+    _shadow_payloads: Incremental queued-only payload rows for persist.
+    _shadow_pending: Incremental LIST dedupe sets for persist.
+    _ingest_hot_n: O(1) queued hot-band ingest count.
+    _ingest_catchup_n: O(1) queued catchup-band ingest count.
   """
 
   def __init__(
@@ -170,6 +187,8 @@ class SyncTimedbJobStore:
     # skipped on claim when _ingest no longer matches.
     self._ingest_heap_hot: list[tuple[float, str]] = []
     self._ingest_heap_catchup: list[tuple[float, str]] = []
+    self._ingest_hot_n = 0
+    self._ingest_catchup_n = 0
     self._lists: dict[str, deque[str]] = {
       kind: deque() for kind in JOB_KINDS_LIST
     }
@@ -181,11 +200,28 @@ class SyncTimedbJobStore:
     }
     self._leases: dict[tuple[str, str], str] = {}
     self._payloads: dict[tuple[str, str], dict[str, str]] = {}
+    self._shadow_ingest: dict[str, float] = {}
+    self._shadow_lists: dict[str, list[str]] = {
+      kind: [] for kind in JOB_KINDS_LIST
+    }
+    self._shadow_pending: dict[str, set[str]] = {
+      kind: set() for kind in JOB_KINDS_LIST
+    }
+    self._shadow_payloads: dict[tuple[str, str], dict[str, str]] = {}
     self._dirty = False
     self._last_persist = 0.0
+    self._persist_gen = 0
+    self._persist_cv = threading.Condition()
+    self._persist_stop = False
+    self._persist_force = False
+    self._persist_error: BaseException | None = None
+    self._persist_force_done = threading.Event()
+    self._persist_force_done.set()
+    self._persist_thread: threading.Thread | None = None
     if self.archive_dir:
       os.makedirs(self.archive_dir, exist_ok=True)
       self.load()
+      self._start_persist_writer()
 
   def ingest_identities(self) -> list[str]:
     """
@@ -240,53 +276,206 @@ class SyncTimedbJobStore:
 
   def persist(self, *, force: bool = False) -> None:
     """
-    Write queued work to the registered snapshot sidecar.
+    Notify the dedicated persist writer (or force-flush through it).
 
-    In-flight claims and owner tokens are omitted so a crash reconstructs
-    from disk and the database instead of resurrecting stale leases.
-    Payload rows for identities that are neither queued nor in-flight are
-    dropped from memory; the snapshot writes only queued payloads.
+    Hot paths never encode or write the sidecar. Only the
+    ``job-store-persist`` thread calls ``save_persistence_document``.
+    In-flight claims and owner tokens stay omitted from the snapshot.
 
     Args:
-      force (bool): Ignore the persist interval and write immediately.
+      force (bool): Wake the writer immediately and wait until it
+        finishes one flush attempt.
 
     Returns:
       None
 
     Raises:
-      OSError: When the snapshot sidecar cannot be written.
-      Exception: The original write error is re-raised after `_dirty`
-        is restored so a later persist can retry.
+      OSError: When a forced flush fails to write the sidecar.
+      TimeoutError: When a forced flush does not finish in time.
 
     Examples:
       >>> store = SyncTimedbJobStore("/tmp/empty")
       >>> store.persist(force=True)
     """
+    if not self.archive_dir:
+      return
+    if force:
+      self._request_force_persist_and_wait()
+      return
+    with self._persist_cv:
+      self._persist_cv.notify()
+
+  def close(self) -> None:
+    """
+    Stop the dedicated persist writer (tests and orchestrator shutdown).
+
+    Returns:
+      None
+
+    Examples:
+      >>> store = SyncTimedbJobStore("/tmp/empty")
+      >>> store.close()
+    """
+    thread = self._persist_thread
+    if thread is None:
+      return
+    with self._persist_cv:
+      self._persist_stop = True
+      self._persist_cv.notify_all()
+    thread.join(timeout=_JOB_STORE_PERSIST_FORCE_TIMEOUT_S)
+    self._persist_thread = None
+
+  def _start_persist_writer(self) -> None:
+    """
+    Start the single daemon thread that owns sidecar writes.
+
+    Returns:
+      None
+
+    Examples:
+      >>> store = SyncTimedbJobStore("")
+      >>> store._persist_thread is None
+      True
+    """
+    if self._persist_thread is not None or not self.archive_dir:
+      return
+    self._persist_stop = False
+    thread = threading.Thread(
+      target=self._persist_writer_main,
+      name="job-store-persist",
+      daemon=True,
+    )
+    self._persist_thread = thread
+    thread.start()
+
+  def _request_force_persist_and_wait(self) -> None:
+    """
+    Ask the writer for an immediate flush and wait for completion.
+
+    Returns:
+      None
+
+    Raises:
+      OSError: Writer I/O failure from the forced attempt.
+      TimeoutError: Writer did not finish within the force timeout.
+      RuntimeError: Persist writer thread is not running.
+      err: Re-raised writer failure stored on ``_persist_error``.
+
+    Examples:
+      >>> store = SyncTimedbJobStore("/tmp/empty")
+      >>> store._request_force_persist_and_wait()
+    """
+    if self._persist_thread is None or not self._persist_thread.is_alive():
+      raise RuntimeError("job-store persist writer is not running")
+    with self._persist_cv:
+      self._persist_error = None
+      self._persist_force = True
+      self._persist_force_done.clear()
+      self._persist_cv.notify_all()
+    if not self._persist_force_done.wait(
+      timeout=_JOB_STORE_PERSIST_FORCE_TIMEOUT_S,
+    ):
+      raise TimeoutError("job-store force persist timed out")
+    err = self._persist_error
+    if err is not None:
+      raise err
+
+  def _persist_writer_main(self) -> None:
+    """
+    Single-flight loop: wait, handoff-copy shadow, write sidecar.
+
+    Returns:
+      None
+
+    Examples:
+      >>> # Started from SyncTimedbJobStore.__init__ when archive_dir set.
+      >>> True
+      True
+    """
+    set_daemon_thread_title(
+      "sync_timedb.py",
+      script_name="sync_timedb.py",
+      role="job-store-persist",
+    )
+    while True:
+      with self._persist_cv:
+        while True:
+          if self._persist_stop and not self._persist_force:
+            if not self._dirty:
+              return
+            break
+          if self._persist_force:
+            break
+          if self._dirty:
+            wait_s = self.persist_interval_s - (
+              time.time() - self._last_persist
+            )
+            if wait_s <= 0.0:
+              break
+            self._persist_cv.wait(timeout=wait_s)
+            continue
+          self._persist_cv.wait(timeout=1.0)
+        force = bool(self._persist_force)
+      wrote_ok = False
+      write_err: BaseException | None = None
+      try:
+        wrote_ok = self._persist_writer_flush_once(force=force)
+      except BaseException as exc:
+        write_err = exc
+        with self._lock:
+          self._dirty = True
+      with self._persist_cv:
+        if force:
+          self._persist_error = write_err
+          self._persist_force = False
+          self._persist_force_done.set()
+        if self._persist_stop and not self._dirty and not self._persist_force:
+          return
+      del wrote_ok
+
+  def _persist_writer_flush_once(self, *, force: bool = False) -> bool:
+    """
+    Copy the durable shadow under the store lock, then write off-lock.
+
+    Args:
+      force (bool): Ignore the persist interval for this flush.
+
+    Returns:
+      bool: True when a sidecar write ran successfully.
+
+    Raises:
+      OSError: When ``save_persistence_document`` fails.
+      exc: Re-raised ``OSError`` after marking the store dirty.
+
+    Examples:
+      >>> store = SyncTimedbJobStore("/tmp/empty")
+      >>> isinstance(store._persist_writer_flush_once(force=True), bool)
+      True
+    """
     now = time.time()
     snapshot = None
+    gen = 0
     with self._lock:
       if not self.archive_dir:
-        return
-      if not force and not self._dirty:
-        return
+        return False
+      if not self._dirty and not force:
+        return False
       if not force and (now - self._last_persist) < self.persist_interval_s:
-        return
+        return False
       queued = self._queued_identities_locked()
       live = queued | self._inflight_identities_locked()
       self._prune_orphan_payloads_locked(active=live)
+      self._prune_shadow_payloads_locked(queued=queued)
+      gen = self._persist_gen
       snapshot = (
         artifact_path(self.archive_dir, JOB_STORE_SNAPSHOT_KIND),
-        dict(self._ingest),
-        {kind: list(items) for kind, items in self._lists.items()},
-        {kind: list(idents) for kind, idents in self._pending.items()},
-        {
-          (kind, ident): dict(fields)
-          for (kind, ident), fields in self._payloads.items()
-          if (kind, ident) in queued
-        },
+        dict(self._shadow_ingest),
+        {kind: list(items) for kind, items in self._shadow_lists.items()},
+        {kind: list(idents) for kind, idents in self._shadow_pending.items()},
+        {key: dict(fields) for key, fields in self._shadow_payloads.items()},
       )
     if snapshot is None:
-      return
+      return False
     path, ingest_c, lists_c, pending_c, payloads_src = snapshot
     payload = {
       "ingest": ingest_c,
@@ -299,13 +488,15 @@ class SyncTimedbJobStore:
     }
     try:
       save_persistence_document(path, JOB_STORE_SNAPSHOT_KIND, payload)
-    except OSError:
+    except OSError as exc:
       with self._lock:
         self._dirty = True
-      raise
+      raise exc
     with self._lock:
-      self._dirty = False
       self._last_persist = now
+      if self._persist_gen == gen:
+        self._dirty = False
+    return True
 
   def load(self) -> None:
     """
@@ -362,6 +553,8 @@ class SyncTimedbJobStore:
       self._prune_orphan_payloads_locked(
         active=self._queued_identities_locked(),
       )
+      self._rebuild_shadow_locked()
+      self._rebuild_ingest_band_counts_locked()
       self._dirty = False
 
   def _ingest_heap_for_band_locked(
@@ -424,8 +617,190 @@ class SyncTimedbJobStore:
     """
     ident = str(identity)
     scored = float(score)
+    old = self._ingest.get(ident)
+    if old is not None:
+      self._ingest_band_dec_locked(float(old))
     self._ingest[ident] = scored
+    self._ingest_band_inc_locked(scored)
     self._ingest_heap_push_locked(ident, scored)
+    self._shadow_ingest[ident] = scored
+    self._shadow_sync_payload_locked(JOB_KIND_INGEST, ident)
+
+  def _ingest_pop_locked(self, identity: str) -> float | None:
+    """
+    Remove one queued ingest identity from live maps and durable shadow.
+
+    Args:
+      identity (str): Queued ingest identity.
+
+    Returns:
+      float | None: Prior score, or None when absent.
+
+    Examples:
+      >>> store = SyncTimedbJobStore("/tmp/empty")
+      >>> store._ingest_pop_locked("/missing") is None
+      True
+    """
+    ident = str(identity)
+    old = self._ingest.pop(ident, None)
+    if old is None:
+      return None
+    self._ingest_band_dec_locked(float(old))
+    self._shadow_ingest.pop(ident, None)
+    self._shadow_payloads.pop((JOB_KIND_INGEST, ident), None)
+    return float(old)
+
+  def _ingest_band_inc_locked(self, score: float) -> None:
+    """
+    Increment the O(1) queued counter for one score's band.
+
+    Args:
+      score (float): Band-encoded ingest score.
+
+    Returns:
+      None
+
+    Examples:
+      >>> store = SyncTimedbJobStore("/tmp/empty")
+      >>> store._ingest_band_inc_locked(1.0)
+    """
+    if decode_ingest_band(score) == "hot":
+      self._ingest_hot_n += 1
+    else:
+      self._ingest_catchup_n += 1
+
+  def _ingest_band_dec_locked(self, score: float) -> None:
+    """
+    Decrement the O(1) queued counter for one score's band.
+
+    Args:
+      score (float): Band-encoded ingest score.
+
+    Returns:
+      None
+
+    Examples:
+      >>> store = SyncTimedbJobStore("/tmp/empty")
+      >>> store._ingest_band_dec_locked(1.0)
+    """
+    if decode_ingest_band(score) == "hot":
+      self._ingest_hot_n = max(0, self._ingest_hot_n - 1)
+    else:
+      self._ingest_catchup_n = max(0, self._ingest_catchup_n - 1)
+
+  def _rebuild_ingest_band_counts_locked(self) -> None:
+    """
+    Recompute hot/catchup queued counters from the live ingest map.
+
+    Returns:
+      None
+
+    Examples:
+      >>> store = SyncTimedbJobStore("/tmp/empty")
+      >>> store._rebuild_ingest_band_counts_locked()
+    """
+    hot_n = 0
+    catch_n = 0
+    for score in self._ingest.values():
+      if decode_ingest_band(score) == "hot":
+        hot_n += 1
+      else:
+        catch_n += 1
+    self._ingest_hot_n = hot_n
+    self._ingest_catchup_n = catch_n
+
+  def _rebuild_shadow_locked(self) -> None:
+    """
+    Rebuild incremental durable shadow maps from live queued state.
+
+    Returns:
+      None
+
+    Examples:
+      >>> store = SyncTimedbJobStore("/tmp/empty")
+      >>> store._rebuild_shadow_locked()
+    """
+    self._shadow_ingest = dict(self._ingest)
+    self._shadow_lists = {
+      kind: list(items) for kind, items in self._lists.items()
+    }
+    self._shadow_pending = {
+      kind: set(idents) for kind, idents in self._pending.items()
+    }
+    queued = self._queued_identities_locked()
+    self._shadow_payloads = {
+      key: dict(fields)
+      for key, fields in self._payloads.items()
+      if key in queued
+    }
+
+  def _identity_is_queued_locked(self, kind: str, identity: str) -> bool:
+    """
+    Return True when ``identity`` sits on a durable queue for ``kind``.
+
+    Args:
+      kind (str): Job kind.
+      identity (str): Job identity.
+
+    Returns:
+      bool: True when queued (not merely in-flight).
+
+    Examples:
+      >>> SyncTimedbJobStore("/tmp/empty")._identity_is_queued_locked(
+      ...   "ingest",
+      ...   "/a",
+      ... )
+      False
+    """
+    ident = str(identity)
+    if str(kind) == JOB_KIND_INGEST:
+      return ident in self._ingest
+    pending = self._pending.get(str(kind))
+    return bool(pending is not None and ident in pending)
+
+  def _shadow_sync_payload_locked(self, kind: str, identity: str) -> None:
+    """
+    Mirror one queued payload row into the durable shadow (or drop it).
+
+    Args:
+      kind (str): Job kind.
+      identity (str): Job identity.
+
+    Returns:
+      None
+
+    Examples:
+      >>> store = SyncTimedbJobStore("/tmp/empty")
+      >>> store._shadow_sync_payload_locked("ingest", "/a")
+    """
+    key = (str(kind), str(identity))
+    fields = self._payloads.get(key)
+    if self._identity_is_queued_locked(kind, identity) and fields is not None:
+      self._shadow_payloads[key] = dict(fields)
+    else:
+      self._shadow_payloads.pop(key, None)
+
+  def _prune_shadow_payloads_locked(
+    self,
+    *,
+    queued: set[tuple[str, str]],
+  ) -> None:
+    """
+    Drop shadow payload rows that are no longer on durable queues.
+
+    Args:
+      queued (set[tuple[str, str]]): Current durable queue identities.
+
+    Returns:
+      None
+
+    Examples:
+      >>> store = SyncTimedbJobStore("/tmp/empty")
+      >>> store._prune_shadow_payloads_locked(queued=set())
+    """
+    for key in list(self._shadow_payloads):
+      if key not in queued:
+        del self._shadow_payloads[key]
 
   def _ingest_rebuild_heaps_locked(self) -> None:
     """
@@ -523,10 +898,11 @@ class SyncTimedbJobStore:
       >>> store._mark_dirty_locked()
     """
     self._dirty = True
+    self._persist_gen += 1
 
   def _maybe_persist_locked(self) -> None:
     """
-    Persist outside the caller lock after a durable mutation.
+    Notify the persist writer after a durable mutation (never write here).
 
     Returns:
       None
@@ -535,10 +911,8 @@ class SyncTimedbJobStore:
       >>> store = SyncTimedbJobStore("/tmp/empty")
       >>> store._maybe_persist_locked()
     """
-    dirty = self._dirty
-    if not dirty:
+    if not self._dirty:
       return
-    # persist() takes the lock again via RLock.
     self.persist(force=False)
 
   def zadd_ingest(
@@ -592,6 +966,7 @@ class SyncTimedbJobStore:
           (JOB_KIND_INGEST, ident),
           {},
         )["fingerprint"] = str(fingerprint)
+        self._shadow_sync_payload_locked(JOB_KIND_INGEST, ident)
       self._mark_dirty_locked()
     self._maybe_persist_locked()
     return 0 if existed else 1
@@ -635,6 +1010,9 @@ class SyncTimedbJobStore:
         return 0
       self._lists[kind].append(ident)
       self._pending[kind].add(ident)
+      self._shadow_lists[kind].append(ident)
+      self._shadow_pending[kind].add(ident)
+      self._shadow_sync_payload_locked(kind, ident)
       self._mark_dirty_locked()
       depth = len(self._lists[kind])
     self._maybe_persist_locked()
@@ -679,10 +1057,10 @@ class SyncTimedbJobStore:
     ttl = int(job_lease_ttl_seconds() if ttl_s is None else ttl_s)
     now = time.time() if now_s is None else float(now_s)
     deadline = now + ttl
-    claimed: list[ClaimedJob] = []
+    claimed_raw: list[tuple[str, str, str, float, float, str]] = []
     with self._lock:
       heap = self._ingest_heap_for_band_locked(band)
-      while len(claimed) < want and heap:
+      while len(claimed_raw) < want and heap:
         snap_score, ident = heapq.heappop(heap)
         if ident in self._inflight[JOB_KIND_INGEST]:
           continue
@@ -696,7 +1074,7 @@ class SyncTimedbJobStore:
         if not (lo <= float(live) <= hi):
           self._ingest_heap_push_locked(ident, float(live))
           continue
-        self._ingest.pop(ident, None)
+        self._ingest_pop_locked(ident)
         self._inflight[JOB_KIND_INGEST][ident] = (
           deadline,
           owner_token,
@@ -704,21 +1082,31 @@ class SyncTimedbJobStore:
         )
         self._leases[(JOB_KIND_INGEST, ident)] = owner_token
         fields = self._payloads.get((JOB_KIND_INGEST, ident), {})
-        claimed.append(
-          ClaimedJob(
-            kind=JOB_KIND_INGEST,
-            identity=ident,
-            owner_token=owner_token,
-            deadline=deadline,
-            score=float(live),
-            fingerprint=str(fields.get("fingerprint") or ""),
+        claimed_raw.append(
+          (
+            JOB_KIND_INGEST,
+            ident,
+            owner_token,
+            deadline,
+            float(live),
+            str(fields.get("fingerprint") or ""),
           ),
         )
-      if claimed:
+      if claimed_raw:
         self._mark_dirty_locked()
-    if claimed:
+    if claimed_raw:
       self._maybe_persist_locked()
-    return claimed
+    return [
+      ClaimedJob(
+        kind=kind,
+        identity=ident,
+        owner_token=token,
+        deadline=dead,
+        score=score,
+        fingerprint=fp,
+      )
+      for kind, ident, token, dead, score, fp in claimed_raw
+    ]
 
   def claim_list(
     self,
@@ -755,28 +1143,36 @@ class SyncTimedbJobStore:
     ttl = int(job_lease_ttl_seconds() if ttl_s is None else ttl_s)
     now = time.time() if now_s is None else float(now_s)
     deadline = now + ttl
+    claimed_raw: tuple[str, str, str, float] | None = None
     with self._lock:
       while self._lists[kind]:
         ident = self._lists[kind].popleft()
         self._pending[kind].discard(ident)
+        shadow_list = self._shadow_lists[kind]
+        if shadow_list and shadow_list[0] == ident:
+          shadow_list.pop(0)
+        elif ident in shadow_list:
+          shadow_list.remove(ident)
+        self._shadow_pending[kind].discard(ident)
+        self._shadow_payloads.pop((str(kind), ident), None)
         if ident in self._inflight[kind]:
           continue
         self._inflight[kind][ident] = (deadline, owner_token, None)
         self._leases[(kind, ident)] = owner_token
         self._mark_dirty_locked()
-        job = ClaimedJob(
-          kind=str(kind),
-          identity=ident,
-          owner_token=owner_token,
-          deadline=deadline,
-          score=None,
-        )
+        claimed_raw = (str(kind), ident, owner_token, deadline)
         break
-      else:
-        job = None
-    if job is not None:
+    if claimed_raw is not None:
       self._maybe_persist_locked()
-    return job
+      kind_s, ident, token, dead = claimed_raw
+      return ClaimedJob(
+        kind=kind_s,
+        identity=ident,
+        owner_token=token,
+        deadline=dead,
+        score=None,
+      )
+    return None
 
   def ack(self, *, kind: str, identity: str, owner_token: str) -> bool:
     """
@@ -807,8 +1203,7 @@ class SyncTimedbJobStore:
       self._payloads.pop((kind, ident), None)
       if kind in self._pending:
         self._pending[kind].discard(ident)
-      self._mark_dirty_locked()
-    self._maybe_persist_locked()
+      # Inflight-only: durable queues already dropped this identity at claim.
     return True
 
   def requeue(
@@ -852,6 +1247,9 @@ class SyncTimedbJobStore:
       else:
         self._lists[kind].append(ident)
         self._pending[kind].add(ident)
+        self._shadow_lists[kind].append(ident)
+        self._shadow_pending[kind].add(ident)
+        self._shadow_sync_payload_locked(kind, ident)
       self._mark_dirty_locked()
     self._maybe_persist_locked()
     return True
@@ -915,7 +1313,13 @@ class SyncTimedbJobStore:
     """
     low = _bound_to_float(lo, default=float("-inf"))
     high = _bound_to_float(hi, default=float("+inf"))
+    hot_lo, hot_hi = ingest_score_range("hot")
+    catch_lo, catch_hi = ingest_score_range("catchup")
     with self._lock:
+      if low == hot_lo and high == hot_hi:
+        return int(self._ingest_hot_n)
+      if low == catch_lo and high == catch_hi:
+        return int(self._ingest_catchup_n)
       scores = list(self._ingest.values())
     return sum(1 for score in scores if low <= score <= high)
 
@@ -957,8 +1361,8 @@ class SyncTimedbJobStore:
       if not dq:
         return []
       n = len(dq)
-      start_i = start
-      end_i = end
+      start_i = int(start)
+      end_i = int(end)
       if end_i == -1:
         end_i = n - 1
       if start_i < 0:
@@ -967,6 +1371,7 @@ class SyncTimedbJobStore:
         end_i = max(-1, n + end_i)
       if start_i > end_i or start_i >= n:
         return []
+      # Critical section is copy-only; clamps need ``n`` under the lock.
       return list(islice(dq, start_i, end_i + 1))
 
   def reorder_list(self, kind: str, ordered_idents: list[str]) -> bool:
@@ -1002,7 +1407,10 @@ class SyncTimedbJobStore:
       if list(self._lists[kind]) != current:
         return False
       self._lists[kind] = deque(desired)
-      return True
+      self._shadow_lists[kind] = list(desired)
+      self._mark_dirty_locked()
+    self._maybe_persist_locked()
+    return True
 
   def lease_token(self, kind: str, identity: str) -> str | None:
     """
@@ -1608,6 +2016,10 @@ def write_job_fingerprint(
     store._payloads.setdefault((str(kind), str(identity)), {})[
       "fingerprint"
     ] = str(fingerprint)
+    if store._identity_is_queued_locked(kind, identity):
+      store._shadow_sync_payload_locked(kind, identity)
+      store._mark_dirty_locked()
+  store._maybe_persist_locked()
 
 
 def read_job_fingerprint(
@@ -1930,7 +2342,11 @@ def bump_job_attempt(
     fields = store._payloads.setdefault((str(kind), str(identity)), {})
     nxt = int(fields.get("attempt") or 0) + 1
     fields["attempt"] = str(nxt)
-    return nxt
+    if store._identity_is_queued_locked(kind, identity):
+      store._shadow_sync_payload_locked(kind, identity)
+      store._mark_dirty_locked()
+  store._maybe_persist_locked()
+  return nxt
 
 
 def read_job_attempt(
@@ -2363,8 +2779,11 @@ def reap_expired_inflight(
       else:
         store._lists[kind].append(ident)
         store._pending[kind].add(ident)
+        store._shadow_lists[kind].append(ident)
+        store._shadow_pending[kind].add(ident)
+        store._shadow_sync_payload_locked(kind, ident)
       out.append(ident)
-      store._dirty = True
+      store._mark_dirty_locked()
   if out:
     store.persist(force=False)
   return out

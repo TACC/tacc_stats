@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import contextlib
 import threading
 import time
 from collections import deque
@@ -550,3 +551,135 @@ def test_zadd_ingest_refuses_new_catchup_at_discover_cap(tmp_path, monkeypatch):
   assert store.zadd_ingest("/c/3", float(CATCHUP_SCORE_BASE)) == 0
   assert store.zadd_ingest("/h/1", 0.0) == 1
   assert store.zadd_ingest("/c/1", float(CATCHUP_SCORE_BASE)) == 0
+  store.close()
+
+
+@pytest.mark.django_db(databases=[])
+def test_persist_io_only_on_writer_thread(tmp_path, monkeypatch):
+  """save_persistence_document must run only on job-store-persist."""
+  store = SyncTimedbJobStore(str(tmp_path / "archive"))
+  threads: list[str] = []
+  real_save = job_store_mod.save_persistence_document
+
+  def tracking_save(*args, **kwargs):
+    threads.append(threading.current_thread().name)
+    return real_save(*args, **kwargs)
+
+  monkeypatch.setattr(job_store_mod, "save_persistence_document", tracking_save)
+  zadd_ingest_job(store, identity="/raw/a", score=1.0)
+  store.persist(force=False)
+  store.persist(force=True)
+  assert threads
+  assert all(name == "job-store-persist" for name in threads)
+  store.close()
+
+
+@pytest.mark.django_db(databases=[])
+def test_shadow_tracks_zadd_and_claim(tmp_path):
+  store = SyncTimedbJobStore(str(tmp_path / "archive"))
+  zadd_ingest_job(store, identity="/raw/q", score=3.0, fingerprint="fp")
+  assert "/raw/q" in store._shadow_ingest
+  assert (JOB_KIND_INGEST, "/raw/q") in store._shadow_payloads
+  owner = make_lease_owner_token(pid=1, hostname="h", boot_id="b")
+  claim = claim_ingest_job(store, band="hot", owner_token=owner)
+  assert claim is not None
+  assert "/raw/q" not in store._shadow_ingest
+  assert (JOB_KIND_INGEST, "/raw/q") not in store._shadow_payloads
+  store.close()
+
+
+@pytest.mark.django_db(databases=[])
+def test_persist_single_flight_slow_save(tmp_path, monkeypatch):
+  store = SyncTimedbJobStore(
+    str(tmp_path / "archive"),
+    persist_interval_s=0.01,
+  )
+  active = {"n": 0}
+  peak = {"n": 0}
+  real_save = job_store_mod.save_persistence_document
+  barrier = threading.Barrier(2)
+
+  def slow_save(*args, **kwargs):
+    active["n"] += 1
+    peak["n"] = max(peak["n"], active["n"])
+    with contextlib.suppress(threading.BrokenBarrierError):
+      barrier.wait(timeout=2)
+    time.sleep(0.2)
+    try:
+      return real_save(*args, **kwargs)
+    finally:
+      active["n"] -= 1
+
+  monkeypatch.setattr(job_store_mod, "save_persistence_document", slow_save)
+  zadd_ingest_job(store, identity="/raw/a", score=1.0)
+  t1 = threading.Thread(target=lambda: store.persist(force=True))
+  t1.start()
+  barrier.wait(timeout=2)
+  zadd_ingest_job(store, identity="/raw/b", score=2.0)
+  store.persist(force=False)
+  t1.join(timeout=5)
+  store.persist(force=True)
+  assert peak["n"] == 1
+  store.close()
+
+
+@pytest.mark.django_db(databases=[])
+def test_ack_does_not_dirty_or_notify(tmp_path):
+  store = SyncTimedbJobStore(str(tmp_path / "archive"))
+  zadd_ingest_job(store, identity="/raw/done", score=1.0, fingerprint="fp")
+  owner = make_lease_owner_token(pid=1, hostname="h", boot_id="b")
+  claim = claim_ingest_job(store, band="hot", owner_token=owner)
+  assert claim is not None
+  store.persist(force=True)
+  assert store._dirty is False
+  gen_before = store._persist_gen
+  assert ack_job(
+    store,
+    kind=JOB_KIND_INGEST,
+    identity="/raw/done",
+    owner_token=owner,
+  )
+  assert store._dirty is False
+  assert store._persist_gen == gen_before
+  store.close()
+
+
+@pytest.mark.django_db(databases=[])
+def test_ingest_band_counters_match_map(tmp_path):
+  store = SyncTimedbJobStore(str(tmp_path / "archive"))
+  zadd_ingest_job(store, identity="/raw/h1", score=1.0)
+  zadd_ingest_job(store, identity="/raw/h2", score=2.0)
+  zadd_ingest_job(
+    store,
+    identity="/raw/c1",
+    score=float(CATCHUP_SCORE_BASE) + 1.0,
+  )
+  hot_lo, hot_hi = job_store_mod.ingest_score_range("hot")
+  catch_lo, catch_hi = job_store_mod.ingest_score_range("catchup")
+  assert store.ingest_count_in_score_range(hot_lo, hot_hi) == 2
+  assert store.ingest_count_in_score_range(catch_lo, catch_hi) == 1
+  assert store._ingest_hot_n == 2
+  assert store._ingest_catchup_n == 1
+  owner = make_lease_owner_token(pid=1, hostname="h", boot_id="b")
+  claim_ingest_job(store, band="hot", owner_token=owner)
+  assert store._ingest_hot_n == 1
+  store.persist(force=True)
+  revived = SyncTimedbJobStore(str(tmp_path / "archive"))
+  assert revived._ingest_hot_n + revived._ingest_catchup_n == len(
+    revived._ingest,
+  )
+  store.close()
+  revived.close()
+
+
+@pytest.mark.django_db(databases=[])
+def test_reorder_list_marks_dirty(tmp_path):
+  store = SyncTimedbJobStore(str(tmp_path / "archive"))
+  store.enqueue_list(JOB_KIND_APPEND, "a")
+  store.enqueue_list(JOB_KIND_APPEND, "b")
+  store.persist(force=True)
+  assert store._dirty is False
+  assert store.reorder_list(JOB_KIND_APPEND, ["b", "a"]) is True
+  assert store._dirty is True
+  assert store._shadow_lists[JOB_KIND_APPEND] == ["b", "a"]
+  store.close()

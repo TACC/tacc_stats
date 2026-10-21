@@ -31,6 +31,7 @@ Supervisor/batch daemons (`sync_timedb`, `update_metrics`, `listend`, etc.) must
 | listend AMQP consume thread | `listend.py [thread:amqp-consumer-N]` (one BlockingConnection each) |
 | listend archive thread | `listend.py [thread:archive-N]` |
 | Post-chunk hygiene thread | `sync_timedb.py [thread:archive-post-chunk-hygiene]` |
+| Job-store persist thread | `sync_timedb.py [thread:job-store-persist]` (`SyncTimedbJobStore` sidecar writer only) |
 
 Use a **distinct, stable role** per pool type in the same script (e.g. `ingest-pool`, `append-pool`, `metrics-pool`, `public-ef-pool`).
 
