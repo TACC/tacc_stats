@@ -2,18 +2,22 @@
 
 from __future__ import annotations
 
+import time
 from pathlib import Path
 
 from hpcperfstats.dbload import sync_timedb as st
+from hpcperfstats.dbload.lib import sync_timedb_parsing as parse_mod
 from hpcperfstats.dbload.lib.sync_timedb_parsing import (
   PARSE_STAGE_BUILD_DF_PARTS,
   PARSE_STAGE_HOLD_KEYS,
   PARSE_STAGE_LOG_KEYS,
   IncrementalStatsParser,
+  _held_parse_stage,
   attach_parse_unaccounted,
   build_stats_dataframes,
   compute_deltas_and_arc,
   reset_parse_stage_timing,
+  snapshot_parse_stage_campaign_timing,
   snapshot_parse_stage_timing,
 )
 
@@ -234,3 +238,69 @@ def test_build_stats_dataframes_has_no_outer_build_df_hold():
       "def _collapse_stats_with_deltas",
     )[1].split("\ndef ")[0]
   )
+
+
+def test_parse_stage_campaign_lock_not_taken_during_nested_feed(monkeypatch):
+  """Nested feed must not acquire the campaign lock until outermost flush."""
+  real_lock = parse_mod._parse_stage_campaign_lock
+  acquires = {"n": 0}
+
+  class _CountingLock:
+    def __enter__(self):
+      acquires["n"] += 1
+      return real_lock.__enter__()
+
+    def __exit__(self, *args):
+      return real_lock.__exit__(*args)
+
+  monkeypatch.setattr(parse_mod, "_parse_stage_campaign_lock", _CountingLock())
+  reset_parse_stage_timing(enabled=True)
+  try:
+    baseline = acquires["n"]
+    lines = [
+      "1709123456 job1 cn001\n",
+      "!host_proc pid,vm_peak,vm_hwm\n",
+    ]
+    for i in range(40):
+      lines.append(f"host_proc {1000 + i} proc{i} 10 20\n")
+    parser = IncrementalStatsParser(0)
+    with _held_parse_stage("feed_s"):
+      mid = acquires["n"]
+      parser.feed_lines(lines)
+      assert acquires["n"] == mid
+    assert acquires["n"] == mid + 1
+    campaign = snapshot_parse_stage_campaign_timing()
+    file_snap = snapshot_parse_stage_timing()
+    assert campaign.get("feed_s", 0.0) >= file_snap.get("feed_s", 0.0) - 1e-9
+    assert campaign.get("proc_merge_s", 0.0) >= 0.0
+    assert acquires["n"] >= baseline
+  finally:
+    reset_parse_stage_timing(enabled=False)
+
+
+def test_parse_stage_nested_holds_are_exclusive():
+  """Nested proc_merge under feed must not double-count wall into stages_sum."""
+  reset_parse_stage_timing(enabled=True)
+  try:
+    wall0 = time.perf_counter()
+    with _held_parse_stage("feed_s"):
+      time.sleep(0.025)
+      with _held_parse_stage("proc_merge_s"):
+        time.sleep(0.02)
+      time.sleep(0.015)
+    wall = time.perf_counter() - wall0
+    snap = snapshot_parse_stage_timing()
+    assert snap["proc_merge_s"] >= 0.015
+    assert snap["feed_s"] >= 0.03
+    assert snap["feed_s"] + snap["proc_merge_s"] <= wall + 0.02
+    assert snap["stages_sum_s"] <= wall + 0.02
+    meta = attach_parse_unaccounted(
+      {
+        "parse_elapsed_s": wall,
+        "stages_sum_s": snap["stages_sum_s"],
+        "postgres_s": 0.0,
+      },
+    )
+    assert meta["parse_unaccounted_s"] >= 0.0
+  finally:
+    reset_parse_stage_timing(enabled=False)

@@ -65,8 +65,11 @@ the baseline plan and back into this table:
 ## Ranked optimizations
 
 Rank is structural speedup on durable ingest (MiB/min and giant-file wall),
-**#1 largest**, from the 2026-10-17 soak. The 01 `feed_s` median is telem-on
-and untrusted. Ranks are not taken from the historical E-series. F2 is
+**#1 largest**, from the 2026-10-17 soak. Historical 01 `feed_s` medians from
+telem-on soaks before the **feed_s telem tax** fix (per-line campaign lock +
+nested additive holds) are untrusted for product ranking. After that CODE,
+telem-on `feed_s` / `proc_merge_s` are exclusive-time holds flushed once per
+outermost stage. Ranks are not taken from the historical E-series. F2 is
 rejected. `conflict_insert` and F1 are retained. The in-place proc merge is
 in the tree and waits on the 01 soak. The next untried cut is the giant-file
 `start_s` scan.
@@ -158,6 +161,7 @@ Append one row per soak. Leave the rank table unchanged until a row contradicts 
 | 2026-10-20 | `soak-readout-next` | 04 Horizon, 01 Stampede3 | 8h, telem on, stage-reuse + columnar image | F4 stage reuse + columnar COPY bodies (parse cut reverted) | 04 dense n=483: stage_ddl 0.000 (was 5.500), write_setup 0.000 (was 8.750), conflict_insert 64.500, copy 3.200, db_execute 103.800, gap_proxy 36.100, 18.0079 MiB/min. nz stage_ddl lines 302/4169 (was 2917/6169). 01 MiB/min 142.8009 (bar 133.6808); dense/giant feed_s 498.850 / 1666.350; nz stage_ddl 2/1912. decision_next 04=`write_timescale_path`, 01=`parse_hold_feed_s`. | Operator retain both cuts (meters passed; conflict_insert guardrail miss overridden). Next cut: 04 conflict_insert / Timescale write path. |
 | 2026-10-20 | `ft-ingest-parse-write-split` | _(code land; soak pending)_ | n/a | tree + battery `day-close-loop-regression-battery-20261020-001427.log` | Parse pool + write stage (`sync_ingest_write_pool_processes` default ¼ parse, `parse_queue_max` 32, `parse_flush_max_mib` 512); retired `sync_bulk_create_batch_size`; census `parse_put_block_*`. | **Code landed** — production soak (T1/T2 + ≥8h CPU≥20 on 04) still required before retain/reject. |
 | 2026-10-20 | `write-telem-cross-thread` | _(code land; soak pending)_ | n/a | write timers on `IngestWritePayload.write_timing` | Stage-split soaks showed `postgres_s=0` / `conflict_insert_s=0` on parse-thread outcome lines while DB backends were busy; ferry snapshot across the write queue. | **Do not reject** F18 or stage-split. Pending re-soak: require non-zero dense write tokens before scoring F18 (≤32.250) or stage-split CPU. Cite `docs/OPERATOR_SYNC_TIMEDB_STALL_VERIFY.md` T1/T2 after deploy. |
+| 2026-10-21 | `feed-s-telem-tax` | _(code land; soak pending)_ | n/a | deferred campaign flush + exclusive nested `_held_parse_stage` | Removed per-line `_parse_stage_campaign_lock` from `_add_parse_stage_s`; nested `proc_merge_s` pauses outer `feed_s`. Do **not** re-land E6/E7/`cda5da57`. | **Code landed** — operator soak at **`sync_ingest_pool_processes=64`** on same CODE redeploy; meter = dense/mid `median_feed_s` drop vs `/tmp/ingest-rate-parse128-before64.txt` and `sync_full_ingest_per_min` / MiB/min not below prior losing baseline; expect `futex_pct` down vs ~95% at parse=128. |
 
 ## Next plan after the baseline
 
@@ -169,12 +173,14 @@ host_proc merge is in the tree after that baseline. Retain it only if 01
 64 MiB–1 GiB `proc_merge_s` is at least 20 percent below 139.5s with n at
 least 12, and 04 dense `conflict_insert_s` stays at or under 38.3s. The
 following untried cut is the giant-file `start_s` scan (129.4s). Telemetry
-was on in the 2026-10-15, 2026-10-16, and 2026-10-17 windows. The 01 `feed_s`
-median is telem-on and untrusted. The 2026-10-19 parse-cut image is not
+was on in the 2026-10-15, 2026-10-16, and 2026-10-17 windows. Pre–feed-s-telem-tax
+01 `feed_s` medians (telem-on) remain untrusted for ranking; post-fix soaks
+may use telem-on `feed_s` as exclusive wall. The 2026-10-19 parse-cut image is not
 retained. Stage reuse and columnar COPY are retained on the 2026-10-20 soak
 (operator keep): 04 dense `stage_ddl_s` and `write_setup_s` are both 0.000;
 nz `stage_ddl_s=` lines fell from 2917 to 302. The next cut is 04
-`conflict_insert_s` / Timescale write path (`decision_next=write_timescale_path`).
+`conflict_insert_s` / Timescale write path (`decision_next=write_timescale_path`),
+after the feed-s-telem-tax + parse=64 soak meters.
 
 ## Historical campaign (through 2026-10-14)
 

@@ -14,7 +14,9 @@ Attributes:
   PARSE_STAGE_HOLD_KEYS: Attribute.
   PARSE_STAGE_LOG_KEYS: Attribute.
   _parse_stage_campaign: Process-wide closed-book stage totals.
-  _parse_stage_campaign_lock: Mutex for campaign totals.
+  _parse_stage_campaign_lock: Mutex for campaign totals (flush only).
+  _parse_stage_flushed_s: Per-file campaign-flush watermark ContextVar.
+  _parse_stage_hold_stack: Nested exclusive hold stack ContextVar.
   _parse_stage_s: Per-file stage ContextVar.
   _parse_stage_telem_on: Process-wide parse-stage timing enable flag.
   _STATS_COL_NAMES: Attribute.
@@ -173,6 +175,18 @@ _parse_stage_s: contextvars.ContextVar[dict[str, float] | None] = (
     default=None,
   )
 )
+_parse_stage_flushed_s: contextvars.ContextVar[dict[str, float] | None] = (
+  contextvars.ContextVar(
+    "parse_stage_flushed_s",
+    default=None,
+  )
+)
+_parse_stage_hold_stack: contextvars.ContextVar[
+  list[tuple[str, float | None]] | None
+] = contextvars.ContextVar(
+  "parse_stage_hold_stack",
+  default=None,
+)
 
 
 def _parse_stage_acc() -> dict[str, float]:
@@ -190,6 +204,24 @@ def _parse_stage_acc() -> dict[str, float]:
   if cur is None:
     cur = dict.fromkeys(PARSE_STAGE_HOLD_KEYS, 0.0)
     _parse_stage_s.set(cur)
+  return cur
+
+
+def _parse_stage_flushed_acc() -> dict[str, float]:
+  """
+  Return per-context watermark of stage seconds already flushed to campaign.
+
+  Returns:
+    dict[str, float]: Mutable hold-key seconds already added to campaign.
+
+  Examples:
+    >>> isinstance(_parse_stage_flushed_acc(), dict)
+    True
+  """
+  cur = _parse_stage_flushed_s.get()
+  if cur is None:
+    cur = dict.fromkeys(PARSE_STAGE_HOLD_KEYS, 0.0)
+    _parse_stage_flushed_s.set(cur)
   return cur
 
 
@@ -236,6 +268,11 @@ def reset_parse_stage_timing(*, enabled: bool | None = None) -> None:
     >>> reset_parse_stage_timing(enabled=False)
   """
   global _parse_stage_telem_on
+  # Preserve prior file seconds in campaign before clearing ContextVars when
+  # sticky-on ``enabled=None`` (per-file reset). Explicit enable/disable zeros
+  # campaign under the lock below, so a flush would be discarded.
+  if _parse_stage_telem_on and enabled is None:
+    _flush_parse_stage_campaign_from_file_acc()
   if enabled is None:
     if not _parse_stage_telem_on:
       from hpcperfstats.dbload.lib import conf_parser as cfg
@@ -254,6 +291,8 @@ def reset_parse_stage_timing(*, enabled: bool | None = None) -> None:
       for key in PARSE_STAGE_HOLD_KEYS:
         _parse_stage_campaign[key] = 0.0
   _parse_stage_s.set(dict.fromkeys(PARSE_STAGE_HOLD_KEYS, 0.0))
+  _parse_stage_flushed_s.set(dict.fromkeys(PARSE_STAGE_HOLD_KEYS, 0.0))
+  _parse_stage_hold_stack.set(None)
 
 
 def snapshot_parse_stage_timing() -> dict[str, float]:
@@ -274,9 +313,44 @@ def snapshot_parse_stage_timing() -> dict[str, float]:
   return _parse_stage_derived(_parse_stage_acc())
 
 
+def _flush_parse_stage_campaign_from_file_acc() -> None:
+  """
+  Add unflushed per-file stage seconds into process-wide campaign totals.
+
+  Takes ``_parse_stage_campaign_lock`` once. Idempotent via a per-context
+  watermark so repeated snapshot/outcome flushes do not double-count.
+
+  Returns:
+    None
+
+  Examples:
+    >>> reset_parse_stage_timing(enabled=True)
+    >>> _add_parse_stage_s("feed_s", 0.1)
+    >>> _flush_parse_stage_campaign_from_file_acc()
+  """
+  if not _parse_stage_telem_on:
+    return
+  acc = _parse_stage_acc()
+  flushed = _parse_stage_flushed_acc()
+  with _parse_stage_campaign_lock:
+    for key in PARSE_STAGE_HOLD_KEYS:
+      total = float(acc.get(key, 0.0))
+      already = float(flushed.get(key, 0.0))
+      delta = total - already
+      if delta <= 0.0:
+        continue
+      _parse_stage_campaign[key] = (
+        float(_parse_stage_campaign.get(key, 0.0)) + delta
+      )
+      flushed[key] = total
+
+
 def snapshot_parse_stage_campaign_timing() -> dict[str, float]:
   """
   Return process-wide parse-stage totals accumulated across ingest threads.
+
+  Flushes the calling context's unflushed per-file accumulator first so
+  closed-book E2 sees worker holds without a per-line campaign lock.
 
   Returns:
     dict[str, float]: Empty when disabled; else hold keys plus derived sums.
@@ -288,6 +362,7 @@ def snapshot_parse_stage_campaign_timing() -> dict[str, float]:
   """
   if not _parse_stage_telem_on:
     return {}
+  _flush_parse_stage_campaign_from_file_acc()
   with _parse_stage_campaign_lock:
     return _parse_stage_derived(_parse_stage_campaign)
 
@@ -320,7 +395,11 @@ def attach_parse_unaccounted(meta: dict[str, Any]) -> dict[str, Any]:
 
 def _add_parse_stage_s(stage: str, delta_s: float) -> None:
   """
-  Accumulate non-negative seconds into per-file and campaign parse totals.
+  Accumulate non-negative seconds into the per-file ContextVar only.
+
+  Campaign totals update later via ``_flush_parse_stage_campaign_from_file_acc``
+  (outermost hold exit, campaign snapshot, or file-outcome merge). Never take
+  ``_parse_stage_campaign_lock`` on this hot path.
 
   Args:
     stage (str): A key in ``PARSE_STAGE_HOLD_KEYS``.
@@ -338,19 +417,18 @@ def _add_parse_stage_s(stage: str, delta_s: float) -> None:
   delta = float(delta_s)
   if delta <= 0.0 or stage not in PARSE_STAGE_HOLD_KEYS:
     return
-  acc = dict(_parse_stage_acc())
+  acc = _parse_stage_acc()
   acc[stage] = float(acc.get(stage, 0.0)) + delta
-  _parse_stage_s.set(acc)
-  with _parse_stage_campaign_lock:
-    _parse_stage_campaign[stage] = (
-      float(_parse_stage_campaign.get(stage, 0.0)) + delta
-    )
 
 
 @contextmanager
 def _held_parse_stage(stage: str) -> Iterator[None]:
   """
-  Hold ``perf_counter`` for ``stage`` only when telemetry is enabled.
+  Hold exclusive ``perf_counter`` for ``stage`` when telemetry is enabled.
+
+  Nested enters pause the outer stage clock and resume it on exit so
+  ``feed_s`` / ``proc_merge_s`` do not double-count wall. On outermost exit,
+  flush unflushed per-file seconds into the process campaign once.
 
   Args:
     stage (str): A key in ``PARSE_STAGE_HOLD_KEYS``.
@@ -366,11 +444,29 @@ def _held_parse_stage(stage: str) -> Iterator[None]:
   if not _parse_stage_telem_on:
     yield
     return
-  t0 = time.perf_counter()
+  stack = _parse_stage_hold_stack.get()
+  if stack is None:
+    stack = []
+    _parse_stage_hold_stack.set(stack)
+  now = time.perf_counter()
+  if stack:
+    outer_stage, outer_t0 = stack[-1]
+    if outer_t0 is not None:
+      _add_parse_stage_s(outer_stage, now - outer_t0)
+    stack[-1] = (outer_stage, None)
+  stack.append((stage, now))
   try:
     yield
   finally:
-    _add_parse_stage_s(stage, time.perf_counter() - t0)
+    end = time.perf_counter()
+    cur_stage, t0 = stack.pop()
+    if t0 is not None:
+      _add_parse_stage_s(cur_stage, end - t0)
+    if stack:
+      outer_stage, _paused = stack[-1]
+      stack[-1] = (outer_stage, end)
+    else:
+      _flush_parse_stage_campaign_from_file_acc()
 
 
 # Instantaneous gauges and kernel peaks retained as high-water marks across
