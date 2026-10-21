@@ -104,7 +104,6 @@ compose_rsync_repo_to_work_copy() {
       "${repo_root}/conftest.py" \
       "${repo_root}/docker-compose.defaults.yaml" \
       "${repo_root}/docker-compose.yaml.example" \
-      "${repo_root}/Dockerfile" \
       "${dest}/"
     rsync -a --timeout=120 "${excludes[@]}" \
       "${repo_root}/hpcperfstats.ini.example" \

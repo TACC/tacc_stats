@@ -154,7 +154,7 @@ compose_build_web_image() {
     git_commit="$(git -C "${REPO_ROOT}" rev-parse HEAD)"
   fi
   run_cmd "${PODMAN[@]}" build \
-    -f "${REPO_ROOT}/Dockerfile" \
+    -f "${REPO_ROOT}/services-conf/pipeline_web.Dockerfile" \
     -t hpcperfstats \
     --target hpcperfstats-full \
     --build-arg "HPCPERFSTATS_GIT_COMMIT=${git_commit}" \

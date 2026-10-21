@@ -242,7 +242,9 @@ def test_git_directory_not_excluded_from_docker_build_context():
 
 
 def test_dockerfile_copies_git_for_spa_bake_and_strips_from_runtime():
-  dockerfile = (_repo_root() / "Dockerfile").read_text()
+  dockerfile = (
+    _repo_root() / "services-conf" / "pipeline_web.Dockerfile"
+  ).read_text()
   assert "COPY .git /home/hpcperfstats/.git" in dockerfile
   assert (
     "apk add --no-cache bash git" in dockerfile

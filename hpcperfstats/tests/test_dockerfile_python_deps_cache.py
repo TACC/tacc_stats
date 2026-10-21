@@ -28,7 +28,9 @@ def _pyproject_runtime_requirements() -> list[str]:
 
 def test_python_build_layers_python_deps_on_pyproject():
   """PyPI deps install in python-build; application COPY must not reinstall them."""
-  dockerfile = (_repo_root() / "Dockerfile").read_text()
+  dockerfile = (
+    _repo_root() / "services-conf" / "pipeline_web.Dockerfile"
+  ).read_text()
   build = _stage_body(dockerfile, "python-build")
 
   assert re.search(r"COPY pyproject\.toml \./", build)
@@ -53,7 +55,10 @@ def test_python_build_gil_pip_invokes_via_python3_m():
   tomllib requirements slice because only pip3 was symlinked to /usr/local/bin
   and /opt/python3.14/bin was not on PATH in python-build.
   """
-  build = _stage_body((_repo_root() / "Dockerfile").read_text(), "python-build")
+  build = _stage_body(
+    (_repo_root() / "services-conf" / "pipeline_web.Dockerfile").read_text(),
+    "python-build",
+  )
   assert (
     "python3 -m pip install --no-cache-dir -r /tmp/requirements-build.txt"
     in build
@@ -83,7 +88,10 @@ def test_python_build_prunes_full_image_build_toolchain_keeps_cython():
   meson/ninja): drop devel/backends; keep cython and MKL/OpenMP/TBB runtime.
   Rest project.dependencies (Django/Bokeh/...) do not need the pruned names.
   """
-  build = _stage_body((_repo_root() / "Dockerfile").read_text(), "python-build")
+  build = _stage_body(
+    (_repo_root() / "services-conf" / "pipeline_web.Dockerfile").read_text(),
+    "python-build",
+  )
   uninstall_bodies = [
     body
     for body in re.findall(
@@ -132,7 +140,10 @@ def test_python_build_path_includes_prefix_bins_for_cython_meson():
   cython under /opt/python3.14/bin while python-build PATH only had
   /usr/local/bin (python3/pip3 symlinks).
   """
-  build = _stage_body((_repo_root() / "Dockerfile").read_text(), "python-build")
+  build = _stage_body(
+    (_repo_root() / "services-conf" / "pipeline_web.Dockerfile").read_text(),
+    "python-build",
+  )
   path_lines = [
     ln for ln in build.splitlines() if re.search(r"(^|\s)PATH=", ln)
   ]
@@ -154,7 +165,10 @@ def test_python_build_cython_path_matches_abi_prefix():
   Shared ENV PATH lists GIL bin before FT; without per-RUN PATH pinning, the
   FT numpy source build would pick /opt/python3.14/bin/cython.
   """
-  build = _stage_body((_repo_root() / "Dockerfile").read_text(), "python-build")
+  build = _stage_body(
+    (_repo_root() / "services-conf" / "pipeline_web.Dockerfile").read_text(),
+    "python-build",
+  )
   gil = build[
     build.index("COPY pyproject.toml") : build.index(
       "/opt/python3.14t/bin/python3.14t -m pip install --no-cache-dir --upgrade pip"
@@ -184,7 +198,9 @@ def test_python_build_cython_path_matches_abi_prefix():
 
 def test_hpcperfstats_base_installs_package_no_deps_after_full_copy():
   """Runtime base copies tree then pip --no-deps only (deps already in python-build)."""
-  dockerfile = (_repo_root() / "Dockerfile").read_text()
+  dockerfile = (
+    _repo_root() / "services-conf" / "pipeline_web.Dockerfile"
+  ).read_text()
   stage = _stage_body(dockerfile, "hpcperfstats-base")
 
   assert "COPY --chown=hpcperfstats:hpcperfstats . ." in stage
@@ -215,7 +231,9 @@ def test_pyproject_dependencies_write_valid_pip_requirements_file():
 
 def test_hpcperfstats_child_stages_do_not_reinstall_python_deps():
   """hpcperfstats-full and pipeline-refresh inherit base; collectstatic locally."""
-  dockerfile = (_repo_root() / "Dockerfile").read_text()
+  dockerfile = (
+    _repo_root() / "services-conf" / "pipeline_web.Dockerfile"
+  ).read_text()
 
   for stage_name in ("hpcperfstats-full", "hpcperfstats-pipeline-refresh"):
     stage = _stage_body(dockerfile, stage_name)
@@ -229,7 +247,10 @@ def test_hpcperfstats_child_stages_do_not_reinstall_python_deps():
 
 
 def test_python_build_uses_clang_22_toolchain() -> None:
-  build = _stage_body((_repo_root() / "Dockerfile").read_text(), "python-build")
+  build = _stage_body(
+    (_repo_root() / "services-conf" / "pipeline_web.Dockerfile").read_text(),
+    "python-build",
+  )
   assert "clang-22" in build
   assert "bake_clang_flags.sh" in build
   assert "PGO_PHASE" not in build
@@ -238,7 +259,9 @@ def test_python_build_uses_clang_22_toolchain() -> None:
 
 def test_hpcperfstats_full_is_last_dockerfile_stage():
   """Default build target must run frontend-builder (podman-compose ignores build.target)."""
-  dockerfile = (_repo_root() / "Dockerfile").read_text()
+  dockerfile = (
+    _repo_root() / "services-conf" / "pipeline_web.Dockerfile"
+  ).read_text()
   stages = re.findall(r"^FROM .* AS (\S+)", dockerfile, flags=re.MULTILINE)
 
   assert stages[-1] == "hpcperfstats-full"
@@ -252,7 +275,9 @@ def test_hpcperfstats_full_is_last_dockerfile_stage():
 
 def test_dockerfile_documents_spa_volume_fingerprint_heal_contract():
   """From-scratch rebuild lands SPA via django_startup heal, not image collectstatic alone."""
-  dockerfile = (_repo_root() / "Dockerfile").read_text()
+  dockerfile = (
+    _repo_root() / "services-conf" / "pipeline_web.Dockerfile"
+  ).read_text()
   assert "django_startup.sh" in dockerfile
   assert "spa_static_root_heal" in dockerfile
   assert "staticfiles_data" in dockerfile
@@ -265,7 +290,9 @@ def test_dockerfile_documents_spa_volume_fingerprint_heal_contract():
 
 def test_dockerfile_pins_dual_cpython_prefixes_from_python_build():
   """GIL /opt/python3.14 (+ /usr/local links) and FT /opt/python3.14t from python-build."""
-  dockerfile = (_repo_root() / "Dockerfile").read_text()
+  dockerfile = (
+    _repo_root() / "services-conf" / "pipeline_web.Dockerfile"
+  ).read_text()
   stages = re.findall(r"^FROM .* AS (\S+)", dockerfile, flags=re.MULTILINE)
   assert "python-build" in stages
   assert stages.index("python-build") < stages.index("hpcperfstats-base")

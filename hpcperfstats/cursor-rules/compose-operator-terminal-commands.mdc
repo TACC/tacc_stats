@@ -651,7 +651,7 @@ print(\"discover\", store.queued_count(\"discover\"), \"day_close\", store.queue
 
 ## Container introspection tools (pipeline / web image)
 
-The **`hpcperfstats-base`** image ( **`pipeline`**, **`web`**, and siblings built from root **`Dockerfile`**) ships these **read-only diagnostic** tools. Prefer them over asking the operator to install packages on the host.
+The **`hpcperfstats-base`** image ( **`pipeline`**, **`web`**, and siblings built from **`services-conf/pipeline_web.Dockerfile`**) ships these **read-only diagnostic** tools. Prefer them over asking the operator to install packages on the host.
 
 | Tool | Package / install | Typical use |
 |------|-------------------|-------------|

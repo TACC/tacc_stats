@@ -1042,7 +1042,7 @@ def test_docker_compose_web_build_uses_hpcperfstats_full_target():
   """Compose must request full image; rebuild_pipeline.sh uses pipeline-refresh explicitly."""
   repo_root = Path(__file__).resolve().parents[2]
   content = (repo_root / "docker-compose.defaults.yaml").read_text()
-  assert "dockerfile: Dockerfile" in content
+  assert "dockerfile: services-conf/pipeline_web.Dockerfile" in content
   assert "target: hpcperfstats-full" in content
   assert content.index("target: hpcperfstats-full") < content.index(
     "image: hpcperfstats"

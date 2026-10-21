@@ -18,7 +18,7 @@ _FORBIDDEN = (
 )
 
 _PRODUCT_GLOBS = (
-  "Dockerfile",
+  "services-conf/pipeline_web.Dockerfile",
   "docker-compose.defaults.yaml",
   "docker-compose.yaml.example",
   "docker-compose.yaml",
@@ -57,6 +57,13 @@ def test_no_custom_pgo_surface_remains() -> None:
   assert not hits, "custom PGO tokens still present:\n" + "\n".join(hits[:40])
 
 
+def test_pipeline_web_dockerfile_path_layout() -> None:
+  """Web/pipeline bake lives under services-conf; root Dockerfile must be gone."""
+  root = _repo_root()
+  assert (root / "services-conf" / "pipeline_web.Dockerfile").is_file()
+  assert not (root / "Dockerfile").exists()
+
+
 def test_bake_clang_flags_and_enable_optimizations_present() -> None:
   root = _repo_root()
   bake = (root / "services-conf" / "bake_clang_flags.sh").read_text()
@@ -64,7 +71,7 @@ def test_bake_clang_flags_and_enable_optimizations_present() -> None:
   assert "hpcperfstats_cpython_make_install" in bake
   assert "--enable-optimizations" in bake
   assert ("f" + "profile-instr") not in bake
-  dockerfile = (root / "Dockerfile").read_text()
+  dockerfile = (root / "services-conf" / "pipeline_web.Dockerfile").read_text()
   assert "bake_clang_flags.sh" in dockerfile
   assert "hpcperfstats_cpython_enable_optimizations_for_configure" in dockerfile
   # Upstream --enable-optimizations needs llvm-profdata; keep it without

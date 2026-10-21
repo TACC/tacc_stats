@@ -22,7 +22,9 @@ def _frontend_builder_stage(dockerfile: str) -> str:
 
 def test_frontend_builder_does_not_copy_entire_repo():
   """Backend-only edits must not invalidate the npm ci / build cache layers."""
-  dockerfile = (_repo_root() / "Dockerfile").read_text()
+  dockerfile = (
+    _repo_root() / "services-conf" / "pipeline_web.Dockerfile"
+  ).read_text()
   stage = _frontend_builder_stage(dockerfile)
 
   assert "COPY --chown=node:node . ." not in stage

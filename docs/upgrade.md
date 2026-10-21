@@ -25,8 +25,11 @@ after the new paths are verified.
 Rebuild with `podman-compose -p hpcperfstats up --build -d`. Development uses
 project `hpcperfstats-dev` and ports 8080/8443/1514; tests use
 `hpcperfstats-test`. Never run global Podman prune or enable an alternate
-runtime-compatibility endpoint. OCI filenames (`Dockerfile`, `.dockerignore`,
-`docker-compose*.yaml`) remain unchanged.
+runtime-compatibility endpoint. OCI filenames (`.dockerignore`,
+`docker-compose*.yaml`) and service bake recipes under
+`services-conf/*.Dockerfile` (web/pipeline:
+`services-conf/pipeline_web.Dockerfile` with context `./`) remain the
+canonical layout.
 
 ---
 

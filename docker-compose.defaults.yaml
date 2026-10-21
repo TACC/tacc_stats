@@ -17,8 +17,9 @@ x-logging: &hpc-logging
 services:
   web:
     build:
+      # Context stays checkout root so COPY paths (hpcperfstats/, .git, …) resolve.
       context: ./
-      dockerfile: Dockerfile
+      dockerfile: services-conf/pipeline_web.Dockerfile
       target: hpcperfstats-full
       # Optional override for staff SPA commit link. Primary bake uses context .git
       # (frontend-builder COPY + git rev-parse). Default unknown falls back to .git.

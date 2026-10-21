@@ -121,8 +121,8 @@ preflight() {
     echo "rebuild_pipeline.sh: docker-compose.yaml not found under ${REPO_ROOT}" >&2
     exit 1
   fi
-  if [[ ! -f "${REPO_ROOT}/Dockerfile" ]]; then
-    echo "rebuild_pipeline.sh: Dockerfile not found under ${REPO_ROOT}" >&2
+  if [[ ! -f "${REPO_ROOT}/services-conf/pipeline_web.Dockerfile" ]]; then
+    echo "rebuild_pipeline.sh: pipeline_web.Dockerfile not found under ${REPO_ROOT}" >&2
     exit 1
   fi
   cd "${REPO_ROOT}"

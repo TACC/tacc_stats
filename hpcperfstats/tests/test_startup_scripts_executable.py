@@ -20,7 +20,9 @@ def _repo_root() -> Path:
 
 
 def test_dockerfile_chmods_compose_startup_scripts():
-  dockerfile = (_repo_root() / "Dockerfile").read_text()
+  dockerfile = (
+    _repo_root() / "services-conf" / "pipeline_web.Dockerfile"
+  ).read_text()
 
   for script in STARTUP_SCRIPTS:
     assert script in dockerfile

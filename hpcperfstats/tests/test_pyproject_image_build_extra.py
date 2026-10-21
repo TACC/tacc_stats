@@ -60,7 +60,9 @@ def test_image_build_extra_includes_setuptools_for_no_build_isolation():
   assert "setuptools" in names
   assert "wheel" in names
   # Must not rely on the base image having setuptools; image-build installs it.
-  dockerfile = (_repo_root() / "Dockerfile").read_text()
+  dockerfile = (
+    _repo_root() / "services-conf" / "pipeline_web.Dockerfile"
+  ).read_text()
   assert "--no-build-isolation" in dockerfile
   assert "setuptools" in dockerfile
 
@@ -72,7 +74,9 @@ def test_image_build_extra_includes_versioneer_for_pandas_meson():
   names = {_pep508_name(d) for d in build}
   assert "versioneer" in names
   assert any("versioneer[toml]==0.29" in d for d in build)
-  dockerfile = (_repo_root() / "Dockerfile").read_text()
+  dockerfile = (
+    _repo_root() / "services-conf" / "pipeline_web.Dockerfile"
+  ).read_text()
   assert "versioneer" in dockerfile
   writer_assert = next(
     line
@@ -87,7 +91,9 @@ def test_image_build_extra_includes_versioneer_for_pandas_meson():
 
 def test_dockerfile_python_build_path_exposes_image_build_scripts():
   """Meson needs cython on PATH; each ABI RUN must pin its own prefix cython."""
-  dockerfile = (_repo_root() / "Dockerfile").read_text()
+  dockerfile = (
+    _repo_root() / "services-conf" / "pipeline_web.Dockerfile"
+  ).read_text()
   assert re.search(
     r"PATH=/usr/local/bin:/opt/zstd/bin:/opt/python3\.14/bin:/opt/python3\.14t/bin",
     dockerfile,

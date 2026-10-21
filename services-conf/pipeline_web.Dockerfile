@@ -1,3 +1,5 @@
+# Web + pipeline image bake (compose service web; image hpcperfstats).
+# Path: services-conf/pipeline_web.Dockerfile — build context must stay repo root (./).
 # Build frontend assets in a dedicated node stage.
 # COPY is scoped to frontend inputs so Python/backend changes do not bust npm layers.
 FROM node:26.12.0-alpine3.24 AS frontend-builder

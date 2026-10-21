@@ -12,8 +12,11 @@ configuration, container workflow scripts, or the shared Podman adapter.
 - Use unprivileged `podman` and `podman-compose`; never require Docker Desktop,
   Colima, `docker`, `docker compose`, `docker-compose`, `DOCKER_HOST`, or a
   Docker socket on this Linux workspace.
-- Keep OCI-standard filenames such as `Dockerfile`, `.dockerignore`, and
-  `docker-compose*.yaml`; filename compatibility does not select the runtime.
+- Keep OCI-standard filenames such as `.dockerignore` and
+  `docker-compose*.yaml`, plus service bake recipes under
+  `services-conf/*.Dockerfile` (web/pipeline:
+  `services-conf/pipeline_web.Dockerfile` with context `./`); filename
+  compatibility does not select the runtime.
 - Run committed workflows through `scripts/lib/podman_runtime.sh`. Production
   operators use project `hpcperfstats` (network `hpcperfstats_net`) and must
   **not** require `/data/user/$USER`. Tests use `hpcperfstats-test`; the

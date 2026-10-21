@@ -21,7 +21,9 @@ def _stage_body(dockerfile: str, stage_name: str) -> str:
 
 
 def test_python_build_uses_clang_22_from_trixie() -> None:
-  dockerfile = (_repo_root() / "Dockerfile").read_text()
+  dockerfile = (
+    _repo_root() / "services-conf" / "pipeline_web.Dockerfile"
+  ).read_text()
   build = _stage_body(dockerfile, "python-build")
   assert "clang-22" in build
   assert "llvm-22" in build
@@ -44,7 +46,10 @@ def test_python_build_uses_clang_22_from_trixie() -> None:
 
 def test_python_build_uses_bake_clang_flags_and_cpython_helpers() -> None:
   """ThinLTO bake helper + CPython --enable-optimizations path (no custom PGO)."""
-  build = _stage_body((_repo_root() / "Dockerfile").read_text(), "python-build")
+  build = _stage_body(
+    (_repo_root() / "services-conf" / "pipeline_web.Dockerfile").read_text(),
+    "python-build",
+  )
   assert "bake_clang_flags.sh" in build
   # CPython configure --enable-optimizations requires llvm-profdata on PATH
   # (upstream mini profile merge). Not custom Clang -fprofile-instr.
@@ -76,7 +81,9 @@ def test_python_build_uses_bake_clang_flags_and_cpython_helpers() -> None:
 
 
 def test_python_build_uses_clang_native_probe_not_gcc_help() -> None:
-  dockerfile = (_repo_root() / "Dockerfile").read_text()
+  dockerfile = (
+    _repo_root() / "services-conf" / "pipeline_web.Dockerfile"
+  ).read_text()
   assert "-Q --help=target" not in dockerfile
   assert "clang_march_native_probe.sh" in dockerfile
   probe = (
@@ -93,7 +100,9 @@ def test_python_build_uses_clang_native_probe_not_gcc_help() -> None:
 
 
 def test_dockerfile_uses_debian_trixie_builder_and_slim_runtime():
-  dockerfile = (_repo_root() / "Dockerfile").read_text()
+  dockerfile = (
+    _repo_root() / "services-conf" / "pipeline_web.Dockerfile"
+  ).read_text()
   assert "FROM python:3.14.7-trixie" not in dockerfile
   assert re.search(
     r"^FROM debian:trixie AS python-build\s*$",
@@ -110,7 +119,10 @@ def test_dockerfile_uses_debian_trixie_builder_and_slim_runtime():
 
 def test_compiled_library_pins_are_latest_known():
   """Lock Dockerfile compile-from-source pins (bump when intentionally upgrading)."""
-  build = _stage_body((_repo_root() / "Dockerfile").read_text(), "python-build")
+  build = _stage_body(
+    (_repo_root() / "services-conf" / "pipeline_web.Dockerfile").read_text(),
+    "python-build",
+  )
   assert "jemalloc-5.4.0.tar.bz2" in build
   assert (
     "200776fac271093e7c2f21edd6d62657ecd2be578d9328633f2a86bfa6ef4f1d" in build
@@ -150,7 +162,9 @@ def test_compiled_library_pins_are_latest_known():
 
 def test_zlib_ng_compat_opt_direct_link_no_explicit_apt_zlib():
   """zlib-ng ZLIB_COMPAT under /opt; CPython/extensions link it; no apt zlib* pin."""
-  dockerfile = (_repo_root() / "Dockerfile").read_text()
+  dockerfile = (
+    _repo_root() / "services-conf" / "pipeline_web.Dockerfile"
+  ).read_text()
   build = _stage_body(dockerfile, "python-build")
   base = _stage_body(dockerfile, "hpcperfstats-base")
   assert "CMAKE_INSTALL_PREFIX=/opt/zlib-ng" in build
@@ -187,7 +201,9 @@ def test_zlib_ng_compat_opt_direct_link_no_explicit_apt_zlib():
 
 def test_zstd_opt_direct_link_replaces_system_cli_enables_cpython_zstd():
   """zstd under /opt; CPython _zstd + system CLI from /opt (no apt zstd pin)."""
-  dockerfile = (_repo_root() / "Dockerfile").read_text()
+  dockerfile = (
+    _repo_root() / "services-conf" / "pipeline_web.Dockerfile"
+  ).read_text()
   build = _stage_body(dockerfile, "python-build")
   base = _stage_body(dockerfile, "hpcperfstats-base")
   assert "PREFIX=/opt/zstd" in build
@@ -230,7 +246,10 @@ def test_gil_and_ft_assign_zstd_so_before_test_n():
   Regression: GIL RUN had test -n \"$zstd_so\" without a find assignment
   (FT already correct), which fails builds under set -u.
   """
-  build = _stage_body((_repo_root() / "Dockerfile").read_text(), "python-build")
+  build = _stage_body(
+    (_repo_root() / "services-conf" / "pipeline_web.Dockerfile").read_text(),
+    "python-build",
+  )
   gil = build[
     build.index("--prefix=/opt/python3.14") : build.index(
       "--prefix=/opt/python3.14t"
@@ -250,7 +269,10 @@ def test_gil_and_ft_assign_zstd_so_before_test_n():
 
 
 def test_jemalloc_configure_flags_and_no_initial_exec_tls():
-  build = _stage_body((_repo_root() / "Dockerfile").read_text(), "python-build")
+  build = _stage_body(
+    (_repo_root() / "services-conf" / "pipeline_web.Dockerfile").read_text(),
+    "python-build",
+  )
   assert "MAKEFLAGS=-j40" in build or "make -j40" in build
   assert "--prefix=/opt/jemalloc" in build
   assert "--disable-stats" in build
@@ -294,7 +316,10 @@ def test_jemalloc_configure_flags_and_no_initial_exec_tls():
 
 
 def test_libmpdec_and_libffi_native_flags():
-  build = _stage_body((_repo_root() / "Dockerfile").read_text(), "python-build")
+  build = _stage_body(
+    (_repo_root() / "services-conf" / "pipeline_web.Dockerfile").read_text(),
+    "python-build",
+  )
   assert "/opt/mpdecimal" in build
   assert "-DCONFIG_64" in build
   assert "-DASM" in build
@@ -321,7 +346,10 @@ def test_libmpdec_and_libffi_native_flags():
 
 
 def test_cpython_gil_without_mimalloc_ft_keeps_mimalloc_both_force_jemalloc():
-  build = _stage_body((_repo_root() / "Dockerfile").read_text(), "python-build")
+  build = _stage_body(
+    (_repo_root() / "services-conf" / "pipeline_web.Dockerfile").read_text(),
+    "python-build",
+  )
   assert "--with-lto" in build
   assert "hpcperfstats_cpython_enable_optimizations_for_configure" in build
   bake_sh = (_repo_root() / "services-conf" / "bake_clang_flags.sh").read_text()
@@ -346,7 +374,8 @@ def test_cpython_gil_without_mimalloc_ft_keeps_mimalloc_both_force_jemalloc():
 
 def test_runtime_jemalloc_both_ways_preload_and_ld_so_preload():
   base = _stage_body(
-    (_repo_root() / "Dockerfile").read_text(), "hpcperfstats-base"
+    (_repo_root() / "services-conf" / "pipeline_web.Dockerfile").read_text(),
+    "hpcperfstats-base",
   )
   assert "ENV LD_PRELOAD=/opt/jemalloc/lib/libjemalloc.so.2" in base or (
     "LD_PRELOAD=/opt/jemalloc/lib/libjemalloc.so.2" in base
@@ -381,7 +410,9 @@ def test_runtime_jemalloc_both_ways_preload_and_ld_so_preload():
 
 def test_hpcperfstats_base_apt_includes_curl_for_supervisor_startup():
   """pipeline supervisor_startup.sh curls web:8000; slim must ship curl."""
-  dockerfile = (_repo_root() / "Dockerfile").read_text()
+  dockerfile = (
+    _repo_root() / "services-conf" / "pipeline_web.Dockerfile"
+  ).read_text()
   base = _stage_body(dockerfile, "hpcperfstats-base")
   apt_install = base[
     base.index("apt-get install") : base.index("apt-get clean")
@@ -395,7 +426,9 @@ def test_hpcperfstats_base_apt_includes_curl_for_supervisor_startup():
 
 def test_hpcperfstats_base_apt_includes_fd_find():
   """pipeline discover walks with fdfind; slim must ship fd-find."""
-  dockerfile = (_repo_root() / "Dockerfile").read_text()
+  dockerfile = (
+    _repo_root() / "services-conf" / "pipeline_web.Dockerfile"
+  ).read_text()
   base = _stage_body(dockerfile, "hpcperfstats-base")
   apt_install = base[
     base.index("apt-get install") : base.index("apt-get clean")
@@ -405,7 +438,9 @@ def test_hpcperfstats_base_apt_includes_fd_find():
 
 def test_dockerfile_avoids_nested_quotes_inside_command_substitution():
   """Podman/buildah: RUN is sh -c \"...\"; $(... \" ...) and bare \" break quoting."""
-  text = (_repo_root() / "Dockerfile").read_text()
+  text = (
+    _repo_root() / "services-conf" / "pipeline_web.Dockerfile"
+  ).read_text()
   assert '$(basename "' not in text
   assert '$(basename "' not in text
   assert "${so##*/}" in text
@@ -472,7 +507,7 @@ def test_dockerfile_run_c_quotes_balanced_all_dockerfiles() -> None:
   """
   root = _repo_root()
   paths = [
-    root / "Dockerfile",
+    root / "services-conf" / "pipeline_web.Dockerfile",
     root / "services-conf" / "db.Dockerfile",
     root / "services-conf" / "proxy.Dockerfile",
   ]
@@ -490,7 +525,7 @@ def test_dockerfile_run_c_quotes_balanced_all_dockerfiles() -> None:
   assert not failures, failures
   assert checked >= 20, checked
   # GIL + FT MKL stacks: brotli smoke owns the ``-c '`` closer (not a ``\\`` cont).
-  main = (root / "Dockerfile").read_text()
+  main = (root / "services-conf" / "pipeline_web.Dockerfile").read_text()
   closer = 'assert brotli.decompress(p)==b\\"hps\\""\''
   assert main.count(closer) == 2, main.count(closer)
 
@@ -514,7 +549,9 @@ def test_dockerfile_run_c_quote_scanner_detects_missing_closer() -> None:
 
 def test_hpcperfstats_base_copies_only_opt_prefixes_not_compile_trees():
   """Runtime stage must not COPY /usr/src or other compile trees from python-build."""
-  dockerfile = (_repo_root() / "Dockerfile").read_text()
+  dockerfile = (
+    _repo_root() / "services-conf" / "pipeline_web.Dockerfile"
+  ).read_text()
   build = _stage_body(dockerfile, "python-build")
   base = _stage_body(dockerfile, "hpcperfstats-base")
   copies = [

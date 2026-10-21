@@ -27,12 +27,15 @@ def _stage_body(dockerfile: str, stage_name: str) -> str:
 
 
 def _python_build() -> str:
-  return _stage_body((_repo_root() / "Dockerfile").read_text(), "python-build")
+  return _stage_body(
+    (_repo_root() / "services-conf" / "pipeline_web.Dockerfile").read_text(),
+    "python-build",
+  )
 
 
 def _hpcperfstats_base() -> str:
   return _stage_body(
-    (_repo_root() / "Dockerfile").read_text(),
+    (_repo_root() / "services-conf" / "pipeline_web.Dockerfile").read_text(),
     "hpcperfstats-base",
   )
 
@@ -55,7 +58,9 @@ def test_python_build_does_not_pip_install_unpinned_pyspy():
 
 def test_python_build_pyspy_pins_pr_860_sha_and_temporary_comment():
   """Cargo pin must be SHA-locked, TEMPORARY, and dropped when official >0.4.2 ships."""
-  dockerfile = (_repo_root() / "Dockerfile").read_text()
+  dockerfile = (
+    _repo_root() / "services-conf" / "pipeline_web.Dockerfile"
+  ).read_text()
   build = _stage_body(dockerfile, "python-build")
   assert _PYSPY_PIN_SHA in build
   assert _PYSPY_TARBALL_SHA256 in build
@@ -118,7 +123,9 @@ def test_python_build_wipes_pyspy_src_and_rustup_before_stage_end():
 
 def test_hpcperfstats_base_has_libunwind8_not_rustc_or_libunwind_dev():
   """Dynamically linked py-spy needs libunwind8; compilers stay in python-build."""
-  dockerfile = (_repo_root() / "Dockerfile").read_text()
+  dockerfile = (
+    _repo_root() / "services-conf" / "pipeline_web.Dockerfile"
+  ).read_text()
   build = _stage_body(dockerfile, "python-build")
   base = _stage_body(dockerfile, "hpcperfstats-base")
   base_apt = base[base.index("apt-get install") : base.index("apt-get clean")]

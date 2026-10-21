@@ -143,7 +143,7 @@ Primary maintainer contact appears in `pyproject.toml` authors (Texas Advanced C
 
 | Service | Role |
 |---------|------|
-| **web** | Builds from repo `Dockerfile` (`hpcperfstats-full`); runs Django via `services-conf/django_startup.sh`; exposes app port (default host `8000` via `HPCPERFSTATS_WEB_PORT`). **Depends on healthy `db` and healthy `redis`.** |
+| **web** | Builds from `services-conf/pipeline_web.Dockerfile` with context `./` (`hpcperfstats-full`); runs Django via `services-conf/django_startup.sh`; exposes app port (default host `8000` via `HPCPERFSTATS_WEB_PORT`). **Depends on healthy `db` and healthy `redis`.** |
 | **pipeline** | Same image as `web`; runs `supervisor_startup.sh` to supervise long-running ingest/processing programs (see §6). Uses the **`hpcperfstatsdata`** bind for archive, accounting, daily archive, and **cluster syslog** under **`/hpcperfstats/logs/`** (bind `device:` in **`docker-compose.yaml`**). Reaches **`db`**, **`redis`**, and **`rabbitmq`** on `hpcperfstats_net`. |
 | **db** | TimescaleDB on PostgreSQL 15 (`timescale/timescaledb:2.28.3-pg15`); primary system of record until PG18 cutover. Compose sets large **`shm_size`** and Postgres tuning (`shared_buffers`, timeouts, WAL) for concurrent Django + pipeline load. |
 | **db_pg18** | Optional dual-run homemade PostgreSQL 18 + TimescaleDB (`hpcperfstats-db` from `services-conf/db.Dockerfile`; profile **`pg18-migrate`**, alias **`db18`**). Logical migrate runbook: `docs/OPERATOR_PG18_MIGRATION.md`. Same **`shm_size: "16gb"`** plus **`io_method=io_uring`**. |

@@ -1,14 +1,14 @@
 ---
 description: Keep .dockerignore aligned with test and dev-only paths so Docker build context stays lean
-globs: HPCPerfStats/.dockerignore,HPCPerfStats/Dockerfile,hpcperfstats/tests/test_dockerignore_test_artifacts.py
+globs: HPCPerfStats/.dockerignore,HPCPerfStats/services-conf/pipeline_web.Dockerfile,hpcperfstats/tests/test_dockerignore_test_artifacts.py
 alwaysApply: false
 ---
 
 # Dockerignore Build Context Sync
 
-**Activation:** triggered when editing **`.dockerignore`**, root **`Dockerfile`** build-context scope, or introducing **new test-only / dev-only path conventions** (see below).
+**Activation:** triggered when editing **`.dockerignore`**, **`services-conf/pipeline_web.Dockerfile`** build-context scope, or introducing **new test-only / dev-only path conventions** (see below).
 
-Docker image builds use the git checkout as context (`COPY` in **`Dockerfile`**). Test sources, agent rules, compose manifests, docs, and local scratch must **not** ship in that context — they inflate uploads, bust layer cache, and are never needed at runtime.
+Docker image builds use the git checkout as context (`COPY` in **`services-conf/pipeline_web.Dockerfile`** with context **`./`**). Test sources, agent rules, compose manifests, docs, and local scratch must **not** ship in that context — they inflate uploads, bust layer cache, and are never needed at runtime.
 
 ## Canonical exclusions (baseline)
 
@@ -55,7 +55,7 @@ Read this file in the **same task** when you:
 - Add **colocated** `test_*.py` outside existing `tests/` packages.
 - Add frontend files matching new test suffixes (for example `*.spec.ts` if adopted).
 - Add **cursor rules**, **docs**, or other **host-only** trees that should not enter `COPY . .`.
-- Narrow **`Dockerfile`** `COPY` scope and discover non-runtime paths still enter the context.
+- Narrow **`pipeline_web.Dockerfile`** `COPY` scope and discover non-runtime paths still enter the context.
 
 ## Do not exclude
 
@@ -65,7 +65,7 @@ Read this file in the **same task** when you:
 - Deploy scripts: **`scripts/rebuild_frontend.sh`**, **`scripts/rebuild_pipeline.sh`**, **`services-conf/`**.
 - Root **`README.md`** (referenced by **`pyproject.toml`** for `pip install`).
 - Root **`LICENSE`**, **`pyproject.toml`**, **`hpcperfstats.ini*`**.
-- **`.git/`** — intentional include for SPA commit bake (`Dockerfile` `frontend-builder` `COPY .git` + `git rev-parse`). **`hpcperfstats-base` must `rm -rf /home/hpcperfstats/.git` immediately after `COPY . .`** so the runtime image does not retain history. Keep **`.gitignore`** dockerignored.
+- **`.git/`** — intentional include for SPA commit bake (`pipeline_web.Dockerfile` `frontend-builder` `COPY .git` + `git rev-parse`). **`hpcperfstats-base` must `rm -rf /home/hpcperfstats/.git` immediately after `COPY . .`** so the runtime image does not retain history. Keep **`.gitignore`** dockerignored.
 
 ## Overlap
 

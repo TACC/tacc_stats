@@ -273,7 +273,7 @@ HPCPERFSTATS_ROUTER_ENTRIES: list[RouterEntry] = [
       "scripts/rebuild_frontend.sh",
     ],
     "exact_paths": [
-      "Dockerfile",
+      "services-conf/pipeline_web.Dockerfile",
       ".dockerignore",
     ],
     "rules": [
@@ -292,7 +292,7 @@ HPCPERFSTATS_ROUTER_ENTRIES: list[RouterEntry] = [
       "hpcperfstats/tests/test_dockerfile_mkl_source_stack.py",
     ],
     "exact_paths": [
-      "Dockerfile",
+      "services-conf/pipeline_web.Dockerfile",
     ],
     "rules": [
       "python-image-interpreter-contract.mdc",
@@ -462,7 +462,7 @@ HPCPERFSTATS_ROUTER_ENTRIES: list[RouterEntry] = [
     "id": "dockerignore_test_artifacts",
     "patterns": [
       ".dockerignore",
-      "Dockerfile",
+      "services-conf/pipeline_web.Dockerfile",
       "hpcperfstats/tests/test_dockerignore_test_artifacts.py",
     ],
     "rules": [

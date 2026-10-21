@@ -8,7 +8,7 @@ globs:
   - hpcperfstats/site/frontend/scripts/copy-next-export.mjs
   - hpcperfstats/site/frontend/test/**
   - hpcperfstats/site/frontend/app/bokeh-playwright-smoke/**
-  - Dockerfile
+  - services-conf/pipeline_web.Dockerfile
   - scripts/rebuild_frontend.sh
   - .dockerignore
 ---
@@ -76,7 +76,7 @@ Fixtures live under `test/fixtures/` (not `src/test-fixtures/`).
 
 When touching this boundary:
 
-1. Keep **`build:prod`** on Dockerfile `frontend-builder` and `rebuild_frontend.sh`.
+1. Keep **`build:prod`** on `pipeline_web.Dockerfile` `frontend-builder` and `rebuild_frontend.sh`.
 2. Update **`test_dockerignore_test_artifacts.py`** if `frontend/test/` layout or dockerignore patterns change (`dockerignore-test-artifacts-sync.mdc`).
 3. Run **`copy-next-export.production.test.ts`** and **`npm run typecheck:all`**.
 4. Document **`build` vs `build:prod`** in `docs/TESTING.md` when commands change (`testing-doc-sync.mdc`).

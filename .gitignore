@@ -39,7 +39,7 @@ tacc_stats.egg-info/
 # Redis bind-mount entrypoint (compose unix socket prep). Missing file → Podman
 # creates a directory at this path and Redis exits 0 immediately.
 !services-conf/redis_entrypoint.sh
-# Native ThinLTO bake flags (db/proxy COPY; Dockerfile COPY from services-conf/).
+# Native ThinLTO bake flags (db/proxy/pipeline_web COPY from services-conf/).
 !services-conf/bake_clang_flags.sh
 !services-conf/clang_march_native_probe.sh
 *.so
@@ -121,7 +121,7 @@ hpcperfstats/test_runs/
 # Orval client under hpcperfstats/site/frontend/src/api/generated/ is gitignored
 # (run npm run generate:api before typecheck/test/build). Never commit static tree.
 # Produce locally: cd hpcperfstats/site/frontend && npm ci && npm run build
-# Docker: Dockerfile frontend-builder runs npm run build and copies into the image.
+# Docker: pipeline_web.Dockerfile frontend-builder runs npm run build into the image.
 # -----------------------------------------------------------------------------
 hpcperfstats/site/hpcperfstats_site/static/frontend/
 scripts/unlazy*

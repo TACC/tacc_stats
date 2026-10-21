@@ -54,9 +54,9 @@ build_web_image_with_target() {
 
   cd "${REPO_ROOT}"
   image_name="$(compose_web_image_name)"
-  dockerfile="${REPO_ROOT}/Dockerfile"
+  dockerfile="${REPO_ROOT}/services-conf/pipeline_web.Dockerfile"
   if [[ ! -f "${dockerfile}" ]]; then
-    echo "build_web_image_with_target: Dockerfile not found at ${dockerfile}" >&2
+    echo "build_web_image_with_target: pipeline_web.Dockerfile not found at ${dockerfile}" >&2
     return 1
   fi
 

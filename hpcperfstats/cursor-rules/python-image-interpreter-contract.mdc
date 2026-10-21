@@ -1,7 +1,7 @@
 ---
 description: Dual ABI — GIL /opt/python3.14 (+ /usr/local) for web; baked /opt/python3.14t for pipeline; jemalloc both ways; no INI ABI switch
 alwaysApply: false
-globs: Dockerfile,services-conf/supervisord.conf
+globs: services-conf/pipeline_web.Dockerfile,services-conf/supervisord.conf
 ---
 
 # Python image interpreter contract (GIL web + baked pipeline 3.14t)

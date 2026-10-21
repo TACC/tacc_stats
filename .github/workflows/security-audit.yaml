@@ -6,7 +6,7 @@ on:
       - "pyproject.toml"
       - "hpcperfstats/site/frontend/package*.json"
       - "docker-compose.yaml"
-      - "Dockerfile"
+      - "services-conf/pipeline_web.Dockerfile"
       - "tests/run_security_audit_workflow.sh"
       - ".github/workflows/security-audit.yaml"
   schedule:
