@@ -424,42 +424,92 @@ def test_dockerfile_avoids_nested_quotes_inside_command_substitution():
   assert '"' not in symlink_run
 
 
-def test_dockerfile_mkl_optimization_stack_runs_close_shell_quote() -> None:
-  """GIL/FT MKL RUNs must close ``-c '…'`` (PGO capture used to own the closer)."""
-  text = (_repo_root() / "Dockerfile").read_text()
-  # Exact terminator after brotli smoke — not a continued ``\\`` line.
-  closer = 'assert brotli.decompress(p)==b\\"hps\\""\''
-  assert text.count(closer) == 2, text.count(closer)
-  # Scanner: no multi-line ``RUN … -c '`` hits the next ``RUN`` before close.
+def _dockerfile_join_run_instructions(text: str) -> list[tuple[int, int, str]]:
+  """Join Dockerfile ``\\`` continuations into one shell string per ``RUN``."""
   lines = text.splitlines()
+  out: list[tuple[int, int, str]] = []
   i = 0
   while i < len(lines):
-    line = lines[i]
-    opens = line.startswith("RUN") and (
-      "-c '" in line
-      or (
-        line.rstrip() == "RUN \\"
-        and i + 1 < len(lines)
-        and "-c '" in lines[i + 1]
-      )
-    )
-    if not opens:
+    if not re.match(r"^\s*RUN\b", lines[i]):
       i += 1
       continue
-    opened = "-c '" in line or "-c '" in lines[i + 1]
+    start = i
+    parts: list[str] = []
     j = i
     while j < len(lines):
-      cur = lines[j].rstrip()
-      if j > i and cur.startswith("RUN ") and opened:
-        raise AssertionError(
-          f"unclosed -c quote: RUN at line {i + 1} hits RUN at {j + 1}"
-        )
-      if opened and cur.endswith("'") and not cur.endswith("\\"):
+      parts.append(lines[j])
+      if not lines[j].rstrip().endswith("\\"):
         break
       j += 1
-    else:
-      raise AssertionError(f"unclosed -c quote starting at line {i + 1}")
+    joined = "".join(
+      p.rstrip()[:-1] if p.rstrip().endswith("\\") else p.rstrip()
+      for p in parts
+    )
+    out.append((start + 1, j + 1, joined))
     i = j + 1
+  return out
+
+
+def _dockerfile_run_c_quote_status(joined: str) -> str | None:
+  """Return ``ok``, ``NEVER_CLOSED``, or ``None`` if the RUN has no ``-c`` quote."""
+  match = re.search(r"""-c\s+(['"])""", joined)
+  if not match:
+    return None
+  quote = match.group(1)
+  rest = joined[match.end() :]
+  if rest.find(quote) < 0:
+    return "NEVER_CLOSED"
+  return "ok"
+
+
+def test_dockerfile_run_c_quotes_balanced_all_dockerfiles() -> None:
+  """Every Dockerfile ``RUN … -c '…'`` / ``-c \"…\"`` must close after line-join.
+
+  Git history (``9295b9ef``): only GIL/FT ``hpcperfstats_pgo_capture_generate_exec
+  … optimization-stack … import numpy'`` lines were RUN closers. Mid-RUN capture
+  deletions (jemalloc/zlib/zstd/mpdecimal/libffi + db/proxy) left quotes intact.
+  Deleting those two closers left brotli lines ending ``\"; \\`` → NEVER_CLOSED.
+  """
+  root = _repo_root()
+  paths = [
+    root / "Dockerfile",
+    root / "services-conf" / "db.Dockerfile",
+    root / "services-conf" / "proxy.Dockerfile",
+  ]
+  failures: list[str] = []
+  checked = 0
+  for path in paths:
+    text = path.read_text()
+    for start, end, joined in _dockerfile_join_run_instructions(text):
+      status = _dockerfile_run_c_quote_status(joined)
+      if status is None:
+        continue
+      checked += 1
+      if status != "ok":
+        failures.append(f"{path.name}:{start}-{end} {status}")
+  assert not failures, failures
+  assert checked >= 20, checked
+  # GIL + FT MKL stacks: brotli smoke owns the ``-c '`` closer (not a ``\\`` cont).
+  main = (root / "Dockerfile").read_text()
+  closer = 'assert brotli.decompress(p)==b\\"hps\\""\''
+  assert main.count(closer) == 2, main.count(closer)
+
+
+def test_dockerfile_run_c_quote_scanner_detects_missing_closer() -> None:
+  """Scanner must fail the exact PGO-removal shape (brotli cont, no closing ``'``)."""
+  broken = (
+    "RUN \\\n"
+    "  /bin/bash -o pipefail -c '\\\n"
+    "  set -euo pipefail; \\\n"
+    '  python3 -c "import brotli; assert brotli.decompress(p)==b\\"hps\\""; \\\n'
+    "\n"
+    "RUN /bin/bash -o pipefail -c 'true'\n"
+  )
+  statuses = [
+    _dockerfile_run_c_quote_status(joined)
+    for _, _, joined in _dockerfile_join_run_instructions(broken)
+  ]
+  assert "NEVER_CLOSED" in statuses, statuses
 
 
 def test_hpcperfstats_base_copies_only_opt_prefixes_not_compile_trees():
