@@ -18,14 +18,13 @@ def test_db_dockerfile_uses_clang22_apk_toolchain() -> None:
   text = _dockerfile()
   assert "clang22" in text
   assert "compiler-rt" in text
-  assert "alpine_pgo_profile_runtime_link.sh" in text
+  assert "bake_clang_flags.sh" in text
   assert "lld22" in text
   assert "ENV CC=clang CXX=clang++" in text
   assert "HPC_ALPINE_LLVM_TOOLCHAIN=1" in text
   assert "NM=/usr/lib/llvm22/bin/llvm-nm" in text
   assert "gcc-toolchain" not in text
   assert "assert_gcc_min_version" not in text
-  assert "pgo_clang_flags.sh" in text
   assert "from=pgo,source=.,target=/root/.hpcperfstats_pgo" not in text
   assert "clang_march_native_probe.sh" in text
   assert "-Q --help=target" not in text
@@ -131,7 +130,7 @@ def test_db_dockerfile_uses_zlib_ng_not_apk_zlib() -> None:
   assert "-L/opt/lz4/lib" in text
   # zstd bake must rpath both codecs (zlib-ng + lz4), not only the global PG LDFLAGS.
   zstd_run = text[text.index("# --- zstd") : text.index("ENV PKG_CONFIG_PATH=")]
-  assert "hpcperfstats_pgo_ensure_db_zstd_upstream" in zstd_run
+  assert "hpcperfstats_ensure_db_zstd_upstream" in zstd_run
   assert "HAVE_LZ4=1" in zstd_run
   assert "/opt/lz4" in zstd_run
   assert "/opt/lz4/.+liblz4" in zstd_run
@@ -204,10 +203,11 @@ def test_db_dockerfile_links_opt_icu_liburing_lz4_zstd_into_postgres() -> None:
   # rejects unrecognized options (bake failure on prod: 2026-09-04).
   assert "--enable-thread-safety" not in configure_block
   assert 'gnuArch="$(clang -dumpmachine)"' in pg_run
-  assert "hpcperfstats_pgo_ensure_db_postgresql_link_dirs" in pg_run
+  assert "hpcperfstats_ensure_db_postgresql_link_dirs" in pg_run
   assert "hpcperfstats_bake_cflags db/postgresql pg" in pg_run
-  assert "src/interfaces/libpq/Makefile" in pg_run
-  assert "__tsan_func_exit -e atexit" in pg_run
+  # Custom Clang generate-phase libpq Makefile sed is gone with host profiling.
+  assert "src/interfaces/libpq/Makefile" not in pg_run
+  assert "__tsan_func_exit -e atexit" not in pg_run
   assert 'export LLVM_CONFIG="${LLVM_CONFIG}"' in pg_run
   assert "LLVM_CONFIG=/usr/lib/llvm22/bin/llvm-config" in text
   assert "pg_bake_ldflags" not in pg_run
@@ -320,7 +320,7 @@ def test_db_dockerfile_timescale_229_no_external_lz4_zstd_ldd_gate() -> None:
   ts_run = text[
     text.index("# --- TimescaleDB") : text.index("# Prune docs/man")
   ]
-  assert "hpcperfstats_pgo_ensure_db_timescaledb_link_dirs" in ts_run
+  assert "hpcperfstats_ensure_db_timescaledb_link_dirs" in ts_run
   assert "unset LDFLAGS" in ts_run
   assert "pg-config-wrap" in ts_run
   assert "printf '%s\\n'" in ts_run

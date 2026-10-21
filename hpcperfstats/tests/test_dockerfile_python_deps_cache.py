@@ -204,7 +204,7 @@ def test_pyproject_dependencies_write_valid_pip_requirements_file():
   deps = _pyproject_runtime_requirements()
   requirements_text = "\n".join(deps) + "\n"
 
-  assert "Django>=6.1.1,<6.2" in requirements_text
+  assert "Django>=6.1.2,<6.2" in requirements_text
   assert "'Django" not in requirements_text
   assert '"Django' not in requirements_text
 
@@ -231,8 +231,8 @@ def test_hpcperfstats_child_stages_do_not_reinstall_python_deps():
 def test_python_build_uses_clang_22_toolchain() -> None:
   build = _stage_body((_repo_root() / "Dockerfile").read_text(), "python-build")
   assert "clang-22" in build
-  assert "PGO_PHASE=skip" in build or "ARG PGO_PHASE=skip" in build
-  assert "pgo_clang_flags.sh" in build
+  assert "bake_clang_flags.sh" in build
+  assert "PGO_PHASE" not in build
   assert "gcc-toolchain" not in build
 
 

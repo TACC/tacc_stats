@@ -24,8 +24,6 @@ services:
       # (frontend-builder COPY + git rev-parse). Default unknown falls back to .git.
       args:
         HPCPERFSTATS_GIT_COMMIT: ${HPCPERFSTATS_GIT_COMMIT:-unknown}
-        PGO_PHASE: ${PGO_PHASE:-stdlib}
-        PGO_ROOT: ${PGO_ROOT:-/root/.hpcperfstats_pgo}
     image: hpcperfstats
     pull_policy: never
     restart: always
@@ -36,8 +34,6 @@ services:
       - STATIC_ROOT=/home/hpcperfstats/staticfiles
       - STATICFILES_RAM_ROOT=/home/hpcperfstats/staticfiles-ram
       - MEDIAFILES_RAM_ROOT=/home/hpcperfstats/media-ram
-      # CPython PGO generate soak (Clang); ignored when interpreters are not instrumented.
-      - LLVM_PROFILE_FILE=/root/.hpcperfstats_pgo/web/gil/cpython/raw/python-%p.profraw
     stop_grace_period: ${HPCPERFSTATS_WEB_STOP_GRACE:-30s}
     volumes:
       - staticfiles_data:/home/hpcperfstats/staticfiles
@@ -64,7 +60,6 @@ services:
     command: /home/hpcperfstats/services-conf/supervisor_startup.sh
     environment:
       - HPCPERFSTATS_INI=/home/hpcperfstats/hpcperfstats.ini
-      - LLVM_PROFILE_FILE=/root/.hpcperfstats_pgo/web/ft/cpython/raw/python-%p.profraw
     ports:
       - "${HPCPERFSTATS_SYSLOG_PORT:-514}:514/udp"
       - "${HPCPERFSTATS_SYSLOG_PORT:-514}:514/tcp"
@@ -123,8 +118,6 @@ services:
       context: ./
       dockerfile: services-conf/proxy.Dockerfile
       args:
-        PGO_PHASE: ${PGO_PHASE:-stdlib}
-        PGO_ROOT: ${PGO_ROOT:-/root/.hpcperfstats_pgo}
       # TLS PEMs materialized at container start from proxy_ssl_source settings volume.
       # No additional_contexts / no .env for TLS paths.
     image: hpcperfstats-proxy
@@ -264,8 +257,6 @@ services:
       context: ./services-conf
       dockerfile: db.Dockerfile
       args:
-        PGO_PHASE: ${PGO_PHASE:-stdlib}
-        PGO_ROOT: ${PGO_ROOT:-/root/.hpcperfstats_pgo}
     image: hpcperfstats-db
     pull_policy: never
     logging: *hpc-logging

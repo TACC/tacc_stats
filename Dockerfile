@@ -56,9 +56,6 @@ RUN /bin/bash -o pipefail -c "\
 # FT: keep mimalloc for objects; still force-link jemalloc for side allocation.
 # Jemalloc both ways: DT_NEEDED here + runtime LD_PRELOAD + /etc/ld.so.preload for wheels.
 FROM debian:trixie AS python-build
-ARG PGO_PHASE=skip
-ARG PGO_ROOT=/root/.hpcperfstats_pgo
-ENV HPC_PGO_PHASE=${PGO_PHASE} HPC_PGO_ROOT=${PGO_ROOT}
 ENV PYTHON_VERSION=3.14.8 \
     MAKEFLAGS=-j40 \
     PYTHONDONTWRITEBYTECODE=1 \
@@ -68,9 +65,9 @@ ENV PYTHON_VERSION=3.14.8 \
     PKG_CONFIG_PATH=/opt/zstd/lib/pkgconfig:/opt/mpdecimal/lib/pkgconfig:/opt/libffi/lib/pkgconfig:/opt/libffi/lib/x86_64-linux-gnu/pkgconfig
 
 # Builder apt toolchain (compilers stay in python-build only). Clang 22 from trixie.
-COPY services-conf/pgo_clang_flags.sh /usr/local/lib/hpcperfstats/pgo_clang_flags.sh
+COPY services-conf/bake_clang_flags.sh /usr/local/lib/hpcperfstats/bake_clang_flags.sh
 COPY services-conf/clang_march_native_probe.sh /usr/local/lib/hpcperfstats/clang_march_native_probe.sh
-RUN chmod +x /usr/local/lib/hpcperfstats/pgo_clang_flags.sh /usr/local/lib/hpcperfstats/clang_march_native_probe.sh
+RUN chmod +x /usr/local/lib/hpcperfstats/bake_clang_flags.sh /usr/local/lib/hpcperfstats/clang_march_native_probe.sh
 RUN /bin/bash -o pipefail -c '\
   set -euo pipefail; \
   test "$(uname -m)" = "x86_64"; \
@@ -98,15 +95,7 @@ RUN /bin/bash -o pipefail -c '\
   update-alternatives --install /usr/bin/llvm-ar llvm-ar /usr/bin/llvm-ar-22 100; \
   update-alternatives --install /usr/bin/llvm-ranlib llvm-ranlib /usr/bin/llvm-ranlib-22 100; \
   update-alternatives --install /usr/bin/llvm-nm llvm-nm /usr/bin/llvm-nm-22 100; \
-  command -v llvm-profdata-22 >/dev/null; \
-  update-alternatives --install /usr/bin/llvm-profdata llvm-profdata /usr/bin/llvm-profdata-22 100; \
   command -v llvm-ar >/dev/null; \
-  command -v llvm-profdata >/dev/null; \
-  _rt=/usr/lib/llvm-22/lib/clang/22/lib; \
-  _triple=x86_64-pc-linux-gnu; \
-  mkdir -p "${_rt}/${_triple}"; \
-  ln -sf ../linux/libclang_rt.profile-x86_64.a "${_rt}/${_triple}/libclang_rt.profile.a"; \
-  test -f "${_rt}/${_triple}/libclang_rt.profile.a"; \
   apt-get clean; \
   rm -rf /var/lib/apt/lists/*'
 
@@ -116,11 +105,6 @@ ENV CC=clang-22 CXX=clang++-22 \
 
 # Print out compiler platform detection (services-conf/clang_march_native_probe.sh).
 RUN CC=clang-22 /bin/bash /usr/local/lib/hpcperfstats/clang_march_native_probe.sh
-
-# Re-bind build-arg → ENV so PGO_PHASE=stdlib|generate|use is not stuck on an early cached ENV layer.
-ARG PGO_PHASE
-ARG PGO_ROOT
-ENV HPC_PGO_PHASE=${PGO_PHASE} HPC_PGO_ROOT=${PGO_ROOT}
 
 # jemalloc 5.4.0 (shared; keep default initial-exec TLS — do not disable it).
 RUN \
@@ -142,7 +126,7 @@ RUN \
   tar -xjf /tmp/jemalloc.tar.bz2 -C /usr/src/jemalloc --strip-components=1; \
   rm -f /tmp/jemalloc.tar.bz2; \
   cd /usr/src/jemalloc; \
-  . /usr/local/lib/hpcperfstats/pgo_clang_flags.sh; \
+  . /usr/local/lib/hpcperfstats/bake_clang_flags.sh; \
   _cf_cfg="$(hpcperfstats_configure_cflags web/shared/jemalloc debian-lib)"; \
   _cf_bake="$(hpcperfstats_bake_cflags web/shared/jemalloc debian-lib)"; \
   _ld="${HPC_CLANG_LD_PATH}"; \
@@ -154,7 +138,6 @@ RUN \
     CFLAGS="${_cf_bake}" CXXFLAGS="${_cf_bake}" LDFLAGS="${_ld}"; \
   make install CC="${CC}" CXX="${CXX}" AR="${AR}" RANLIB="${RANLIB}" NM="${NM}" \
     CFLAGS="${_cf_bake}" CXXFLAGS="${_cf_bake}" LDFLAGS="${_ld}"; \
-  hpcperfstats_pgo_capture_generate_dlopen web/shared/jemalloc /opt/jemalloc; \
   find /opt/jemalloc -type f | while read -r f; do file -b "$f" | grep -q ELF && strip --strip-unneeded "$f" || true; done; \
   echo "/opt/jemalloc/lib" > /etc/ld.so.conf.d/jemalloc.conf; \
   ldconfig; \
@@ -171,7 +154,7 @@ RUN \
   tar -xzf /tmp/zlib-ng.tar.gz -C /usr/src/zlib-ng --strip-components=1; \
   rm -f /tmp/zlib-ng.tar.gz; \
   cd /usr/src/zlib-ng; \
-  . /usr/local/lib/hpcperfstats/pgo_clang_flags.sh; \
+  . /usr/local/lib/hpcperfstats/bake_clang_flags.sh; \
   _cf_bake="$(hpcperfstats_bake_cflags web/shared/zlib-ng debian-lib)"; \
   cmake -S . -B build \
     -DCMAKE_BUILD_TYPE=Release \
@@ -187,7 +170,6 @@ RUN \
     -DCMAKE_C_FLAGS="${_cf_bake} ${HPC_CLANG_LD_PATH}"; \
   cmake --build build -j40; \
   cmake --install build; \
-  hpcperfstats_pgo_capture_generate_dlopen web/shared/zlib-ng /opt/zlib-ng; \
   find /opt/zlib-ng -type f | while read -r f; do file -b "$f" | grep -q ELF && strip --strip-unneeded "$f" || true; done; \
   test -f /opt/zlib-ng/lib/libz.so || test -f /opt/zlib-ng/lib/libz.so.1; \
   echo "/opt/zlib-ng/lib" > /etc/ld.so.conf.d/zlib-ng.conf; \
@@ -208,12 +190,10 @@ RUN \
   export PKG_CONFIG_PATH="/opt/zlib-ng/lib/pkgconfig${PKG_CONFIG_PATH:+:$PKG_CONFIG_PATH}"; \
   export CPPFLAGS="-I/opt/zlib-ng/include${CPPFLAGS:+ $CPPFLAGS}"; \
   export LDFLAGS="-L/opt/zlib-ng/lib -Wl,-rpath,/opt/zlib-ng/lib${LDFLAGS:+ $LDFLAGS}"; \
-  . /usr/local/lib/hpcperfstats/pgo_clang_flags.sh; \
-  hpcperfstats_pgo_ensure_raw_dir web/shared/zlib-ng; \
+  . /usr/local/lib/hpcperfstats/bake_clang_flags.sh; \
   export MOREFLAGS="$(hpcperfstats_bake_cflags web/shared/zstd debian-lib) ${HPC_CLANG_LD_PATH}"; \
   make -j40 PREFIX=/opt/zstd HAVE_ZLIB=1; \
   make install PREFIX=/opt/zstd; \
-  hpcperfstats_pgo_capture_generate_exec web/shared/zstd -- /opt/zstd/bin/zstd -h; \
   find /opt/zstd -type f | while read -r f; do file -b "$f" | grep -q ELF && strip --strip-unneeded "$f" || true; done; \
   test -x /opt/zstd/bin/zstd; \
   test -f /opt/zstd/lib/libzstd.so || test -f /opt/zstd/lib/libzstd.so.1; \
@@ -234,7 +214,7 @@ RUN \
   tar -xzf /tmp/mpdecimal.tar.gz -C /usr/src/mpdecimal --strip-components=1; \
   rm -f /tmp/mpdecimal.tar.gz; \
   cd /usr/src/mpdecimal; \
-  . /usr/local/lib/hpcperfstats/pgo_clang_flags.sh; \
+  . /usr/local/lib/hpcperfstats/bake_clang_flags.sh; \
   _cf_cfg="$(hpcperfstats_configure_cflags web/shared/mpdecimal debian-lib) -DCONFIG_64 -DASM"; \
   _cf_bake="$(hpcperfstats_bake_cflags web/shared/mpdecimal debian-lib) -DCONFIG_64 -DASM"; \
   _ld="${HPC_CLANG_LD_PATH} -flto=thin"; \
@@ -245,7 +225,6 @@ RUN \
     CFLAGS="${_cf_bake}" CXXFLAGS="${_cf_bake}" LDFLAGS="${_ld}"; \
   make install CC="${CC}" CXX="${CXX}" AR="${AR}" RANLIB="${RANLIB}" NM="${NM}" \
     CFLAGS="${_cf_bake}" CXXFLAGS="${_cf_bake}" LDFLAGS="${_ld}"; \
-  hpcperfstats_pgo_capture_generate_dlopen web/shared/mpdecimal /opt/mpdecimal; \
   find /opt/mpdecimal -type f | while read -r f; do file -b "$f" | grep -q ELF && strip --strip-unneeded "$f" || true; done; \
   echo "/opt/mpdecimal/lib" > /etc/ld.so.conf.d/mpdecimal.conf; \
   ldconfig; \
@@ -262,7 +241,7 @@ RUN \
   tar -xzf /tmp/libffi.tar.gz -C /usr/src/libffi --strip-components=1; \
   rm -f /tmp/libffi.tar.gz; \
   cd /usr/src/libffi; \
-  . /usr/local/lib/hpcperfstats/pgo_clang_flags.sh; \
+  . /usr/local/lib/hpcperfstats/bake_clang_flags.sh; \
   _cf_cfg="$(hpcperfstats_configure_cflags web/shared/libffi debian-lib)"; \
   _cf_bake="$(hpcperfstats_bake_cflags web/shared/libffi debian-lib)"; \
   _ld="${HPC_CLANG_LD_PATH}"; \
@@ -273,7 +252,6 @@ RUN \
     CFLAGS="${_cf_bake}" CXXFLAGS="${_cf_bake}" LDFLAGS="${_ld}"; \
   make install CC="${CC}" CXX="${CXX}" AR="${AR}" RANLIB="${RANLIB}" NM="${NM}" \
     CFLAGS="${_cf_bake}" CXXFLAGS="${_cf_bake}" LDFLAGS="${_ld}"; \
-  hpcperfstats_pgo_capture_generate_dlopen web/shared/libffi /opt/libffi; \
   find /opt/libffi -type f | while read -r f; do file -b "$f" | grep -q ELF && strip --strip-unneeded "$f" || true; done; \
   if [ -d /opt/libffi/lib/x86_64-linux-gnu ]; then \
     echo "/opt/libffi/lib/x86_64-linux-gnu" > /etc/ld.so.conf.d/libffi.conf; \
@@ -294,8 +272,8 @@ RUN \
   tar -xzf /tmp/Python.tgz -C /usr/src/python --strip-components=1; \
   rm -f /tmp/Python.tgz; \
   cd /usr/src/python; \
-  . /usr/local/lib/hpcperfstats/pgo_clang_flags.sh; \
-  hpcperfstats_pgo_ensure_web_gil_cpython_link_dirs; \
+  . /usr/local/lib/hpcperfstats/bake_clang_flags.sh; \
+  hpcperfstats_ensure_web_gil_cpython_link_dirs; \
   _py_cfg="$(hpcperfstats_configure_cflags web/gil/cpython debian-lib)"; \
   export PKG_CONFIG_PATH="/opt/zstd/lib/pkgconfig:/opt/zlib-ng/lib/pkgconfig:/opt/mpdecimal/lib/pkgconfig:/opt/libffi/lib/pkgconfig:/opt/libffi/lib/x86_64-linux-gnu/pkgconfig${PKG_CONFIG_PATH:+:$PKG_CONFIG_PATH}"; \
   export CPPFLAGS="-I/opt/zstd/include -I/opt/zlib-ng/include${CPPFLAGS:+ $CPPFLAGS}"; \
@@ -360,8 +338,8 @@ RUN \
   tar -xzf /tmp/Python.tgz -C /usr/src/python --strip-components=1; \
   rm -f /tmp/Python.tgz; \
   cd /usr/src/python; \
-  . /usr/local/lib/hpcperfstats/pgo_clang_flags.sh; \
-  hpcperfstats_pgo_ensure_web_ft_cpython_link_dirs; \
+  . /usr/local/lib/hpcperfstats/bake_clang_flags.sh; \
+  hpcperfstats_ensure_web_ft_cpython_link_dirs; \
   _py_cfg="$(hpcperfstats_configure_cflags web/ft/cpython debian-lib)"; \
   export PKG_CONFIG_PATH="/opt/zstd/lib/pkgconfig:/opt/zlib-ng/lib/pkgconfig:/opt/mpdecimal/lib/pkgconfig:/opt/libffi/lib/pkgconfig:/opt/libffi/lib/x86_64-linux-gnu/pkgconfig${PKG_CONFIG_PATH:+:$PKG_CONFIG_PATH}"; \
   export CPPFLAGS="-I/opt/zstd/include -I/opt/zlib-ng/include${CPPFLAGS:+ $CPPFLAGS}"; \
@@ -481,8 +459,8 @@ RUN /bin/bash -o pipefail -c '\
 RUN \
   /bin/bash -o pipefail -c '\
   set -euo pipefail; \
-  . /usr/local/lib/hpcperfstats/pgo_clang_flags.sh; \
-  hpcperfstats_pgo_ensure_web_gil_optimization_stack_link_dirs; \
+  . /usr/local/lib/hpcperfstats/bake_clang_flags.sh; \
+  hpcperfstats_ensure_web_gil_optimization_stack_link_dirs; \
   _opt_stack_cf="$(hpcperfstats_bake_cflags web/gil/optimization-stack debian-lib)"; \
   export PATH="/opt/python3.14/bin:/usr/local/bin:/opt/zstd/bin:${PATH}"; \
   test "$(command -v cython)" = "/opt/python3.14/bin/cython"; \
@@ -503,7 +481,7 @@ RUN \
   echo "${_PY_LIB}" >> /etc/ld.so.conf.d/mkl-gil.conf; \
   shopt -s nullglob; \
   for _lib in "${MKLROOT}"/lib/libmkl*.so* "${MKLROOT}"/lib/libiomp5.so* "${MKLROOT}"/lib/libtbb*.so*; do \
-    _b="$(basename "${_lib}")"; \
+    _b="${_lib##*/}"; \
     [ -e "${_PY_LIB}/${_b}" ] || ln -sf "${_lib}" "${_PY_LIB}/${_b}"; \
   done; \
   shopt -u nullglob; \
@@ -547,7 +525,7 @@ RUN \
     --no-binary brotli \
     -r /tmp/requirements-mkl-brotli.txt; \
   python3 -c "import brotli; p=brotli.compress(b\"hps\", quality=11); assert brotli.decompress(p)==b\"hps\""; \
-  hpcperfstats_pgo_capture_generate_exec web/gil/optimization-stack -- python3 -c "import numpy"'
+
 
 # 4) GIL rest wheels (Bokeh/contourpy see MKL numpy; constraint blocks wheel upgrades).
 # python-dateutil is here; import pandas only after rest (needs dateutil).
@@ -576,8 +554,8 @@ RUN /bin/bash -o pipefail -c '\
 RUN \
   /bin/bash -o pipefail -c '\
   set -euo pipefail; \
-  . /usr/local/lib/hpcperfstats/pgo_clang_flags.sh; \
-  hpcperfstats_pgo_ensure_web_ft_optimization_stack_link_dirs; \
+  . /usr/local/lib/hpcperfstats/bake_clang_flags.sh; \
+  hpcperfstats_ensure_web_ft_optimization_stack_link_dirs; \
   _opt_stack_cf="$(hpcperfstats_bake_cflags web/ft/optimization-stack debian-lib)"; \
   export PATH="/opt/python3.14t/bin:/usr/local/bin:/opt/zstd/bin:${PATH}"; \
   test "$(command -v cython)" = "/opt/python3.14t/bin/cython"; \
@@ -598,7 +576,7 @@ RUN \
   echo "${_PY_LIB}" >> /etc/ld.so.conf.d/mkl-ft.conf; \
   shopt -s nullglob; \
   for _lib in "${MKLROOT_T}"/lib/libmkl*.so* "${MKLROOT_T}"/lib/libiomp5.so* "${MKLROOT_T}"/lib/libtbb*.so*; do \
-    _b="$(basename "${_lib}")"; \
+    _b="${_lib##*/}"; \
     [ -e "${_PY_LIB}/${_b}" ] || ln -sf "${_lib}" "${_PY_LIB}/${_b}"; \
   done; \
   shopt -u nullglob; \
@@ -642,7 +620,7 @@ RUN \
     --no-binary brotli \
     -r /tmp/requirements-mkl-brotli.txt; \
   /opt/python3.14t/bin/python3.14t -c "import brotli; p=brotli.compress(b\"hps\", quality=11); assert brotli.decompress(p)==b\"hps\""; \
-  hpcperfstats_pgo_capture_generate_exec web/ft/optimization-stack -- /opt/python3.14t/bin/python3.14t -c "import numpy"'
+
 
 # 7) Free-threaded rest wheels (dateutil then import pandas, same as GIL).
 RUN /bin/bash -o pipefail -c '\

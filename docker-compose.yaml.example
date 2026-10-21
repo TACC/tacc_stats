@@ -78,31 +78,18 @@ volumes:
       # See below for extra configuration for symlinks outside of this directory (Lets Encrypt)
       device: /opt/certs
       o: bind
-  # Live-soak Clang PGO profiles (not committed). device: must match PGOROOT used by
-  # rebuild_full_site.sh (default /root/.hpcperfstats_pgo). That script (and
-  # scripts/pgo_ensure_layout.sh) creates this host tree before compose build/up and
-  # chmods dirs 1777 / files a+rw so any host user or container UID can write profraw.
-  # Host path under /root is still only reachable as root on the host; prefer
-  # PGOROOT=/data/user/$USER/hpcperfstats-pgo for rootless multi-user sites.
-  # If you override PGOROOT, change device: here to the same path before enabling binds.
-  pgo_profiles:
-    driver: local
-    driver_opts:
-      type: none
-      device: /root/.hpcperfstats_pgo
-      o: bind
 
 # Site service overrides (single `services:` map — YAML must not repeat `services:` at
 # top level; a second key replaces the first). Stack bodies live in
 # docker-compose.defaults.yaml; uncomment optional keys below as needed.
 #
-# Dev/unprivileged ports: also set HPCPERFSTATS_HTTP_PORT=8080, HPCPERFSTATS_HTTPS_PORT=8443,
+# Production defaults remain 80/443/514/5672. Dev/unprivileged ports: also set
+# HPCPERFSTATS_HTTP_PORT=8080, HPCPERFSTATS_HTTPS_PORT=8443,
 # HPCPERFSTATS_SYSLOG_PORT=1514, HPCPERFSTATS_AMQP_PORT=5673 on the compose command env.
 services:
   web:
     image: hpcperfstats
     volumes:
-      - pgo_profiles:/root/.hpcperfstats_pgo
     # Dev/debug — publish gunicorn on the host:
     # ports:
     #   - "${HPCPERFSTATS_WEB_PORT:-8000}:8000"
@@ -110,7 +97,6 @@ services:
   pipeline:
     image: hpcperfstats
     volumes:
-      - pgo_profiles:/root/.hpcperfstats_pgo
     # Pipeline debug (optional):
     # cap_add:
     #   - SYS_PTRACE
@@ -120,7 +106,6 @@ services:
   proxy:
     image: hpcperfstats-proxy
     volumes:
-      - pgo_profiles:/root/.hpcperfstats_pgo
     # Let's Encrypt: set proxy_ssl_source.device to /etc/letsencrypt, then uncomment:
     # environment:
     #   - HPCPERFSTATS_SSL_CERTS_REL=live/your.hostname.example
@@ -128,7 +113,6 @@ services:
   db_pg18:
     image: hpcperfstats-db
     volumes:
-      - pgo_profiles:/root/.hpcperfstats_pgo
 
   # db (defaults): dev/debug host port — add under db: (keep or drop `{}`):
   # db:

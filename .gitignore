@@ -39,10 +39,9 @@ tacc_stats.egg-info/
 # Redis bind-mount entrypoint (compose unix socket prep). Missing file → Podman
 # creates a directory at this path and Redis exits 0 immediately.
 !services-conf/redis_entrypoint.sh
-# Clang PGO bake flags (db/proxy COPY; Dockerfile COPY from services-conf/).
-!services-conf/pgo_clang_flags.sh
+# Native ThinLTO bake flags (db/proxy COPY; Dockerfile COPY from services-conf/).
+!services-conf/bake_clang_flags.sh
 !services-conf/clang_march_native_probe.sh
-!services-conf/alpine_pgo_profile_runtime_link.sh
 *.so
 *.d
 .project
@@ -127,4 +126,3 @@ hpcperfstats/test_runs/
 hpcperfstats/site/hpcperfstats_site/static/frontend/
 scripts/unlazy*
 GATES.md
-services-conf/pgo_sketch_podman_context/.stable

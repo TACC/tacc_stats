@@ -8,15 +8,11 @@ ARG ALPINE_VERSION=3.24.2
 
 FROM alpine:${ALPINE_VERSION} AS db-build
 
-ARG PGO_PHASE=skip
-ARG PGO_ROOT=/root/.hpcperfstats_pgo
-ENV HPC_PGO_PHASE=${PGO_PHASE} HPC_PGO_ROOT=${PGO_ROOT}
 ENV CC=clang CXX=clang++ LD=ld.lld
 
-COPY pgo_clang_flags.sh /usr/local/lib/hpcperfstats/pgo_clang_flags.sh
+COPY bake_clang_flags.sh /usr/local/lib/hpcperfstats/bake_clang_flags.sh
 COPY clang_march_native_probe.sh /usr/local/lib/hpcperfstats/clang_march_native_probe.sh
-COPY alpine_pgo_profile_runtime_link.sh /usr/local/lib/hpcperfstats/alpine_pgo_profile_runtime_link.sh
-RUN chmod +x /usr/local/lib/hpcperfstats/pgo_clang_flags.sh /usr/local/lib/hpcperfstats/clang_march_native_probe.sh /usr/local/lib/hpcperfstats/alpine_pgo_profile_runtime_link.sh
+RUN chmod +x /usr/local/lib/hpcperfstats/bake_clang_flags.sh /usr/local/lib/hpcperfstats/clang_march_native_probe.sh
 
 # LLVM major matches docker-library postgres 18/alpine3.24.
 ENV DOCKER_PG_LLVM_DEPS="llvm22-dev clang22"
@@ -51,12 +47,11 @@ RUN set -eux; \
     python3 \
     util-linux-dev \
     $DOCKER_PG_LLVM_DEPS; \
-  test -x /usr/bin/ld.lld; \
-  /bin/bash /usr/local/lib/hpcperfstats/alpine_pgo_profile_runtime_link.sh
+  test -x /usr/bin/ld.lld
 # libz ABI is /opt/zlib-ng (ZLIB_COMPAT); do not apk-install stock zlib packages.
 
-# Podman OCI ignores Dockerfile SHELL; PGO RUN steps invoke /bin/bash explicitly (BASH_ENV sources pgo_clang_flags.sh).
-ENV BASH_ENV=/usr/local/lib/hpcperfstats/pgo_clang_flags.sh
+# Podman OCI ignores Dockerfile SHELL; bake RUN steps invoke /bin/bash explicitly (BASH_ENV sources bake_clang_flags.sh).
+ENV BASH_ENV=/usr/local/lib/hpcperfstats/bake_clang_flags.sh
 # Every /opt bake: llvm-ar/ranlib/nm + clang/lld (GNU nm/ar + ThinLTO → "file format not recognized").
 ENV HPC_ALPINE_LLVM_TOOLCHAIN=1 \
   AR=/usr/lib/llvm22/bin/llvm-ar \
@@ -67,9 +62,6 @@ ENV HPC_ALPINE_LLVM_TOOLCHAIN=1 \
 # Print out compiler platform detection (clang_march_native_probe.sh).
 RUN /bin/bash -o pipefail /usr/local/lib/hpcperfstats/clang_march_native_probe.sh
 
-ARG PGO_PHASE
-ARG PGO_ROOT
-ENV HPC_PGO_PHASE=${PGO_PHASE} HPC_PGO_ROOT=${PGO_ROOT}
 
 # /opt source pins: slowest-changing independent layers first (Docker cache).
 # zstd links /opt/lz4 + /opt/zlib-ng, so it stays after both even though zstd
@@ -79,66 +71,60 @@ ARG JEMALLOC_VERSION=5.4.0
 ARG JEMALLOC_SHA256=200776fac271093e7c2f21edd6d62657ecd2be578d9328633f2a86bfa6ef4f1d
 ENV JEMALLOC_VERSION=${JEMALLOC_VERSION} JEMALLOC_SHA256=${JEMALLOC_SHA256}
 # --- jemalloc ---
-ARG PGO_NAMESPACE=db/jemalloc
 RUN \
   /bin/bash -o pipefail -s <<'BASH'
 set -eux
-curl -fsSL "https://github.com/jemalloc/jemalloc/releases/download/${JEMALLOC_VERSION}/jemalloc-${JEMALLOC_VERSION}.tar.bz2" -o /tmp/jemalloc.tar.bz2; echo "${JEMALLOC_SHA256}  /tmp/jemalloc.tar.bz2" | sha256sum -c -; mkdir -p /usr/src/jemalloc; tar -xjf /tmp/jemalloc.tar.bz2 -C /usr/src/jemalloc --strip-components=1; cd /usr/src/jemalloc; _cf_cfg="$(hpcperfstats_configure_cflags db/jemalloc)"; _cf_bake="$(hpcperfstats_bake_cflags db/jemalloc)"; _lto_ld="$(hpcperfstats_alpine_thinlto_ldflags)"; hpcperfstats_alpine_jemalloc_export_link_toolchain; AR="${AR}" RANLIB="${RANLIB}" NM="${NM}" CC="${CC}" CXX="${CXX}" CPPFLAGS="-D_GNU_SOURCE" CFLAGS="${_cf_cfg}" CXXFLAGS="${_cf_cfg}" ./configure --prefix=/opt/jemalloc; make -j"$(nproc)" CC="${CC}" CXX="${CXX}" CFLAGS="${_cf_bake}" CXXFLAGS="${_cf_bake}" LDFLAGS="${_lto_ld}" EXTRA_LDFLAGS="${_lto_ld}" AR="${AR}" RANLIB="${RANLIB}" NM="${NM}"; make install CC="${CC}" CXX="${CXX}" CFLAGS="${_cf_bake}" CXXFLAGS="${_cf_bake}" LDFLAGS="${_lto_ld}" EXTRA_LDFLAGS="${_lto_ld}" AR="${AR}" RANLIB="${RANLIB}" NM="${NM}"; hpcperfstats_pgo_capture_generate_dlopen db/jemalloc /opt/jemalloc; rm -rf /usr/src/jemalloc /tmp/jemalloc.tar.bz2
+curl -fsSL "https://github.com/jemalloc/jemalloc/releases/download/${JEMALLOC_VERSION}/jemalloc-${JEMALLOC_VERSION}.tar.bz2" -o /tmp/jemalloc.tar.bz2; echo "${JEMALLOC_SHA256}  /tmp/jemalloc.tar.bz2" | sha256sum -c -; mkdir -p /usr/src/jemalloc; tar -xjf /tmp/jemalloc.tar.bz2 -C /usr/src/jemalloc --strip-components=1; cd /usr/src/jemalloc; _cf_cfg="$(hpcperfstats_configure_cflags db/jemalloc)"; _cf_bake="$(hpcperfstats_bake_cflags db/jemalloc)"; _lto_ld="$(hpcperfstats_alpine_thinlto_ldflags)"; hpcperfstats_alpine_jemalloc_export_link_toolchain; AR="${AR}" RANLIB="${RANLIB}" NM="${NM}" CC="${CC}" CXX="${CXX}" CPPFLAGS="-D_GNU_SOURCE" CFLAGS="${_cf_cfg}" CXXFLAGS="${_cf_cfg}" ./configure --prefix=/opt/jemalloc; make -j"$(nproc)" CC="${CC}" CXX="${CXX}" CFLAGS="${_cf_bake}" CXXFLAGS="${_cf_bake}" LDFLAGS="${_lto_ld}" EXTRA_LDFLAGS="${_lto_ld}" AR="${AR}" RANLIB="${RANLIB}" NM="${NM}"; make install CC="${CC}" CXX="${CXX}" CFLAGS="${_cf_bake}" CXXFLAGS="${_cf_bake}" LDFLAGS="${_lto_ld}" EXTRA_LDFLAGS="${_lto_ld}" AR="${AR}" RANLIB="${RANLIB}" NM="${NM}"; rm -rf /usr/src/jemalloc /tmp/jemalloc.tar.bz2
 BASH
 
 ARG LZ4_VERSION=1.10.0
 ARG LZ4_SHA256=537512904744b35e232912055ccf8ec66d768639ff3abe5788d90d792ec5f48b
 ENV LZ4_VERSION=${LZ4_VERSION} LZ4_SHA256=${LZ4_SHA256}
 # --- lz4 ---
-ARG PGO_NAMESPACE=db/lz4
 RUN \
   /bin/bash -o pipefail -s <<'BASH'
 set -eux
-_cflags="$(hpcperfstats_bake_cflags db/lz4) -DLZ4_HEAPMODE=0"; curl -fsSL "https://github.com/lz4/lz4/archive/refs/tags/v${LZ4_VERSION}.tar.gz" -o /tmp/lz4.tar.gz; echo "${LZ4_SHA256}  /tmp/lz4.tar.gz" | sha256sum -c -; mkdir -p /usr/src/lz4; tar -xzf /tmp/lz4.tar.gz -C /usr/src/lz4 --strip-components=1; cd /usr/src/lz4; make -j"$(nproc)" CC="${CC}" AR="${AR}" RANLIB="${RANLIB}" NM="${NM}" LDFLAGS="${HPC_THINLTO_LDFLAGS}" CFLAGS="${_cflags}" PREFIX=/opt/lz4; make install CC="${CC}" AR="${AR}" RANLIB="${RANLIB}" NM="${NM}" LDFLAGS="${HPC_THINLTO_LDFLAGS}" PREFIX=/opt/lz4; hpcperfstats_pgo_capture_generate_exec db/lz4 -- /opt/lz4/bin/lz4 -h; rm -rf /usr/src/lz4 /tmp/lz4.tar.gz
+_cflags="$(hpcperfstats_bake_cflags db/lz4) -DLZ4_HEAPMODE=0"; curl -fsSL "https://github.com/lz4/lz4/archive/refs/tags/v${LZ4_VERSION}.tar.gz" -o /tmp/lz4.tar.gz; echo "${LZ4_SHA256}  /tmp/lz4.tar.gz" | sha256sum -c -; mkdir -p /usr/src/lz4; tar -xzf /tmp/lz4.tar.gz -C /usr/src/lz4 --strip-components=1; cd /usr/src/lz4; make -j"$(nproc)" CC="${CC}" AR="${AR}" RANLIB="${RANLIB}" NM="${NM}" LDFLAGS="${HPC_THINLTO_LDFLAGS}" CFLAGS="${_cflags}" PREFIX=/opt/lz4; make install CC="${CC}" AR="${AR}" RANLIB="${RANLIB}" NM="${NM}" LDFLAGS="${HPC_THINLTO_LDFLAGS}" PREFIX=/opt/lz4; rm -rf /usr/src/lz4 /tmp/lz4.tar.gz
 BASH
 
 ARG ICU_VERSION=78.3
 ARG ICU_SHA256=3a2e7a47604ba702f345878308e6fefeca612ee895cf4a5f222e7955fabfe0c0
 ENV ICU_VERSION=${ICU_VERSION} ICU_SHA256=${ICU_SHA256}
 # --- ICU (source under /opt/icu; not apk icu-dev as linked ABI) ---
-ARG PGO_NAMESPACE=db/icu
 RUN \
   /bin/bash -o pipefail -s <<'BASH'
 set -eux
-_cflags="$(hpcperfstats_bake_cflags db/icu)"; curl -fsSL "https://github.com/unicode-org/icu/releases/download/release-${ICU_VERSION}/icu4c-${ICU_VERSION}-sources.tgz" -o /tmp/icu.tgz; echo "${ICU_SHA256}  /tmp/icu.tgz" | sha256sum -c -; mkdir -p /usr/src/icu; tar -xzf /tmp/icu.tgz -C /usr/src/icu; cd /usr/src/icu/icu/source; CC="${CC}" CXX="${CXX}" CFLAGS="${_cflags}" CXXFLAGS="${_cflags}" LDFLAGS="${HPC_THINLTO_LDFLAGS}" ./configure --prefix=/opt/icu --enable-static --disable-samples --disable-tests; make -j"$(nproc)" CC="${CC}" CXX="${CXX}" AR="${AR}" RANLIB="${RANLIB}" NM="${NM}" LDFLAGS="${HPC_THINLTO_LDFLAGS}"; make install CC="${CC}" CXX="${CXX}" AR="${AR}" RANLIB="${RANLIB}" NM="${NM}" LDFLAGS="${HPC_THINLTO_LDFLAGS}"; hpcperfstats_pgo_capture_generate_dlopen db/icu /opt/icu; rm -rf /usr/src/icu /tmp/icu.tgz
+_cflags="$(hpcperfstats_bake_cflags db/icu)"; curl -fsSL "https://github.com/unicode-org/icu/releases/download/release-${ICU_VERSION}/icu4c-${ICU_VERSION}-sources.tgz" -o /tmp/icu.tgz; echo "${ICU_SHA256}  /tmp/icu.tgz" | sha256sum -c -; mkdir -p /usr/src/icu; tar -xzf /tmp/icu.tgz -C /usr/src/icu; cd /usr/src/icu/icu/source; CC="${CC}" CXX="${CXX}" CFLAGS="${_cflags}" CXXFLAGS="${_cflags}" LDFLAGS="${HPC_THINLTO_LDFLAGS}" ./configure --prefix=/opt/icu --enable-static --disable-samples --disable-tests; make -j"$(nproc)" CC="${CC}" CXX="${CXX}" AR="${AR}" RANLIB="${RANLIB}" NM="${NM}" LDFLAGS="${HPC_THINLTO_LDFLAGS}"; make install CC="${CC}" CXX="${CXX}" AR="${AR}" RANLIB="${RANLIB}" NM="${NM}" LDFLAGS="${HPC_THINLTO_LDFLAGS}"; rm -rf /usr/src/icu /tmp/icu.tgz
 BASH
 
 ARG LIBURING_VERSION=2.15
 ARG LIBURING_SHA256=8d052f2622dcb3678cbaee5ff582a87572672a6c0a56533cdda5b65cb636120a
 ENV LIBURING_VERSION=${LIBURING_VERSION} LIBURING_SHA256=${LIBURING_SHA256}
 # --- liburing ---
-ARG PGO_NAMESPACE=db/liburing
 RUN \
   /bin/bash -o pipefail -s <<'BASH'
 set -eux
-_cflags="$(hpcperfstats_bake_cflags db/liburing)"; curl -fsSL "https://github.com/axboe/liburing/archive/refs/tags/liburing-${LIBURING_VERSION}.tar.gz" -o /tmp/liburing.tar.gz; echo "${LIBURING_SHA256}  /tmp/liburing.tar.gz" | sha256sum -c -; mkdir -p /usr/src/liburing; tar -xzf /tmp/liburing.tar.gz -C /usr/src/liburing --strip-components=1; cd /usr/src/liburing; CC="${CC}" CXX="${CXX}" LDFLAGS="${HPC_THINLTO_LDFLAGS}" ./configure --prefix=/opt/liburing; make -j"$(nproc)" CC="${CC}" AR="${AR}" RANLIB="${RANLIB}" NM="${NM}" LDFLAGS="${HPC_THINLTO_LDFLAGS}" CFLAGS="${_cflags}"; make install CC="${CC}" AR="${AR}" RANLIB="${RANLIB}" NM="${NM}" LDFLAGS="${HPC_THINLTO_LDFLAGS}"; hpcperfstats_pgo_capture_generate_dlopen db/liburing /opt/liburing; rm -rf /usr/src/liburing /tmp/liburing.tar.gz
+_cflags="$(hpcperfstats_bake_cflags db/liburing)"; curl -fsSL "https://github.com/axboe/liburing/archive/refs/tags/liburing-${LIBURING_VERSION}.tar.gz" -o /tmp/liburing.tar.gz; echo "${LIBURING_SHA256}  /tmp/liburing.tar.gz" | sha256sum -c -; mkdir -p /usr/src/liburing; tar -xzf /tmp/liburing.tar.gz -C /usr/src/liburing --strip-components=1; cd /usr/src/liburing; CC="${CC}" CXX="${CXX}" LDFLAGS="${HPC_THINLTO_LDFLAGS}" ./configure --prefix=/opt/liburing; make -j"$(nproc)" CC="${CC}" AR="${AR}" RANLIB="${RANLIB}" NM="${NM}" LDFLAGS="${HPC_THINLTO_LDFLAGS}" CFLAGS="${_cflags}"; make install CC="${CC}" AR="${AR}" RANLIB="${RANLIB}" NM="${NM}" LDFLAGS="${HPC_THINLTO_LDFLAGS}"; rm -rf /usr/src/liburing /tmp/liburing.tar.gz
 BASH
 
 ARG ZLIB_NG_VERSION=2.3.3
 ARG ZLIB_NG_SHA256=f9c65aa9c852eb8255b636fd9f07ce1c406f061ec19a2e7d508b318ca0c907d1
 ENV ZLIB_NG_VERSION=${ZLIB_NG_VERSION} ZLIB_NG_SHA256=${ZLIB_NG_SHA256}
 # --- zlib-ng (ZLIB_COMPAT → libz.so; match Python image /opt/zlib-ng pin) ---
-ARG PGO_NAMESPACE=db/zlib-ng
 RUN \
   /bin/bash -o pipefail -s <<'BASH'
 set -eux
-_cflags="$(hpcperfstats_bake_cflags db/zlib-ng)"; curl -fsSL "https://github.com/zlib-ng/zlib-ng/archive/refs/tags/${ZLIB_NG_VERSION}.tar.gz" -o /tmp/zlib-ng.tar.gz; echo "${ZLIB_NG_SHA256}  /tmp/zlib-ng.tar.gz" | sha256sum -c -; mkdir -p /usr/src/zlib-ng; tar -xzf /tmp/zlib-ng.tar.gz -C /usr/src/zlib-ng --strip-components=1; cd /usr/src/zlib-ng; cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/opt/zlib-ng -DCMAKE_INSTALL_LIBDIR=lib -DZLIB_COMPAT=ON -DZLIB_ENABLE_TESTS=OFF -DZLIBNG_ENABLE_TESTS=OFF -DWITH_GTEST=OFF -DWITH_OPTIM=ON -DWITH_NEW_STRATEGIES=ON -DWITH_NATIVE_INSTRUCTIONS=ON -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ -DCMAKE_AR="${AR}" -DCMAKE_RANLIB="${RANLIB}" -DCMAKE_NM="${NM}" -DCMAKE_EXE_LINKER_FLAGS="${HPC_THINLTO_LDFLAGS}" -DCMAKE_SHARED_LINKER_FLAGS="${HPC_THINLTO_LDFLAGS}" -DCMAKE_C_FLAGS="${_cflags}"; cmake --build build -j"$(nproc)"; cmake --install build; test -f /opt/zlib-ng/lib/libz.so || test -f /opt/zlib-ng/lib/libz.so.1; hpcperfstats_pgo_capture_generate_dlopen db/zlib-ng /opt/zlib-ng; rm -rf /usr/src/zlib-ng /tmp/zlib-ng.tar.gz
+_cflags="$(hpcperfstats_bake_cflags db/zlib-ng)"; curl -fsSL "https://github.com/zlib-ng/zlib-ng/archive/refs/tags/${ZLIB_NG_VERSION}.tar.gz" -o /tmp/zlib-ng.tar.gz; echo "${ZLIB_NG_SHA256}  /tmp/zlib-ng.tar.gz" | sha256sum -c -; mkdir -p /usr/src/zlib-ng; tar -xzf /tmp/zlib-ng.tar.gz -C /usr/src/zlib-ng --strip-components=1; cd /usr/src/zlib-ng; cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DCMAKE_INSTALL_PREFIX=/opt/zlib-ng -DCMAKE_INSTALL_LIBDIR=lib -DZLIB_COMPAT=ON -DZLIB_ENABLE_TESTS=OFF -DZLIBNG_ENABLE_TESTS=OFF -DWITH_GTEST=OFF -DWITH_OPTIM=ON -DWITH_NEW_STRATEGIES=ON -DWITH_NATIVE_INSTRUCTIONS=ON -DCMAKE_C_COMPILER=clang -DCMAKE_CXX_COMPILER=clang++ -DCMAKE_AR="${AR}" -DCMAKE_RANLIB="${RANLIB}" -DCMAKE_NM="${NM}" -DCMAKE_EXE_LINKER_FLAGS="${HPC_THINLTO_LDFLAGS}" -DCMAKE_SHARED_LINKER_FLAGS="${HPC_THINLTO_LDFLAGS}" -DCMAKE_C_FLAGS="${_cflags}"; cmake --build build -j"$(nproc)"; cmake --install build; test -f /opt/zlib-ng/lib/libz.so || test -f /opt/zlib-ng/lib/libz.so.1; rm -rf /usr/src/zlib-ng /tmp/zlib-ng.tar.gz
 BASH
 
 ARG ZSTD_VERSION=1.5.7
 ARG ZSTD_SHA256=eb33e51f49a15e023950cd7825ca74a4a2b43db8354825ac24fc1b7ee09e6fa3
 ENV ZSTD_VERSION=${ZSTD_VERSION} ZSTD_SHA256=${ZSTD_SHA256}
 # --- zstd (match Python image /opt/zstd 1.5.7 pin; gzip→zlib-ng, .lz4→/opt/lz4) ---
-ARG PGO_NAMESPACE=db/zstd
 RUN \
   /bin/bash -o pipefail -s <<'BASH'
 set -eux
-hpcperfstats_pgo_ensure_db_zstd_upstream; _cflags="$(hpcperfstats_bake_cflags db/zstd)"; curl -fsSL "https://github.com/facebook/zstd/releases/download/v${ZSTD_VERSION}/zstd-${ZSTD_VERSION}.tar.gz" -o /tmp/zstd.tar.gz; echo "${ZSTD_SHA256}  /tmp/zstd.tar.gz" | sha256sum -c -; mkdir -p /usr/src/zstd; tar -xzf /tmp/zstd.tar.gz -C /usr/src/zstd --strip-components=1; cd /usr/src/zstd; export PKG_CONFIG_PATH="/opt/lz4/lib/pkgconfig:/opt/zlib-ng/lib/pkgconfig${PKG_CONFIG_PATH:+:$PKG_CONFIG_PATH}"; export CPPFLAGS="-I/opt/lz4/include -I/opt/zlib-ng/include${CPPFLAGS:+ $CPPFLAGS}"; export LDFLAGS="${HPC_THINLTO_LDFLAGS} -L/opt/lz4/lib -Wl,-rpath,/opt/lz4/lib -L/opt/zlib-ng/lib -Wl,-rpath,/opt/zlib-ng/lib"; make -j"$(nproc)" CC="${CC}" AR="${AR}" RANLIB="${RANLIB}" NM="${NM}" PREFIX=/opt/zstd HAVE_ZLIB=1 HAVE_LZ4=1 MOREFLAGS="${_cflags}"; make install CC="${CC}" AR="${AR}" RANLIB="${RANLIB}" NM="${NM}" PREFIX=/opt/zstd; ldd /opt/zstd/bin/zstd | tee /tmp/zstd.ldd; grep -E '/opt/zlib-ng/.+libz' /tmp/zstd.ldd; grep -E '/opt/lz4/.+liblz4' /tmp/zstd.ldd; if grep -E '[[:space:]](/lib/libz\.|/usr/lib/libz\.|/usr/lib/liblz4)' /tmp/zstd.ldd; then echo "zstd linked apk zlib/lz4 instead of /opt" >&2; exit 1; fi; hpcperfstats_pgo_capture_generate_exec db/zstd -- /opt/zstd/bin/zstd -h; rm -rf /usr/src/zstd /tmp/zstd.tar.gz
+hpcperfstats_ensure_db_zstd_upstream; _cflags="$(hpcperfstats_bake_cflags db/zstd)"; curl -fsSL "https://github.com/facebook/zstd/releases/download/v${ZSTD_VERSION}/zstd-${ZSTD_VERSION}.tar.gz" -o /tmp/zstd.tar.gz; echo "${ZSTD_SHA256}  /tmp/zstd.tar.gz" | sha256sum -c -; mkdir -p /usr/src/zstd; tar -xzf /tmp/zstd.tar.gz -C /usr/src/zstd --strip-components=1; cd /usr/src/zstd; export PKG_CONFIG_PATH="/opt/lz4/lib/pkgconfig:/opt/zlib-ng/lib/pkgconfig${PKG_CONFIG_PATH:+:$PKG_CONFIG_PATH}"; export CPPFLAGS="-I/opt/lz4/include -I/opt/zlib-ng/include${CPPFLAGS:+ $CPPFLAGS}"; export LDFLAGS="${HPC_THINLTO_LDFLAGS} -L/opt/lz4/lib -Wl,-rpath,/opt/lz4/lib -L/opt/zlib-ng/lib -Wl,-rpath,/opt/zlib-ng/lib"; make -j"$(nproc)" CC="${CC}" AR="${AR}" RANLIB="${RANLIB}" NM="${NM}" PREFIX=/opt/zstd HAVE_ZLIB=1 HAVE_LZ4=1 MOREFLAGS="${_cflags}"; make install CC="${CC}" AR="${AR}" RANLIB="${RANLIB}" NM="${NM}" PREFIX=/opt/zstd; ldd /opt/zstd/bin/zstd | tee /tmp/zstd.ldd; grep -E '/opt/zlib-ng/.+libz' /tmp/zstd.ldd; grep -E '/opt/lz4/.+liblz4' /tmp/zstd.ldd; if grep -E '[[:space:]](/lib/libz\.|/usr/lib/libz\.|/usr/lib/liblz4)' /tmp/zstd.ldd; then echo "zstd linked apk zlib/lz4 instead of /opt" >&2; exit 1; fi; rm -rf /usr/src/zstd /tmp/zstd.tar.gz
 BASH
 
 ENV PKG_CONFIG_PATH="/opt/zlib-ng/lib/pkgconfig:/opt/icu/lib/pkgconfig:/opt/liburing/lib/pkgconfig:/opt/lz4/lib/pkgconfig:/opt/zstd/lib/pkgconfig" \
@@ -152,11 +138,10 @@ ARG PG_VERSION=18.6
 ARG PG_SHA256=555610c24d53e4316da5b7d3fc25c279d96856d5e0e23ee308c328c5fa881d9f
 ENV PG_VERSION=${PG_VERSION} PG_SHA256=${PG_SHA256}
 # --- PostgreSQL 18 ---
-ARG PGO_NAMESPACE=db/postgresql
 RUN \
   /bin/bash -o pipefail -s <<'BASH'
 set -eux
-hpcperfstats_pgo_ensure_db_postgresql_link_dirs
+hpcperfstats_ensure_db_postgresql_link_dirs
 _pg_cflags="$(hpcperfstats_bake_cflags db/postgresql pg)"
 curl -fsSL "https://ftp.postgresql.org/pub/source/v${PG_VERSION}/postgresql-${PG_VERSION}.tar.bz2" -o /tmp/postgresql.tar.bz2
 echo "${PG_SHA256}  /tmp/postgresql.tar.bz2" | sha256sum -c -
@@ -167,9 +152,6 @@ cd /usr/src/postgresql
 awk '$1 == "#define" && $2 == "DEFAULT_PGSOCKET_DIR" && $3 == "\"/tmp\"" { $3 = "\"/var/run/postgresql\""; print; next } { print }' src/include/pg_config_manual.h > src/include/pg_config_manual.h.new
 grep '/var/run/postgresql' src/include/pg_config_manual.h.new
 mv src/include/pg_config_manual.h.new src/include/pg_config_manual.h
-if [[ "$(hpcperfstats_pgo_phase)" == generate ]]; then
-  sed -i 's/grep -v -e __cxa_atexit -e __tsan_func_exit/grep -v -e __cxa_atexit -e __tsan_func_exit -e atexit/' src/interfaces/libpq/Makefile
-fi
 export LLVM_CONFIG="${LLVM_CONFIG}"
 export CLANG=clang-22
 gnuArch="$(clang -dumpmachine)"
@@ -190,7 +172,7 @@ grep -E '/opt/liburing/.+liburing' /tmp/postgres.ldd
 grep -E '/opt/lz4/.+liblz4' /tmp/postgres.ldd
 grep -E '/opt/zstd/.+libzstd' /tmp/postgres.ldd
 if grep -E '[[:space:]](/lib/libz\.|/usr/lib/libz\.|/usr/lib/liblz4|/usr/lib/libzstd|/usr/lib/libicu|/usr/lib/liburing)' /tmp/postgres.ldd; then echo "postgres linked apk libs instead of /opt" >&2; exit 1; fi
-hpcperfstats_pgo_capture_generate_exec db/postgresql -- /usr/local/bin/postgres --version
+
 strip --strip-unneeded /usr/local/bin/postgres /usr/local/bin/psql || true
 postgres --version
 BASH
@@ -206,11 +188,10 @@ ENV TIMESCALEDB_VERSION=${TIMESCALEDB_VERSION} TIMESCALEDB_SHA256=${TIMESCALEDB_
 # heredoc — podman/buildah misparses <<EOF inside RUN as a CHMOD instruction).
 # Timescale 2.29+ also does not DT_NEEDED external liblz4/libzstd. musl `ldd`
 # on a PG extension always reports unresolved backend symbols — use scanelf.
-ARG PGO_NAMESPACE=db/timescaledb
 RUN \
   /bin/bash -o pipefail -s <<'BASH'
 set -eux
-hpcperfstats_pgo_ensure_db_timescaledb_link_dirs
+hpcperfstats_ensure_db_timescaledb_link_dirs
 _ts_cflags="$(hpcperfstats_bake_cflags db/timescaledb pg)"
 curl -fsSL "https://github.com/timescale/timescaledb/archive/refs/tags/${TIMESCALEDB_VERSION}.tar.gz" -o /tmp/timescaledb.tar.gz
 echo "${TIMESCALEDB_SHA256}  /tmp/timescaledb.tar.gz" | sha256sum -c -
@@ -238,7 +219,7 @@ scanelf -n "$TS_SO" | tee /tmp/timescaledb.needed
 if grep -E 'liblz4|libzstd|libjemalloc' /tmp/timescaledb.needed; then echo "timescaledb.so must not DT_NEEDED jemalloc/lz4/zstd" >&2; exit 1; fi
 sed -ri "s/#?(shared_preload_libraries)\s*=.*/\1 = 'timescaledb'/" /usr/local/share/postgresql/postgresql.conf.sample
 grep -F "shared_preload_libraries = 'timescaledb'" /usr/local/share/postgresql/postgresql.conf.sample
-hpcperfstats_pgo_capture_generate_postgres_extension db/timescaledb
+
 rm -rf /usr/src/timescaledb /usr/src/postgresql /tmp/pg-config-wrap
 BASH
 

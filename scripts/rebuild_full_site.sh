@@ -1,16 +1,14 @@
 #!/usr/bin/env bash
 # Full-stack image rebuild: podman build web, proxy, db_pg18; compose down + up -d
-# --no-build. Optional live-soak PGO via --profile-phase. Pipeline cgroup
-# memory.high is commented out (do not throttle below memory.max). Never use
-# podman-compose up --build here.
+# --no-build. CPython bake uses --enable-optimizations only (no custom Clang host profiles).
+# Pipeline cgroup memory.high is commented out (do not throttle below memory.max).
+# Never use podman-compose up --build here.
 #
 # Usage (from the git checkout that contains docker-compose.yaml):
 #   ./scripts/rebuild_full_site.sh
-#   ./scripts/rebuild_full_site.sh --profile-phase
 #   ./scripts/rebuild_full_site.sh --dry-run
 #   ./scripts/rebuild_full_site.sh --build-only
 #   ./scripts/rebuild_full_site.sh --no-start
-#   ./scripts/rebuild_full_site.sh --full-pgo
 set -euo pipefail
 
 if [[ "${BASH_SOURCE[0]}" != "${0}" ]]; then
@@ -26,25 +24,15 @@ source "${SCRIPT_DIR}/lib/podman_runtime.sh"
 source "${SCRIPT_DIR}/lib/compose_pipeline_memory_high.sh"
 # shellcheck source=lib/compose_frontend_helpers.sh
 source "${SCRIPT_DIR}/lib/compose_frontend_helpers.sh"
-# shellcheck source=pgo_lib.sh
-source "${SCRIPT_DIR}/pgo_lib.sh"
 # shellcheck source=lib/pipeline_supervisor_shutdown.sh
 source "${SCRIPT_DIR}/lib/pipeline_supervisor_shutdown.sh"
 
 DRY_RUN=0
 BUILD_ONLY=0
 NO_START=0
-PROFILE_PHASE=0
-PGO_USE=0
-PGO_SKIP=0
-FULL_PGO=0
 
-export PGOROOT="${PGOROOT:-${HPCPERFSTATS_PGO_ROOT:-/root/.hpcperfstats_pgo}}"
-
-PODMAN_BUILD_STACK_IMAGES=(web proxy)
 PG18_PROFILE=pg18-migrate
 PG18_SERVICE=db_pg18
-PGO_PHASE=stdlib
 
 usage() {
   cat <<'EOF'
@@ -59,17 +47,8 @@ the compose project (graceful stop, preserve volumes) and start:
 Down uses each service stop_grace_period from compose (do not pass down -t; a global
 timeout overrides longer db/rabbitmq/pg18 grace and risks SIGKILL mid-shutdown).
 
-PGO (optional): default rebuild is always PGO_PHASE=stdlib — no PGOROOT access, no Clang
-PGOROOT PGO (CPython --enable-optimizations + plain make install). PGOROOT defaults to
-/root/.hpcperfstats_pgo only when a PGO flag is used.
-
-  --profile-phase  Wipe PGOROOT (confirm if complete set) and build PGO_PHASE=generate for live soak
-  --pgo-use        After soak: merge profiles + one-time PGO_PHASE=use rebuild (--no-cache on images)
-  --pgo-skip       Rebuild with PGO_PHASE=skip (merged profdata under PGOROOT; podman cache allowed)
-  --full-pgo       Generate → live soak → down → merge/use rebuild (orchestrates profile-phase + soak + pgo-use)
-
-Only one of --profile-phase, --pgo-use, --pgo-skip, --full-pgo may be passed.
---full-pgo cannot be combined with --build-only, --no-start, or --dry-run soak skip (dry-run prints steps only).
+Images bake ThinLTO + CPython --enable-optimizations (upstream mini profile path).
+There is no custom Clang host-profile bake path and no legacy profile-phase flags.
 
 Options:
   --dry-run        Print planned steps only
@@ -81,21 +60,22 @@ EOF
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
-    --profile-phase)
-      PROFILE_PHASE=1
-      shift
+    --profile-phase | --pgo-*)
+      echo "rebuild_full_site.sh: custom Clang host profiling was removed; unsupported option: $1" >&2
+      echo "rebuild_full_site.sh: images always bake with CPython --enable-optimizations only" >&2
+      usage >&2
+      exit 2
       ;;
-    --pgo-use)
-      PGO_USE=1
-      shift
-      ;;
-    --pgo-skip)
-      PGO_SKIP=1
-      shift
-      ;;
-    --full-pgo)
-      FULL_PGO=1
-      shift
+    --full-*)
+      if [[ "${1#--full-}" == pgo ]]; then
+        echo "rebuild_full_site.sh: custom Clang host profiling was removed; unsupported option: $1" >&2
+        echo "rebuild_full_site.sh: images always bake with CPython --enable-optimizations only" >&2
+        usage >&2
+        exit 2
+      fi
+      echo "rebuild_full_site.sh: unknown option: $1" >&2
+      usage >&2
+      exit 2
       ;;
     --dry-run)
       DRY_RUN=1
@@ -120,26 +100,6 @@ while [[ $# -gt 0 ]]; do
       ;;
   esac
 done
-
-pgo_validate_exclusive_cli_flags() {
-  local n=0
-  [[ "${PROFILE_PHASE}" -eq 1 ]] && n=$((n + 1))
-  [[ "${PGO_USE}" -eq 1 ]] && n=$((n + 1))
-  [[ "${PGO_SKIP}" -eq 1 ]] && n=$((n + 1))
-  [[ "${FULL_PGO}" -eq 1 ]] && n=$((n + 1))
-  if [[ "${n}" -gt 1 ]]; then
-    echo "rebuild_full_site.sh: only one of --profile-phase, --pgo-use, --pgo-skip, --full-pgo allowed" >&2
-    usage >&2
-    exit 2
-  fi
-  if [[ "${FULL_PGO}" -eq 1 && ( "${BUILD_ONLY}" -eq 1 || "${NO_START}" -eq 1 ) ]]; then
-    echo "rebuild_full_site.sh: --full-pgo cannot be used with --build-only or --no-start" >&2
-    usage >&2
-    exit 2
-  fi
-}
-
-pgo_validate_exclusive_cli_flags
 
 run_cmd() {
   printf '+'
@@ -174,52 +134,6 @@ preflight() {
   fi
 }
 
-resolve_pgo_phase() {
-  if [[ "${PROFILE_PHASE}" -eq 1 ]]; then
-    PGO_PHASE=generate
-    echo "PGO: --profile-phase → PGO_PHASE=generate" >&2
-    return 0
-  fi
-  if [[ "${PGO_USE}" -eq 1 ]]; then
-    PGO_PHASE=use
-    echo "PGO: --pgo-use → PGO_PHASE=use (merge + profile-guided rebuild)" >&2
-    return 0
-  fi
-  if [[ "${PGO_SKIP}" -eq 1 ]]; then
-    PGO_PHASE=skip
-    echo "PGO: --pgo-skip → PGO_PHASE=skip (merged profdata; build cache allowed)" >&2
-    return 0
-  fi
-  PGO_PHASE=stdlib
-  echo "PGO: default stdlib — no PGOROOT; no Clang PGO (optional: --profile-phase, --pgo-use, --pgo-skip)" >&2
-}
-
-run_pgo_use_path() {
-  echo "=== PGO one-time use rebuild (merge → build db_pg18/proxy/web → up) ===" >&2
-  profiles_ready "${REPO_ROOT}" \
-    || pgo_die "PGO use rebuild refused: profiles_ready false (soak not confirmed for every namespace)"
-  local failed=0
-  if ! run_cmd "${SCRIPT_DIR}/pgo_merge_namespaces.sh"; then
-    failed=1
-  fi
-  if [[ "${failed}" -eq 0 ]]; then
-    if ! compose_build_all_with_pgo; then
-      failed=1
-    fi
-  fi
-  if [[ "${failed}" -ne 0 ]]; then
-    date -u +"%Y-%m-%dT%H:%M:%SZ" >"$(pgo_use_failed_path)"
-    echo "PGO: use rebuild FAILED — breadcrumb NOT written" >&2
-    pgo_die "use path failed (see above)"
-  fi
-  if [[ "${BUILD_ONLY}" -eq 1 || "${NO_START}" -eq 1 || "${DRY_RUN}" -eq 1 ]]; then
-    echo "PGO: use build finished; skipping up due to flags" >&2
-  else
-    run_stack_up_and_verify || pgo_die "stack verify failed after PGO use up"
-  fi
-  echo "PGO: use rebuild complete" >&2
-}
-
 run_stack_up_and_verify() {
   PHASE=up
   compose_up_project_stack
@@ -230,9 +144,8 @@ run_stack_up_and_verify() {
 }
 
 compose_build_web_image() {
-  local pgo_ctx git_commit
-  local -a cache_args=()
-  LAST_STEP="podman build web (PGO_PHASE=${PGO_PHASE} PGOROOT=${PGOROOT})"
+  local git_commit
+  LAST_STEP="podman build web"
   echo "rebuild_full_site.sh: ${LAST_STEP} ..."
   git_commit="${HPCPERFSTATS_GIT_COMMIT:-unknown}"
   if [[ "${git_commit}" == "unknown" ]] \
@@ -240,55 +153,33 @@ compose_build_web_image() {
     && git -C "${REPO_ROOT}" rev-parse HEAD >/dev/null 2>&1; then
     git_commit="$(git -C "${REPO_ROOT}" rev-parse HEAD)"
   fi
-  mapfile -t pgo_ctx < <(pgo_podman_build_context_args "${REPO_ROOT}")
-  mapfile -t cache_args < <(pgo_image_build_cache_args)
   run_cmd "${PODMAN[@]}" build \
-    "${cache_args[@]}" \
     -f "${REPO_ROOT}/Dockerfile" \
     -t hpcperfstats \
     --target hpcperfstats-full \
     --build-arg "HPCPERFSTATS_GIT_COMMIT=${git_commit}" \
-    --build-arg "PGO_PHASE=${PGO_PHASE}" \
-    --build-arg "PGO_ROOT=/root/.hpcperfstats_pgo" \
-    "${pgo_ctx[@]}" \
     "${REPO_ROOT}"
 }
 
 compose_build_proxy_image() {
-  local pgo_ctx
-  local -a cache_args=()
-  LAST_STEP="podman build proxy (PGO_PHASE=${PGO_PHASE} PGOROOT=${PGOROOT})"
+  LAST_STEP="podman build proxy"
   echo "rebuild_full_site.sh: ${LAST_STEP} ..."
-  mapfile -t pgo_ctx < <(pgo_podman_build_context_args "${REPO_ROOT}")
-  mapfile -t cache_args < <(pgo_image_build_cache_args)
   run_cmd "${PODMAN[@]}" build \
-    "${cache_args[@]}" \
     -f "${REPO_ROOT}/services-conf/proxy.Dockerfile" \
     -t hpcperfstats-proxy \
-    --build-arg "PGO_PHASE=${PGO_PHASE}" \
-    --build-arg "PGO_ROOT=/root/.hpcperfstats_pgo" \
-    "${pgo_ctx[@]}" \
     "${REPO_ROOT}"
 }
 
 compose_build_db_pg18() {
-  local pgo_ctx
-  local -a cache_args=()
-  LAST_STEP="podman build ${PG18_SERVICE} (PGO_PHASE=${PGO_PHASE} PGOROOT=${PGOROOT})"
+  LAST_STEP="podman build ${PG18_SERVICE}"
   echo "rebuild_full_site.sh: ${LAST_STEP} ..."
-  mapfile -t pgo_ctx < <(pgo_podman_build_context_args "${REPO_ROOT}")
-  mapfile -t cache_args < <(pgo_image_build_cache_args)
   run_cmd "${PODMAN[@]}" build \
-    "${cache_args[@]}" \
     -f "${REPO_ROOT}/services-conf/db.Dockerfile" \
     -t hpcperfstats-db \
-    --build-arg "PGO_PHASE=${PGO_PHASE}" \
-    --build-arg "PGO_ROOT=/root/.hpcperfstats_pgo" \
-    "${pgo_ctx[@]}" \
     "${REPO_ROOT}/services-conf"
 }
 
-compose_build_all_with_pgo() {
+compose_build_all_images() {
   compose_build_web_image || return 1
   compose_build_proxy_image || return 1
   compose_build_db_pg18 || return 1
@@ -302,70 +193,6 @@ compose_down_project() {
   LAST_STEP="podman-compose down --remove-orphans"
   echo "rebuild_full_site.sh: ${LAST_STEP} (volumes preserved; no -v; stop_grace_period from compose) ..."
   run_cmd "${PODMAN_COMPOSE[@]}" down --remove-orphans
-}
-
-pgo_stop_stack_after_soak() {
-  echo "=== PGO post-soak stack teardown (supervisor shutdown + compose down) ===" >&2
-  compose_down_project
-}
-
-run_pgo_soak_web_traffic() {
-  local soak_args=()
-  echo "=== PHASE soak starting ===" >&2
-  if [[ "${DRY_RUN}" -eq 0 ]]; then
-    echo "PGO soak: stop pipeline and re-seed rank-0 before traffic" >&2
-    run_cmd podman stop -t 20 "${HPCPERFSTATS_COMPOSE_PROJECT}_pipeline_1" || true
-    run_cmd "${PODMAN_COMPOSE[@]}" exec -T web python3 - < "${SCRIPT_DIR}/pgo_soak_seed_rank0_job.py"
-  fi
-  echo "=== PGO live soak (Playwright + API rank-0 jobs) ===" >&2
-  soak_args=(
-    --repo-root "${REPO_ROOT}"
-    --compose-project "${HPCPERFSTATS_COMPOSE_PROJECT}"
-  )
-  if [[ "${DRY_RUN}" -eq 1 ]]; then
-    soak_args+=(--dry-run)
-  fi
-  run_cmd pgo_run_soak_web_traffic "${REPO_ROOT}" "${soak_args[@]}"
-}
-
-run_full_pgo_orchestration() {
-  echo "=== Full PGO orchestration (generate → soak → down → use rebuild) ===" >&2
-  if [[ "${DRY_RUN}" -eq 1 ]]; then
-    echo "[dry-run] would: wipe PGOROOT (profile-phase), build generate, up+verify, soak, down, merge+use build, up+verify" >&2
-    PROFILE_PHASE=1
-    resolve_pgo_phase
-    run_pgo_soak_web_traffic
-    return 0
-  fi
-
-  PROFILE_PHASE=1
-  pgo_confirm_wipe_pgroot_for_profile_phase "${REPO_ROOT}"
-  resolve_pgo_phase
-  pgo_die_if_partial_profile_collection "${REPO_ROOT}" "${PROFILE_PHASE}"
-  pgo_prepare_host_pgroot_for_rebuild "${REPO_ROOT}" "${SCRIPT_DIR}/pgo_ensure_layout.sh"
-
-  PHASE=build
-  compose_build_all_with_pgo
-  run_compose_up_memory_high_and_summary
-
-  PHASE=soak
-  run_pgo_soak_web_traffic
-
-  PHASE=post_soak_down
-  pgo_stop_stack_after_soak
-
-  profiles_ready "${REPO_ROOT}" \
-    || pgo_die "PGO full-pgo refused after soak: profiles_ready false (check PGOROOT bind and LLVM_PROFILE_FILE)"
-
-  PGO_USE=1
-  PGO_PHASE=use
-  echo "PGO: --full-pgo → PGO_PHASE=use (merge + profile-guided rebuild)" >&2
-  run_pgo_use_path
-
-  # memory.high left at the cgroup default (max). Do not call apply_pipeline_memory_high.
-  PHASE=summary
-  echo "Full-site PGO --full-pgo complete (generate + soak + use rebuild)."
-  print_stack_summary
 }
 
 compose_up_project_stack() {
@@ -424,7 +251,6 @@ LAST_STEP=
 
 on_exit() {
   local ec=$?
-  pgo_print_summary "${PGO_PHASE}"
   if [[ "${UP_COMPLETED}" -eq 0 && "${BUILD_ONLY}" -eq 0 && "${NO_START}" -eq 0 && "${DRY_RUN}" -eq 0 ]]; then
     echo "rebuild_full_site.sh: exited (code ${ec}) before podman-compose up finished (phase=${PHASE} last_step=${LAST_STEP:-unknown})." >&2
     if [[ "${PHASE}" == build ]]; then
@@ -466,10 +292,6 @@ print_stack_summary() {
 }
 
 run_compose_up_memory_high_and_summary() {
-  # Compose pgo_profiles bind needs the host path to exist (empty dir is enough).
-  if [[ "${PGO_PHASE}" != stdlib ]]; then
-    pgo_ensure_pg_root
-  fi
   echo "=== rebuild_full_site.sh: starting podman-compose down + up (no --build) ==="
   run_stack_up_and_verify || exit 1
 
@@ -486,46 +308,13 @@ run_compose_up_memory_high_and_summary() {
 main() {
   trap on_exit EXIT
   preflight
-  if [[ "${FULL_PGO}" -eq 1 ]]; then
-    run_full_pgo_orchestration
-    return 0
-  fi
-  if [[ "${PROFILE_PHASE}" -eq 1 ]]; then
-    if [[ "${DRY_RUN}" -eq 1 ]]; then
-      if profiles_ready "${REPO_ROOT}"; then
-        echo "[dry-run] --profile-phase would prompt before wiping complete PGOROOT at $(pgo_root_dir)" >&2
-      else
-        echo "[dry-run] --profile-phase would wipe PGOROOT at $(pgo_root_dir) (incomplete or empty profile set)" >&2
-      fi
-    else
-      pgo_confirm_wipe_pgroot_for_profile_phase "${REPO_ROOT}"
-    fi
-  fi
-  resolve_pgo_phase
-  if [[ "${PGO_PHASE}" != stdlib ]]; then
-    pgo_die_if_partial_profile_collection "${REPO_ROOT}" "${PROFILE_PHASE}"
-    pgo_prepare_host_pgroot_for_rebuild "${REPO_ROOT}" "${SCRIPT_DIR}/pgo_ensure_layout.sh"
-  fi
-
-  if [[ "${PGO_USE}" -eq 1 ]]; then
-    run_pgo_use_path
-    # memory.high left at the cgroup default (max). Do not call apply_pipeline_memory_high.
-    # PHASE=memory_high
-    # if [[ "${DRY_RUN}" -eq 0 && "${BUILD_ONLY}" -eq 0 && "${NO_START}" -eq 0 ]]; then
-    #   apply_pipeline_memory_high || exit 1
-    # fi
-    PHASE=summary
-    echo "Full-site PGO use rebuild complete."
-    print_stack_summary
-    return 0
-  fi
 
   PHASE=build
-  echo "rebuild_full_site.sh: project=${HPCPERFSTATS_COMPOSE_PROJECT} DRY_RUN=${DRY_RUN} BUILD_ONLY=${BUILD_ONLY} NO_START=${NO_START} PGO_PHASE=${PGO_PHASE}"
+  echo "rebuild_full_site.sh: project=${HPCPERFSTATS_COMPOSE_PROJECT} DRY_RUN=${DRY_RUN} BUILD_ONLY=${BUILD_ONLY} NO_START=${NO_START}"
   if [[ "${BUILD_ONLY}" -eq 1 || "${NO_START}" -eq 1 || "${DRY_RUN}" -eq 1 ]]; then
     echo "NOTE: compose down + up runs only when all three flags above are 0." >&2
   fi
-  compose_build_all_with_pgo
+  compose_build_all_images
 
   if [[ "${BUILD_ONLY}" -eq 1 ]]; then
     echo "rebuild_full_site.sh: FINISHED BUILD ONLY — did not run podman-compose up (use without --build-only to recreate containers)." >&2

@@ -461,6 +461,27 @@ compose_service_container_exists() {
   "${PODMAN[@]}" container exists "${name}" >/dev/null 2>&1
 }
 
+# Tag locally built images to the names podman-compose expects for this project.
+compose_ensure_local_stack_image_tags() {
+  local project canonical alias
+  project="${HPCPERFSTATS_COMPOSE_PROJECT:-hpcperfstats}"
+  while read -r canonical alias; do
+    [[ -n "${canonical}" ]] || continue
+    if ! podman image exists "${canonical}"; then
+      echo "compose_ensure_local_stack_image_tags: stack image missing before compose up: ${canonical} (build images first)" >&2
+      return 1
+    fi
+    if [[ "${canonical}" != "${alias}" ]] && ! podman image exists "${alias}"; then
+      podman tag "${canonical}" "${alias}"
+    fi
+  done <<EOF
+hpcperfstats:latest ${project}_web:latest
+hpcperfstats:latest ${project}_pipeline:latest
+hpcperfstats-proxy:latest ${project}_proxy:latest
+hpcperfstats-db:latest ${project}_db_pg18:latest
+EOF
+}
+
 # podman-compose has no ``rm`` subcommand. Remove stale project containers by
 # name/id via Podman so ``up --detach`` can reuse
 # fixed project service names. Also wipe ``*_tmp*`` collision leftovers.

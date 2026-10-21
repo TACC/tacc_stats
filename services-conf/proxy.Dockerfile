@@ -9,17 +9,13 @@ ARG ALPINE_VERSION=3.24.2
 
 FROM alpine:${ALPINE_VERSION} AS proxy-build
 
-ARG PGO_PHASE=skip
-ARG PGO_ROOT=/root/.hpcperfstats_pgo
-ENV HPC_PGO_PHASE=${PGO_PHASE} HPC_PGO_ROOT=${PGO_ROOT}
 ENV CC=clang CXX=clang++ LD=ld.lld
 
-COPY services-conf/pgo_clang_flags.sh /usr/local/lib/hpcperfstats/pgo_clang_flags.sh
+COPY services-conf/bake_clang_flags.sh /usr/local/lib/hpcperfstats/bake_clang_flags.sh
 COPY services-conf/clang_march_native_probe.sh /usr/local/lib/hpcperfstats/clang_march_native_probe.sh
-COPY services-conf/alpine_pgo_profile_runtime_link.sh /usr/local/lib/hpcperfstats/alpine_pgo_profile_runtime_link.sh
-RUN chmod +x /usr/local/lib/hpcperfstats/pgo_clang_flags.sh /usr/local/lib/hpcperfstats/clang_march_native_probe.sh /usr/local/lib/hpcperfstats/alpine_pgo_profile_runtime_link.sh
+RUN chmod +x /usr/local/lib/hpcperfstats/bake_clang_flags.sh /usr/local/lib/hpcperfstats/clang_march_native_probe.sh
 
-# nginx and /opt deps: unified -O2 ThinLTO bake (+ optional PGO via pgo_clang_flags.sh).
+# nginx and /opt deps: unified -O2 ThinLTO bake (+ ThinLTO via bake_clang_flags.sh).
 ARG NGINX_VERSION=1.31.7
 ARG NGINX_SHA256=89ea8a3dc171511f7325043b50e4c036248d9fad5feb7ec809c0b82d5df42c65
 ARG OPENSSL_VERSION=3.5.9
@@ -71,10 +67,10 @@ RUN apk add --no-cache \
     pcre2-dev \
     perl
 
-RUN test -x /usr/bin/ld.lld && /bin/bash /usr/local/lib/hpcperfstats/alpine_pgo_profile_runtime_link.sh
+RUN test -x /usr/bin/ld.lld
 
-# Podman OCI ignores Dockerfile SHELL; PGO RUN steps invoke /bin/bash explicitly (BASH_ENV sources pgo_clang_flags.sh).
-ENV BASH_ENV=/usr/local/lib/hpcperfstats/pgo_clang_flags.sh
+# Podman OCI ignores Dockerfile SHELL; bake RUN steps invoke /bin/bash explicitly (BASH_ENV sources bake_clang_flags.sh).
+ENV BASH_ENV=/usr/local/lib/hpcperfstats/bake_clang_flags.sh
 ENV HPC_ALPINE_LLVM_TOOLCHAIN=1 \
   AR=/usr/lib/llvm22/bin/llvm-ar \
   RANLIB=/usr/lib/llvm22/bin/llvm-ranlib \
@@ -84,12 +80,8 @@ ENV HPC_ALPINE_LLVM_TOOLCHAIN=1 \
 # Print out compiler platform detection (clang_march_native_probe.sh).
 RUN /bin/bash -o pipefail /usr/local/lib/hpcperfstats/clang_march_native_probe.sh
 
-ARG PGO_PHASE
-ARG PGO_ROOT
-ENV HPC_PGO_PHASE=${PGO_PHASE} HPC_PGO_ROOT=${PGO_ROOT}
 
 # --- jemalloc ---
-ARG PGO_NAMESPACE=proxy/jemalloc
 RUN \
   /bin/bash -o pipefail -s <<'BASH'
 set -eux
@@ -110,7 +102,7 @@ make -j"$(nproc)" CC="${CC}" CXX="${CXX}" CFLAGS="${_cf_bake}" CXXFLAGS="${_cf_b
   AR="${AR}" RANLIB="${RANLIB}" NM="${NM}"
 make install CC="${CC}" CXX="${CXX}" CFLAGS="${_cf_bake}" CXXFLAGS="${_cf_bake}" LDFLAGS="${_lto_ld}" EXTRA_LDFLAGS="${_lto_ld}" \
   AR="${AR}" RANLIB="${RANLIB}" NM="${NM}"
-hpcperfstats_pgo_capture_generate_dlopen proxy/jemalloc /opt/jemalloc
+
 rm -rf /usr/src/jemalloc /tmp/jemalloc.tar.bz2
 BASH
 
@@ -120,11 +112,11 @@ WORKDIR /usr/src
 # nginx auto/lib/zlib injects --with-zlib-opt into CFLAGS when it re-runs
 # ./configure. zlib-ng requires --zlib-compat as a configure argv flag; passing
 # it via CFLAGS aborts with "Compiler error reporting is too harsh".
-# Not a PGO namespace: nginx rebuilds this tree with nginx's own profile.
+# Not under bake_cflags namespaces: nginx rebuilds this tree with its own flags.
 RUN \
   /bin/bash -o pipefail -s <<'BASH'
 set -eux
-_cf_cfg="$(hpcperfstats_strip_lto_and_pgo "$(hpcperfstats_native_base_cflags)")"
+_cf_cfg="$(hpcperfstats_strip_lto "$(hpcperfstats_native_base_cflags)")"
 _cf_bake="$(hpcperfstats_native_base_cflags)"
 curl -fsSL "https://github.com/zlib-ng/zlib-ng/archive/refs/tags/${ZLIB_NG_VERSION}.tar.gz" \
   -o /tmp/zlib-ng.tar.gz
@@ -244,11 +236,10 @@ rm -rf /usr/src/zstd /tmp/zstd.tar.gz /tmp/zstd-nginx-module.tar.gz
 BASH
 
 # --- nginx ---
-ARG PGO_NAMESPACE=proxy/nginx
 RUN \
   /bin/bash -o pipefail -s <<'BASH'
 set -eux
-hpcperfstats_pgo_ensure_proxy_nginx_link_dirs
+hpcperfstats_ensure_proxy_nginx_link_dirs
 _cflags="$(hpcperfstats_bake_cflags proxy/nginx)"
 _openssl_cflags="$(hpcperfstats_native_base_cflags)"
 test -f /usr/src/zlib-ng/libz.a
@@ -301,7 +292,7 @@ make -f objs/Makefile -j1 \
   CFLAGS="${nginx_bake_cflags}" LDFLAGS="${_lto_ld}" EXTRA_LDFLAGS="${_lto_ld}"
 make -j"$(nproc)" CFLAGS="${nginx_bake_cflags}"
 make install CFLAGS="${nginx_bake_cflags}"
-hpcperfstats_pgo_capture_generate_exec proxy/nginx -- /usr/sbin/nginx -V
+
 strip --strip-unneeded /usr/sbin/nginx
 # --conf-path=/etc/nginx/nginx.conf installs mime.types under /etc/nginx/, not
 # prefix/conf/. Normalize into /opt/nginx/conf for the runtime COPY.

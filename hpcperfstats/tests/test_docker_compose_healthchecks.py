@@ -653,9 +653,10 @@ def test_proxy_dockerfile_uses_clang22_apk_toolchain() -> None:
     "Alpine lld22 ships ld.lld in /usr/bin; fail closed if apk layout regresses"
   )
   assert "compiler-rt" in _apk_before_probe, (
-    "PGO_PHASE=generate needs compiler-rt for -fprofile-instr-generate links"
+    "Alpine clang ThinLTO bake installs compiler-rt with the clang22 toolchain"
   )
-  assert "alpine_pgo_profile_runtime_link.sh" in dockerfile
+  assert "bake_clang_flags.sh" in dockerfile
+  assert "alpine_pgo_profile_runtime_link.sh" not in dockerfile
   assert "-Q --help=target" not in dockerfile
   assert "NGINX_OPT_CFLAGS" not in dockerfile
   assert "-flto=thin" in dockerfile
@@ -775,13 +776,13 @@ def test_proxy_dockerfile_source_builds_nginx_with_pinned_deps():
     'nginx_bake_cflags="${_cflags} -I/opt/zstd/include -DZLIB_COMPAT"'
     in nginx_run
   )
-  assert "hpcperfstats_pgo_ensure_proxy_nginx_link_dirs" in nginx_run
+  assert "hpcperfstats_ensure_proxy_nginx_link_dirs" in nginx_run
   zlib_run = dockerfile[
     dockerfile.index("# --- zlib-ng") : dockerfile.index("# --- OpenSSL")
   ]
   assert "hpcperfstats_native_base_cflags" in zlib_run
   assert "make -j" in zlib_run and "libz.a" in zlib_run
-  assert "hpcperfstats_strip_lto_and_pgo" in zlib_run
+  assert "hpcperfstats_strip_lto" in zlib_run
   assert "hpcperfstats_bake_cflags proxy/zlib-ng" not in zlib_run
   assert "-DZLIB_COMPAT" in zlib_run, (
     "proxy zlib-ng make must not drop configure --zlib-compat (CFLAGS= override)"
@@ -1041,7 +1042,6 @@ _OPERATOR_SETTINGS_VOLUME_NAMES = (
   "rabbitmq_messages:",
   "ssh_keys:",
   "proxy_ssl_source:",
-  "pgo_profiles:",
 )
 
 
@@ -1061,25 +1061,10 @@ def test_docker_compose_settings_example_operator_markers():
   assert "SYS_PTRACE" in example_content
   assert "15672:15672" in example_content
   assert "5432:5432" in example_content
-  assert "device: /root/.hpcperfstats_pgo" in example_content
-  assert "pgo_profiles:/root/.hpcperfstats_pgo" in example_content
+  assert "pgo_profiles" not in example_content
+  assert "hpcperfstats_pgo" not in example_content
   assert "single `services:` map" in example_content
   assert example_content.count("\nservices:\n") == 1
-
-
-def test_docker_compose_pgo_profiles_service_mounts_in_settings_example():
-  """Settings include base and merge service volumes; PGOROOT bind is not in base."""
-  repo_root = Path(__file__).resolve().parents[2]
-  base = (repo_root / "docker-compose.defaults.yaml").read_text()
-  example = (repo_root / "docker-compose.yaml.example").read_text()
-  mount = "pgo_profiles:/root/.hpcperfstats_pgo"
-  assert mount not in base
-  assert example.count(mount) >= 4
-  for svc in ("web:", "pipeline:", "proxy:", "db_pg18:"):
-    assert re.search(
-      rf"(?ms)^  {re.escape(svc)}\n.*?{re.escape(mount)}",
-      example,
-    ), f"{svc} missing {mount} in settings example"
 
 
 def test_docker_compose_settings_example_is_valid_yaml():
@@ -1088,7 +1073,7 @@ def test_docker_compose_settings_example_is_valid_yaml():
   parsed = yaml.safe_load(example_path.read_text())
   assert isinstance(parsed, dict)
   assert "volumes" in parsed
-  assert "pgo_profiles" in parsed["volumes"]
+  assert "pgo_profiles" not in parsed["volumes"]
 
 
 def test_docker_compose_settings_example_operator_parity():
