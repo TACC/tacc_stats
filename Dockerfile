@@ -527,7 +527,7 @@ RUN \
   python3 -m pip install --no-cache-dir --no-build-isolation --force-reinstall --no-deps \
     --no-binary brotli \
     -r /tmp/requirements-mkl-brotli.txt; \
-  python3 -c "import brotli; p=brotli.compress(b\"hps\", quality=11); assert brotli.decompress(p)==b\"hps\""; \
+  python3 -c "import brotli; p=brotli.compress(b\"hps\", quality=11); assert brotli.decompress(p)==b\"hps\""'
 
 
 # 4) GIL rest wheels (Bokeh/contourpy see MKL numpy; constraint blocks wheel upgrades).
@@ -622,7 +622,7 @@ RUN \
   /opt/python3.14t/bin/python3.14t -m pip install --no-cache-dir --no-build-isolation --force-reinstall --no-deps \
     --no-binary brotli \
     -r /tmp/requirements-mkl-brotli.txt; \
-  /opt/python3.14t/bin/python3.14t -c "import brotli; p=brotli.compress(b\"hps\", quality=11); assert brotli.decompress(p)==b\"hps\""; \
+  /opt/python3.14t/bin/python3.14t -c "import brotli; p=brotli.compress(b\"hps\", quality=11); assert brotli.decompress(p)==b\"hps\""'
 
 
 # 7) Free-threaded rest wheels (dateutil then import pandas, same as GIL).

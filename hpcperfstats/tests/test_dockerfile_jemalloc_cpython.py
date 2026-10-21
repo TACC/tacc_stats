@@ -424,6 +424,44 @@ def test_dockerfile_avoids_nested_quotes_inside_command_substitution():
   assert '"' not in symlink_run
 
 
+def test_dockerfile_mkl_optimization_stack_runs_close_shell_quote() -> None:
+  """GIL/FT MKL RUNs must close ``-c '…'`` (PGO capture used to own the closer)."""
+  text = (_repo_root() / "Dockerfile").read_text()
+  # Exact terminator after brotli smoke — not a continued ``\\`` line.
+  closer = 'assert brotli.decompress(p)==b\\"hps\\""\''
+  assert text.count(closer) == 2, text.count(closer)
+  # Scanner: no multi-line ``RUN … -c '`` hits the next ``RUN`` before close.
+  lines = text.splitlines()
+  i = 0
+  while i < len(lines):
+    line = lines[i]
+    opens = line.startswith("RUN") and (
+      "-c '" in line
+      or (
+        line.rstrip() == "RUN \\"
+        and i + 1 < len(lines)
+        and "-c '" in lines[i + 1]
+      )
+    )
+    if not opens:
+      i += 1
+      continue
+    opened = "-c '" in line or "-c '" in lines[i + 1]
+    j = i
+    while j < len(lines):
+      cur = lines[j].rstrip()
+      if j > i and cur.startswith("RUN ") and opened:
+        raise AssertionError(
+          f"unclosed -c quote: RUN at line {i + 1} hits RUN at {j + 1}"
+        )
+      if opened and cur.endswith("'") and not cur.endswith("\\"):
+        break
+      j += 1
+    else:
+      raise AssertionError(f"unclosed -c quote starting at line {i + 1}")
+    i = j + 1
+
+
 def test_hpcperfstats_base_copies_only_opt_prefixes_not_compile_trees():
   """Runtime stage must not COPY /usr/src or other compile trees from python-build."""
   dockerfile = (_repo_root() / "Dockerfile").read_text()
