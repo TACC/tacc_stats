@@ -55,7 +55,9 @@ def test_live_distinct_host_time_count_compose_seed():
   row = qs.get()
   assert int(row.live_distinct) == 3
   assert jid_scoped_distinct_host_time_count(jid, start, end) == 3
-  assert get_live_distinct_time_count_for_jid(jid) == 3
+  # Live SQL probe disabled: always persisted metrics_distinct_time_count.
+  job_data.objects.filter(jid=jid).update(metrics_distinct_time_count=7)
+  assert get_live_distinct_time_count_for_jid(jid) == 7
 
 
 @pytest.mark.django_db(transaction=True)

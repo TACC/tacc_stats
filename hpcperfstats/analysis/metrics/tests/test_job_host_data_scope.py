@@ -8,6 +8,8 @@ from django.db.models import Q
 
 from hpcperfstats.analysis.metrics.lib.job_host_data_scope import (
   SHARED_HOST_WIDE_HELP_FOOTER,
+  SHARED_NODE_EXISTS_MAX_HOURS,
+  SHARED_NODE_EXISTS_STATEMENT_TIMEOUT_MS,
   apply_gpu_affinity_dev_filter,
   apply_job_host_data_scope,
   gpu_devs_for_job,
@@ -128,7 +130,9 @@ def test_job_is_shared_node_affinity_or_j_dev():
     patch("hpcperfstats.site.lib.machine.models.job_affinity") as ja,
     patch("hpcperfstats.site.lib.machine.models.host_data") as hd,
     patch("hpcperfstats.site.lib.machine.models.job_data") as jd,
+    patch("django.db.connection") as conn,
   ):
+    conn.vendor = "sqlite"
     ja.objects.filter.return_value.exists.return_value = True
     assert job_is_shared_node("5") is True
     hd.objects.filter.assert_not_called()
@@ -175,7 +179,9 @@ def test_job_is_shared_node_uses_start_end_when_telemetry_null():
     patch("hpcperfstats.site.lib.machine.models.job_affinity") as ja,
     patch("hpcperfstats.site.lib.machine.models.host_data") as hd,
     patch("hpcperfstats.site.lib.machine.models.job_data") as jd,
+    patch("django.db.connection") as conn,
   ):
+    conn.vendor = "sqlite"
     ja.objects.filter.return_value.exists.return_value = False
     jd.objects.filter.return_value.values.return_value.first.return_value = (
       bounds
@@ -193,13 +199,77 @@ def test_job_is_shared_node_database_error_fail_open():
     patch("hpcperfstats.site.lib.machine.models.job_affinity") as ja,
     patch("hpcperfstats.site.lib.machine.models.host_data") as hd,
     patch("hpcperfstats.site.lib.machine.models.job_data") as jd,
+    patch("django.db.connection") as conn,
   ):
+    conn.vendor = "sqlite"
     ja.objects.filter.return_value.exists.return_value = False
     jd.objects.filter.return_value.values.return_value.first.return_value = (
       bounds
     )
     hd.objects.filter.return_value.exists.side_effect = DatabaseError("cancel")
     assert job_is_shared_node("5") is False
+
+
+def test_job_is_shared_node_skips_exists_when_hours_gt_4():
+  t0 = datetime(2026, 10, 19, 0, 0, tzinfo=UTC)
+  t1 = datetime(2026, 10, 19, 5, 0, tzinfo=UTC)
+  assert (t1 - t0).total_seconds() / 3600.0 > SHARED_NODE_EXISTS_MAX_HOURS
+  bounds = _job_bounds_row(t0=t0, t1=t1)
+  with (
+    patch("hpcperfstats.site.lib.machine.models.job_affinity") as ja,
+    patch("hpcperfstats.site.lib.machine.models.host_data") as hd,
+    patch("hpcperfstats.site.lib.machine.models.job_data") as jd,
+  ):
+    ja.objects.filter.return_value.exists.return_value = False
+    jd.objects.filter.return_value.values.return_value.first.return_value = (
+      bounds
+    )
+    assert job_is_shared_node("61778") is False
+    hd.objects.filter.assert_not_called()
+
+
+def test_job_is_shared_node_sets_local_statement_timeout():
+  bounds = _job_bounds_row()
+  seen: list[tuple] = []
+
+  class _Cursor:
+    def __enter__(self):
+      return self
+
+    def __exit__(self, *_a):
+      return False
+
+    def execute(self, sql, params=None):
+      seen.append((sql, params))
+
+  class _Txn:
+    def __enter__(self):
+      return self
+
+    def __exit__(self, *_a):
+      return False
+
+  with (
+    patch("hpcperfstats.site.lib.machine.models.job_affinity") as ja,
+    patch("hpcperfstats.site.lib.machine.models.host_data") as hd,
+    patch("hpcperfstats.site.lib.machine.models.job_data") as jd,
+    patch("django.db.connection") as conn,
+    patch("django.db.transaction.atomic", return_value=_Txn()),
+  ):
+    conn.vendor = "postgresql"
+    conn.cursor.return_value = _Cursor()
+    ja.objects.filter.return_value.exists.return_value = False
+    jd.objects.filter.return_value.values.return_value.first.return_value = (
+      bounds
+    )
+    hd.objects.filter.return_value.exists.return_value = True
+    assert job_is_shared_node("5") is True
+    assert any(
+      "SET LOCAL statement_timeout" in (s or "")
+      and p == [SHARED_NODE_EXISTS_STATEMENT_TIMEOUT_MS]
+      for s, p in seen
+    )
+    assert SHARED_NODE_EXISTS_STATEMENT_TIMEOUT_MS == 5000
 
 
 def test_shared_host_wide_help_footer_copy():

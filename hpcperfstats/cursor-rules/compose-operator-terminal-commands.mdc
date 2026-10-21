@@ -120,7 +120,28 @@ print(\"members_dir\", os.path.join(arch, \".sync_timedb_archive_members\"), os.
 "'
 ```
 
-**Anti-pattern — Django/ORM imports without bootstrap (hpcperfstats03 / web hpcperfstats04 2026-08-06):** importing `sync_timedb_ingest_readiness`, `host_data`, **`sync_timedb_day_raw_removal`** (pulls readiness → models), **`job_data` / `proc_data` / other `machine.models`**, or related ORM helpers from bare `python3 -c` inside **pipeline or web** raises **`ImproperlyConfigured`** (`Requested setting INSTALLED_APPS…`). Same failure for older images of **`scripts/migrate_daily_archive_gz_to_zst.py`** before it called **`ensure_django()`**. Call **`ensure_django()`** first (migrate script does this after deploy of the bootstrap fix). Prefer `from hpcperfstats.dbload.lib.django_bootstrap import ensure_django` over hand-rolling `DJANGO_SETTINGS_MODULE` + `django.setup()`.
+**Anti-pattern — Django/ORM imports without bootstrap (hpcperfstats03 / web hpcperfstats04 2026-08-06; live-distinct fingerprint web hpcperfstats04 2026-10-21):** importing `sync_timedb_ingest_readiness`, `host_data`, **`sync_timedb_day_raw_removal`** (pulls readiness → models), **`job_data` / `proc_data` / other `machine.models`**, **`job_plot_artifacts`** (imports `jid_table` → models), or related ORM helpers from bare `python3 -c` inside **pipeline or web** raises **`ImproperlyConfigured`** (`Requested setting INSTALLED_APPS…`). Same failure for older images of **`scripts/migrate_daily_archive_gz_to_zst.py`** before it called **`ensure_django()`**. Call **`ensure_django()`** first (migrate script does this after deploy of the bootstrap fix). Prefer `from hpcperfstats.dbload.lib.django_bootstrap import ensure_django` over hand-rolling `DJANGO_SETTINGS_MODULE` + `django.setup()`. For **deploy fingerprints** of constants in `job_plot_artifacts` / `metrics_host_data_sql`, prefer **source-only** package-root `Path.read_text` (no module import) — see corrected block below.
+
+**Corrected — web source-only live-distinct / probe fingerprint (hpcperfstats04 2026-10-21):**
+
+```bash
+podman-compose -p hpcperfstats exec web su hpcperfstats -c 'python3 -c "
+import hpcperfstats
+from pathlib import Path
+root = Path(hpcperfstats.__file__).resolve().parent
+jp = (root / \"site\" / \"lib\" / \"machine\" / \"job_plot_artifacts.py\").read_text()
+sp = (root / \"analysis\" / \"metrics\" / \"lib\" / \"metrics_host_data_sql.py\").read_text()
+for line in jp.splitlines():
+  if line.startswith(\"LIVE_DISTINCT_SQL_PROBE_ENABLED\") or line.startswith(\"LIVE_DISTINCT_MAX_HOSTS\") or line.startswith(\"LIVE_DISTINCT_MAX_HOST_HOURS\"):
+    print(line)
+for line in sp.splitlines():
+  if line.startswith(\"LIVE_DISTINCT_STATEMENT_TIMEOUT_MS\"):
+    print(line)
+needle = \"SET\" + \" LOCAL\"
+print(\"jid_scoped_has_SET_LOCAL\", needle in sp and \"jid_scoped_distinct_host_time_count\" in sp)
+"'
+```
+
 
 **Anti-pattern — migrate gz-only unlinks gzip after empty mkstemp dest (hpcperfstats02 2026-09-10):** `_migrate_one_daily_legacy_gz_locked` created an empty `mkstemp` dest; `decompress_compressed_to_tar` treated `os.path.isfile(dest)` as success and skipped zstd; then `os.remove(gz)` ran before seal. **Do not re-run** `scripts/migrate_daily_archive_gz_to_zst.py` until the fail-closed unlink fix is deployed. Restore hole days from Ranch (`sharrell@ranch:`) into INI `get_daily_archive_dir_path()` with `--ignore-existing`. Never unlink the only production `.tar.gz` / `.tar.zst` / open `.tar` until a verified replacement exists (`workspace-guardrails.mdc`, `sync-timedb-lock-and-archive-contract.mdc` A–D).
 

@@ -103,25 +103,21 @@ def test_app_plot_artifact_schema_version_bumped_for_telemetry_bounds():
 
 
 @pytest.mark.machine_unit_mock
-def test_get_live_distinct_prefers_telemetry_and_passes_hosts(monkeypatch):
+def test_get_live_distinct_returns_persisted_without_sql(monkeypatch):
   from django.db import connection as dj_conn
 
   from hpcperfstats.site.lib.machine import job_plot_artifacts as jpa
 
   now = timezone.now()
-  telem_lo = now - timedelta(hours=2)
-  telem_hi = now - timedelta(hours=1)
-  acct_lo = now - timedelta(days=1)
-  acct_hi = now
   row = {
-    "start_time": acct_lo,
-    "end_time": acct_hi,
-    "telemetry_first_time": telem_lo,
-    "telemetry_last_time": telem_hi,
+    "start_time": now - timedelta(hours=2),
+    "end_time": now,
+    "telemetry_first_time": now - timedelta(hours=2),
+    "telemetry_last_time": now,
     "host_list": ["n1", "n2"],
     "metrics_distinct_time_count": 99,
   }
-  seen: dict = {}
+  calls = {"n": 0}
 
   class _Vals:
     def first(self):
@@ -135,10 +131,11 @@ def test_get_live_distinct_prefers_telemetry_and_passes_hosts(monkeypatch):
     def filter(self, **_k):
       return _QS()
 
-  def _fake_count(jid, start, end, hosts=None):
-    seen["args"] = (jid, start, end, hosts)
+  def _fake_count(*_a, **_k):
+    calls["n"] += 1
     return 7
 
+  assert jpa.LIVE_DISTINCT_SQL_PROBE_ENABLED is False
   monkeypatch.setattr(dj_conn, "vendor", "postgresql")
   monkeypatch.setattr(jpa, "job_data", type("JD", (), {"objects": _Mgr()})())
   import hpcperfstats.analysis.metrics.lib.metrics_host_data_sql as sql_mod
@@ -146,16 +143,13 @@ def test_get_live_distinct_prefers_telemetry_and_passes_hosts(monkeypatch):
   monkeypatch.setattr(
     sql_mod, "jid_scoped_distinct_host_time_count", _fake_count
   )
-  assert jpa.get_live_distinct_time_count_for_jid("livedist1") == 7
-  assert seen["args"][0] == "livedist1"
-  assert seen["args"][1] == telem_lo
-  assert seen["args"][2] == telem_hi
-  assert seen["args"][3] == ["n1", "n2"]
+  assert jpa.get_live_distinct_time_count_for_jid("livedist1") == 99
+  assert calls["n"] == 0
 
 
 @pytest.mark.machine_unit_mock
-def test_get_live_distinct_database_error_fail_open(monkeypatch):
-  from django.db import DatabaseError, connection as dj_conn
+def test_get_live_distinct_non_postgresql_persisted(monkeypatch):
+  from django.db import connection as dj_conn
 
   from hpcperfstats.site.lib.machine import job_plot_artifacts as jpa
 
@@ -181,104 +175,9 @@ def test_get_live_distinct_database_error_fail_open(monkeypatch):
     def filter(self, **_k):
       return _QS()
 
-  def _boom(*_a, **_k):
-    raise DatabaseError("canceling statement due to statement timeout")
-
-  monkeypatch.setattr(dj_conn, "vendor", "postgresql")
+  monkeypatch.setattr(dj_conn, "vendor", "sqlite")
   monkeypatch.setattr(jpa, "job_data", type("JD", (), {"objects": _Mgr()})())
-  import hpcperfstats.analysis.metrics.lib.metrics_host_data_sql as sql_mod
-
-  monkeypatch.setattr(sql_mod, "jid_scoped_distinct_host_time_count", _boom)
   assert jpa.get_live_distinct_time_count_for_jid("livedist2") == 42
-
-
-@pytest.mark.machine_unit_mock
-def test_get_live_distinct_skips_large_nhosts(monkeypatch):
-  from django.db import connection as dj_conn
-
-  from hpcperfstats.site.lib.machine import job_plot_artifacts as jpa
-
-  now = timezone.now()
-  row = {
-    "start_time": now - timedelta(hours=1),
-    "end_time": now,
-    "telemetry_first_time": now - timedelta(hours=1),
-    "telemetry_last_time": now,
-    "host_list": [f"n{i}" for i in range(9)],
-    "metrics_distinct_time_count": 11,
-  }
-  calls = {"n": 0}
-
-  class _Vals:
-    def first(self):
-      return row
-
-  class _QS:
-    def values(self, *_a, **_k):
-      return _Vals()
-
-  class _Mgr:
-    def filter(self, **_k):
-      return _QS()
-
-  def _fake_count(*_a, **_k):
-    calls["n"] += 1
-    return 99
-
-  monkeypatch.setattr(dj_conn, "vendor", "postgresql")
-  monkeypatch.setattr(jpa, "job_data", type("JD", (), {"objects": _Mgr()})())
-  import hpcperfstats.analysis.metrics.lib.metrics_host_data_sql as sql_mod
-
-  monkeypatch.setattr(
-    sql_mod, "jid_scoped_distinct_host_time_count", _fake_count
-  )
-  assert jpa.get_live_distinct_time_count_for_jid("livedist3") == 11
-  assert calls["n"] == 0
-
-
-@pytest.mark.machine_unit_mock
-def test_get_live_distinct_skips_large_host_hours(monkeypatch):
-  from django.db import connection as dj_conn
-
-  from hpcperfstats.site.lib.machine import job_plot_artifacts as jpa
-
-  now = timezone.now()
-  # 4 hosts × 30h = 120 > 96
-  row = {
-    "start_time": now - timedelta(hours=30),
-    "end_time": now,
-    "telemetry_first_time": now - timedelta(hours=30),
-    "telemetry_last_time": now,
-    "host_list": ["a", "b", "c", "d"],
-    "metrics_distinct_time_count": 5,
-  }
-  calls = {"n": 0}
-
-  class _Vals:
-    def first(self):
-      return row
-
-  class _QS:
-    def values(self, *_a, **_k):
-      return _Vals()
-
-  class _Mgr:
-    def filter(self, **_k):
-      return _QS()
-
-  def _fake_count(*_a, **_k):
-    calls["n"] += 1
-    return 99
-
-  monkeypatch.setattr(dj_conn, "vendor", "postgresql")
-  monkeypatch.setattr(jpa, "job_data", type("JD", (), {"objects": _Mgr()})())
-  import hpcperfstats.analysis.metrics.lib.metrics_host_data_sql as sql_mod
-
-  monkeypatch.setattr(
-    sql_mod, "jid_scoped_distinct_host_time_count", _fake_count
-  )
-  assert jpa.get_live_distinct_time_count_for_jid("livedist4") == 5
-  assert calls["n"] == 0
 
 
 @pytest.mark.machine_unit_mock

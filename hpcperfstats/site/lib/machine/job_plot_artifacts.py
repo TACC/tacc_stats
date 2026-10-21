@@ -10,8 +10,7 @@ Attributes:
   JOB_PLOT_KIND_SPECS: Attribute.
   JOB_PLOT_LAYOUT_NORMAL: Attribute.
   JOB_PLOT_LAYOUT_ZOOM_V3: Attribute.
-  LIVE_DISTINCT_MAX_HOSTS: Max hosts for optional live-distinct SQL probe.
-  LIVE_DISTINCT_MAX_HOST_HOURS: Max host-hours for optional live-distinct probe.
+  LIVE_DISTINCT_SQL_PROBE_ENABLED: When True, freshen via SQL; production False.
   PAYLOAD_ENCODING_GZIP_JSON: Attribute.
   logger: Attribute.
 """
@@ -43,9 +42,9 @@ from .models import job_data, job_plot_artifact
 
 logger = logging.getLogger(__name__)
 
-# Circuit-break optional live-distinct freshen before expensive host_data SQL.
-LIVE_DISTINCT_MAX_HOSTS = 8
-LIVE_DISTINCT_MAX_HOST_HOURS = 96.0
+# Optional live-distinct SQL probe (jid_scoped_distinct_host_time_count).
+# Disabled: portal load cancels even small windows; readiness uses persisted.
+LIVE_DISTINCT_SQL_PROBE_ENABLED = False
 
 
 class JobPlotKindSpec(NamedTuple):
@@ -200,20 +199,19 @@ def _utc_iso_for_plot_fingerprint(dt: Any) -> str:
 
 def get_live_distinct_time_count_for_jid(jid: str) -> int:
   """
-  Live per-job distinct sample times (PostgreSQL); else persisted count.
+  Return persisted distinct sample count; optional live SQL when enabled.
 
-  Prefer ``telemetry_first_time`` / ``telemetry_last_time`` when set; pass
-  ``host_list`` into the PG function. Skip the SQL probe when
-  ``len(hosts) > LIVE_DISTINCT_MAX_HOSTS`` or host-hours exceeds
-  ``LIVE_DISTINCT_MAX_HOST_HOURS`` (same outcome as fail-open, no DB burn).
-  On ``DatabaseError`` (statement timeout), return persisted
-  ``metrics_distinct_time_count`` or ``0``.
+  Production keeps ``LIVE_DISTINCT_SQL_PROBE_ENABLED`` False so update_metrics
+  / web never call ``jid_scoped_distinct_host_time_count`` (statement-timeout
+  ERROR class under portal load). When enabled on PostgreSQL, prefer
+  telemetry bounds, pass ``host_list``, and on ``DatabaseError`` return
+  persisted ``metrics_distinct_time_count`` or ``0``.
 
   Args:
     jid (str): Job id string.
 
   Returns:
-    int: Sum of per-host distinct sample times, or persisted / ``0``.
+    int: Persisted count, or live sum when the probe is enabled.
 
   Examples:
     >>> get_live_distinct_time_count_for_jid("x")  # doctest: +SKIP
@@ -234,7 +232,7 @@ def get_live_distinct_time_count_for_jid(jid: str) -> int:
     return 0
   persisted = row.get("metrics_distinct_time_count")
   persisted_i = int(persisted) if persisted is not None else 0
-  if connection.vendor != "postgresql":
+  if not LIVE_DISTINCT_SQL_PROBE_ENABLED or connection.vendor != "postgresql":
     return persisted_i
   t0 = row.get("telemetry_first_time") or row.get("start_time")
   t1 = row.get("telemetry_last_time") or row.get("end_time")
@@ -243,12 +241,6 @@ def get_live_distinct_time_count_for_jid(jid: str) -> int:
   hosts = list(row.get("host_list") or [])
   if not hosts:
     return 0
-  hours = max(0.0, (t1 - t0).total_seconds() / 3600.0)
-  if (
-    len(hosts) > LIVE_DISTINCT_MAX_HOSTS
-    or len(hosts) * hours > LIVE_DISTINCT_MAX_HOST_HOURS
-  ):
-    return persisted_i
   from hpcperfstats.analysis.metrics.lib.metrics_host_data_sql import (
     jid_scoped_distinct_host_time_count,
   )

@@ -9,6 +9,8 @@ restricts which devices count for a job.
 
 Attributes:
   SHARED_HOST_WIDE_HELP_FOOTER: User-facing red-footer copy for shared jobs.
+  SHARED_NODE_EXISTS_MAX_HOURS: Skip ``dev=j:`` EXISTS above this window.
+  SHARED_NODE_EXISTS_STATEMENT_TIMEOUT_MS: SET LOCAL timeout for short EXISTS.
 """
 
 from __future__ import annotations
@@ -22,6 +24,11 @@ SHARED_HOST_WIDE_HELP_FOOTER: str = (
   "this job when affinity or cgroup data is available; some other counters "
   "may still be host-wide."
 )
+
+# Affinity-miss EXISTS on host_data.dev=j:<jid>; multi-day windows cancel at
+# portal statement_timeout. Skip long windows; bound short probes locally.
+SHARED_NODE_EXISTS_MAX_HOURS = 4.0
+SHARED_NODE_EXISTS_STATEMENT_TIMEOUT_MS = 5000
 
 
 def job_dev_token(jid: str) -> str:
@@ -231,9 +238,12 @@ def job_is_shared_node(jid: str) -> bool:
   True when the job has affinity rows or time-bounded ``dev=j:<jid>`` host_data.
 
   Used for Job Detail ``is_shared_node`` and shared-job help footers.
-  After an affinity miss, loads job time bounds in Python and probes
-  ``host_data`` with literal ``time__gte`` / ``time__lte`` (Timescale chunk
-  exclusion). Missing bounds or ``DatabaseError`` fail open to False.
+  After an affinity miss, loads job time bounds in Python. Windows longer
+  than ``SHARED_NODE_EXISTS_MAX_HOURS`` return False without SQL (affinity
+  remains authoritative). Shorter windows probe ``host_data`` under
+  ``SET LOCAL statement_timeout`` of
+  ``SHARED_NODE_EXISTS_STATEMENT_TIMEOUT_MS``. Missing bounds or
+  ``DatabaseError`` fail open to False.
 
   Args:
     jid (str): Job id.
@@ -249,7 +259,7 @@ def job_is_shared_node(jid: str) -> bool:
   jid_s = str(jid or "").strip()
   if not jid_s:
     return False
-  from django.db import DatabaseError
+  from django.db import DatabaseError, connection, transaction
 
   from hpcperfstats.site.lib.machine.models import (
     host_data,
@@ -275,7 +285,22 @@ def job_is_shared_node(jid: str) -> bool:
   t1 = row.get("telemetry_last_time") or row.get("end_time")
   if t0 is None or t1 is None:
     return False
+  hours = max(0.0, (t1 - t0).total_seconds() / 3600.0)
+  if hours > SHARED_NODE_EXISTS_MAX_HOURS:
+    return False
   try:
+    if connection.vendor == "postgresql":
+      with transaction.atomic():
+        with connection.cursor() as cursor:
+          cursor.execute(
+            "SET LOCAL statement_timeout = %s",
+            [SHARED_NODE_EXISTS_STATEMENT_TIMEOUT_MS],
+          )
+        return host_data.objects.filter(
+          dev=job_dev_token(jid_s),
+          time__gte=t0,
+          time__lte=t1,
+        ).exists()
     return host_data.objects.filter(
       dev=job_dev_token(jid_s),
       time__gte=t0,
