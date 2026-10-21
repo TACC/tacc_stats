@@ -738,11 +738,11 @@ def catchup_dispatch_cap(
   """
   Return how many catchup slots may be filled this tick.
 
-  Catchup may overflow into unused pool slots when the hot range is empty,
-  or when hot is queued but this tick submitted zero hot jobs
-  (``hot_submitted=0``). Omitting ``hot_submitted`` (or passing ``None``)
-  keeps the reserved-band law: catchup stays at ``catchup_cap`` while
-  hot members remain queued so a later hot fill can still use ``hot_cap``.
+  While hot work remains queued, catchup stays at ``catchup_cap`` so the
+  reserved hot share cannot be permanently stolen. Catchup may use the
+  full pool only when the hot range is empty. ``hot_submitted`` remains
+  accepted for older callers and does not expand catchup while
+  ``hot_queued > 0``.
 
   Args:
     hot_queued (int): Members currently in the hot score range.
@@ -750,9 +750,7 @@ def catchup_dispatch_cap(
     hot_cap (int): Reserved hot slots.
     catchup_cap (int): Reserved catchup slots.
     pool (int): Ingest pool size.
-    hot_submitted (int | None): Hot jobs submitted this tick. ``None``
-      means reserved law (do not expand). ``0`` means hot was
-      unsubmittable and unused pool slots may go to catchup.
+    hot_submitted (int | None): Ignored for expand policy (legacy kwarg).
 
   Returns:
     int: Catchup fill ceiling for this tick.
@@ -782,12 +780,10 @@ def catchup_dispatch_cap(
     ...   pool=24,
     ...   hot_submitted=0,
     ... )
-    24
+    8
   """
-  del catchup_queued, hot_cap
+  del catchup_queued, hot_cap, hot_submitted
   if int(hot_queued) <= 0:
-    return max(int(catchup_cap), int(pool))
-  if hot_submitted is not None and int(hot_submitted) == 0:
     return max(int(catchup_cap), int(pool))
   return int(catchup_cap)
 
@@ -5578,11 +5574,10 @@ def _ingest_coordinator_fill_tick(
   """
   Run one ingest-coordinator fill pass (hot, catchup, spillover, retry).
 
-  Order: fill hot to ``hot_cap``; catchup under reserved
-  ``catchup_dispatch_cap`` (``hot_submitted`` omitted); hot spillover to
-  pool; when free slots remain, elevated-probe hot retry (if hot queued)
-  then catchup with ``hot_submitted=0`` expand (if catchup queued) -
-  even when this tick already submitted hot (RC7).
+  Order: fill hot while ``hot_used < hot_cap`` and pool has free slots;
+  catchup under reserved ``catchup_dispatch_cap``; hot spillover to pool;
+  elevated-probe hot retry when hot is still queued; catchup expand to
+  full pool only when ``hot_queued <= 0``.
 
   Args:
     client (Any): job store.
@@ -5639,11 +5634,14 @@ def _ingest_coordinator_fill_tick(
     "inflight_sizes": inflight_sizes,
     "log_fn": log_fn,
   }
-  while len(ingest_inflight) < hot_cap:
+  while (
+    int(band_used.get("hot", 0)) < hot_cap
+    and len(ingest_inflight) < ingest_pool_size
+  ):
     n = _fill_ingest_band(
       client,
       band="hot",
-      cap=hot_cap,
+      cap=ingest_pool_size,
       inflight=ingest_inflight,
       claims=ingest_leases,
       submitted=ingest_submitted,
@@ -5712,14 +5710,17 @@ def _ingest_coordinator_fill_tick(
         hot_submitted += n
         if n == 0:
           break
-    if len(ingest_inflight) < ingest_pool_size and catchup_queued > 0:
+    if (
+      len(ingest_inflight) < ingest_pool_size
+      and catchup_queued > 0
+      and hot_queued <= 0
+    ):
       catchup_limit = catchup_dispatch_cap(
         hot_queued=hot_queued,
         catchup_queued=catchup_queued,
         hot_cap=hot_cap,
         catchup_cap=catchup_cap,
         pool=ingest_pool_size,
-        hot_submitted=0,
       )
       while len(ingest_inflight) < ingest_pool_size:
         n = _fill_ingest_band(

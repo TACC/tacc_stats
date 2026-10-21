@@ -1512,8 +1512,8 @@ def test_reserved_band_slots_under_mixed_inflight():
   )
 
 
-def test_catchup_dispatch_cap_expands_when_hot_submitted_zero():
-  """RC1: unused pool slots go to catchup when hot is queued but unsubmittable."""
+def test_catchup_dispatch_cap_no_expand_while_hot_queued():
+  """While hot_queued>0, catchup ceiling stays catchup_cap (even hot_submitted=0)."""
   assert (
     qo.catchup_dispatch_cap(
       hot_queued=531,
@@ -1523,7 +1523,7 @@ def test_catchup_dispatch_cap_expands_when_hot_submitted_zero():
       pool=24,
       hot_submitted=0,
     )
-    == 24
+    == 8
   )
   assert (
     qo.catchup_dispatch_cap(
@@ -1536,12 +1536,20 @@ def test_catchup_dispatch_cap_expands_when_hot_submitted_zero():
     )
     == 8
   )
+  assert (
+    qo.catchup_dispatch_cap(
+      hot_queued=0,
+      catchup_queued=2010,
+      hot_cap=16,
+      catchup_cap=8,
+      pool=24,
+    )
+    == 24
+  )
 
 
-def test_rc7_unused_slot_catchup_when_hot_submitted_nonzero(
-  monkeypatch, tmp_path
-):
-  """RC7: after one hot submit, unused slots still expand catchup (and elevated hot)."""
+def test_rc7_no_catchup_expand_while_hot_queued(monkeypatch, tmp_path):
+  """While hot ZSET is deep, unused slots retry hot; catchup does not expand to pool."""
   pool = 3
   hot_cap = 2
   catchup_cap = 1
@@ -1601,12 +1609,10 @@ def test_rc7_unused_slot_catchup_when_hot_submitted_nonzero(
     # Elevated hot retry: still nothing claimable.
     if band == "hot" and int(kw.get("probe_depth") or 0) >= 32:
       return 0
-    # Expanded catchup into remaining pool slots (RC7).
+    # Expand-to-pool must not run while hot_queued>0.
     if band == "catchup" and band_cap == pool:
-      if "catch-expand-0" not in inflight:
-        inflight["catch-expand-0"] = object()
-        return 1
-      return 0
+      inflight["catch-expand-0"] = object()
+      return 1
     return 0
 
   monkeypatch.setattr(qo, "_fill_ingest_band", _fake_fill)
@@ -1625,9 +1631,9 @@ def test_rc7_unused_slot_catchup_when_hot_submitted_nonzero(
     fill_stats=qo._empty_ingest_fill_stats(),
   )
   assert hot_n >= 1
-  assert did >= 2
-  assert "catch-expand-0" in inflight
-  assert any(
+  assert did >= 1
+  assert "catch-expand-0" not in inflight
+  assert not any(
     c["band"] == "catchup" and c["band_cap"] == pool for c in fill_log
   ), fill_log
   assert any(
@@ -1636,6 +1642,157 @@ def test_rc7_unused_slot_catchup_when_hot_submitted_nonzero(
   ), fill_log
   assert hot_q == 50
   assert zcard == 250
+
+
+def test_catchup_expand_when_hot_queue_empty(monkeypatch, tmp_path):
+  """When hot ZSET is empty, catchup_dispatch_cap is pool on the first pass."""
+  pool = 3
+  hot_cap = 2
+  catchup_cap = 1
+  inflight: dict[str, object] = {}
+  fill_log: list[dict[str, object]] = []
+
+  class _Client:
+    def ingest_count_in_score_range(self, lo, hi):
+      hi_f = float(hi)
+      if hi_f < 1e15:
+        return 0
+      return 200
+
+    def queued_count(self, kind):
+      del kind
+      return 200
+
+  def _fake_fill(
+    client,
+    *,
+    band,
+    cap,
+    inflight,
+    claims,
+    submitted,
+    ingest_pool,
+    band_cap=None,
+    **kw,
+  ):
+    del client, claims, submitted, ingest_pool, cap, kw
+    fill_log.append({"band": band, "band_cap": band_cap})
+    if band == "hot":
+      return 0
+    # hot_queued==0 → first catchup pass already gets band_cap=pool.
+    if band == "catchup" and band_cap == pool:
+      n = 0
+      for i in range(pool):
+        key = f"catch-expand-{i}"
+        if key not in inflight and len(inflight) < pool:
+          inflight[key] = object()
+          n += 1
+      return n
+    return 0
+
+  monkeypatch.setattr(qo, "_fill_ingest_band", _fake_fill)
+  did, hot_q, zcard, _hot_n = qo._ingest_coordinator_fill_tick(
+    client=_Client(),
+    pool_ref=qo.AtomicPoolRef(object()),
+    directory=str(tmp_path),
+    tgz_archive_dir=str(tmp_path),
+    hot_cap=hot_cap,
+    catchup_cap=catchup_cap,
+    ingest_pool_size=pool,
+    ingest_inflight=inflight,
+    ingest_leases={},
+    ingest_submitted={},
+    skip_budget=8,
+    fill_stats=qo._empty_ingest_fill_stats(),
+  )
+  assert hot_q == 0
+  assert did >= 2
+  assert len(inflight) == pool
+  assert any(
+    c["band"] == "catchup" and c["band_cap"] == pool for c in fill_log
+  ), fill_log
+  assert zcard == 200
+
+
+def test_reserved_hot_runs_when_catchup_overhangs_hot_cap(
+  monkeypatch, tmp_path
+):
+  """Reserved hot fills on hot_used, not total inflight vs hot_cap."""
+  pool = 3
+  hot_cap = 2
+  catchup_cap = 1
+  catch_score = float(jq.CATCHUP_SCORE_BASE) + 1.0
+  leases = {
+    "c0": type("C", (), {"score": catch_score})(),
+    "c1": type("C", (), {"score": catch_score + 1.0})(),
+  }
+  inflight: dict[str, object] = {"c0": object(), "c1": object()}
+  fill_log: list[dict[str, object]] = []
+
+  class _Client:
+    def ingest_count_in_score_range(self, lo, hi):
+      hi_f = float(hi)
+      if hi_f < 1e15:
+        return 40
+      return 100
+
+    def queued_count(self, kind):
+      del kind
+      return 140
+
+  def _fake_fill(
+    client,
+    *,
+    band,
+    cap,
+    inflight,
+    claims,
+    submitted,
+    ingest_pool,
+    band_cap=None,
+    **kw,
+  ):
+    del client, claims, submitted, ingest_pool, cap, kw
+    fill_log.append(
+      {
+        "band": band,
+        "band_cap": band_cap,
+        "inflight_before": len(inflight),
+      }
+    )
+    if band == "hot" and band_cap == hot_cap:
+      if "hot-res-0" not in inflight:
+        inflight["hot-res-0"] = object()
+        return 1
+      return 0
+    return 0
+
+  monkeypatch.setattr(qo, "_fill_ingest_band", _fake_fill)
+  did, hot_q, zcard, hot_n = qo._ingest_coordinator_fill_tick(
+    client=_Client(),
+    pool_ref=qo.AtomicPoolRef(object()),
+    directory=str(tmp_path),
+    tgz_archive_dir=str(tmp_path),
+    hot_cap=hot_cap,
+    catchup_cap=catchup_cap,
+    ingest_pool_size=pool,
+    ingest_inflight=inflight,
+    ingest_leases=leases,
+    ingest_submitted={},
+    skip_budget=8,
+    fill_stats=qo._empty_ingest_fill_stats(),
+  )
+  assert hot_q == 40
+  assert did >= 1
+  assert hot_n >= 1
+  assert "hot-res-0" in inflight
+  assert any(
+    c["band"] == "hot"
+    and c["band_cap"] == hot_cap
+    and int(c["inflight_before"]) >= hot_cap
+    for c in fill_log
+  ), fill_log
+  assert zcard == 140
 
 
 def test_reband_at_claim_moves_stale_hot_to_catchup(monkeypatch):
@@ -3849,7 +4006,8 @@ def test_ingest_claim_probe_depth_elevates_when_hot_deep():
   assert jq.ingest_claim_probe_depth(hot_q=500, pool=16) == 31
   fill_src = inspect.getsource(qo._ingest_coordinator_fill_tick)
   assert "min(64, max(int(probe_depth), 32))" in fill_src
-  assert "hot_submitted=0" in fill_src
+  assert 'band_used.get("hot"' in fill_src or "band_used.get('hot'" in fill_src
+  assert "hot_queued <= 0" in fill_src
 
 
 def test_dominant_ingest_fill_block_picks_max():
