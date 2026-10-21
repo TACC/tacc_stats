@@ -21,7 +21,7 @@ hpcperfstats_ensure_proxy_nginx_link_dirs() { :; }
 # Shared libmpdec/jemalloc/libffi: ThinLTO link of a .so needs PIC on LTO objects.
 hpcperfstats_shared_lib_namespace() {
   case "${1}" in
-    */jemalloc | web/shared/libffi | web/shared/mpdecimal) return 0 ;;
+    */jemalloc | */pcre2 | web/shared/libffi | web/shared/mpdecimal) return 0 ;;
     *) return 1 ;;
   esac
 }

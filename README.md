@@ -414,12 +414,14 @@ This is a container orchestration with Django/PostgreSQL, ingest/archival tools,
    Full-stack image rebuilds (including **proxy** and homemade **db_pg18**) use **`./scripts/rebuild_full_site.sh`**, which **`podman build`**s **web**, **proxy**, and **`db_pg18`** (Clang **22** ThinLTO via **`services-conf/bake_clang_flags.sh`** on Alpine **db/proxy** and Debian **`python-build`**), then **`podman-compose down`** and **`up -d --no-build`**. CPython always bakes with upstream **`--enable-optimizations`** (no custom Clang profile-guided rebuild flags). See **`docs/upgrade.md`**.
 
    The **`proxy`** image is **source-built** from **`services-conf/proxy.Dockerfile`**:
-   pinned **nginx 1.31.7**, **jemalloc**, **zlib-ng (ZLIB_COMPAT)**, **OpenSSL 3.5.x**,
+   pinned **nginx 1.31.8**, **PCRE2 10.49** under **`/opt/pcre2`** (shared + JIT; no apk
+   **`pcre2`**), **jemalloc**, **zlib-ng (ZLIB_COMPAT)**, **OpenSSL 3.5.x**,
    **ngx_brotli**, and **zstd 1.5.7** (static **`libzstd.a`** + GetPageSpeed
-   **zstd-nginx-module**), with **`-march=native -mtune=native`** on every source-built
-   lib (including OpenSSL **`--with-openssl-opt`**). **Build the proxy image on
-   the production host** (native flags are not portable across CPU generations). Do **not**
-   rely on Alpine edge apk nginx packages. The image **`COPY`**s **`nginx-main.conf`** and
+   **zstd-nginx-module**), with **`-march=native -mtune=native`** ThinLTO bake via
+   **`bake_clang_flags.sh`** on every source-built lib (including OpenSSL
+   **`--with-openssl-opt`**). Runtime keeps **`libstdc++`** for brotli. **Build the
+   proxy image on the production host** (native flags are not portable across CPU
+   generations). Do **not** rely on Alpine edge apk nginx packages. The image **`COPY`**s **`nginx-main.conf`** and
    **`cp`**s **`nginx.conf`** into **`default.conf`** at **build** time for a
    non-Compose baseline, generates **`hps-proxy-allowed-hosts.inc`** from
    **`[DEFAULT] server=`**, and ships **`proxy_entrypoint.sh`** plus the TLS/resolver

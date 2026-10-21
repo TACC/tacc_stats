@@ -666,9 +666,31 @@ def test_proxy_dockerfile_source_builds_nginx_with_pinned_deps():
   """Regression: proxy must SHA-pin source nginx/jemalloc/zlib-ng/OpenSSL/brotli; no apk edge nginx."""
   repo_root = Path(__file__).resolve().parents[2]
   dockerfile = (repo_root / "services-conf" / "proxy.Dockerfile").read_text()
-  assert "ARG NGINX_VERSION=1.31.7" in dockerfile
-  assert dockerfile.count("ARG NGINX_VERSION=1.31.7") == 2
-  assert "ARG NGINX_SHA256=" in dockerfile
+  assert "ARG NGINX_VERSION=1.31.8" in dockerfile
+  assert dockerfile.count("ARG NGINX_VERSION=1.31.8") == 2
+  assert (
+    "ARG NGINX_SHA256=0652b760b3b772d2ec17b47c2fc15d9a95e6fe35cd5b877eadc1a62d9bc75af1"
+    in dockerfile
+  )
+  assert "ARG PCRE2_VERSION=10.49" in dockerfile
+  assert (
+    "ARG PCRE2_SHA256=53c156e1ba416a20da8e65395daa132da0d80e76910424caca3fcdae7831d384"
+    in dockerfile
+  )
+  assert "/opt/pcre2" in dockerfile
+  assert "-lpcre2-8" in dockerfile
+  assert "hpcperfstats_bake_cflags proxy/pcre2" in dockerfile
+  assert "--enable-jit" in dockerfile
+  assert "  --with-pcre \\" not in dockerfile
+  assert "pcre2-dev" not in dockerfile
+  # Runtime: source /opt/pcre2 only — no apk pcre2; keep libstdc++ for brotli.
+  runtime_apk = dockerfile.split("FROM alpine:${ALPINE_VERSION}")[-1]
+  assert re.search(r"(?m)^\s+pcre2\s*\\?\s*$", runtime_apk) is None
+  assert "apk info -e pcre2" in dockerfile
+  assert "COPY --from=proxy-build /opt/pcre2" in dockerfile
+  assert "libstdc++" in runtime_apk
+  assert "-lstdc++" in dockerfile
+  assert "/opt/libc++" not in dockerfile
   assert "ARG JEMALLOC_VERSION=5.4.0" in dockerfile
   assert "ARG JEMALLOC_SHA256=" in dockerfile
   assert (
@@ -773,8 +795,16 @@ def test_proxy_dockerfile_source_builds_nginx_with_pinned_deps():
     )
   ]
   assert (
-    'nginx_bake_cflags="${_cflags} -I/opt/zstd/include -DZLIB_COMPAT"'
+    'nginx_bake_cflags="${_cflags} -I/opt/zstd/include -I/opt/pcre2/include -DZLIB_COMPAT"'
     in nginx_run
+  )
+  assert "-L/opt/pcre2/lib" in nginx_run
+  assert "PKG_CONFIG_PATH=" in nginx_run
+  assert "grep -F /opt/pcre2" in nginx_run
+  # Regression: '/lib/libpcre2' false-positive matches /opt/pcre2/lib/libpcre2-*.so
+  assert "=> (/usr)?/lib/libpcre2" in dockerfile
+  assert "grep -E '/usr/lib/libpcre2|/lib/libpcre2'" not in dockerfile, (
+    "apk pcre2 leak guard must not substring-match /opt/pcre2/lib/"
   )
   assert "hpcperfstats_ensure_proxy_nginx_link_dirs" in nginx_run
   zlib_run = dockerfile[

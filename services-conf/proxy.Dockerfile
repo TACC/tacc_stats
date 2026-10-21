@@ -16,8 +16,10 @@ COPY services-conf/clang_march_native_probe.sh /usr/local/lib/hpcperfstats/clang
 RUN chmod +x /usr/local/lib/hpcperfstats/bake_clang_flags.sh /usr/local/lib/hpcperfstats/clang_march_native_probe.sh
 
 # nginx and /opt deps: unified -O2 ThinLTO bake (+ ThinLTO via bake_clang_flags.sh).
-ARG NGINX_VERSION=1.31.7
-ARG NGINX_SHA256=89ea8a3dc171511f7325043b50e4c036248d9fad5feb7ec809c0b82d5df42c65
+ARG NGINX_VERSION=1.31.8
+ARG NGINX_SHA256=0652b760b3b772d2ec17b47c2fc15d9a95e6fe35cd5b877eadc1a62d9bc75af1
+ARG PCRE2_VERSION=10.49
+ARG PCRE2_SHA256=53c156e1ba416a20da8e65395daa132da0d80e76910424caca3fcdae7831d384
 ARG OPENSSL_VERSION=3.5.9
 ARG OPENSSL_SHA256=603f5602e2eef00d77fbd429d34dcd5822bb301757a1bc9cdb24c670f1eb859a
 ARG JEMALLOC_VERSION=5.4.0
@@ -36,6 +38,8 @@ ARG ZSTD_NGINX_MODULE_SHA256=d4db8937f035ebb5e7efca833492611f8f5e4f710dbd3fbdd2f
 # Quoted heredoc (<<'BASH') disables BuildKit host $(…) expansion; pins resolve from ENV at RUN time.
 ENV NGINX_VERSION=${NGINX_VERSION} \
     NGINX_SHA256=${NGINX_SHA256} \
+    PCRE2_VERSION=${PCRE2_VERSION} \
+    PCRE2_SHA256=${PCRE2_SHA256} \
     OPENSSL_VERSION=${OPENSSL_VERSION} \
     OPENSSL_SHA256=${OPENSSL_SHA256} \
     JEMALLOC_VERSION=${JEMALLOC_VERSION} \
@@ -64,7 +68,6 @@ RUN apk add --no-cache \
     cmake \
     curl \
     linux-headers \
-    pcre2-dev \
     perl
 
 RUN test -x /usr/bin/ld.lld
@@ -235,6 +238,40 @@ test -f /usr/src/zstd-nginx-module/config
 rm -rf /usr/src/zstd /tmp/zstd.tar.gz /tmp/zstd-nginx-module.tar.gz
 BASH
 
+# --- PCRE2 (shared + JIT under /opt/pcre2; nginx links via pkg-config / -lpcre2-8) ---
+RUN \
+  /bin/bash -o pipefail -s <<'BASH'
+set -eux
+_cf_cfg="$(hpcperfstats_configure_cflags proxy/pcre2)"
+_cf_bake="$(hpcperfstats_bake_cflags proxy/pcre2)"
+_lto_ld="$(hpcperfstats_alpine_thinlto_ldflags)"
+hpcperfstats_alpine_jemalloc_export_link_toolchain
+curl -fsSL "https://github.com/PCRE2Project/pcre2/releases/download/pcre2-${PCRE2_VERSION}/pcre2-${PCRE2_VERSION}.tar.bz2" \
+  -o /tmp/pcre2.tar.bz2
+echo "${PCRE2_SHA256}  /tmp/pcre2.tar.bz2" | sha256sum -c -
+mkdir -p /usr/src/pcre2
+tar -xjf /tmp/pcre2.tar.bz2 -C /usr/src/pcre2 --strip-components=1
+cd /usr/src/pcre2
+AR="${AR}" RANLIB="${RANLIB}" NM="${NM}" CC="${CC}" CXX="${CXX}" \
+  CFLAGS="${_cf_cfg}" CXXFLAGS="${_cf_cfg}" \
+  ./configure --prefix=/opt/pcre2 \
+    --enable-shared \
+    --disable-static \
+    --enable-jit \
+    --enable-pcre2-8 \
+    --disable-pcre2-16 \
+    --disable-pcre2-32
+make -j"$(nproc)" CC="${CC}" CXX="${CXX}" CFLAGS="${_cf_bake}" CXXFLAGS="${_cf_bake}" \
+  LDFLAGS="${_lto_ld}" EXTRA_LDFLAGS="${_lto_ld}" \
+  AR="${AR}" RANLIB="${RANLIB}" NM="${NM}"
+make install CC="${CC}" CXX="${CXX}" CFLAGS="${_cf_bake}" CXXFLAGS="${_cf_bake}" \
+  LDFLAGS="${_lto_ld}" EXTRA_LDFLAGS="${_lto_ld}" \
+  AR="${AR}" RANLIB="${RANLIB}" NM="${NM}"
+test -f /opt/pcre2/lib/libpcre2-8.so
+test -x /opt/pcre2/bin/pcre2-config
+rm -rf /usr/src/pcre2 /tmp/pcre2.tar.bz2
+BASH
+
 # --- nginx ---
 RUN \
   /bin/bash -o pipefail -s <<'BASH'
@@ -243,6 +280,7 @@ hpcperfstats_ensure_proxy_nginx_link_dirs
 _cflags="$(hpcperfstats_bake_cflags proxy/nginx)"
 _openssl_cflags="$(hpcperfstats_native_base_cflags)"
 test -f /usr/src/zlib-ng/libz.a
+test -f /opt/pcre2/lib/libpcre2-8.so
 curl -fsSL "https://nginx.org/download/nginx-${NGINX_VERSION}.tar.gz" \
   -o /tmp/nginx.tar.gz
 echo "${NGINX_SHA256}  /tmp/nginx.tar.gz" | sha256sum -c -
@@ -251,8 +289,12 @@ tar -xzf /tmp/nginx.tar.gz -C /usr/src/nginx --strip-components=1
 cd /usr/src/nginx
 export ZSTD_INC=/opt/zstd/include
 export ZSTD_LIB=/opt/zstd/lib
-nginx_bake_cflags="${_cflags} -I/opt/zstd/include -DZLIB_COMPAT"
+export PATH="/opt/pcre2/bin:${PATH}"
+export PKG_CONFIG_PATH="/opt/pcre2/lib/pkgconfig${PKG_CONFIG_PATH:+:$PKG_CONFIG_PATH}"
+export LD_LIBRARY_PATH="/opt/pcre2/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+nginx_bake_cflags="${_cflags} -I/opt/zstd/include -I/opt/pcre2/include -DZLIB_COMPAT"
 # libzstd.a via zstd-nginx-module. Same ThinLTO flags at configure and make.
+# nginx 1.31 has no --with-pcre2=; wire system PCRE2 via pkg-config + -I/-L/-lpcre2-8.
 ./configure \
   --prefix=/opt/nginx \
   --sbin-path=/usr/sbin/nginx \
@@ -272,13 +314,12 @@ nginx_bake_cflags="${_cflags} -I/opt/zstd/include -DZLIB_COMPAT"
   --with-http_v2_module \
   --with-http_gzip_static_module \
   --with-http_stub_status_module \
-  --with-pcre \
   --add-module=../ngx_brotli \
   --add-module=../zstd-nginx-module \
   --with-openssl=../openssl-${OPENSSL_VERSION} \
   --with-zlib=../zlib-ng \
-  --with-cc-opt="${_cflags} -I/opt/zstd/include" \
-  --with-ld-opt="-L/opt/jemalloc/lib -L/opt/brotli/lib -Wl,-rpath,/opt/jemalloc/lib -ljemalloc -lbrotlienc -lbrotlidec -lbrotlicommon -lstdc++ --ld-path=/usr/bin/ld.lld" \
+  --with-cc-opt="${_cflags} -I/opt/zstd/include -I/opt/pcre2/include" \
+  --with-ld-opt="-L/opt/jemalloc/lib -L/opt/brotli/lib -L/opt/pcre2/lib -Wl,-rpath,/opt/jemalloc/lib -Wl,-rpath,/opt/pcre2/lib -ljemalloc -lbrotlienc -lbrotlidec -lbrotlicommon -lpcre2-8 -lstdc++ --ld-path=/usr/bin/ld.lld" \
   --with-openssl-opt="no-nextprotoneg no-weak-ssl-ciphers no-ssl3 no-shared no-fuzz-afl no-fuzz-libfuzzer no-tests no-apps enable-ec_nistp_64_gcc_128 ${_openssl_cflags}" \
   --with-zlib-opt="--zlib-compat"
 # objs/Makefile builds ../openssl-* and ../zlib-ng in parallel; zlib-ng distclean races
@@ -316,8 +357,13 @@ grep -Fi brotli /tmp/nginx-V.txt
 grep -Fi zstd /tmp/nginx-V.txt
 ldd /usr/sbin/nginx | tee /tmp/nginx-ldd.txt
 grep -F /opt/jemalloc /tmp/nginx-ldd.txt
+grep -F /opt/pcre2 /tmp/nginx-ldd.txt
 if grep -E '/usr/lib/libzstd|/lib/libzstd' /tmp/nginx-ldd.txt; then
   echo "apk libzstd leaked into nginx"; exit 1
+fi
+# Match resolved path only (=> /usr/lib|=> /lib). Naive /lib/libpcre2 also hits /opt/pcre2/lib/.
+if grep -E '=> (/usr)?/lib/libpcre2' /tmp/nginx-ldd.txt; then
+  echo "apk libpcre2 leaked into nginx"; exit 1
 fi
 # llvm22-dev pulls zstd apk in proxy-build; runtime stage enforces no apk zstd.
 grep -F /opt/jemalloc /tmp/nginx-ldd.txt
@@ -328,13 +374,12 @@ BASH
 # ---------------------------------------------------------------------------
 FROM alpine:${ALPINE_VERSION}
 
-ARG NGINX_VERSION=1.31.7
+ARG NGINX_VERSION=1.31.8
 
 RUN apk add --no-cache \
     ca-certificates \
     libstdc++ \
     netcat-openbsd \
-    pcre2 \
     python3 \
  && update-ca-certificates \
  && addgroup -S nginx \
@@ -353,6 +398,7 @@ RUN apk add --no-cache \
  && chown -R nginx:nginx /var/log/nginx /var/lib/nginx /run/nginx
 
 COPY --from=proxy-build /opt/jemalloc /opt/jemalloc
+COPY --from=proxy-build /opt/pcre2 /opt/pcre2
 COPY --from=proxy-build /opt/nginx /opt/nginx
 COPY --from=proxy-build /usr/sbin/nginx /usr/sbin/nginx
 
@@ -363,22 +409,28 @@ RUN set -eux; \
   # jemalloc make install already ships libjemalloc.so.2; do not ln -sf it onto itself.
   test -e /opt/jemalloc/lib/libjemalloc.so.2; \
   ls -la /opt/jemalloc/lib/libjemalloc.so*; \
+  test -f /opt/pcre2/lib/libpcre2-8.so; \
   nginx -V 2>&1 | tee /tmp/nginx-V-runtime.txt; \
   grep -F "nginx/${NGINX_VERSION}" /tmp/nginx-V-runtime.txt; \
   grep -Fi zstd /tmp/nginx-V-runtime.txt; \
   ldd /usr/sbin/nginx | tee /tmp/nginx-ldd-runtime.txt; \
   grep -F /opt/jemalloc /tmp/nginx-ldd-runtime.txt; \
+  grep -F /opt/pcre2 /tmp/nginx-ldd-runtime.txt; \
   if grep -E '/usr/lib/libzstd|/lib/libzstd' /tmp/nginx-ldd-runtime.txt; then \
     echo "apk libzstd leaked into runtime nginx"; exit 1; \
   fi; \
+  if grep -E '=> (/usr)?/lib/libpcre2' /tmp/nginx-ldd-runtime.txt; then \
+    echo "apk libpcre2 leaked into runtime nginx"; exit 1; \
+  fi; \
   grep -F /opt/jemalloc /tmp/nginx-ldd-runtime.txt; \
-  # Fail closed: never ship apk nginx packages.
+  # Fail closed: never ship apk nginx / pcre2 packages.
   if apk info -e nginx >/dev/null 2>&1; then echo "apk nginx present"; exit 1; fi; \
   if apk info -e nginx-mod-http-brotli >/dev/null 2>&1; then echo "apk brotli mod present"; exit 1; fi; \
+  if apk info -e pcre2 >/dev/null 2>&1; then echo "apk pcre2 present"; exit 1; fi; \
   rm -f /tmp/nginx-V-runtime.txt /tmp/nginx-ldd-runtime.txt
 
 ENV LD_PRELOAD=/opt/jemalloc/lib/libjemalloc.so.2
-ENV LD_LIBRARY_PATH=/opt/jemalloc/lib
+ENV LD_LIBRARY_PATH=/opt/jemalloc/lib:/opt/pcre2/lib
 
 # Shared nginx snippets (static-files, edge headers, CSP, django-proxy-common) are
 # compose bind-mounts only — do not COPY them here or they drift from mounts.
