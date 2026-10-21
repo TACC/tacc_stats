@@ -4,9 +4,13 @@ Native ``import numpy`` (Codon-NumPy). No ``from python import numpy`` /
 pandas on the hot path. Mirrors IncrementalStatsParser feed + the plain
 host groupby-sum branch of ``_collapse_stats_with_deltas`` (GPU / ``j:``
 paths stay on CPython until parity locks them).
+
+Class-free for Codon 0.20.4 ``-pyext`` (no custom ``class`` / ``__to_py__``).
+Schema columns are a 4-tuple of parallel lists; feed state is free functions
+over mutable lists/dicts; ``HOST_PROC_KEYS`` stays module-level only.
 """
 
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Tuple
 
 import numpy as np
 
@@ -28,6 +32,9 @@ HOST_PROC_KEYS = [
     "vm_swap",
     "threads",
 ]
+
+# SchemaCols: (events, wids, mults, units)
+SchemaCols = Tuple[List[str], List[int], List[float], List[str]]
 
 
 def schema_key_basename(token: str) -> str:
@@ -73,65 +80,18 @@ def _compile_schema_token(token: str) -> Tuple[str, int, float, str]:
   return eve_parts[0], width, mult, unit
 
 
-class CompiledSchema:
-  events: List[str]
-  wids: List[int]
-  mults: List[float]
-  units: List[str]
-
-  def __init__(self):
-    self.events = []
-    self.wids = []
-    self.mults = []
-    self.units = []
-
-
-def _compile_schema_tokens(tokens: List[str]) -> CompiledSchema:
-  out = CompiledSchema()
+def _compile_schema_tokens(tokens: List[str]) -> SchemaCols:
+  events: List[str] = []
+  wids: List[int] = []
+  mults: List[float] = []
+  units: List[str] = []
   for token in tokens:
     event, wid, mult, unit = _compile_schema_token(token)
-    out.events.append(event)
-    out.wids.append(wid)
-    out.mults.append(mult)
-    out.units.append(unit)
-  return out
-
-
-class ProcRow:
-  jid: str
-  host: str
-  proc: str
-  uid: Optional[int]
-  vm_peak: Optional[int]
-  vm_size: Optional[int]
-  vm_lck: Optional[int]
-  vm_hwm: Optional[int]
-  vm_rss: Optional[int]
-  vm_data: Optional[int]
-  vm_stk: Optional[int]
-  vm_exe: Optional[int]
-  vm_lib: Optional[int]
-  vm_pte: Optional[int]
-  vm_swap: Optional[int]
-  threads: Optional[int]
-
-  def __init__(self):
-    self.jid = ""
-    self.host = ""
-    self.proc = ""
-    self.uid = None
-    self.vm_peak = None
-    self.vm_size = None
-    self.vm_lck = None
-    self.vm_hwm = None
-    self.vm_rss = None
-    self.vm_data = None
-    self.vm_stk = None
-    self.vm_exe = None
-    self.vm_lib = None
-    self.vm_pte = None
-    self.vm_swap = None
-    self.threads = None
+    events.append(event)
+    wids.append(wid)
+    mults.append(mult)
+    units.append(unit)
+  return (events, wids, mults, units)
 
 
 def _cpu_e6_schema_tokens() -> List[str]:
@@ -163,7 +123,6 @@ def build_e6_payload_lines(n_samples: int) -> List[str]:
     for k in range(7):
       vals.append(str(float(i * 7 + k)))
     lines.append("cpu 0 @full " + " ".join(vals))
-    # Second device -> collapse must sum across dev for non-GPU.
     vals2 = []
     for k in range(7):
       vals2.append(str(float(i * 7 + k + 0.5)))
@@ -195,138 +154,143 @@ def build_e6_payload_lines(n_samples: int) -> List[str]:
   return lines
 
 
-class FeedKernel:
-  start_idx: int
-  insert: bool
-  has_tags: bool
-  tag_time: float
-  tag_jid: str
-  tag_host: str
-  schema: Dict[str, List[str]]
-  schema_fast: Dict[str, List[str]]
-  schema_compiled: Dict[str, CompiledSchema]
-  schema_fast_compiled: Dict[str, CompiledSchema]
-  schema_bare: Dict[str, List[str]]
-  schema_fast_bare: Dict[str, List[str]]
-  stats_time: List[float]
-  stats_host: List[str]
-  stats_jid: List[str]
-  stats_type: List[str]
-  stats_dev: List[str]
-  stats_event: List[str]
-  stats_value: List[float]
-  stats_wid: List[int]
-  stats_mult: List[float]
-  stats_unit: List[str]
-  proc_rows: List[ProcRow]
-  _proc_by_key: Dict[str, int]
+def _append_stats(
+    tag_time: float,
+    tag_host: str,
+    tag_jid: str,
+    typ: str,
+    dev: str,
+    compiled: SchemaCols,
+    vals: List[str],
+    stats_time: List[float],
+    stats_host: List[str],
+    stats_jid: List[str],
+    stats_type: List[str],
+    stats_dev: List[str],
+    stats_event: List[str],
+    stats_value: List[float],
+    stats_wid: List[int],
+    stats_mult: List[float],
+    stats_unit: List[str],
+) -> None:
+  events, wids, mults, units = compiled
+  n = len(events)
+  m = len(vals)
+  use = n if n < m else m
+  for i in range(use):
+    stats_time.append(tag_time)
+    stats_host.append(tag_host)
+    stats_jid.append(tag_jid)
+    stats_type.append(typ)
+    stats_dev.append(dev)
+    stats_event.append(events[i])
+    stats_value.append(float(vals[i]) * mults[i])
+    stats_wid.append(wids[i])
+    stats_mult.append(mults[i])
+    stats_unit.append(units[i])
 
-  def __init__(self, start_idx: int):
-    self.start_idx = start_idx
-    self.insert = False
-    self.has_tags = False
-    self.tag_time = 0.0
-    self.tag_jid = ""
-    self.tag_host = ""
-    self.schema = {}
-    self.schema_fast = {}
-    self.schema_compiled = {}
-    self.schema_fast_compiled = {}
-    self.schema_bare = {}
-    self.schema_fast_bare = {}
-    self.stats_time = []
-    self.stats_host = []
-    self.stats_jid = []
-    self.stats_type = []
-    self.stats_dev = []
-    self.stats_event = []
-    self.stats_value = []
-    self.stats_wid = []
-    self.stats_mult = []
-    self.stats_unit = []
-    self.proc_rows = []
-    self._proc_by_key = {}
 
-  def _compiled_schema_for(self, typ: str, fast: bool) -> CompiledSchema:
-    if fast:
-      return self.schema_fast_compiled[typ]
-    return self.schema_compiled[typ]
+def _merge_proc(
+    jid: str,
+    host: str,
+    proc: str,
+    fields: Dict[str, int],
+    proc_jid: List[str],
+    proc_host: List[str],
+    proc_proc: List[str],
+    proc_fields: List[Dict[str, int]],
+    proc_by_key: Dict[str, int],
+) -> None:
+  key = jid + "\0" + host + "\0" + proc
+  idx = proc_by_key.get(key, -1)
+  if idx < 0:
+    proc_by_key[key] = len(proc_jid)
+    proc_jid.append(jid)
+    proc_host.append(host)
+    proc_proc.append(proc)
+    proc_fields.append(fields)
+    return
+  old = proc_fields[idx]
+  for peak_key in ("vm_peak", "vm_hwm", "vm_stk", "vm_exe", "vm_lib"):
+    if peak_key in fields:
+      nv = fields[peak_key]
+      if peak_key not in old or nv > old[peak_key]:
+        old[peak_key] = nv
+  if "vm_rss" in fields:
+    old["vm_rss"] = fields["vm_rss"]
+  if "threads" in fields:
+    old["threads"] = fields["threads"]
 
-  def _append_stats(
-      self, typ: str, dev: str, compiled: CompiledSchema, vals: List[str]
-  ):
-    n = len(compiled.events)
-    m = len(vals)
-    use = n if n < m else m
-    for i in range(use):
-      self.stats_time.append(self.tag_time)
-      self.stats_host.append(self.tag_host)
-      self.stats_jid.append(self.tag_jid)
-      self.stats_type.append(typ)
-      self.stats_dev.append(dev)
-      self.stats_event.append(compiled.events[i])
-      self.stats_value.append(float(vals[i]) * compiled.mults[i])
-      self.stats_wid.append(compiled.wids[i])
-      self.stats_mult.append(compiled.mults[i])
-      self.stats_unit.append(compiled.units[i])
 
-  def _merge_proc(self, row: ProcRow):
-    key = row.jid + "\0" + row.host + "\0" + row.proc
-    idx = self._proc_by_key.get(key, -1)
-    if idx < 0:
-      self._proc_by_key[key] = len(self.proc_rows)
-      self.proc_rows.append(row)
-      return
-    old = self.proc_rows[idx]
-    if row.vm_peak is not None:
-      if old.vm_peak is None or row.vm_peak > old.vm_peak:
-        old.vm_peak = row.vm_peak
-    if row.vm_hwm is not None:
-      if old.vm_hwm is None or row.vm_hwm > old.vm_hwm:
-        old.vm_hwm = row.vm_hwm
-    if row.vm_stk is not None:
-      if old.vm_stk is None or row.vm_stk > old.vm_stk:
-        old.vm_stk = row.vm_stk
-    if row.vm_exe is not None:
-      if old.vm_exe is None or row.vm_exe > old.vm_exe:
-        old.vm_exe = row.vm_exe
-    if row.vm_lib is not None:
-      if old.vm_lib is None or row.vm_lib > old.vm_lib:
-        old.vm_lib = row.vm_lib
-    if row.vm_rss is not None:
-      old.vm_rss = row.vm_rss
-    if row.threads is not None:
-      old.threads = row.threads
+def feed_lines(
+    lines: List[str],
+    start_idx: int = 0,
+) -> Tuple[
+    List[float],
+    List[str],
+    List[str],
+    List[str],
+    List[str],
+    List[str],
+    List[float],
+    List[int],
+    List[float],
+    List[str],
+    int,
+]:
+  """Parse stats lines into columnar lists; return columns + proc row count."""
+  insert = False
+  has_tags = False
+  tag_time = 0.0
+  tag_jid = ""
+  tag_host = ""
+  schema: Dict[str, List[str]] = {}
+  schema_fast: Dict[str, List[str]] = {}
+  schema_compiled: Dict[str, SchemaCols] = {}
+  schema_fast_compiled: Dict[str, SchemaCols] = {}
+  schema_bare: Dict[str, List[str]] = {}
+  schema_fast_bare: Dict[str, List[str]] = {}
+  stats_time: List[float] = []
+  stats_host: List[str] = []
+  stats_jid: List[str] = []
+  stats_type: List[str] = []
+  stats_dev: List[str] = []
+  stats_event: List[str] = []
+  stats_value: List[float] = []
+  stats_wid: List[int] = []
+  stats_mult: List[float] = []
+  stats_unit: List[str] = []
+  proc_jid: List[str] = []
+  proc_host: List[str] = []
+  proc_proc: List[str] = []
+  proc_fields: List[Dict[str, int]] = []
+  proc_by_key: Dict[str, int] = {}
 
-  def feed_line(self, s: str):
+  for s in lines:
     if not s:
-      return
-    i = self.start_idx
-    if self.insert and self.has_tags:
+      continue
+    if insert and has_tags:
       if s[0].isalpha() or s[0] == "_":
         parts = s.split()
         if len(parts) < 2:
-          return
+          continue
         typ = parts[0]
         rest = parts[1:]
         if not rest:
-          return
+          continue
         dev = rest[0]
         vals = rest[1:]
         if typ == "host_proc":
           if not vals:
-            return
+            continue
           tier = ""
           if vals[0] == "@fast" or vals[0] == "@full":
             tier = vals[0]
             vals = vals[1:]
-          bare_keys = self.schema_bare.get("host_proc", HOST_PROC_KEYS)
+          bare_keys = schema_bare.get("host_proc", HOST_PROC_KEYS)
           if tier == "@fast":
-            bare_keys = self.schema_fast_bare.get("host_proc", bare_keys)
-          row = ProcRow()
-          row.jid = self.tag_jid
-          row.host = self.tag_host
-          row.proc = dev
+            bare_keys = schema_fast_bare.get("host_proc", bare_keys)
+          fields: Dict[str, int] = {}
           for bi in range(len(bare_keys)):
             if bi >= len(vals):
               break
@@ -335,82 +299,93 @@ class FeedKernel:
               parsed = int(float(vals[bi]))
             except Exception:
               continue
-            if bare == "uid":
-              row.uid = parsed
-            elif bare == "vm_peak":
-              row.vm_peak = parsed
-            elif bare == "vm_size":
-              row.vm_size = parsed
-            elif bare == "vm_lck":
-              row.vm_lck = parsed
-            elif bare == "vm_hwm":
-              row.vm_hwm = parsed
-            elif bare == "vm_rss":
-              row.vm_rss = parsed
-            elif bare == "vm_data":
-              row.vm_data = parsed
-            elif bare == "vm_stk":
-              row.vm_stk = parsed
-            elif bare == "vm_exe":
-              row.vm_exe = parsed
-            elif bare == "vm_lib":
-              row.vm_lib = parsed
-            elif bare == "vm_pte":
-              row.vm_pte = parsed
-            elif bare == "vm_swap":
-              row.vm_swap = parsed
-            elif bare == "threads":
-              row.threads = parsed
-          self._merge_proc(row)
-          return
-        if typ not in self.schema:
-          return
+            fields[bare] = parsed
+          _merge_proc(
+              tag_jid,
+              tag_host,
+              dev,
+              fields,
+              proc_jid,
+              proc_host,
+              proc_proc,
+              proc_fields,
+              proc_by_key,
+          )
+          continue
+        if typ not in schema:
+          continue
         tier_marker = ""
         if vals and (vals[0] == "@fast" or vals[0] == "@full"):
           tier_marker = vals[0]
           vals = vals[1:]
-        if not self.has_tags:
-          return
-        compiled = self._compiled_schema_for(typ, tier_marker == "@fast")
-        self._append_stats(typ, dev, compiled, vals)
-        return
+        if not has_tags:
+          continue
+        if tier_marker == "@fast":
+          compiled = schema_fast_compiled[typ]
+        else:
+          compiled = schema_compiled[typ]
+        _append_stats(
+            tag_time,
+            tag_host,
+            tag_jid,
+            typ,
+            dev,
+            compiled,
+            vals,
+            stats_time,
+            stats_host,
+            stats_jid,
+            stats_type,
+            stats_dev,
+            stats_event,
+            stats_value,
+            stats_wid,
+            stats_mult,
+            stats_unit,
+        )
+        continue
 
-    if i >= self.start_idx and s[0].isdigit():
+    if start_idx >= 0 and s[0].isdigit():
       parts = s.split()
       if len(parts) < 3:
-        return
-      self.insert = True
-      self.tag_time = float(parts[0])
-      self.tag_jid = parts[1]
-      self.tag_host = parts[2]
-      self.has_tags = True
+        continue
+      insert = True
+      tag_time = float(parts[0])
+      tag_jid = parts[1]
+      tag_host = parts[2]
+      has_tags = True
     elif s[0] == "!":
       pieces = s.split()
       if len(pieces) < 2:
-        return
+        continue
       typ = pieces[0][1:]
       ev_list = pieces[1:]
-      self.schema[typ] = ev_list
-      self.schema_fast[typ] = _fast_schema_keys(ev_list)
-      self.schema_compiled[typ] = _compile_schema_tokens(ev_list)
-      self.schema_fast_compiled[typ] = _compile_schema_tokens(
-          self.schema_fast[typ],
-      )
+      schema[typ] = ev_list
+      schema_fast[typ] = _fast_schema_keys(ev_list)
+      schema_compiled[typ] = _compile_schema_tokens(ev_list)
+      schema_fast_compiled[typ] = _compile_schema_tokens(schema_fast[typ])
       bare: List[str] = []
       for tok in ev_list:
         bare.append(schema_key_basename(tok))
-      self.schema_bare[typ] = bare
+      schema_bare[typ] = bare
       bare_fast: List[str] = []
-      for tok in self.schema_fast[typ]:
+      for tok in schema_fast[typ]:
         bare_fast.append(schema_key_basename(tok))
-      self.schema_fast_bare[typ] = bare_fast
+      schema_fast_bare[typ] = bare_fast
 
-  def feed_lines(self, lines: List[str]):
-    for line in lines:
-      self.feed_line(line)
-
-  def stats_len(self) -> int:
-    return len(self.stats_time)
+  return (
+      stats_time,
+      stats_host,
+      stats_jid,
+      stats_type,
+      stats_dev,
+      stats_event,
+      stats_value,
+      stats_wid,
+      stats_mult,
+      stats_unit,
+      len(proc_jid),
+  )
 
 
 def collapse_plain_host_sum(
@@ -477,7 +452,6 @@ def collapse_plain_host_sum(
     else:
       sums[pos] = sums[pos] + values[i]
 
-  # Codon-NumPy touch: fused total over collapsed values (compile path proof).
   buf = np.zeros(len(sums), dtype=float)
   for i in range(len(sums)):
     buf[i] = sums[i]
@@ -487,32 +461,44 @@ def collapse_plain_host_sum(
 
 def feed_and_collapse(lines: List[str]) -> Tuple[int, int, float, float]:
   """Feed lines then plain-host collapse; return fingerprint + collapse rows."""
-  k = FeedKernel(0)
-  k.feed_lines(lines)
+  (
+      stats_time,
+      stats_host,
+      _stats_jid,
+      stats_type,
+      _stats_dev,
+      stats_event,
+      stats_value,
+      _stats_wid,
+      _stats_mult,
+      stats_unit,
+      proc_count,
+  ) = feed_lines(lines, 0)
   gpu = ["nvidia_gpu", "amd_gpu", "intel_gpu"]
   oh, ot, oe, ou, oti, vals = collapse_plain_host_sum(
-      k.stats_host,
-      k.stats_type,
-      k.stats_event,
-      k.stats_unit,
-      k.stats_time,
-      k.stats_value,
+      stats_host,
+      stats_type,
+      stats_event,
+      stats_unit,
+      stats_time,
+      stats_value,
       gpu,
   )
   value_sum = 0.0
   for v in vals:
     value_sum += float(v)
-  return (len(k.stats_time), len(oh), float(value_sum), float(len(k.proc_rows)))
+  return (len(stats_time), len(oh), float(value_sum), float(proc_count))
 
 
 def feed_and_collapse_fingerprint(
     lines: List[str],
 ) -> Tuple[int, int, float, float]:
-  """pyext alias used by sync_timedb_codon_bridge."""
+  """pyext export used by sync_timedb_codon_bridge."""
   return feed_and_collapse(lines)
 
 
 def main():
+  """Bench entry for ``codon run`` / ``feed_collapse_bench.py`` (not pyext import)."""
   import time
 
   lines = build_e6_payload_lines(N_SAMPLES)
@@ -542,5 +528,8 @@ def main():
   )
 
 
-if __name__ == "__main__":
+# pyext must not auto-run main (Codon may treat ``__main__`` as true at import).
+# Bench scripts sed this to True before ``codon run``.
+RUN_MAIN = False
+if RUN_MAIN:
   main()

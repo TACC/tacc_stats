@@ -201,9 +201,11 @@ See also (listend note retained):
 
 When `hpcperfstats_codon_parse` pyext is **not** on `PYTHONPATH` / `LD_LIBRARY_PATH`, ingest stays on CPython `IncrementalStatsParser` (fail-closed). No stall signature change.
 
-When the extension **is** loaded (fingerprint API or full `parse_stats_lines_codon`):
+**FT ABI note (2026-10-21):** Codon 0.20.4 class-free pyext loads under GIL `/opt/python3.14` after post-link (`codon_pyext_gil=pass`). Import under free-threaded `/opt/python3.14t` currently segfaults in `PyInit_*` (`codon_pyext_314t=fail_ft_abi`). Pipeline daemons stay on 3.14t with fail-closed CPython until that ABI gap is fixed — do **not** put the GIL-only `.so` on the pipeline `PYTHONPATH`.
 
-1. Confirm process ABI is still **`/opt/python3.14t/bin/python`** (`readlink /proc/<sync_timedb pid>/exe`).
+When the extension **is** loaded on a compatible ABI (fingerprint API or full `parse_stats_lines_codon`):
+
+1. Confirm process ABI is still **`/opt/python3.14t/bin/python`** (`readlink /proc/<sync_timedb pid>/exe`) and that Codon import does **not** crash the worker.
 2. Grep for Codon fallback warnings: `codon feed_and_collapse failed` / `codon parse extension unavailable` — sustained flood means disable via `HPCPERFSTATS_CODON_PARSE_DISABLE=1` (test/soak) or remove the `.so` and redeploy CPython-only.
 3. A/B proof remains offline: `experiments/codon/run_codon_ab_baseline.sh` → `test_runs/codon_ab_*.log` with `gate_1p25x=True` (see `docs/plans/CODON_SYNC_TIMEDB_COMPILE_BASELINE.md`). Do **not** treat Codon as a stall fix for day_close / lock / discover hangs.
 

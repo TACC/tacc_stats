@@ -21,10 +21,11 @@ Codon compiles the **parse+collapse numeric hot path** only (`IncrementalStatsPa
 
 1. **Codon-NumPy** — hot path uses native `import numpy` in Codon. Forbidden: `from python import numpy` / `from python import pandas` on that path.
 2. **Clang shim** — Codon still execs argv `g++`; PATH-shim to `clang++` in container builds (no apt `g++` required).
-3. **3.14t pyext** — production bridge loads a Codon extension built/imported under `/opt/python3.14t`. Fail closed to CPython if the `.so` is missing or fingerprint/API mismatches.
-4. **Inventory** — changes that expand Codon surface must refresh `test_runs/codon_sync_timedb_inventory_*.log` (every `sync_timedb*.py` build attempt).
-5. **A/B baseline** — Arm A = 3.14t production `IncrementalStatsParser` + `_collapse_stats_with_deltas`; Arm B = Codon feed+collapse; same corpus/reps/warmup; log `test_runs/codon_ab_*.log` with `arm_a_elapsed_s`, `arm_b_elapsed_s`, `ratio_a_over_b`, `gate_1p25x`. Pass requires **`gate_1p25x=True`** (≥1.25×). Anti-patterns: host GIL `.venv` as Arm A; Codon vs simplified `FeedKernel` alone; claiming win without logged Arm A.
-6. **GPU / `j:` stamps** — collapse must preserve `sync-timedb-parsing-collapse-vectorization.mdc` (GPU keeps `dev`; `j:` stamps keep `dev`). Codon plain-host path covers non-GPU sum; GPU/`j:` remain on CPython until parity-locked.
+3. **pyext link + ABI** — Codon 0.20.4 `--pyext` emits ET_REL; build scripts must post-link to ET_DYN (same flags as `--lib`, plus zlib-ng on `LIBRARY_PATH`). **GIL** `/opt/python3.14` import is proven; **free-threaded** `/opt/python3.14t` currently segfaults in `PyInit_*` — do not put the `.so` on pipeline `PYTHONPATH` until FT import passes. Fail closed to CPython if the `.so` is missing, unloadable, or fingerprint/API mismatches.
+4. **Class-free pyext compile unit** — `experiments/codon/sync_timedb_codon/feed_collapse.py` must contain **no** Codon/`Python` `class` definitions in the export realization graph. Use module-level constants (e.g. `HOST_PROC_KEYS`), tuples/lists/dicts of primitives, and free functions. Forbidden: nesting the kernel inside the exported fn (nested `HOST_PROC_KEYS` capture fails Codon 0.20.4 pyext). Exported APIs return only primitives or lists/dicts of primitives.
+5. **Inventory** — changes that expand Codon surface must refresh `test_runs/codon_sync_timedb_inventory_*.log` (every `sync_timedb*.py` build attempt).
+6. **A/B baseline** — Arm A = 3.14t production `IncrementalStatsParser` + `_collapse_stats_with_deltas`; Arm B = Codon feed+collapse (prefer pyext import when `.so` present; else `codon run`); same corpus/reps/warmup; log `test_runs/codon_ab_*.log` with `arm_a_elapsed_s`, `arm_b_elapsed_s`, `ratio_a_over_b`, `gate_1p25x`. Pass requires **`gate_1p25x=True`** (≥1.25×). Anti-patterns: host GIL `.venv` as Arm A; Codon vs simplified feed kernel alone; claiming win without logged Arm A.
+7. **GPU / `j:` stamps** — collapse must preserve `sync-timedb-parsing-collapse-vectorization.mdc` (GPU keeps `dev`; `j:` stamps keep `dev`). Codon plain-host path covers non-GPU sum; GPU/`j:` remain on CPython until parity-locked.
 
 ## Overlap
 
