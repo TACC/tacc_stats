@@ -9,8 +9,6 @@ restricts which devices count for a job.
 
 Attributes:
   SHARED_HOST_WIDE_HELP_FOOTER: User-facing red-footer copy for shared jobs.
-  SHARED_NODE_EXISTS_MAX_HOURS: Skip ``dev=j:`` EXISTS above this window.
-  SHARED_NODE_EXISTS_STATEMENT_TIMEOUT_MS: SET LOCAL timeout for short EXISTS.
 """
 
 from __future__ import annotations
@@ -24,11 +22,6 @@ SHARED_HOST_WIDE_HELP_FOOTER: str = (
   "this job when affinity or cgroup data is available; some other counters "
   "may still be host-wide."
 )
-
-# Affinity-miss EXISTS on host_data.dev=j:<jid>; multi-day windows cancel at
-# portal statement_timeout. Skip long windows; bound short probes locally.
-SHARED_NODE_EXISTS_MAX_HOURS = 4.0
-SHARED_NODE_EXISTS_STATEMENT_TIMEOUT_MS = 5000
 
 
 def job_dev_token(jid: str) -> str:
@@ -235,22 +228,18 @@ def job_is_shared_node_from_jobish(jobish: Any) -> bool:
 
 def job_is_shared_node(jid: str) -> bool:
   """
-  True when the job has affinity rows or time-bounded ``dev=j:<jid>`` host_data.
+  True when the job has ``job_affinity`` rows (affinity-only).
 
   Used for Job Detail ``is_shared_node`` and shared-job help footers.
-  After an affinity miss, loads job time bounds in Python. Windows longer
-  than ``SHARED_NODE_EXISTS_MAX_HOURS`` return False without SQL (affinity
-  remains authoritative). Shorter windows probe ``host_data`` under
-  ``SET LOCAL statement_timeout`` of
-  ``SHARED_NODE_EXISTS_STATEMENT_TIMEOUT_MS``. Missing bounds or
-  ``DatabaseError`` fail open to False.
+  Does not probe ``host_data`` for ``dev=j:<jid>`` (that EXISTS timed out
+  under portal load and flooded statement-timeout ERROR logs). Missing
+  affinity → False (omit shared footer).
 
   Args:
     jid (str): Job id.
 
   Returns:
-    bool: Shared-node signal for UI/help. ``DatabaseError`` on EXISTS
-    is caught and returns False (fail-open for UI footers).
+    bool: True when affinity rows exist for ``jid``; else False.
 
   Examples:
     >>> job_is_shared_node("")  # doctest: +SKIP
@@ -259,52 +248,6 @@ def job_is_shared_node(jid: str) -> bool:
   jid_s = str(jid or "").strip()
   if not jid_s:
     return False
-  from django.db import DatabaseError, connection, transaction
+  from hpcperfstats.site.lib.machine.models import job_affinity
 
-  from hpcperfstats.site.lib.machine.models import (
-    host_data,
-    job_affinity,
-    job_data,
-  )
-
-  if job_affinity.objects.filter(jid=jid_s).exists():
-    return True
-  row = (
-    job_data.objects.filter(jid=jid_s)
-    .values(
-      "start_time",
-      "end_time",
-      "telemetry_first_time",
-      "telemetry_last_time",
-    )
-    .first()
-  )
-  if not row:
-    return False
-  t0 = row.get("telemetry_first_time") or row.get("start_time")
-  t1 = row.get("telemetry_last_time") or row.get("end_time")
-  if t0 is None or t1 is None:
-    return False
-  hours = max(0.0, (t1 - t0).total_seconds() / 3600.0)
-  if hours > SHARED_NODE_EXISTS_MAX_HOURS:
-    return False
-  try:
-    if connection.vendor == "postgresql":
-      with transaction.atomic():
-        with connection.cursor() as cursor:
-          cursor.execute(
-            "SET LOCAL statement_timeout = %s",
-            [SHARED_NODE_EXISTS_STATEMENT_TIMEOUT_MS],
-          )
-        return host_data.objects.filter(
-          dev=job_dev_token(jid_s),
-          time__gte=t0,
-          time__lte=t1,
-        ).exists()
-    return host_data.objects.filter(
-      dev=job_dev_token(jid_s),
-      time__gte=t0,
-      time__lte=t1,
-    ).exists()
-  except DatabaseError:
-    return False
+  return job_affinity.objects.filter(jid=jid_s).exists()
