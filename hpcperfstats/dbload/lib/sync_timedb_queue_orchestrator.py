@@ -1685,12 +1685,13 @@ def _day_close_disk_remaining_raw_blocks(coord: Any, tar_path: str) -> bool:
   """
   Return True when closed raw / verify phase should block merge this claim.
 
-  Prefer cheap manifest ``phase`` so leftover ``verifying`` / ``deleting``
-  days do not call ``has_closed_raw_on_disk`` or remaining-raw find (those
-  walks hung day_close inflight before the first ``stage_enter``).
-  ``verification_complete`` blocks only when cheap manifest verified-pending
-  is non-zero - remaining=0 days must still merge (H20d). Test doubles
-  without ``phase`` still use ``has_closed_raw_on_disk``.
+  Prefer cheap manifest ``phase`` so leftover ``verifying`` days do not
+  call ``has_closed_raw_on_disk`` or remaining-raw find (those walks hung
+  day_close inflight before the first ``stage_enter``).
+  ``deleting`` and ``verification_complete`` block only when cheap
+  verified-pending is non-zero - remaining=0 days must still merge /
+  tar_drop (H20d / 3J). Test doubles without ``phase`` still use
+  ``has_closed_raw_on_disk``; ``deleting`` without day state still blocks.
 
   Args:
     coord (Any): :class:`DayRawRemovalCoordinator` instance.
@@ -1706,11 +1707,11 @@ def _day_close_disk_remaining_raw_blocks(coord: Any, tar_path: str) -> bool:
   phase_fn = getattr(coord, "phase", None)
   if callable(phase_fn):
     phase = str(phase_fn(tar_path) or "").strip()
-    if phase in ("verifying", "deleting"):
+    if phase == "verifying":
       return True
     if phase == "done":
       return False
-    if phase == "verification_complete":
+    if phase in ("deleting", "verification_complete"):
       get_day = getattr(coord, "_get_or_create_day", None)
       if callable(get_day):
         state = get_day(tar_path)
@@ -1719,9 +1720,9 @@ def _day_close_disk_remaining_raw_blocks(coord: Any, tar_path: str) -> bool:
           "_manifest_verified_pending_count",
           None,
         )
-        if callable(pending_fn) and int(pending_fn() or 0) > 0:
-          return True
-      return False
+        return bool(callable(pending_fn) and int(pending_fn() or 0) > 0)
+      # Doubles without day state: deleting still blocks (H19 latch); VC not.
+      return phase == "deleting"
   has_closed_fn = getattr(coord, "has_closed_raw_on_disk", None)
   if callable(has_closed_fn) and has_closed_fn(tar_path):
     return True
@@ -2227,7 +2228,8 @@ def _run_day_close_job(
 
     skip_merge_remaining_raw = False
     # True only on H19 append_idle remaining path (not phase_done_sealed):
-    # remaining already answered; do not re-find post-seal / after delete.
+    # remaining already answered; do not re-find between seal and post_seal.
+    # Cleared after raw_delete so tar_drop can re-probe (3J).
     remaining_raw_cheap = False
 
     def _wait_on_ingest_or_advance() -> str | None:
@@ -2491,13 +2493,14 @@ def _run_day_close_job(
     # H19 append_idle already answered remaining; do not re-find at post-seal
     # (01 2026-09-26: hung on has_closed after seal exit, before post_seal).
     # phase_done_sealed sets skip_merge but not remaining_raw_cheap - still find.
+    # 3J: clear cheap after raw_delete so tar_drop re-probes (manifest-fast).
     def _closed_raw_remains() -> bool:
       """
       Return True when closed raw still blocks tar_drop this claim.
 
       H19 append_idle sets ``remaining_raw_cheap`` so giant days do not
-      re-call ``has_closed_raw_on_disk`` after seal / delete. ``phase_done``
-      skip_merge does not set cheap - still probes the coord.
+      re-call ``has_closed_raw_on_disk`` between seal and post_seal.
+      ``phase_done`` skip_merge does not set cheap - still probes the coord.
 
       Returns:
         bool: True when remaining closed raw is known or on disk.
@@ -2536,6 +2539,7 @@ def _run_day_close_job(
 
     _stage_enter("raw_delete")
     deleted = int(coord.apply_batch_delete(tar_path) or 0)
+    remaining_raw_cheap = False
     remaining_raw = _closed_raw_remains()
     if deleted > 0:
       progress.record(day_token, "raw_delete", 1)
