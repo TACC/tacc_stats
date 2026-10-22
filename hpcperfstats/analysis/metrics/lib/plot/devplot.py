@@ -145,6 +145,11 @@ class DevPlot:
       )
     )
     help_key = "jobDetailPlot_type_detail_rates"
+    from hpcperfstats.analysis.metrics.lib.job_host_data_scope import (
+      show_shared_host_wide_help_footer,
+    )
+
+    typ = getattr(self.data_provider, "type_name", None)
     add_job_detail_bokeh_help_marker(
       plot,
       description_for_job_detail_bokeh_plot(help_key)
@@ -153,7 +158,10 @@ class DevPlot:
         f"rate or value for event {event}."
       ),
       researcher_use_for_job_detail_bokeh_plot(help_key),
-      is_shared_node=job_is_shared_node_from_jobish(self.data_provider),
+      is_shared_node=show_shared_host_wide_help_footer(
+        is_shared_node=job_is_shared_node_from_jobish(self.data_provider),
+        typ=typ,
+      ),
     )
     log.debug("time to plot %s: %s", event, time.time() - s)
     return plot

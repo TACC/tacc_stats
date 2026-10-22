@@ -148,7 +148,23 @@ describe("VariableInfoLabel", () => {
     expect(screen.queryByTestId("variable-info-tooltip")).not.toBeInTheDocument();
   });
 
-  it("appends the shared-node host-wide-telemetry footer when isSharedNode is true", () => {
+  it("appends residual host-wide footer when shared and variable is not job-scoped", () => {
+    render(
+      <VariableInfoLabel
+        variableName="max_fabricbw"
+        labelText="max_fabricbw"
+        enableHelp
+        isSharedNode
+      />,
+    );
+    fireEvent.click(screen.getByRole("button", { name: /help: max_fabricbw/i }));
+    const panel = screen.getByTestId("variable-info-tooltip");
+    const footer = screen.getByTestId("variable-info-shared-node-footer");
+    expect(footer).toHaveTextContent(SHARED_HOST_WIDE_HELP_FOOTER);
+    expect(panel).toContainElement(footer);
+  });
+
+  it("omits shared-node footer for job-scoped CPU metrics even when isSharedNode", () => {
     render(
       <VariableInfoLabel
         variableName="avg_cpuusage"
@@ -158,30 +174,27 @@ describe("VariableInfoLabel", () => {
       />,
     );
     fireEvent.click(screen.getByRole("button", { name: /help: avg_cpuusage/i }));
-    const panel = screen.getByTestId("variable-info-tooltip");
-    const footer = screen.getByTestId("variable-info-shared-node-footer");
-    expect(footer).toHaveTextContent(SHARED_HOST_WIDE_HELP_FOOTER);
-    expect(panel).toContainElement(footer);
+    expect(screen.queryByTestId("variable-info-shared-node-footer")).not.toBeInTheDocument();
   });
 
   it("omits the shared-node footer when isSharedNode is false (exclusive job)", () => {
     render(
       <VariableInfoLabel
-        variableName="avg_cpuusage"
-        labelText="avg_cpuusage"
+        variableName="max_fabricbw"
+        labelText="max_fabricbw"
         enableHelp
         isSharedNode={false}
       />,
     );
-    fireEvent.click(screen.getByRole("button", { name: /help: avg_cpuusage/i }));
+    fireEvent.click(screen.getByRole("button", { name: /help: max_fabricbw/i }));
     expect(screen.queryByTestId("variable-info-shared-node-footer")).not.toBeInTheDocument();
   });
 
   it("omits the shared-node footer by default when isSharedNode is not passed", () => {
     render(
-      <VariableInfoLabel variableName="avg_cpuusage" labelText="avg_cpuusage" enableHelp />,
+      <VariableInfoLabel variableName="max_fabricbw" labelText="max_fabricbw" enableHelp />,
     );
-    fireEvent.click(screen.getByRole("button", { name: /help: avg_cpuusage/i }));
+    fireEvent.click(screen.getByRole("button", { name: /help: max_fabricbw/i }));
     expect(screen.queryByTestId("variable-info-shared-node-footer")).not.toBeInTheDocument();
   });
 

@@ -6,7 +6,10 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Separator } from "@/components/ui/separator";
 import { cn } from "@/lib/utils";
 import { getVariableTooltipContent } from "../utils/variableMetadata";
-import { SHARED_HOST_WIDE_HELP_FOOTER } from "../utils/sharedNodeHelpFooter";
+import {
+  SHARED_HOST_WIDE_HELP_FOOTER,
+  showSharedHostWideHelpFooter,
+} from "../utils/sharedNodeHelpFooter";
 
 const HELP_HOVER_OPEN_DELAY_MS = 150;
 const HELP_HOVER_CLOSE_DELAY_MS = 150;
@@ -16,7 +19,10 @@ type VariableInfoLabelProps = {
   labelText?: string;
   enableHelp?: boolean;
   suffixBeforeHelp?: ReactNode;
-  /** Job ran on a shared node: append the host-wide-telemetry disclaimer footer. */
+  /**
+   * Job ran on a shared node. Red residual footer shows only when the variable
+   * is not job-scoped (CPU/GPU/cgroup mem).
+   */
   isSharedNode?: boolean;
 };
 
@@ -138,7 +144,7 @@ export function VariableInfoLabel({
               <span className="variable-info-tooltip-researcher-use">{researcherUse}</span>
             </>
           ) : null}
-          {isSharedNode ? (
+          {showSharedHostWideHelpFooter(isSharedNode, variableName) ? (
             <>
               <Separator className="variable-info-tooltip-sep my-2" />
               <span

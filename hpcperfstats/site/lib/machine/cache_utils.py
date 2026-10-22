@@ -22,6 +22,7 @@ Attributes:
   KEY_HOST_PLOT: Attribute.
   KEY_HOST_SCHEMA: Attribute.
   KEY_HOST_TIME_DF: Attribute.
+  KEY_HOST_WIDE_RESIDUAL_HT: Attribute.
   KEY_JID_HOST_WINDOW_ROW_COUNT: Attribute.
   KEY_JOB: Attribute.
   KEY_JOB_CACHE_VERSION: Attribute.
@@ -494,6 +495,70 @@ def warm_job_cache_entries(job_instances: Any, timeout: int) -> None:
     pass
 
 
+def invalidate_host_wide_residual_ht_for_jids(jids: Any) -> None:
+  """
+  Drop residual host-by-time day-frame Redis keys for hosts of the given jids.
+
+  Keys are jid-independent (``KEY_HOST_WIDE_RESIDUAL_HT``). SCAN matches the
+  prefix and deletes entries whose host-fingerprint part includes any of the
+  jobs' accounting hosts.
+
+  Args:
+    jids (Any): Job ids whose host_lists drive invalidation.
+
+  Returns:
+    None
+
+  Examples:
+    >>> invalidate_host_wide_residual_ht_for_jids(None)  # doctest: +SKIP
+  """
+  if not jids:
+    return
+  hosts: set[str] = set()
+  try:
+    from hpcperfstats.site.lib.machine.models import job_data as _job_data_model
+
+    for hl in _job_data_model.objects.filter(
+      jid__in=[j for j in jids if j],
+    ).values_list("host_list", flat=True):
+      for h in hl or []:
+        s = str(h).strip()
+        if s:
+          hosts.add(s)
+  except Exception:
+    return
+  if not hosts:
+    return
+  client = _get_redis_py_client()
+  if client is None:
+    return
+  try:
+    for raw_key in client.scan_iter(
+      match=f"*{KEY_HOST_WIDE_RESIDUAL_HT}*",
+      count=500,
+    ):
+      key_s = (
+        raw_key.decode()
+        if isinstance(raw_key, (bytes, bytearray))
+        else str(raw_key)
+      )
+      parts = key_s.split(":")
+      # make_cache_key → prefix:host_fp:typ:day:rev (host_fp may contain commas)
+      if KEY_HOST_WIDE_RESIDUAL_HT not in parts:
+        continue
+      try:
+        idx = parts.index(KEY_HOST_WIDE_RESIDUAL_HT)
+        host_fp = parts[idx + 1] if idx + 1 < len(parts) else ""
+      except ValueError:
+        continue
+      fp_hosts = set(host_fp.split(",")) if host_fp else set()
+      if fp_hosts & hosts:
+        with contextlib.suppress(Exception):
+          client.delete(raw_key)
+  except Exception:
+    pass
+
+
 def invalidate_jid_derived_cache_keys(
   jids: Any,
   *,
@@ -536,6 +601,8 @@ def invalidate_jid_derived_cache_keys(
       cache.delete(f"{KEY_PROC_LIST}:{jid}")
   except Exception:
     pass
+  with contextlib.suppress(Exception):
+    invalidate_host_wide_residual_ht_for_jids(jids)
 
 
 def _get_redis_py_client() -> Any:
@@ -687,6 +754,8 @@ KEY_JOB_DICT = "job_dict"
 KEY_TYPE_DETAIL_HOST_TIME = "type_detail_host_time"
 KEY_TYPE_DETAIL_AGG = "type_detail_agg"
 KEY_HOST_SCHEMA = "host_schema"
+# Shared-node residual host-by-time day frames (no jid in key).
+KEY_HOST_WIDE_RESIDUAL_HT = "host_wide_residual_ht"
 KEY_ADMIN_CACHE_STATS = "admin_monitor_cache_stats"
 KEY_ADMIN_RMQ_STATS = "admin_monitor_rmq_stats"
 KEY_ADMIN_RMQ_SNAPSHOT = "admin_monitor_rmq_snapshot"

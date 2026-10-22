@@ -8,11 +8,16 @@ from hpcperfstats.analysis.metrics.lib.job_host_data_scope import (
   SHARED_HOST_WIDE_HELP_FOOTER,
   apply_gpu_affinity_dev_filter,
   apply_job_host_data_scope,
+  apply_job_or_host_wide_scope,
   gpu_devs_for_job,
+  host_wide_residual_ht_cache_key,
+  is_job_scoped_host_data_type,
   job_dev_token,
   job_host_data_scope_q,
   job_host_data_scope_sql,
   job_is_shared_node,
+  show_shared_host_wide_help_footer,
+  use_host_wide_residual_scope,
 )
 
 
@@ -125,10 +130,62 @@ def test_job_is_shared_node_empty_jid():
 
 
 def test_shared_host_wide_help_footer_copy():
-  assert "shared node" in SHARED_HOST_WIDE_HELP_FOOTER.lower()
-  assert "host-wide" in SHARED_HOST_WIDE_HELP_FOOTER.lower()
-  assert "cpu" in SHARED_HOST_WIDE_HELP_FOOTER.lower()
-  assert "affinity" in SHARED_HOST_WIDE_HELP_FOOTER.lower()
+  text = SHARED_HOST_WIDE_HELP_FOOTER.lower()
+  assert "shared node" in text or "node-wide" in text
+  assert "host-level" in text or "host-wide" in text or "node-wide" in text
+  assert (
+    "disambiguat" in text or "not job-scoped" in text or "node-wide" in text
+  )
+
+
+def test_is_job_scoped_host_data_type_allowlist():
+  assert is_job_scoped_host_data_type("host_cpu") is True
+  assert is_job_scoped_host_data_type("nvidia_gpu") is True
+  assert is_job_scoped_host_data_type("host_mem_job") is True
+  assert is_job_scoped_host_data_type("host_mem") is False
+  assert is_job_scoped_host_data_type("host_ib") is False
+  assert is_job_scoped_host_data_type("") is False
+
+
+def test_apply_job_or_host_wide_scope_shared_residual_skips_jid():
+  qs = MagicMock()
+  out = apply_job_or_host_wide_scope(qs, "7", "host_mem", shared=True)
+  assert out is qs
+  qs.filter.assert_not_called()
+
+
+def test_apply_job_or_host_wide_scope_shared_cpu_scopes():
+  qs = MagicMock()
+  qs.filter.return_value = "scoped"
+  out = apply_job_or_host_wide_scope(qs, "7", "host_cpu", shared=True)
+  assert out == "scoped"
+  qs.filter.assert_called_once()
+
+
+def test_use_host_wide_residual_scope_and_footer_gate():
+  assert use_host_wide_residual_scope("host_mem", shared=True) is True
+  assert use_host_wide_residual_scope("host_cpu", shared=True) is False
+  assert (
+    show_shared_host_wide_help_footer(is_shared_node=True, typ="host_cpu")
+    is False
+  )
+  assert (
+    show_shared_host_wide_help_footer(is_shared_node=True, typ="host_mem")
+    is True
+  )
+  assert (
+    show_shared_host_wide_help_footer(is_shared_node=False, typ="host_mem")
+    is False
+  )
+
+
+def test_host_wide_residual_ht_cache_key_omits_jid():
+  key = host_wide_residual_ht_cache_key("h1,h2", "host_mem", "2026-10-22")
+  assert "host_wide_residual_ht" in key
+  assert "jid" not in key.lower().split("host_wide_residual_ht")[0]
+  assert ":7:" not in key
+  assert "host_mem" in key
+  assert "2026-10-22" in key
 
 
 def test_co_tenant_q_excludes_other_job_children():

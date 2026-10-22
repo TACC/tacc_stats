@@ -55,7 +55,14 @@ from hpcperfstats.analysis.metrics.lib.gen.utils import queryset_to_dataframe
 from hpcperfstats.analysis.metrics.lib.job_host_data_scope import (
   apply_gpu_affinity_dev_filter,
   apply_job_host_data_scope,
+  apply_job_or_host_wide_scope,
+  calendar_days_covering,
   gpu_devs_for_job,
+  host_wide_residual_ht_cache_key,
+  is_job_scoped_host_data_type,
+  job_is_shared_node,
+  sorted_hosts_fingerprint,
+  use_host_wide_residual_scope,
 )
 from hpcperfstats.dbload.lib.monitor_naming.resolve import (
   canonical_event_name_for_type,
@@ -2313,6 +2320,7 @@ class jid_table:
     _base_filter: ``_base_filter``.
     _gpu_affinity_devs_cache: Cached ``gpu_devs_for_job`` result or unset.
     _large_job_plot_cache_token: ``_large_job_plot_cache_token``.
+    _shared_node: Affinity-based shared-node signal for residual host-wide reads.
     acct_host_list: ``acct_host_list``.
     end_time: ``end_time``.
     host_list: ``host_list``.
@@ -2343,6 +2351,7 @@ class jid_table:
     self.jid = jid
     self._gpu_affinity_devs_cache: list[str] | object | None = _GPU_AFF_UNSET
     self._large_job_plot_cache_token = "full"
+    self._shared_node = False
 
     try:
       row = cached_orm(
@@ -2382,6 +2391,7 @@ class jid_table:
     self.acct_host_list = _build_acct_host_fqdns(hl_raw)
     self.start_time = _ensure_tz(st)
     self.end_time = _ensure_tz(et)
+    self._shared_node = job_is_shared_node(str(jid))
     self._base_filter = {
       "time__gte": self.start_time,
       "time__lte": self.end_time,
@@ -2479,6 +2489,27 @@ class jid_table:
       # shorter tuples if the DB schema and model fields diverge. Keep only rows
       # with at least two elements and trim to the first two.
       rows = [tuple(r[:2]) for r in raw_rows if len(r) >= 2]
+      if getattr(self, "_shared_node", False):
+        # Union residual host-wide (type, event) so NUMA host_mem / fabric
+        # appear on Device data for shared jobs.
+        host_wide_rows = list(
+          host_data.objects.filter(
+            host=str(self.host_list[0]),
+            time__gte=self._base_filter["time__gte"],
+            time__lte=self._base_filter["time__lte"],
+          )
+          .values_list("type", "event")
+          .distinct()
+        )
+        seen = set(rows)
+        for r in host_wide_rows:
+          if len(r) < 2:
+            continue
+          pair = tuple(r[:2])
+          typ = str(pair[0]) if pair[0] is not None else ""
+          if typ and not is_job_scoped_host_data_type(typ) and pair not in seen:
+            seen.add(pair)
+            rows.append(pair)
       if not rows:
         return pd.DataFrame(columns=["type", "event"])
       return _coerce_jid_table_schema_dataframe(
@@ -2637,13 +2668,16 @@ class jid_table:
     if not self._base_filter:
       return host_data.objects.none()
     tkw = self._host_data_time_filter_kwargs()
-    return apply_job_host_data_scope(
+    typ = extra_filters.get("type")
+    return apply_job_or_host_wide_scope(
       host_data.objects.filter(
         host__in=self._base_filter["host__in"],
         **tkw,
         **extra_filters,
       ),
       self.jid,
+      typ,
+      shared=bool(getattr(self, "_shared_node", False)),
     )
 
   def _full_host_data_rows_batched(self, cols: Any) -> Any:
@@ -2901,7 +2935,7 @@ class jid_table:
             >>> True
             True
           """
-          qs = apply_job_host_data_scope(
+          qs = apply_job_or_host_wide_scope(
             host_data.objects.filter(
               host__in=host_chunk,
               **tf,
@@ -2909,6 +2943,8 @@ class jid_table:
               event__in=probed_events,
             ),
             self.jid,
+            ct,
+            shared=bool(getattr(self, "_shared_node", False)),
           )
           if reject_dcgm_blank and val_col in (
             "value",
@@ -3052,7 +3088,7 @@ class jid_table:
                   >>> True
                   True
                 """
-                qs_base = apply_job_host_data_scope(
+                qs_base = apply_job_or_host_wide_scope(
                   host_data.objects.filter(
                     host__in=host_subchunk,
                     **tf_cur,
@@ -3060,6 +3096,8 @@ class jid_table:
                     event__in=probed_events,
                   ),
                   self.jid,
+                  ct,
+                  shared=bool(getattr(self, "_shared_node", False)),
                 )
                 if reject_dcgm_blank:
                   qs_base = qs_base.filter(
@@ -3262,7 +3300,7 @@ class jid_table:
             True
           """
           qs = (
-            apply_job_host_data_scope(
+            apply_job_or_host_wide_scope(
               host_data.objects.filter(
                 host__in=hosts_list,
                 **(tf_cur or {}),
@@ -3270,6 +3308,8 @@ class jid_table:
                 event__in=_probed,
               ),
               self.jid,
+              _typ,
+              shared=bool(getattr(self, "_shared_node", False)),
             )
             .values("event")
             .annotate(delta_sum=Sum("delta"))
@@ -3379,7 +3419,7 @@ class jid_table:
             True
           """
           qs = (
-            apply_job_host_data_scope(
+            apply_job_or_host_wide_scope(
               host_data.objects.filter(
                 host__in=hosts_list,
                 **(tf_cur or {}),
@@ -3387,6 +3427,8 @@ class jid_table:
                 event__in=all_events,
               ),
               self.jid,
+              _typ,
+              shared=bool(getattr(self, "_shared_node", False)),
             )
             .values("event")
             .annotate(delta_sum=Sum("delta"))
@@ -3502,7 +3544,7 @@ class jid_table:
             True
           """
           qs = (
-            apply_job_host_data_scope(
+            apply_job_or_host_wide_scope(
               host_data.objects.filter(
                 host__in=hosts_list,
                 **(tf_cur or {}),
@@ -3510,6 +3552,8 @@ class jid_table:
                 event__in=_probed,
               ),
               self.jid,
+              _typ,
+              shared=bool(getattr(self, "_shared_node", False)),
             )
             .values("event")
             .annotate(delta_sum=Sum("delta"))
@@ -3624,6 +3668,7 @@ class TypeDetailDataProvider:
   accounting host_list, and jid / ``dev=j:<jid>`` (shared-node isolation).
 
   Attributes:
+    _shared_node: Affinity-based shared-node signal for residual host-wide reads.
     end_time: ``end_time``.
     host_list: ``host_list``.
     jid: ``jid``.
@@ -3660,10 +3705,13 @@ class TypeDetailDataProvider:
     self.start_time = start_time
     self.end_time = end_time
     self.host_list = list(host_list) if host_list else []
+    self._shared_node = job_is_shared_node(str(jid)) if jid else False
 
   def _qs(self, **extra: Any) -> Any:
     """
     Base host_data queryset scoped by type, time, hosts, and job jid/``j:``.
+
+    Residual types on shared nodes skip jid / ``j:`` (host_list + time only).
 
     Args:
       **extra (Any): Extra keyword arguments (``extra``); keys are ``str`` and
@@ -3683,9 +3731,11 @@ class TypeDetailDataProvider:
     }
     if self.host_list:
       flt["host__in"] = self.host_list
-    return apply_job_host_data_scope(
+    return apply_job_or_host_wide_scope(
       host_data.objects.filter(**flt, **extra),
       self.jid,
+      self.type_name,
+      shared=bool(getattr(self, "_shared_node", False)),
     )
 
   def get_host_time_df(self) -> Any:
@@ -3693,6 +3743,8 @@ class TypeDetailDataProvider:
     DataFrame of (host, time) distinct, ordered by host, time (cached).
 
     Multi-host reads use hostxtime chunks with timeout split/retry.
+    Residual types on shared nodes use jid-independent day-frame Redis keys
+    (``KEY_HOST_WIDE_RESIDUAL_HT``) so co-tenant jobs reuse SQL.
 
     Returns:
       Any: Open return polymorphism from ``get_host_time_df``: concrete type
@@ -3704,6 +3756,12 @@ class TypeDetailDataProvider:
     """
     _st = self.start_time.isoformat() if self.start_time else ""
     _et = self.end_time.isoformat() if self.end_time else ""
+    residual_shared = use_host_wide_residual_scope(
+      self.type_name,
+      shared=bool(getattr(self, "_shared_node", False)),
+    )
+    if residual_shared and self.host_list and self.start_time and self.end_time:
+      return self._host_time_df_residual_day_cached()
     key = make_cache_key(
       KEY_TYPE_DETAIL_HOST_TIME, self.jid, self.type_name, _st, _et
     )
@@ -3751,13 +3809,15 @@ class TypeDetailDataProvider:
           True
         """
         return (
-          apply_job_host_data_scope(
+          apply_job_or_host_wide_scope(
             host_data.objects.filter(
               type=type_name,
               host__in=host_chunk,
               **(tf or {}),
             ),
             self.jid,
+            type_name,
+            shared=bool(getattr(self, "_shared_node", False)),
           )
           .values("host", "time")
           .distinct()
@@ -3776,6 +3836,103 @@ class TypeDetailDataProvider:
 
     result = cached_orm(key, get_site_content_cache_timeout(), _fn)
     return result if result is not None else queryset_to_dataframe(None)
+
+  def _host_time_df_residual_day_cached(self) -> Any:
+    """
+    Load residual host-by-time via day-scoped Redis keys, then slice to the job.
+
+    Returns:
+      Any: DataFrame with host, time columns.
+
+    Examples:
+      >>> TypeDetailDataProvider()._host_time_df_residual_day_cached()
+      ... # doctest: +SKIP
+    """
+    from datetime import datetime, time as dt_time
+
+    import pandas as pd
+    from django.utils import timezone as dj_tz
+
+    host_fp = sorted_hosts_fingerprint(self.host_list)
+    typ = str(self.type_name)
+    hosts_snap = list(self.host_list)
+    days = calendar_days_covering(self.start_time, self.end_time)
+    frames: list = []
+    for day_iso in days:
+      day = datetime.fromisoformat(day_iso).date()
+      day_start = dj_tz.make_aware(datetime.combine(day, dt_time.min))
+      day_end = dj_tz.make_aware(
+        datetime.combine(day, dt_time.max.replace(microsecond=999999))
+      )
+
+      def _bind_day_fn(
+        hosts_b: Any,
+        typ_b: Any,
+        t0_b: Any,
+        t1_b: Any,
+      ) -> Any:
+        """
+        Build a zero-arg loader for one residual day frame.
+
+        Args:
+          hosts_b (Any): Host list snapshot.
+          typ_b (Any): ``host_data.type``.
+          t0_b (Any): Day start.
+          t1_b (Any): Day end.
+
+        Returns:
+          Any: Callable ``() -> DataFrame``.
+
+        Examples:
+          >>> True
+          True
+        """
+
+        def _day_fn() -> Any:
+          """
+          Materialize distinct host/time for one calendar day.
+
+          Returns:
+            Any: DataFrame host, time.
+
+          Examples:
+            >>> True
+            True
+          """
+          qs = (
+            host_data.objects.filter(
+              type=typ_b,
+              host__in=hosts_b,
+              time__gte=t0_b,
+              time__lte=t1_b,
+            )
+            .values("host", "time")
+            .distinct()
+            .order_by("host", "time")
+          )
+          return queryset_to_dataframe(qs)
+
+        return _day_fn
+
+      day_df = cached_orm(
+        host_wide_residual_ht_cache_key(host_fp, typ, day_iso),
+        get_site_content_cache_timeout(),
+        _bind_day_fn(hosts_snap, typ, day_start, day_end),
+      )
+      if day_df is not None and not getattr(day_df, "empty", True):
+        frames.append(day_df)
+    if not frames:
+      return pd.DataFrame(columns=["host", "time"])
+    out = pd.concat(frames, ignore_index=True)
+    if "time" in out.columns:
+      out = out[
+        (out["time"] >= self.start_time) & (out["time"] <= self.end_time)
+      ]
+    if out.empty or not {"host", "time"}.issubset(out.columns):
+      return pd.DataFrame(columns=["host", "time"])
+    return (
+      out.sort_values(["host", "time"]).drop_duplicates().reset_index(drop=True)
+    )
 
   def get_events_units(self) -> Any:
     """
@@ -3908,7 +4065,7 @@ class TypeDetailDataProvider:
                 True
               """
               return host_data_sum_val_per_sample_queryset(
-                apply_job_host_data_scope(
+                apply_job_or_host_wide_scope(
                   host_data.objects.filter(
                     type=type_name,
                     host__in=host_subchunk,
@@ -3916,6 +4073,8 @@ class TypeDetailDataProvider:
                     **(tf_cur or {}),
                   ),
                   self.jid,
+                  type_name,
+                  shared=bool(getattr(self, "_shared_node", False)),
                 ),
                 met,
               )
@@ -3971,7 +4130,7 @@ class TypeDetailDataProvider:
           >>> True
           True
         """
-        return apply_job_host_data_scope(
+        return apply_job_or_host_wide_scope(
           host_data.objects.filter(
             type=type_name,
             host__in=host_chunk,
@@ -3979,6 +4138,8 @@ class TypeDetailDataProvider:
             **(tf or {}),
           ),
           self.jid,
+          type_name,
+          shared=bool(getattr(self, "_shared_node", False)),
         ).values("host", "time", met)
 
       df_raw = _fetch_host_data_values_frames(

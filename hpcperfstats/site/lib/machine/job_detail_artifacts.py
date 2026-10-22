@@ -50,9 +50,6 @@ from hpcperfstats.analysis.metrics.lib.job_detail_fsio import (
   extend_fsio_payload_lists_with_peaks,
   fsio_job_detail_catalog,
 )
-from hpcperfstats.analysis.metrics.lib.job_host_data_scope import (
-  job_is_shared_node,
-)
 from hpcperfstats.analysis.metrics.lib.plot.bokeh_job_detail_help_marker import (
   add_job_detail_bokeh_help_marker,
 )
@@ -83,7 +80,7 @@ _GPU_MULTIPRECISION_MIX_UNAVAILABLE_REASON = (
   "Missing GPU precision-width mix metrics in job metrics "
   "(need positive avg_*_active shares)."
 )
-APP_DETAIL_ARTIFACT_SCHEMA_VERSION = 13
+APP_DETAIL_ARTIFACT_SCHEMA_VERSION = 14
 
 _FSIO_FINGERPRINT_METRIC_NAMES = tuple(
   sorted(name for name, _t, _u in fsio_job_detail_catalog())
@@ -970,7 +967,9 @@ def persist_job_detail_artifacts_for_jid(
     artifact_scope="",
     input_fingerprint=fingerprint,
     payload=_multiprecision_mix_payload(
-      metric_values, is_shared_node=job_is_shared_node(jid)
+      # Multiprecision pies are CPU/GPU job-scoped — never residual footer.
+      metric_values,
+      is_shared_node=False,
     ),
   )
 

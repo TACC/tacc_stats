@@ -1822,14 +1822,34 @@ class SummaryPlot:
       f"Y ({label_text}): {doc_text}"
     )
     from hpcperfstats.analysis.metrics.lib.job_host_data_scope import (
+      is_job_scoped_host_data_type,
       job_is_shared_node_from_jobish,
+      show_shared_host_wide_help_footer,
     )
+
+    # Map summary column → host_data.type for residual footer gating.
+    _metric_typ = None
+    for spec in _SUMMARY_SINGLE_SPECS:
+      if len(spec) >= 4 and spec[3] == metric:
+        _metric_typ = spec[0]
+        break
+    _surface_job_scoped = None
+    if _metric_typ is not None:
+      _surface_job_scoped = is_job_scoped_host_data_type(_metric_typ)
+    elif metric in ("mem", "cpu") or str(metric).startswith(
+      ("nv_", "amd_", "intel_", "gpu")
+    ):
+      _surface_job_scoped = True
 
     add_job_detail_bokeh_help_marker(
       plot,
       help_body,
       researcher_use,
-      is_shared_node=job_is_shared_node_from_jobish(self.jt),
+      is_shared_node=show_shared_host_wide_help_footer(
+        is_shared_node=job_is_shared_node_from_jobish(self.jt),
+        typ=_metric_typ,
+        surface_job_scoped=_surface_job_scoped,
+      ),
     )
     log.debug("time to plot %s: %s", metric, time.time() - s)
     return plot

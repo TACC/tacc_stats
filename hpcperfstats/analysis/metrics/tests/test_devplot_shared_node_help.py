@@ -21,9 +21,12 @@ from hpcperfstats.analysis.metrics.lib.plot.devplot import DevPlot
 class _TypeDetailProvider:
   jid = "12345"
 
+  def __init__(self, type_name: str = "host_ib"):
+    self.type_name = type_name
 
-def _plot_metric_for_jid(is_shared: bool):
-  dp = DevPlot(_TypeDetailProvider(), ["h1", "h2"])
+
+def _plot_metric_for_jid(is_shared: bool, type_name: str = "host_ib"):
+  dp = DevPlot(_TypeDetailProvider(type_name), ["h1", "h2"])
   dp.hc = {"h1": "#111111", "h2": "#222222"}
   df = pd.DataFrame(
     {
@@ -54,11 +57,16 @@ def _help_hover_tip_text(plot) -> str:
   return html.unescape(help_hovers[0].tooltips)
 
 
-def test_devplot_appends_shared_node_footer_when_shared():
-  tip = _help_hover_tip_text(_plot_metric_for_jid(True))
+def test_devplot_appends_shared_node_footer_for_residual_type():
+  tip = _help_hover_tip_text(_plot_metric_for_jid(True, "host_ib"))
   assert SHARED_HOST_WIDE_HELP_FOOTER in tip
 
 
+def test_devplot_omits_footer_for_job_scoped_type_when_shared():
+  tip = _help_hover_tip_text(_plot_metric_for_jid(True, "host_cpu"))
+  assert SHARED_HOST_WIDE_HELP_FOOTER not in tip
+
+
 def test_devplot_omits_shared_node_footer_when_not_shared():
-  tip = _help_hover_tip_text(_plot_metric_for_jid(False))
+  tip = _help_hover_tip_text(_plot_metric_for_jid(False, "host_ib"))
   assert SHARED_HOST_WIDE_HELP_FOOTER not in tip

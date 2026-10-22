@@ -37,6 +37,7 @@ alwaysApply: false
 
 ## Gaps and boundaries
 
+- **Shared-node residual host×time frames:** Redis ``KEY_HOST_WIDE_RESIDUAL_HT`` (``cache_utils``) caches residual ``host_data`` day frames keyed by host fingerprint + type + calendar day + rev — **no jid**. Used so co-tenant Job Detail / TypeDetail / metrics prewarm does not recompute the same host-wide SQL N times. This is **not** a shared `job_plot_artifact` / `job_detail_artifact` payload; Bokeh and detail artifacts stay per-jid. Invalidate via ``invalidate_host_wide_residual_ht_for_jids`` from ``invalidate_jid_derived_cache_keys``.
 - **`type_detail`** and similar endpoints are **not** the same code path as `job_plots`; they do not automatically use `job_plot_artifact`. Extend caching there explicitly if those pages are hot.
 - Avoid **circular imports** between `api.py` and `update_metrics.py`; shared logic stays in **`job_plot_artifacts`** (and plot modules).
 - **Job Detail GPU / Multiprecision Mix** are served from **`job_detail_artifact`** (SPA is artifact-only). After successful metrics (and for artifact-only refs), **`_PrewarmPipeline`** runs detail then plot persist on the **same metrics in-process thread pool** (`metrics_pool_processes`) so empty detail/mix rows do not stick after metrics are complete. Empty detail artifacts hide GPU/Mix even when `metrics_data` already has GPU/fp/tensor values.

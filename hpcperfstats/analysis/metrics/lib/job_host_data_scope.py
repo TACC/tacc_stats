@@ -7,20 +7,35 @@ sole) or ``dev = 'j:' || <jid>`` (shared non-GPU / ``host_mem_job``).
 GPU hardware ``dev`` stays numeric; optional ``job_affinity.gpu_list``
 restricts which devices count for a job.
 
+On shared nodes, residual (non-allowlisted) ``host_data.type`` values are
+read host-wide (``host_list`` + time only). Job Detail red help footers
+apply only to those residual / host-wide surfaces.
+
 Attributes:
-  SHARED_HOST_WIDE_HELP_FOOTER: User-facing red-footer copy for shared jobs.
+  SHARED_HOST_WIDE_HELP_FOOTER: User-facing red-footer copy for residual
+    host-wide counters on shared jobs.
+  HOST_WIDE_RESIDUAL_CACHE_REV: Redis day-frame cache revision.
+  _GPU_HOST_DATA_TYPES: Canonical GPU ``host_data.type`` names on the
+    job-scoped allowlist.
 """
 
 from __future__ import annotations
 
+from functools import lru_cache
 from typing import Any
 
 from django.db.models import Q
 
 SHARED_HOST_WIDE_HELP_FOOTER: str = (
-  "This job ran on a shared node. CPU, GPU, and job memory are scoped to "
-  "this job when affinity or cgroup data is available; some other counters "
-  "may still be host-wide."
+  "This counter is node-wide (host-level) on a shared node — it is not "
+  "disambiguated to this job. Job-scoped CPU, GPU, and cgroup memory use "
+  "separate surfaces without this disclaimer."
+)
+
+HOST_WIDE_RESIDUAL_CACHE_REV: int = 1
+
+_GPU_HOST_DATA_TYPES: frozenset[str] = frozenset(
+  {"nvidia_gpu", "amd_gpu", "intel_gpu"}
 )
 
 
@@ -165,6 +180,241 @@ def apply_job_host_data_scope(qs: Any, jid: str) -> Any:
   if not jid:
     return qs
   return qs.filter(job_host_data_scope_q(str(jid)))
+
+
+@lru_cache(maxsize=1)
+def _job_scoped_host_data_types() -> frozenset[str]:
+  """
+  Allowlist of ``host_data.type`` names that stay job-scoped on shared nodes.
+
+  Returns:
+    frozenset[str]: CPU family, GPU, ``host_mem_job``, core CPU-PMC types.
+
+  Examples:
+    >>> "host_cpu" in _job_scoped_host_data_types()
+    True
+  """
+  from hpcperfstats.dbload.lib.monitor_naming.resolve import (
+    core_pmc_types_probe_order,
+    host_cpu_hw_type_names,
+    host_cpu_type_names,
+    host_mem_job_type_names,
+  )
+
+  names: set[str] = set(_GPU_HOST_DATA_TYPES)
+  names.update(host_cpu_type_names())
+  names.update(host_cpu_hw_type_names())
+  names.update(host_mem_job_type_names())
+  names.update(core_pmc_types_probe_order())
+  names.add("amd_x86_pmc")
+  return frozenset(names)
+
+
+def is_job_scoped_host_data_type(typ: str | None) -> bool:
+  """
+  True when ``typ`` is on the shared-node job-scoped allowlist.
+
+  Unknown / residual types return False (host-wide read when shared).
+
+  Args:
+    typ (str | None): ``host_data.type`` name.
+
+  Returns:
+    bool: Allowlist membership.
+
+  Examples:
+    >>> is_job_scoped_host_data_type("host_cpu")
+    True
+    >>> is_job_scoped_host_data_type("host_mem")
+    False
+  """
+  if typ is None:
+    return False
+  s = str(typ).strip()
+  if not s:
+    return False
+  return s in _job_scoped_host_data_types()
+
+
+def use_host_wide_residual_scope(
+  typ: str | None,
+  *,
+  shared: bool,
+) -> bool:
+  """
+  True when shared-node residual types should skip jid / ``j:`` filters.
+
+  Args:
+    typ (str | None): ``host_data.type`` (required for residual branch).
+    shared (bool): ``job_is_shared_node`` for the job.
+
+  Returns:
+    bool: Host-wide residual path.
+
+  Examples:
+    >>> use_host_wide_residual_scope("host_mem", shared=True)
+    True
+    >>> use_host_wide_residual_scope("host_cpu", shared=True)
+    False
+  """
+  return bool(shared) and bool(typ) and not is_job_scoped_host_data_type(typ)
+
+
+def apply_job_or_host_wide_scope(
+  qs: Any,
+  jid: str,
+  typ: str | None = None,
+  *,
+  shared: bool = False,
+) -> Any:
+  """
+  Job-scope ``qs``, or leave host/time-only for residual types on shared jobs.
+
+  When ``typ`` is missing, always job-scope (fail closed for untyped dumps).
+
+  Args:
+    qs (Any): Django queryset already filtered by host/time (and usually type).
+    jid (str): Job id.
+    typ (str | None): ``host_data.type`` when known.
+    shared (bool): Shared-node signal for this job.
+
+  Returns:
+    Any: Scoped or passthrough queryset.
+
+  Examples:
+    >>> apply_job_or_host_wide_scope(None, "1", "host_mem", shared=True)
+    ... # doctest: +SKIP
+  """
+  if use_host_wide_residual_scope(typ, shared=shared):
+    return qs
+  return apply_job_host_data_scope(qs, jid)
+
+
+def show_shared_host_wide_help_footer(
+  *,
+  is_shared_node: bool,
+  typ: str | None = None,
+  surface_job_scoped: bool | None = None,
+) -> bool:
+  """
+  Gate the red shared-node help footer to residual / host-wide surfaces.
+
+  Args:
+    is_shared_node (bool): Affinity-based shared-node signal.
+    typ (str | None): ``host_data.type`` when the surface maps to one type.
+    surface_job_scoped (bool | None): Explicit override when type is unknown
+      (True → omit footer; False → show when shared; None → use ``typ``).
+
+  Returns:
+    bool: Whether to append ``SHARED_HOST_WIDE_HELP_FOOTER``.
+
+  Examples:
+    >>> show_shared_host_wide_help_footer(is_shared_node=True, typ="host_cpu")
+    False
+    >>> show_shared_host_wide_help_footer(is_shared_node=True, typ="host_mem")
+    True
+  """
+  if not is_shared_node:
+    return False
+  if surface_job_scoped is True:
+    return False
+  if surface_job_scoped is False:
+    return True
+  if typ is None:
+    return True
+  return not is_job_scoped_host_data_type(typ)
+
+
+def host_wide_residual_ht_cache_key(
+  host_fingerprint: str,
+  typ: str,
+  day_iso: str,
+) -> str:
+  """
+  Redis key for residual host-by-time day frames (no jid).
+
+  Args:
+    host_fingerprint (str): Stable sorted-host fingerprint.
+    typ (str): ``host_data.type``.
+    day_iso (str): Calendar day ``YYYY-MM-DD``.
+
+  Returns:
+    str: Cache key under ``KEY_HOST_WIDE_RESIDUAL_HT``.
+
+  Examples:
+    >>> "host_wide_residual_ht" in host_wide_residual_ht_cache_key(
+    ...   "h", "host_mem", "2026-10-22"
+    ... )
+    True
+  """
+  from hpcperfstats.site.lib.machine.cache_utils import (
+    KEY_HOST_WIDE_RESIDUAL_HT,
+    make_cache_key,
+  )
+
+  return make_cache_key(
+    KEY_HOST_WIDE_RESIDUAL_HT,
+    str(host_fingerprint),
+    str(typ),
+    str(day_iso),
+    HOST_WIDE_RESIDUAL_CACHE_REV,
+  )
+
+
+def sorted_hosts_fingerprint(hosts: Any) -> str:
+  """
+  Stable fingerprint for a host list used in residual day-cache keys.
+
+  Args:
+    hosts (Any): Iterable of hostnames.
+
+  Returns:
+    str: Comma-joined sorted unique host strings (empty → ``-``).
+
+  Examples:
+    >>> sorted_hosts_fingerprint(["b", "a"])
+    'a,b'
+  """
+  vals = sorted({str(h) for h in (hosts or []) if h})
+  return ",".join(vals) if vals else "-"
+
+
+def calendar_days_covering(start: Any, end: Any) -> list[str]:
+  """
+  Inclusive calendar-day ISO strings covering ``[start, end]``.
+
+  Args:
+    start (Any): Datetime-like window start.
+    end (Any): Datetime-like window end.
+
+  Returns:
+    list[str]: ``YYYY-MM-DD`` days (empty when bounds missing).
+
+  Examples:
+    >>> from datetime import datetime, timezone
+    >>> calendar_days_covering(
+    ...   datetime(2026, 10, 21, 23, tzinfo=timezone.utc),
+    ...   datetime(2026, 10, 22, 1, tzinfo=timezone.utc),
+    ... )
+    ['2026-10-21', '2026-10-22']
+  """
+  if start is None or end is None:
+    return []
+  try:
+    from datetime import timedelta
+
+    d0 = start.date() if hasattr(start, "date") else start
+    d1 = end.date() if hasattr(end, "date") else end
+    if d1 < d0:
+      d0, d1 = d1, d0
+    out: list[str] = []
+    cur = d0
+    while cur <= d1:
+      out.append(cur.isoformat())
+      cur = cur + timedelta(days=1)
+    return out
+  except Exception:
+    return []
 
 
 def apply_gpu_affinity_dev_filter(

@@ -195,9 +195,19 @@ def host_data_sum_metric_per_sample_rows(
   if jid_s:
     from hpcperfstats.analysis.metrics.lib.job_host_data_scope import (
       job_host_data_scope_sql,
+      job_is_shared_node,
+      use_host_wide_residual_scope,
     )
 
-    scope = job_host_data_scope_sql(table_alias="h")
+    host_wide = use_host_wide_residual_scope(
+      typ, shared=job_is_shared_node(jid_s)
+    )
+    if host_wide:
+      scope = "TRUE"
+      scope_params: list[Any] = []
+    else:
+      scope = job_host_data_scope_sql(table_alias="h")
+      scope_params = [jid_s, jid_s]
     sql = f"""
       SELECT h.host::text AS host,
              h.time AS sample_time,
@@ -209,14 +219,13 @@ def host_data_sum_metric_per_sample_rows(
         AND {scope}
       GROUP BY h.host, h.time
     """
-    params: list[Any] = [
+    params = [
       list(hosts),
       t0,
       t1,
       typ,
       list(events),
-      jid_s,
-      jid_s,
+      *scope_params,
     ]
   else:
     sql = (
@@ -296,11 +305,15 @@ def job_arc_cluster_aggregate_value(
   )
   from hpcperfstats.analysis.metrics.lib.job_host_data_scope import (
     job_host_data_scope_sql,
+    job_is_shared_node,
+    use_host_wide_residual_scope,
   )
 
   arc_filter = " AND arc >= 0" if nonnegative_rate else ""
   jid_s = str(jid).strip() if jid else ""
-  if jid_s:
+  if jid_s and not use_host_wide_residual_scope(
+    typ, shared=job_is_shared_node(jid_s)
+  ):
     scope = " AND " + job_host_data_scope_sql(table_alias="")
     scope_params: list[Any] = [jid_s, jid_s]
   else:

@@ -1889,7 +1889,8 @@ def _host_data_metric_rows_queryset(
     >>> _host_data_metric_rows_queryset(0)  # doctest: +SKIP
   """
   from hpcperfstats.analysis.metrics.lib.job_host_data_scope import (
-    apply_job_host_data_scope,
+    apply_job_or_host_wide_scope,
+    job_is_shared_node,
   )
   from hpcperfstats.site.lib.machine.models import host_data
 
@@ -1900,7 +1901,12 @@ def _host_data_metric_rows_queryset(
     event__in=events,
   )
   if jid:
-    qs = apply_job_host_data_scope(qs, str(jid))
+    qs = apply_job_or_host_wide_scope(
+      qs,
+      str(jid),
+      typename,
+      shared=job_is_shared_node(str(jid)),
+    )
   if sum_per_sample:
     return jid_table.host_data_sum_val_per_sample_queryset(
       qs, metric_column, nonnegative_only=nonnegative_only

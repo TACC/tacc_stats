@@ -451,3 +451,41 @@ def test_cached_non_staff_visible_accounts_uses_cached_orm():
   assert first == ["acct1"]
   assert second == ["acct1"]
   mock_objects.filter.assert_called_once()
+
+
+def test_key_host_wide_residual_ht_defined():
+  from hpcperfstats.site.lib.machine.cache_utils import (
+    KEY_HOST_WIDE_RESIDUAL_HT,
+    make_cache_key,
+  )
+
+  assert KEY_HOST_WIDE_RESIDUAL_HT == "host_wide_residual_ht"
+  key = make_cache_key(
+    KEY_HOST_WIDE_RESIDUAL_HT, "h1", "host_mem", "2026-10-22", 1
+  )
+  assert "jid" not in key.split("host_wide_residual_ht")[0]
+
+
+def test_residual_cache_invalidation_drops_host_day():
+  from hpcperfstats.site.lib.machine import cache_utils
+
+  deleted: list = []
+  mock_client = MagicMock()
+  key = (
+    f"prefix:{cache_utils.KEY_HOST_WIDE_RESIDUAL_HT}:"
+    "c100.cluster:host_mem:2026-10-22:1"
+  )
+  mock_client.scan_iter.return_value = [key.encode()]
+  mock_client.delete.side_effect = lambda k: deleted.append(k)
+
+  with (
+    patch.object(cache_utils, "_get_redis_py_client", return_value=mock_client),
+    patch("hpcperfstats.site.lib.machine.models.job_data.objects") as mock_jd,
+  ):
+    mock_jd.filter.return_value.values_list.return_value = [
+      ["c100.cluster"],
+    ]
+    cache_utils.invalidate_host_wide_residual_ht_for_jids(["42"])
+
+  assert deleted
+  mock_client.scan_iter.assert_called()

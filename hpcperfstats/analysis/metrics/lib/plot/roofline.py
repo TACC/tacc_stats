@@ -1125,9 +1125,6 @@ def plot_roofline_from_jid_table(
   inf_f, inf_b = infer_cpu_roofline_peak_flops_and_bw_gbps(jt)
   peak_flops_gf = peak_flops_gf if peak_flops_gf is not None else inf_f
   peak_bw_gb = peak_bw_gb if peak_bw_gb is not None else inf_b
-  from hpcperfstats.analysis.metrics.lib.job_host_data_scope import (
-    job_is_shared_node_from_jobish,
-  )
 
   return _build_roofline_figure(
     df,
@@ -1135,7 +1132,7 @@ def plot_roofline_from_jid_table(
     peak_bw_gb=peak_bw_gb,
     title="CPU Roofline (job)",
     help_plot_key="jobDetailPlot_roofline_cpu",
-    is_shared_node=job_is_shared_node_from_jobish(jt),
+    is_shared_node=False,  # CPU/GPU PMC surfaces are job-scoped
   )
 
 
@@ -1166,9 +1163,6 @@ def plot_gpu_roofline_from_jid_table(
   inf_f, inf_b = infer_gpu_roofline_peak_flops_and_bw_gbps(jt, bw_axis=bw_axis)
   use_peak_flops = peak_flops_gf if peak_flops_gf is not None else inf_f
   use_peak_bw = peak_bw_gb if peak_bw_gb is not None else inf_b
-  from hpcperfstats.analysis.metrics.lib.job_host_data_scope import (
-    job_is_shared_node_from_jobish,
-  )
 
   return _build_roofline_figure(
     df,
@@ -1176,7 +1170,7 @@ def plot_gpu_roofline_from_jid_table(
     peak_bw_gb=use_peak_bw,
     title=_gpu_roofline_title_for_axis(bw_axis),
     help_plot_key="jobDetailPlot_roofline_gpu",
-    is_shared_node=job_is_shared_node_from_jobish(jt),
+    is_shared_node=False,  # CPU/GPU PMC surfaces are job-scoped
   )
 
 
@@ -1215,9 +1209,6 @@ def plot_and_reason_roofline_from_jid_table(
   eff_bw = use_peak_bw if use_peak_bw is not None else DEFAULT_PEAK_BW_GB
   if not _nominal_roofline_peaks_valid(eff_flops, eff_bw):
     return (None, ROOFLINE_NOMINAL_PEAKS_INVALID_REASON)
-  from hpcperfstats.analysis.metrics.lib.job_host_data_scope import (
-    job_is_shared_node_from_jobish,
-  )
 
   fig = _build_roofline_figure(
     df,
@@ -1225,7 +1216,7 @@ def plot_and_reason_roofline_from_jid_table(
     peak_bw_gb=use_peak_bw,
     title="CPU Roofline (job)",
     help_plot_key="jobDetailPlot_roofline_cpu",
-    is_shared_node=job_is_shared_node_from_jobish(jt),
+    is_shared_node=False,  # CPU/GPU PMC surfaces are job-scoped
   )
   if fig is None:
     return (
@@ -1275,9 +1266,6 @@ def plot_and_reason_gpu_roofline_from_jid_table(
   eff_bw = use_peak_bw if use_peak_bw is not None else DEFAULT_PEAK_BW_GB
   if not _nominal_roofline_peaks_valid(eff_flops, eff_bw):
     return (None, ROOFLINE_NOMINAL_PEAKS_INVALID_REASON, bw_axis)
-  from hpcperfstats.analysis.metrics.lib.job_host_data_scope import (
-    job_is_shared_node_from_jobish,
-  )
 
   fig = _build_roofline_figure(
     df,
@@ -1285,7 +1273,7 @@ def plot_and_reason_gpu_roofline_from_jid_table(
     peak_bw_gb=use_peak_bw,
     title=_gpu_roofline_title_for_axis(bw_axis),
     help_plot_key="jobDetailPlot_roofline_gpu",
-    is_shared_node=job_is_shared_node_from_jobish(jt),
+    is_shared_node=False,  # CPU/GPU PMC surfaces are job-scoped
   )
   if fig is None:
     return (
