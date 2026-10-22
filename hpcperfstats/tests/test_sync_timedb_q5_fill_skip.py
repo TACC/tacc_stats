@@ -98,7 +98,7 @@ def test_retry_or_dead_letter_claim_none_empty_dir_and_score(monkeypatch):
 
 
 def test_requeue_ingest_fill_skip_no_attempt_burn(monkeypatch):
-  """Every fill skip (backpressure and skip_fp) must not bump or dead-letter."""
+  """Backpressure fill skips must not bump or dead-letter."""
   client = jq.SyncTimedbJobStore("")
   claim = jq.ClaimedJob(
     kind=jq.JOB_KIND_INGEST,
@@ -131,7 +131,6 @@ def test_requeue_ingest_fill_skip_no_attempt_burn(monkeypatch):
     "skip_cgroup_headroom",
     "skip_budget_bytes",
     "skip_file_cache_pressure",
-    "skip_fp",
   ):
     bumps.clear()
     requeues.clear()

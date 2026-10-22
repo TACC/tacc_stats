@@ -4146,10 +4146,8 @@ def test_dominant_ingest_fill_block_picks_max():
   assert qo._dominant_ingest_fill_block(stats) == "claim_none"
 
 
-def test_skip_fp_penalty_lets_claimable_job_behind_submit(
-  monkeypatch, tmp_path
-):
-  """RC9: stale fingerprint at head must not block submit of job behind it."""
+def test_skip_fp_refresh_admits_mismatched_head(monkeypatch, tmp_path):
+  """RC9: stale fingerprint refreshes and admits; peer still submits."""
   good_path = tmp_path / "host" / "good"
   good_path.parent.mkdir(parents=True)
   good_path.write_bytes(b"data")
@@ -4175,6 +4173,7 @@ def test_skip_fp_penalty_lets_claimable_job_behind_submit(
   )
   requeue_kw: list[dict] = []
   submitted: list[str] = []
+  fp_writes: list[str] = []
   claim_calls = {"n": 0}
 
   def _claim_jobs(*a, **k):
@@ -4199,7 +4198,12 @@ def test_skip_fp_penalty_lets_claimable_job_behind_submit(
   monkeypatch.setattr(
     jq, "append_queue_dead_letter", lambda *a, **k: letters.append(a) or True
   )
-  monkeypatch.setattr(jq, "write_job_fingerprint", lambda *a, **k: True)
+
+  def _write_fp(*a, **k):
+    fp_writes.append(str(k.get("identity") or (a[2] if len(a) > 2 else "")))
+    return True
+
+  monkeypatch.setattr(jq, "write_job_fingerprint", _write_fp)
   monkeypatch.setattr(jq, "ack_job", lambda *a, **k: True)
 
   class _Pool:
@@ -4207,6 +4211,7 @@ def test_skip_fp_penalty_lets_claimable_job_behind_submit(
       submitted.append(args[0])
       return type("_R", (), {"ready": lambda self: False})()
 
+  fill_stats = qo._empty_ingest_fill_stats()
   n = qo._fill_ingest_band(
     SyncTimedbJobStore(""),
     band="hot",
@@ -4218,12 +4223,14 @@ def test_skip_fp_penalty_lets_claimable_job_behind_submit(
     band_cap=2,
     tgz_archive_dir=str(tmp_path),
     archive_data_dir=str(tmp_path),
+    fill_stats=fill_stats,
   )
-  assert n == 1
-  assert submitted == [str(good_path)]
-  assert len(requeue_kw) == 1
-  assert requeue_kw[0]["identity"] == str(bad_path)
-  assert requeue_kw[0]["score"] == qo._penalized_ingest_requeue_score(5.0)
+  assert n == 2
+  assert submitted == [str(bad_path), str(good_path)]
+  assert requeue_kw == []
+  assert str(bad_path) in fp_writes
+  assert fill_stats.get("skip_fp", 0) == 0
+  assert fill_stats.get("fp_refresh", 0) == 1
   assert bumps == []
   assert letters == []
 

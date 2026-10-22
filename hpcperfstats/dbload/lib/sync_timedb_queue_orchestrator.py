@@ -3518,10 +3518,11 @@ def _requeue_ingest_fill_skip(
   """
   Penalty-requeue an ingest fill skip without bumping its attempt counter.
 
-  Every fill skip (``skip_budget_bytes``, ``skip_cgroup_headroom``,
-  ``skip_file_cache_pressure``, ``skip_fp``) is a wait, not a failure, so it
-  never dead-letters. The penalty score keeps a stale head (RC9) from
-  spinning ahead of claimable peers.
+  Every backpressure fill skip (``skip_budget_bytes``,
+  ``skip_cgroup_headroom``, ``skip_file_cache_pressure``) is a wait, not a
+  failure, so it never dead-letters. The penalty score keeps a blocked head
+  from spinning ahead of claimable peers. Fingerprint mismatch admits after
+  refresh (RC9) and does not call this helper.
 
   Args:
     client (Any): job store.
@@ -3536,7 +3537,7 @@ def _requeue_ingest_fill_skip(
 
   Examples:
     >>> _requeue_ingest_fill_skip(
-    ...   None, claim=None, archive_data_dir="/a", reason="skip_fp"
+    ...   None, claim=None, archive_data_dir="/a", reason="skip_budget_bytes"
     ... )
     'dropped_no_claim'
   """
@@ -3825,19 +3826,9 @@ def _fill_ingest_band(
               st_now.st_mtime_ns,
             ),
           )
-        _requeue_ingest_fill_skip(
-          client,
-          claim=claim,
-          archive_data_dir=archive_data_dir,
-          reason="skip_fp",
-          score=claim.score,
-          log_fn=log_fn,
-        )
-        skipped += 1
-        stats["skip_fp"] += 1
-        if skipped >= budget:
-          break
-        continue
+        # RC9: refresh identity metadata and admit (do not penalty-requeue /
+        # burn skip_budget — that underfills the pool on growing hot files).
+        stats["fp_refresh"] = int(stats.get("fp_refresh", 0) or 0) + 1
       size_bytes = int(st_now.st_size)
       if inflight_sizes is not None:
         stats["admit_probes"] = int(stats.get("admit_probes", 0) or 0) + 1
