@@ -94,7 +94,7 @@ Remove **`sync_process_tree_rss_limit_mb`** and **`sync_process_tree_rss_exit_mb
 
 | Old key | New key | 128g production default |
 | --- | --- | --- |
-| `sync_process_tree_rss_limit_mb=50000` | **`sync_process_tree_rss_limit_cgroup_pct=40`** | **40** → effective roof **52428** MiB, raw budget **≈20971** MiB (`/ 2.5`) |
+| `sync_process_tree_rss_limit_mb=50000` | **`sync_process_tree_rss_limit_cgroup_pct=40`** | **40** → effective roof **52428** MiB, raw budget **≈52428** MiB (`/ PEAK 1.0`) |
 | `sync_process_tree_rss_exit_mb=0` | **`sync_process_tree_rss_exit_cgroup_pct=0`** | **0** = hard exit off |
 
 Effective MiB = ``(memory.max × pct // 100) // (1024×1024)`` at runtime. **`limit_cgroup_pct=0`** disables defer and the raw-byte admit gate (same as old **`limit_mb=0`**). Recompute pct on non-128g hosts: ``round(100 × desired_roof_mib / memory_max_mib)``. Telem prints **`rss_limit_cgroup_pct=`** plus effective **`rss_limit_mib=`**. See **`docs/DEPLOY_CONCURRENCY_AND_NUMA.md`** § OOM.

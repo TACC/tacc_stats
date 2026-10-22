@@ -7,7 +7,7 @@ Attributes:
   REAP_KEEP: Attribute.
   REAP_RSS: Attribute.
   PEAK_CGROUP_PER_RAW_FILE_BYTE: Design peak cgroup bytes per in-flight
-    raw ``st_size`` byte (admit budget = tree RSS roof / this).
+    raw ``st_size`` byte (admit budget = tree RSS roof / this; default 1.0).
   _MIB_BYTES: Bytes in one mebibyte (``1024 * 1024``).
   _FAILED_OUTCOMES: Attribute.
   _LIBC: Cached ``ctypes.CDLL("libc.so.6")`` handle for malloc_trim.
@@ -28,10 +28,13 @@ REAP_KEEP = "keep"
 REAP_FAILURE = "failure_reap"
 REAP_RSS = "rss_reap"
 
-# Design peak cgroup bytes per in-flight raw ``st_size`` byte (page cache ≈1x
-# + parse/DF/jemalloc ≈1-1.5x). Ingest admit budget = tree RSS roof / this.
-# See plan sync-timedb-oom-sep24 + docs/DEPLOY_CONCURRENCY_AND_NUMA.md § OOM.
-PEAK_CGROUP_PER_RAW_FILE_BYTE = 2.5
+# Design peak cgroup bytes per in-flight raw ``st_size`` byte. Ingest admit
+# budget = tree RSS roof / this. Was 2.5 (thread-era whole-file heap); streaming
+# parse + Codon (hpcperfstats02 2026-10-22) showed ~0.2x anon vs raw while
+# skip_budget_bytes underfilled the pool — lowered to 1.0 (budget ≈ roof).
+# Headroom / file-cache gates remain the shared-cgroup safety net.
+# See docs/DEPLOY_CONCURRENCY_AND_NUMA.md § OOM.
+PEAK_CGROUP_PER_RAW_FILE_BYTE = 1.0
 _MIB_BYTES = 1024 * 1024
 
 _FAILED_OUTCOMES = frozenset(
