@@ -6497,6 +6497,13 @@ def run_sync_timedb_supervisor_from_parsed(
     f"Pipeline absolute pools effective_cores={cfg.get_effective_cores()} sync_ingest={cfg.get_sync_ingest_pool_processes()} sync_archive={cfg.get_sync_archive_pool_processes()} metrics={cfg.get_metrics_pool_processes()}",
     flush=True,
   )
+  # In-process entry (loaded48 / tests) skips ``main()``; still size Codon
+  # workers from the active ingest pool (may be monkeypatched).
+  from hpcperfstats.dbload.lib.sync_timedb_codon_bridge import (
+    log_codon_parse_startup,
+  )
+
+  log_codon_parse_startup()
   with create_sync_timedb_thread_pool(
     max_workers=archive_thread_count,
     thread_role="archive-pool",
@@ -6514,6 +6521,8 @@ def run_sync_timedb_supervisor_from_parsed(
       )
     except MultiprocessingWorkerExitError as exc:
       hard_exit_pool_worker_error(exc)
+  # Codon Popen workers are reaped by process exit / soak finally. Do not
+  # shut them down here — under FT, teardown from this thread can spin forever.
 
   if DEBUG:
     log_print("sync_timedb finished")

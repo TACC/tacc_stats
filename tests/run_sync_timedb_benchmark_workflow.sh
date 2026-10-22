@@ -71,6 +71,8 @@ Environment:
   HPCPERFSTATS_CONTENTION_ARM              baseline|candidate (default baseline)
   HPCPERFSTATS_CONTENTION_WAVE             Wave id (caches, park_resume, ...)
   HPCPERFSTATS_LOADED48_HOURS              Soak wall hours (default 6)
+  HPCPERFSTATS_CODON_PARSE_DISABLE         Forwarded with --loaded48 (set 1 for
+                                           CPython Arm A vs Codon Arm B)
   HPCPERFSTATS_COMPOSE_NETWORK=1           Set by this script for django_db tests
   HPCPERFSTATS_SYNC_TIMEDB_SCREEN_WIDTHS   Optional CSV override (default 1..96 or knee)
   HPCPERFSTATS_SYNC_TIMEDB_SCREEN_REPLICATES  Optional replicate count
@@ -292,6 +294,12 @@ if [[ "$LOADED48" -eq 1 ]]; then
   RUN_ARGS+=(-e "HPCPERFSTATS_LOADED48_HOURS=${HPCPERFSTATS_LOADED48_HOURS:-6}")
   [[ -n "${HPCPERFSTATS_SYNC_TIMEDB_LOADED48_WIDTH:-}" ]] && \
     RUN_ARGS+=(-e "HPCPERFSTATS_SYNC_TIMEDB_LOADED48_WIDTH=${HPCPERFSTATS_SYNC_TIMEDB_LOADED48_WIDTH}")
+  # Codon divert toggle for CPython-vs-Codon loaded48 A/B (Arm A sets DISABLE=1).
+  [[ -n "${HPCPERFSTATS_CODON_PARSE_DISABLE:-}" ]] && \
+    RUN_ARGS+=(-e "HPCPERFSTATS_CODON_PARSE_DISABLE=${HPCPERFSTATS_CODON_PARSE_DISABLE}")
+  # Opt out of Codon Popen workers (FT soak teardown); in-process N=1 instead.
+  [[ -n "${HPCPERFSTATS_CODON_PROCESS_POOL:-}" ]] && \
+    RUN_ARGS+=(-e "HPCPERFSTATS_CODON_PROCESS_POOL=${HPCPERFSTATS_CODON_PROCESS_POOL}")
   # Forward insert-path A/B arms into the soak (COPY vs bulk_create).
   [[ -n "${HPCPERFSTATS_HOST_INSERT_ARM:-}" ]] && \
     RUN_ARGS+=(-e "HPCPERFSTATS_HOST_INSERT_ARM=${HPCPERFSTATS_HOST_INSERT_ARM}")

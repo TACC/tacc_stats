@@ -36,16 +36,16 @@ Forbidden for prod: host-side `build_codon_ext.sh`, staging `codon_parse_image/`
 or copying prebuilt `.so` into the build context.
 
 1. `codon build -release --mcpu=native --linker-flags "-flto=thin" --lib feed_collapse_capi.py` → `libhpcperfstats_codon_kernel.so` (`feed_and_collapse_fingerprint_c`, `parse_stats_lines_codon_run_c`).
-2. Compile `pyext_ft_init.c` with `-march=native -mtune=native -flto=thin` against `/opt/python3.14t` headers (multi-phase slots, `Py_MOD_GIL_USED`); link `hpcperfstats_codon_parse.so` with ThinLTO + `-Wl,-rpath,$ORIGIN` + `-lhpcperfstats_codon_kernel`.
-3. Hard smoke under **free-threaded** `/opt/python3.14t`: empty fingerprint + E6 fingerprint + **`parse_stats_lines_codon`** row counts → **`codon_pyext_314t=pass`**.
+2. Compile `pyext_ft_init.c` with `-march=native -mtune=native -flto=thin` against `/opt/python3.14t` headers (multi-phase slots, **`Py_MOD_GIL_NOT_USED`**, per-slot marshal); link `hpcperfstats_codon_parse.so` with ThinLTO + `-Wl,-rpath,$ORIGIN` + `-lhpcperfstats_codon_kernel`.
+3. Hard smoke under **free-threaded** `/opt/python3.14t`: **`sys._is_gil_enabled() is False`** after import (`codon_pyext_314t_gil_off=pass`) + empty fingerprint + E6 fingerprint + **`parse_stats_lines_codon`** row counts → **`codon_pyext_314t=pass`**.
 4. GIL `/opt/python3.14` against the FT-header `.so` is best-effort (`codon_pyext_gil=pass` or `skip_ft_abi`).
 
 Do **not** leave `hpcperfstats_codon_parse.py` stubs next to the `.so` (shadows the extension). Deploy pyext + kernel **and** Codon runtime libs (`libcodonrt.so`, `libomp.so`, `libgfortran.so.5`, `libquadmath.so.0`, `libgcc_s.so.1`) under `/opt/hpcperfstats/codon_parse` with `$ORIGIN` rpath (`PYTHONPATH` for `sync_timedb`). No `/opt/codon` mount in the pipeline image.
 
 ## Bridge
 
-`hpcperfstats/dbload/lib/sync_timedb_codon_bridge.py` — fail-closed; `parse_stats_lines` takes Codon when `parse_stats_lines_codon` exists on the extension. Fingerprint API alone does not divert ORM ingest. Startup logs `codon_parse status=enabled|disabled …`.
+`hpcperfstats/dbload/lib/sync_timedb_codon_bridge.py` — fail-closed; width **`N = round(parse_pool × sync_codon_context_pool_fraction)`** (default 0.125). Production FT + baked `.so` uses **Popen stdio Codon workers** (`codon_mode=process_pool`, `codon_process_worker.py`, kill-only atexit — no `multiprocessing` teardown under FT) because codonrt is not safe across threads in one process; host fakes stay `codon_mode=in_process`. No process-wide serialize (`codonrt_serialize=0`). GIL-after-import fail-closed on 3.14t; `parse_stats_lines` takes Codon when `parse_stats_lines_codon` exists. Fingerprint API alone does not divert ORM ingest. Startup logs `codon_parse status=enabled|disabled … gil=off contexts=N codon_mode=… codonrt_serialize=0`. Concurrent stress: `test_runs/codon_stripe_stress_*.log` with `slot_occ_max>1`.
 
 ## Contract rule
 
-`hpcperfstats/cursor-rules/codon-sync-timedb-parse-contract.mdc` — class-free unit + FT C-ABI/`Py_MOD_GIL_USED` + Codon-NumPy + A/B ≥1.25× + `--mcpu=native` / ThinLTO + GPU/`j:` feed parity.
+`hpcperfstats/cursor-rules/codon-sync-timedb-parse-contract.mdc` — class-free unit + FT C-ABI/`Py_MOD_GIL_NOT_USED` + process-pool concurrent Codon + Codon-NumPy + A/B ≥1.25× + `--mcpu=native` / ThinLTO + GPU/`j:` feed parity.

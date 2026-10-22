@@ -68,9 +68,12 @@ build_web_image_with_target() {
     return 1
   fi
   echo "Building ${image_name} target=${target} via podman build (podman-compose lacks compose build --target) ..."
+  # Always refresh COPY --from=codon-build (Buildah can retain a stale codon_parse layer).
+  local codon_bust="${HPCPERFSTATS_CODON_CACHEBUST:-$(date -u +%Y%m%dT%H%M%SZ)}"
   "${PODMAN[@]}" build \
     --target "${target}" \
     --build-arg "HPCPERFSTATS_GIT_COMMIT=${git_commit}" \
+    --build-arg "HPCPERFSTATS_CODON_CACHEBUST=${codon_bust}" \
     -f "${dockerfile}" \
     -t "${image_name}" \
     "${REPO_ROOT}"

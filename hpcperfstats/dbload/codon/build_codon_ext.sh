@@ -2,7 +2,7 @@
 # In-image Codon FT pyext bake (pipeline_web.Dockerfile codon-build stage).
 # Produces /opt/hpcperfstats/codon_parse with:
 #   libhpcperfstats_codon_kernel.so  — Codon --lib (@export C entry)
-#   hpcperfstats_codon_parse.so      — pyext_ft_init.c (Py_MOD_GIL_USED)
+#   hpcperfstats_codon_parse.so      — pyext_ft_init.c (Py_MOD_GIL_NOT_USED)
 #   libcodonrt.so / libomp.so / libgfortran / libquadmath / libgcc_s
 # linked with -Wl,-rpath,$ORIGIN (no /opt/codon at runtime).
 set -euo pipefail
@@ -138,6 +138,9 @@ from feed_collapse import build_e6_payload_lines, feed_and_collapse_fingerprint 
 
 assert hasattr(m, "feed_and_collapse_fingerprint")
 assert hasattr(m, "parse_stats_lines_codon")
+gil = sys._is_gil_enabled()
+assert gil is False, gil
+print("codon_pyext_314t_gil_off=pass")
 fp = m.feed_and_collapse_fingerprint([])
 assert fp == (0, 0, 0.0, 0.0), fp
 print("fp_empty", fp)
@@ -150,7 +153,7 @@ oracle_py = py_fp(lines)
 assert codon_fp == oracle_py, (codon_fp, oracle_py)
 print("fp_e6", codon_fp)
 
-c_stats, c_procs = m.parse_stats_lines_codon(lines)
+c_stats, c_procs = m.parse_stats_lines_codon(lines, 0)
 assert len(c_stats) == codon_fp[0], (len(c_stats), codon_fp[0])
 assert len(c_procs) == int(codon_fp[3]), (len(c_procs), codon_fp[3])
 print("parse_stats_lines_codon_e6", len(c_stats), len(c_procs))
@@ -170,3 +173,5 @@ fi
 
 ls -la "${CODON_OUT}"
 echo "codon_out=${CODON_OUT}"
+
+# cache-bust codon-ft-no-gil 20261022T050025Z

@@ -4065,6 +4065,34 @@ def test_drain_timeout_terminates_before_requeue():
   )
 
 
+def test_drain_deadline_armed_even_if_coordinator_set_draining_first():
+  """Shutdown must arm drain_deadline even when barrier.draining is already set.
+
+  Coordinators set ``barrier.draining`` on ``shutdown_requested()`` before Main
+  may observe it. If Main only arms the deadline inside
+  ``not barrier.draining.is_set()``, the deadline stays 0 and a stalled
+  ``all_drained`` (Codon-on hang) never times out.
+  """
+  src = inspect.getsource(qo.run_sync_timedb_queue_orchestrator)
+  # Main loop: shutdown_requested() then deadline arm before draining.set only.
+  idx = src.find("if shutdown_requested():")
+  assert idx != -1
+  window = src[idx : idx + 450]
+  assert "if drain_deadline == 0.0:" in window
+  assert window.find("if drain_deadline == 0.0:") < window.find(
+    "if not barrier.draining.is_set():"
+  )
+
+
+def test_populate_reap_skipped_after_shutdown_requested():
+  """Main must not call populate.reap_and_restart after shutdown (Codon hang)."""
+  src = inspect.getsource(qo.run_sync_timedb_queue_orchestrator)
+  idx = src.find("populate.reap_and_restart()")
+  assert idx != -1
+  window = src[max(0, idx - 200) : idx + 40]
+  assert "if not shutdown_requested():" in window
+
+
 def test_ingest_timeout_requeues_without_attempt_bump(tmp_path, monkeypatch):
   """P1-18: timeout/lookup_budget must not burn the poison attempt counter."""
   monkeypatch.setattr(jq, "job_max_attempts", lambda: 5)

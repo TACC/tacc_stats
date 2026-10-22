@@ -133,6 +133,10 @@ def test_loaded48_helpers_hours_occupancy_manifest():
       width=48,
       warmup_s=300.0,
   )
+  # Short smoke: warmup-inclusive peak (not post-warmup busy) gates occupancy.
+  assert mod.loaded48_smoke_peak_ok(hours=0.25, peak_inflight=64, width=64)
+  assert not mod.loaded48_smoke_peak_ok(hours=0.25, peak_inflight=0, width=64)
+  assert not mod.loaded48_smoke_peak_ok(hours=1.0, peak_inflight=64, width=64)
   m = mod.build_loaded48_manifest(
       hours=0.1,
       ingest_width=48,

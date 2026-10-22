@@ -25,7 +25,7 @@ Benches/inventory stay under `experiments/codon/`.
 |------|------|
 | `feed_collapse.py` | Class-free Codon-NumPy feed + plain-host collapse |
 | `feed_collapse_capi.py` | `@export` C ABI (`fingerprint` + `parse_stats_lines_codon`) |
-| `pyext_ft_init.c` | Multi-phase `Py_MOD_GIL_USED` FT trampoline |
+| `pyext_ft_init.c` | Multi-phase `Py_MOD_GIL_NOT_USED` FT trampoline (slot-aware marshal) |
 | `collapse_sum_kernel.py` | Extra Codon-NumPy kernel (maximize-surface) |
 | `feed_collapse_bench.py` | `codon run` / CPython bench entry (experiments only) |
 | `build_codon_ext.sh` | In-image bake helper (Dockerfile `codon-build` only) |

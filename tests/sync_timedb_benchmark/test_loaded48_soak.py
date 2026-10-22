@@ -17,6 +17,7 @@ from tests.sync_timedb_benchmark.screening_runner import (
     loaded48_hours,
     loaded48_mode_enabled,
     loaded48_occupancy_ok,
+    loaded48_smoke_peak_ok,
     plant_loaded48_queue_padding,
     reset_screening_state,
     summarize_width_replicates,
@@ -262,14 +263,40 @@ def test_loaded48_continuous_fill_soak(monkeypatch):
   refill_thr.start()
   watch_thr.start()
 
+  # Bound supervisor join: Codon-on can hang native workers past drain.
+  supervisor_error: list[BaseException] = []
+
+  def _run_supervisor() -> None:
+    try:
+      run_sync_timedb_supervisor_from_parsed(False, None, None)
+    except BaseException as exc:  # noqa: BLE001 — surface in parent
+      supervisor_error.append(exc)
+
   try:
     database_startup()
-    run_sync_timedb_supervisor_from_parsed(False, None, None)
+    sup_thr = threading.Thread(
+        target=_run_supervisor, name="loaded48-supervisor", daemon=True
+    )
+    sup_thr.start()
+    # wall + drain budget + margin (SHUTDOWN_DRAIN_TIMEOUT_S is 120s).
+    sup_thr.join(timeout=float(wall_s) + 180.0)
+    if sup_thr.is_alive():
+      request_shutdown()
+      sup_thr.join(timeout=30.0)
   finally:
     stop.set()
     request_shutdown()
-    refill_thr.join(timeout=30.0)
-    watch_thr.join(timeout=30.0)
+    # Codon Popen workers: do not tear down from soak under FT (spins).
+    # Container/process exit reaps them.
+    refill_thr.join(timeout=5.0)
+    watch_thr.join(timeout=5.0)
+    if sup_thr.is_alive():
+      request_shutdown()
+      # Daemon supervisor — do not join forever if it is wedged.
+      sup_thr.join(timeout=2.0)
+
+  if supervisor_error:
+    raise supervisor_error[0]
 
   elapsed = max(1e-6, time.monotonic() - t0)
   finals = complete_counts[-1] if complete_counts else _count_complete()
@@ -310,10 +337,12 @@ def test_loaded48_continuous_fill_soak(monkeypatch):
   )
   peak_n = max((int(row[1]) for row in samples), default=0)
   peak_post = max(busy_secs) if busy_secs else 0
-  # Short smoke at high width: prove the pool can reach near-full once.
-  # Sustained full_frac is owned by the multi-hour soak (3h/6h).
+  # Short smoke at high width: prove the pool can reach near-full once
+  # (warmup-inclusive peak_n). Sustained full_frac is owned by multi-hour soaks.
   occupancy_gate = "sustained"
-  if (not occ_ok) and hours <= 0.25 and peak_post >= max(1, int(ingest_width * 0.75)):
+  if (not occ_ok) and loaded48_smoke_peak_ok(
+      hours=hours, peak_inflight=peak_n, width=ingest_width
+  ):
     occ_ok = True
     occupancy_gate = "smoke_peak"
   abi = "%s" % (getattr(sys, "version", "unknown"),)
@@ -352,6 +381,11 @@ def test_loaded48_continuous_fill_soak(monkeypatch):
   )
   payload["host_insert_arm"] = host_arm
   payload["proc_insert_arm"] = proc_arm
+  # Codon A/B: env divert flag (1/true = CPython arm).
+  payload["codon_parse_disable"] = bool(
+      os.environ.get("HPCPERFSTATS_CODON_PARSE_DISABLE", "").strip().lower()
+      in {"1", "true", "yes", "on"}
+  )
   out = write_screening_artifact(
       payload,
       repo_root=REPO_ROOT,

@@ -75,6 +75,25 @@ def test_terminate_shuts_abandoned_task_backend_socket(monkeypatch):
   assert pool._task_connections == {}
 
 
+def test_join_after_terminate_does_not_wait_for_stuck_worker():
+  """terminate() then join() must not hang on workers stuck in native/long sleep."""
+  release = threading.Event()
+
+  def stuck() -> None:
+    release.wait(timeout=3600)
+
+  pool = SyncTimedbThreadPool(max_workers=1, thread_role="ingest-pool")
+  try:
+    pool.apply_async(stuck)
+    time.sleep(0.1)
+    pool.terminate()
+    t0 = time.monotonic()
+    pool.join()
+    assert (time.monotonic() - t0) < 2.0
+  finally:
+    release.set()
+
+
 def test_completed_task_is_never_abandoned(monkeypatch):
   """Normal completion unregisters the task; later terminate touches nothing."""
   ours, peer = socket.socketpair()

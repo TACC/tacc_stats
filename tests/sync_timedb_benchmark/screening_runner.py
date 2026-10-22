@@ -1086,6 +1086,40 @@ def loaded48_occupancy_ok(
   return (full / float(len(vals))) >= float(min_full_frac)
 
 
+def loaded48_smoke_peak_ok(
+    *,
+    hours: float,
+    peak_inflight: int,
+    width: int,
+) -> bool:
+  """
+  Return True when a short smoke may pass on a near-full peak once.
+
+  For ``hours <= 0.25``, sustained post-warmup ``full_frac`` is often empty
+  at high width (fill/drain samples land on idle ticks). Accept a
+  warmup-inclusive ``peak_inflight`` at or above 75% of ``width``.
+
+  Args:
+    hours (float): Configured soak hours.
+    peak_inflight (int): Max ``in_flight_n`` across all samples (incl. warmup).
+    width (int): Ingest pool width.
+
+  Returns:
+    bool: True when the short-smoke peak gate applies.
+
+  Examples:
+    >>> loaded48_smoke_peak_ok(hours=0.25, peak_inflight=64, width=64)
+    True
+    >>> loaded48_smoke_peak_ok(hours=0.25, peak_inflight=0, width=64)
+    False
+    >>> loaded48_smoke_peak_ok(hours=1.0, peak_inflight=64, width=64)
+    False
+  """
+  return float(hours) <= 0.25 and int(peak_inflight) >= max(
+      1, int(width * 0.75)
+  )
+
+
 def build_loaded48_manifest(
     *,
     hours: float,

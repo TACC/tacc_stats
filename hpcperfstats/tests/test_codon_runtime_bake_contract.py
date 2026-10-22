@@ -33,12 +33,15 @@ def test_build_script_is_in_image_only_no_podman_host_bake() -> None:
   assert "patchelf --set-rpath '$ORIGIN'" in text
   assert "podman" not in text
   assert "codon_parse_image" not in text
+  assert "Py_MOD_GIL_NOT_USED" in text or "GIL_NOT_USED" in text
+  assert "codon_pyext_314t_gil_off=pass" in text
   # Smoke must not put a Codon install tree on LD_LIBRARY_PATH.
   smoke = text.split("FT 3.14t import+fingerprint smoke")[1].split(
     "codon_pyext_314t=pass"
   )[0]
   assert 'LD_LIBRARY_PATH="/opt/zlib-ng/lib:/opt/python3.14t/lib"' in smoke
   assert "/opt/codon/lib" not in smoke
+  assert "sys._is_gil_enabled()" in smoke or "_is_gil_enabled" in smoke
 
 
 def test_dockerfile_codon_build_stage_copies_to_runtime() -> None:
@@ -54,9 +57,18 @@ def test_dockerfile_codon_build_stage_copies_to_runtime() -> None:
   assert "flto=thin" in _BUILD.read_text(encoding="utf-8")
   base = _stage_body(text, "hpcperfstats-base")
   assert "COPY --from=codon-build /opt/hpcperfstats/codon_parse" in base
+  assert "HPCPERFSTATS_CODON_CACHEBUST" in base
   assert "test -f /opt/hpcperfstats/codon_parse/libcodonrt.so" in base
   assert "codon_parse_image" not in text
   assert "build_codon_ext_in_pipeline.sh" not in text
+
+
+def test_rebuild_helper_passes_codon_cachebust_build_arg() -> None:
+  helpers = (
+    _REPO / "scripts" / "lib" / "compose_frontend_helpers.sh"
+  ).read_text(encoding="utf-8")
+  assert "HPCPERFSTATS_CODON_CACHEBUST" in helpers
+  assert "--build-arg" in helpers
 
 
 def test_versioned_shared_object_sonames_are_gitignored() -> None:

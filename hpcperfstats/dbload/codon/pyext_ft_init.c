@@ -3,14 +3,21 @@
  *
  * Codon 0.20.4 --pyext PyInit/Create2 and from_python converters are GIL-ABI
  * and SIGSEGV / fail under /opt/python3.14t. We build the Codon unit with
- * --lib (@export C entry), marshal List[str] -> char** here, and expose
+ * --lib (@export C entry), marshal List[str] -> owned char** here, and expose
  * METH_VARARGS methods that call Codon C ABI.
+ *
+ * Declares Py_MOD_GIL_NOT_USED. Concurrent callers must use distinct slot
+ * banks (optional slot arg; default 0) under bridge per-slot locks.
  */
 #define PY_SSIZE_T_CLEAN
 #include <Python.h>
 #include <stdint.h>
+#include <string.h>
+
+#define MAX_CODON_SLOTS 32
 
 extern void feed_and_collapse_fingerprint_c(
+  long slot,
   long n,
   char **ptr,
   long *out_raw,
@@ -20,26 +27,27 @@ extern void feed_and_collapse_fingerprint_c(
 );
 
 extern void parse_stats_lines_codon_run_c(
+  long slot,
   long n,
   char **ptr,
   long *out_ns,
   long *out_np
 );
 
-extern double pss_time_c(long i);
-extern double pss_value_c(long i);
-extern long pss_wid_c(long i);
-extern double pss_mult_c(long i);
-extern char *pss_host_c(long i);
-extern char *pss_jid_c(long i);
-extern char *pss_type_c(long i);
-extern char *pss_dev_c(long i);
-extern char *pss_event_c(long i);
-extern char *pss_unit_c(long i);
-extern char *psp_jid_c(long i);
-extern char *psp_host_c(long i);
-extern char *psp_proc_c(long i);
-extern long psp_field_c(long i, long key_idx);
+extern double pss_time_c(long slot, long i);
+extern double pss_value_c(long slot, long i);
+extern long pss_wid_c(long slot, long i);
+extern double pss_mult_c(long slot, long i);
+extern char *pss_host_c(long slot, long i);
+extern char *pss_jid_c(long slot, long i);
+extern char *pss_type_c(long slot, long i);
+extern char *pss_dev_c(long slot, long i);
+extern char *pss_event_c(long slot, long i);
+extern char *pss_unit_c(long slot, long i);
+extern char *psp_jid_c(long slot, long i);
+extern char *psp_host_c(long slot, long i);
+extern char *psp_proc_c(long slot, long i);
+extern long psp_field_c(long slot, long i, long key_idx);
 
 /* Must match feed_collapse.HOST_PROC_KEYS order. */
 static const char *const HOST_PROC_KEYS[] = {
@@ -48,6 +56,18 @@ static const char *const HOST_PROC_KEYS[] = {
 };
 static const Py_ssize_t HOST_PROC_N =
   (Py_ssize_t)(sizeof(HOST_PROC_KEYS) / sizeof(HOST_PROC_KEYS[0]));
+
+static void
+free_char_ptrs(char **ptrs, Py_ssize_t n)
+{
+  if (ptrs == NULL) {
+    return;
+  }
+  for (Py_ssize_t i = 0; i < n; i++) {
+    PyMem_Free(ptrs[i]);
+  }
+  PyMem_Free(ptrs);
+}
 
 static int
 fill_char_ptrs(PyObject *list_obj, char ***out_ptrs, Py_ssize_t *out_n)
@@ -66,17 +86,40 @@ fill_char_ptrs(PyObject *list_obj, char ***out_ptrs, Py_ssize_t *out_n)
   for (Py_ssize_t i = 0; i < n; i++) {
     PyObject *item = PyList_GET_ITEM(list_obj, i);
     if (!PyUnicode_Check(item)) {
-      PyMem_Free(ptrs);
+      free_char_ptrs(ptrs, i);
       PyErr_SetString(PyExc_TypeError, "lines must be str");
       return -1;
     }
-    ptrs[i] = (char *)PyUnicode_AsUTF8(item);
-    if (ptrs[i] == NULL) {
-      PyMem_Free(ptrs);
+    const char *utf8 = PyUnicode_AsUTF8(item);
+    if (utf8 == NULL) {
+      free_char_ptrs(ptrs, i);
       return -1;
     }
+    const size_t len = strlen(utf8);
+    char *owned = (char *)PyMem_Malloc(len + 1);
+    if (owned == NULL) {
+      free_char_ptrs(ptrs, i);
+      PyErr_NoMemory();
+      return -1;
+    }
+    memcpy(owned, utf8, len + 1);
+    ptrs[i] = owned;
   }
   *out_ptrs = ptrs;
+  return 0;
+}
+
+static int
+parse_lines_and_slot(PyObject *args, PyObject **list_obj, long *slot)
+{
+  *slot = 0;
+  if (!PyArg_ParseTuple(args, "O!|l", &PyList_Type, list_obj, slot)) {
+    return -1;
+  }
+  if (*slot < 0 || *slot >= MAX_CODON_SLOTS) {
+    PyErr_SetString(PyExc_ValueError, "codon slot out of range");
+    return -1;
+  }
   return 0;
 }
 
@@ -84,7 +127,8 @@ static PyObject *
 feed_and_collapse_fingerprint_py(PyObject *self, PyObject *args)
 {
   PyObject *list_obj = NULL;
-  if (!PyArg_ParseTuple(args, "O!", &PyList_Type, &list_obj)) {
+  long slot = 0;
+  if (parse_lines_and_slot(args, &list_obj, &slot) < 0) {
     return NULL;
   }
   char **ptrs = NULL;
@@ -97,6 +141,7 @@ feed_and_collapse_fingerprint_py(PyObject *self, PyObject *args)
   double value_sum = 0.0;
   double proc_rows = 0.0;
   feed_and_collapse_fingerprint_c(
+    slot,
     (long)n,
     ptrs,
     &raw_stats,
@@ -104,7 +149,7 @@ feed_and_collapse_fingerprint_py(PyObject *self, PyObject *args)
     &value_sum,
     &proc_rows
   );
-  PyMem_Free(ptrs);
+  free_char_ptrs(ptrs, n);
   return Py_BuildValue("(lldd)", raw_stats, collapsed_rows, value_sum, proc_rows);
 }
 
@@ -121,7 +166,8 @@ static PyObject *
 parse_stats_lines_codon_py(PyObject *self, PyObject *args)
 {
   PyObject *list_obj = NULL;
-  if (!PyArg_ParseTuple(args, "O!", &PyList_Type, &list_obj)) {
+  long slot = 0;
+  if (parse_lines_and_slot(args, &list_obj, &slot) < 0) {
     return NULL;
   }
   char **ptrs = NULL;
@@ -131,8 +177,8 @@ parse_stats_lines_codon_py(PyObject *self, PyObject *args)
   }
   long n_stats = 0;
   long n_procs = 0;
-  parse_stats_lines_codon_run_c((long)n, ptrs, &n_stats, &n_procs);
-  PyMem_Free(ptrs);
+  parse_stats_lines_codon_run_c(slot, (long)n, ptrs, &n_stats, &n_procs);
+  free_char_ptrs(ptrs, n);
 
   PyObject *stats = PyList_New((Py_ssize_t)n_stats);
   if (stats == NULL) {
@@ -146,34 +192,34 @@ parse_stats_lines_codon_py(PyObject *self, PyObject *args)
     }
     PyObject *v;
     int rc = 0;
-    v = PyFloat_FromDouble(pss_time_c(i));
+    v = PyFloat_FromDouble(pss_time_c(slot, i));
     rc |= v == NULL || PyDict_SetItemString(row, "time", v) < 0;
     Py_XDECREF(v);
-    v = py_str_from_codon(pss_host_c(i));
+    v = py_str_from_codon(pss_host_c(slot, i));
     rc |= v == NULL || PyDict_SetItemString(row, "host", v) < 0;
     Py_XDECREF(v);
-    v = py_str_from_codon(pss_jid_c(i));
+    v = py_str_from_codon(pss_jid_c(slot, i));
     rc |= v == NULL || PyDict_SetItemString(row, "jid", v) < 0;
     Py_XDECREF(v);
-    v = py_str_from_codon(pss_type_c(i));
+    v = py_str_from_codon(pss_type_c(slot, i));
     rc |= v == NULL || PyDict_SetItemString(row, "type", v) < 0;
     Py_XDECREF(v);
-    v = py_str_from_codon(pss_dev_c(i));
+    v = py_str_from_codon(pss_dev_c(slot, i));
     rc |= v == NULL || PyDict_SetItemString(row, "dev", v) < 0;
     Py_XDECREF(v);
-    v = py_str_from_codon(pss_event_c(i));
+    v = py_str_from_codon(pss_event_c(slot, i));
     rc |= v == NULL || PyDict_SetItemString(row, "event", v) < 0;
     Py_XDECREF(v);
-    v = PyFloat_FromDouble(pss_value_c(i));
+    v = PyFloat_FromDouble(pss_value_c(slot, i));
     rc |= v == NULL || PyDict_SetItemString(row, "value", v) < 0;
     Py_XDECREF(v);
-    v = PyLong_FromLong(pss_wid_c(i));
+    v = PyLong_FromLong(pss_wid_c(slot, i));
     rc |= v == NULL || PyDict_SetItemString(row, "wid", v) < 0;
     Py_XDECREF(v);
-    v = PyFloat_FromDouble(pss_mult_c(i));
+    v = PyFloat_FromDouble(pss_mult_c(slot, i));
     rc |= v == NULL || PyDict_SetItemString(row, "mult", v) < 0;
     Py_XDECREF(v);
-    v = py_str_from_codon(pss_unit_c(i));
+    v = py_str_from_codon(pss_unit_c(slot, i));
     rc |= v == NULL || PyDict_SetItemString(row, "unit", v) < 0;
     Py_XDECREF(v);
     if (rc) {
@@ -198,17 +244,17 @@ parse_stats_lines_codon_py(PyObject *self, PyObject *args)
     }
     PyObject *v;
     int rc = 0;
-    v = py_str_from_codon(psp_jid_c(i));
+    v = py_str_from_codon(psp_jid_c(slot, i));
     rc |= v == NULL || PyDict_SetItemString(row, "jid", v) < 0;
     Py_XDECREF(v);
-    v = py_str_from_codon(psp_host_c(i));
+    v = py_str_from_codon(psp_host_c(slot, i));
     rc |= v == NULL || PyDict_SetItemString(row, "host", v) < 0;
     Py_XDECREF(v);
-    v = py_str_from_codon(psp_proc_c(i));
+    v = py_str_from_codon(psp_proc_c(slot, i));
     rc |= v == NULL || PyDict_SetItemString(row, "proc", v) < 0;
     Py_XDECREF(v);
     for (Py_ssize_t k = 0; k < HOST_PROC_N; k++) {
-      long fv = psp_field_c(i, (long)k);
+      long fv = psp_field_c(slot, i, (long)k);
       if (fv < 0) {
         continue;
       }
@@ -232,13 +278,13 @@ static PyMethodDef codon_methods[] = {
     "feed_and_collapse_fingerprint",
     feed_and_collapse_fingerprint_py,
     METH_VARARGS,
-    "Fingerprint: (raw_stats, collapsed_rows, value_sum, proc_rows)",
+    "Fingerprint: (raw_stats, collapsed_rows, value_sum, proc_rows) [slot optional]",
   },
   {
     "parse_stats_lines_codon",
     parse_stats_lines_codon_py,
     METH_VARARGS,
-    "Finish()-shaped parse: (stats_records, proc_rows)",
+    "Finish()-shaped parse: (stats_records, proc_rows) [slot optional]",
   },
   {NULL, NULL, 0, NULL},
 };
@@ -249,19 +295,22 @@ hpcperfstats_codon_parse_exec(PyObject *module)
   if (PyModule_AddFunctions(module, codon_methods) < 0) {
     return -1;
   }
+  if (PyModule_AddIntConstant(module, "MAX_CODON_SLOTS", MAX_CODON_SLOTS) < 0) {
+    return -1;
+  }
   return 0;
 }
 
 static PyModuleDef_Slot codon_slots[] = {
   {Py_mod_exec, (void *)hpcperfstats_codon_parse_exec},
-  {Py_mod_gil, Py_MOD_GIL_USED},
+  {Py_mod_gil, Py_MOD_GIL_NOT_USED},
   {0, NULL},
 };
 
 static struct PyModuleDef codon_module = {
   PyModuleDef_HEAD_INIT,
   .m_name = "hpcperfstats_codon_parse",
-  .m_doc = "Codon feed+collapse (C-ABI + multi-phase FT init)",
+  .m_doc = "Codon feed+collapse (C-ABI + multi-phase FT init, GIL_NOT_USED)",
   .m_size = 0,
   .m_slots = codon_slots,
 };

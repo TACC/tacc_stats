@@ -5275,6 +5275,33 @@ def _drain_day_close_ready(
   return done, cooperative_only
 
 
+def _join_callable_into_event(
+  join_fn: Callable[[], Any],
+  done: threading.Event,
+) -> None:
+  """
+  Call ``join_fn`` (errors suppressed) then set ``done``.
+
+  Used so MainThread can wait on ingest-pool join with a wall timeout.
+
+  Args:
+    join_fn (Callable[[], Any]): Pool ``join`` callable.
+    done (threading.Event): Set after ``join_fn`` returns or raises.
+
+  Returns:
+    None
+
+  Examples:
+    >>> ev = threading.Event()
+    >>> _join_callable_into_event(lambda: None, ev)
+    >>> ev.is_set()
+    True
+  """
+  with contextlib.suppress(Exception):
+    join_fn()
+  done.set()
+
+
 def _release_claims_on_shutdown(
   client: Any,
   claim_maps: Iterable[tuple[str, dict[str, Any]]],
@@ -6350,8 +6377,16 @@ def _reconstruct_coordinator_loop(
           mem_tok = format_ingest_mem_block_census_suffix()
           writers_tok = format_append_writers_census_token()
           put_tok = format_parse_put_block_census_token()
+          try:
+            from hpcperfstats.dbload.lib.sync_timedb_codon_bridge import (
+              format_codon_slot_occ_census_token,
+            )
+
+            codon_tok = format_codon_slot_occ_census_token()
+          except Exception:
+            codon_tok = ""
           _log(
-            f"queue_orchestrator census {jq.format_queue_census(census)} total_ingested={total_ingested} total_completed={total_completed}{' ' + busy_tok if busy_tok else ''}{mem_tok} {writers_tok}{put_tok}{census_tok}",
+            f"queue_orchestrator census {jq.format_queue_census(census)} total_ingested={total_ingested} total_completed={total_completed}{' ' + busy_tok if busy_tok else ''}{mem_tok} {writers_tok}{put_tok}{codon_tok}{census_tok}",
             log_fn=log_fn,
           )
           snap = mem_telem.snapshot_pipeline_mem_telemetry(
@@ -6724,18 +6759,24 @@ def run_sync_timedb_queue_orchestrator(
     )
     try:
       while True:
-        if shutdown_requested() and not barrier.draining.is_set():
-          barrier.draining.set()
+        # Arm drain_deadline whenever shutdown is seen — coordinators may set
+        # barrier.draining first; if deadline stays 0, timeout never fires.
+        if shutdown_requested():
           if drain_deadline == 0.0:
             drain_deadline = time.monotonic() + SHUTDOWN_DRAIN_TIMEOUT_S
-          with busy_lock:
-            local_n = sum(1 for v in busy_flags.values() if v)
-          _log(
-            f"queue_orchestrator shutdown requested; draining inflight={local_n}",
-            log_fn=log_fn,
-          )
-        with contextlib.suppress(Exception):
-          populate.reap_and_restart()
+          if not barrier.draining.is_set():
+            barrier.draining.set()
+            with busy_lock:
+              local_n = sum(1 for v in busy_flags.values() if v)
+            _log(
+              f"queue_orchestrator shutdown requested; draining inflight={local_n}",
+              log_fn=log_fn,
+            )
+        # Never reap/restart populate workers after shutdown — apply_async can
+        # hang when workers are stuck in native Codon and block SHUTDOWN_DRAIN.
+        if not shutdown_requested():
+          with contextlib.suppress(Exception):
+            populate.reap_and_restart()
         if (
           recycle_gate.recycle_requested.is_set()
           and recycle_gate.paused.is_set()
@@ -6771,7 +6812,7 @@ def run_sync_timedb_queue_orchestrator(
               log_fn=log_fn,
             )
             break
-          if drain_deadline and time.monotonic() >= drain_deadline:
+          if drain_deadline > 0.0 and time.monotonic() >= drain_deadline:
             for fut in list(day_inflight.values()):
               with contextlib.suppress(Exception):
                 fut.cancel()
@@ -6805,9 +6846,24 @@ def run_sync_timedb_queue_orchestrator(
       # Closes whichever pool object is current, including one installed by a
       # watchdog recycle (a `with` block would only close the first).
       current_pool = pool_ref.get() if "pool_ref" in locals() else ingest_pool
-      for method in ("terminate", "join"):
-        call = getattr(current_pool, method, None)
-        if call is None:
-          continue
-        with contextlib.suppress(Exception):
-          call()
+      with contextlib.suppress(Exception):
+        term = getattr(current_pool, "terminate", None)
+        if callable(term):
+          term()
+      # Timed join: native Codon workers can ignore cooperative cancel.
+      join = getattr(current_pool, "join", None)
+      if callable(join):
+        done = threading.Event()
+
+        thr = threading.Thread(
+          target=_join_callable_into_event,
+          args=(join, done),
+          name="ingest-pool-join",
+          daemon=True,
+        )
+        thr.start()
+        if not done.wait(30.0):
+          _log(
+            "queue_orchestrator ingest pool join timeout; abandoning",
+            log_fn=log_fn,
+          )

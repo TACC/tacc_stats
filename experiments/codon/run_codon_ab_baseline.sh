@@ -9,10 +9,17 @@ WORKSPACE_ROOT="$(cd "$GIT_ROOT/.." && pwd)"
 CODON_HOME="${CODON_HOME:-/data/user/${USER}/codon-0.20.4}"
 LOG_DIR="${HPCPERFSTATS_TEST_RUNS:-${WORKSPACE_ROOT}/test_runs}"
 STAMP="$(date +%Y%m%dT%H%M%S)"
-LOG="${LOG_DIR}/codon_ab_${STAMP}.log"
+B_ONLY="${HPCPERFSTATS_CODON_AB_B_ONLY:-0}"
+if [[ "$B_ONLY" == "1" || "$B_ONLY" == "true" || "$B_ONLY" == "yes" ]]; then
+  LOG="${LOG_DIR}/codon_ab_${STAMP}_nogil.log"
+else
+  LOG="${LOG_DIR}/codon_ab_${STAMP}.log"
+fi
 IMAGE="${HPCPERFSTATS_IMAGE:-localhost/hpcperfstats:latest}"
 REPS="${HPCPERFSTATS_CODON_BENCH_REPS:-40}"
 SAMPLES="${HPCPERFSTATS_CODON_BENCH_SAMPLES:-200}"
+# Frozen Arm A from test_runs/codon_ab_20261021T185743.log (B-only remeasure).
+FROZEN_A="${HPCPERFSTATS_CODON_AB_FROZEN_A:-2.144}"
 
 mkdir -p "$LOG_DIR"
 
@@ -32,11 +39,14 @@ fi
   echo "codon_home=$CODON_HOME"
   echo "reps=$REPS samples=$SAMPLES corpus_id=e6_dual_dev_v1"
   echo "arm_b_mode=pyext pyext_src=${PYEXT_SRC}"
+  echo "b_only=${B_ONLY} frozen_a=${FROZEN_A}"
 
   podman run --rm --user root \
     -e DEBIAN_FRONTEND=noninteractive \
     -e HPCPERFSTATS_CODON_BENCH_REPS="$REPS" \
     -e HPCPERFSTATS_CODON_BENCH_SAMPLES="$SAMPLES" \
+    -e "HPCPERFSTATS_CODON_AB_B_ONLY=${B_ONLY}" \
+    -e "HPCPERFSTATS_CODON_AB_FROZEN_A=${FROZEN_A}" \
     "${PODMAN_PYEXT_ARGS[@]}" \
     -v "${GIT_ROOT}/experiments/codon:/work/experiments/codon:ro" \
     -v "${GIT_ROOT}/hpcperfstats:/work/hpcperfstats:ro" \
@@ -97,6 +107,12 @@ print(
 print("arm_b_mode=pyext")
 PY
 
+if [[ "${HPCPERFSTATS_CODON_AB_B_ONLY:-0}" == "1" ]]; then
+  echo "=== arm_a frozen (B-only) ==="
+  echo "arm_a_elapsed_s=${HPCPERFSTATS_CODON_AB_FROZEN_A}"
+  echo "arm_a_source=frozen_codon_ab_20261021T185743"
+  echo "arm_a_collapsed_rows=frozen"
+else
 echo "=== arm_a 3.14t incremental+collapse ==="
 export PYTHONPATH="/work/experiments/codon:/work:${PYTHONPATH:-}"
 /opt/python3.14t/bin/python - <<'\''PY'\''
@@ -170,6 +186,7 @@ if collapsed is not None and len(collapsed) and "value" in collapsed.columns:
 print(f"arm_a_value_sum={vsum}")
 Path("/tmp/arm_a_elapsed_s").write_text(f"{arm_a:.12f}")
 PY
+fi
 '
 
 } 2>&1 | tee "$LOG"

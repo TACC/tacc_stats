@@ -661,6 +661,9 @@ class SyncTimedbThreadPool:
     """
     Wait for the underlying executor to finish shutting down.
 
+    After ``terminate()``, do not ``wait=True`` — workers can be stuck in
+    native Codon/codonrt and would hang the process forever.
+
     Returns:
       None
 
@@ -669,6 +672,9 @@ class SyncTimedbThreadPool:
       >>> pool.terminate()
       ... pool.join()
     """
+    if self._terminated:
+      self._executor.shutdown(wait=False, cancel_futures=True)
+      return
     self._executor.shutdown(wait=True)
 
   def __enter__(self) -> SyncTimedbThreadPool:
