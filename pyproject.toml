@@ -213,6 +213,8 @@ combine-as-imports = true
 ]
 "hpcperfstats/dbload/sync_timedb_archive.py" = ["E402"]
 "hpcperfstats/dbload/lib/sync_timedb_parsing.py" = ["B023", "SIM115", "E741"]
+# Codon-only C ABI (``Ptr`` / ``cobj`` / ``@export``); not importable under CPython.
+"hpcperfstats/dbload/codon/feed_collapse_capi.py" = ["F821"]
 "hpcperfstats/dbload/lib/sync_timedb_queue_orchestrator.py" = [
   "SIM117",
   "SIM102",

@@ -11,9 +11,9 @@ import pandas as pd
 
 FEED_COLLAPSE = (
   Path(__file__).resolve().parents[2]
-  / "experiments"
+  / "hpcperfstats"
+  / "dbload"
   / "codon"
-  / "sync_timedb_codon"
   / "feed_collapse.py"
 )
 

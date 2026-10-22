@@ -963,6 +963,11 @@ def test_docker_compose_base_omits_null_volume_stubs_for_podman_compose():
   assert "proxy_ssl_source:/mnt/ssl-source:ro" in base
   assert "staticfiles_ram:" not in settings
   assert "media_ram:" not in settings
+  # Bare `volumes:` under a service (no list items) parses as null and breaks
+  # merge with the list from defaults (ValueError: NoneType vs list).
+  assert re.search(r"(?m)^    volumes:\s*(?:#.*)?$", settings) is None, (
+    "service-level empty volumes: stubs break podman-compose include merge"
+  )
 
 
 def test_docker_compose_staticfiles_ram_and_media_ram_tmpfs_not_null_stub():

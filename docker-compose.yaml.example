@@ -89,14 +89,12 @@ volumes:
 services:
   web:
     image: hpcperfstats
-    volumes:
     # Dev/debug — publish gunicorn on the host:
     # ports:
     #   - "${HPCPERFSTATS_WEB_PORT:-8000}:8000"
 
   pipeline:
     image: hpcperfstats
-    volumes:
     # Pipeline debug (optional):
     # cap_add:
     #   - SYS_PTRACE
@@ -105,14 +103,12 @@ services:
 
   proxy:
     image: hpcperfstats-proxy
-    volumes:
     # Let's Encrypt: set proxy_ssl_source.device to /etc/letsencrypt, then uncomment:
     # environment:
     #   - HPCPERFSTATS_SSL_CERTS_REL=live/your.hostname.example
 
   db_pg18:
     image: hpcperfstats-db
-    volumes:
 
   # db (defaults): dev/debug host port — add under db: (keep or drop `{}`):
   # db:

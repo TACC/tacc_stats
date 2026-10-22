@@ -734,6 +734,41 @@ RUN /bin/bash -o pipefail -c '\
   dump_smoke FT /opt/python3.14t/bin/python; \
   /opt/python3.14/bin/py-spy --version'
 
+# Codon FT parse pyext (build stage). Download pinned Codon, compile class-free
+# feed_collapse --lib + Py_MOD_GIL_USED trampoline with --mcpu=native / ThinLTO,
+# bundle Codon runtime next to $ORIGIN. Runtime copies only /opt/hpcperfstats/codon_parse
+# (no /opt/codon in the slim image).
+FROM python-build AS codon-build
+ENV CODON_VERSION=0.20.4 \
+    CODON_TARBALL_SHA256=490d2263e2a543b7786e8f5898eb767dd6a67945238c90fe8be130b4331eb8c9
+RUN /bin/bash -o pipefail -c '\
+  set -euo pipefail; \
+  apt-get update -y; \
+  apt-get install -y --no-install-recommends patchelf; \
+  apt-get clean; \
+  rm -rf /var/lib/apt/lists/*; \
+  curl -fsSL "https://github.com/exaloop/codon/releases/download/v${CODON_VERSION}/codon-linux-x86_64.tar.gz" \
+    -o /tmp/codon.tar.gz; \
+  echo "${CODON_TARBALL_SHA256}  /tmp/codon.tar.gz" | sha256sum -c -; \
+  mkdir -p /opt/codon; \
+  tar -xzf /tmp/codon.tar.gz -C /opt/codon --strip-components=1; \
+  rm -f /tmp/codon.tar.gz; \
+  test -x /opt/codon/bin/codon; \
+  /opt/codon/bin/codon --version | grep -F "${CODON_VERSION}"'
+COPY hpcperfstats/dbload/codon/ /tmp/codon-src/
+RUN chmod +x /tmp/codon-src/build_codon_ext.sh \
+  && CODON_HOME=/opt/codon CODON_SRC=/tmp/codon-src \
+     CODON_OUT=/opt/hpcperfstats/codon_parse \
+     /tmp/codon-src/build_codon_ext.sh \
+  && test -f /opt/hpcperfstats/codon_parse/hpcperfstats_codon_parse.so \
+  && test -f /opt/hpcperfstats/codon_parse/libhpcperfstats_codon_kernel.so \
+  && test -f /opt/hpcperfstats/codon_parse/libcodonrt.so \
+  && test -f /opt/hpcperfstats/codon_parse/libomp.so \
+  && test -f /opt/hpcperfstats/codon_parse/libgfortran.so.5 \
+  && test -f /opt/hpcperfstats/codon_parse/libquadmath.so.0 \
+  && test -f /opt/hpcperfstats/codon_parse/libgcc_s.so.1 \
+  && rm -rf /tmp/codon-src /opt/codon
+
 # Slim runtime: COPY only /opt install prefixes (never /usr/src or cmake build dirs).
 FROM debian:trixie-slim AS hpcperfstats-base
 
@@ -764,6 +799,7 @@ COPY --from=python-build /opt/mpdecimal /opt/mpdecimal
 COPY --from=python-build /opt/libffi /opt/libffi
 COPY --from=python-build /opt/python3.14 /opt/python3.14
 COPY --from=python-build /opt/python3.14t /opt/python3.14t
+COPY --from=codon-build /opt/hpcperfstats/codon_parse /opt/hpcperfstats/codon_parse
 
 # Default syslog-ng allowlist fragment (render overwrites at container start).
 RUN /bin/bash -o pipefail -c "printf '%s\n' \
@@ -837,6 +873,11 @@ ENV LD_PRELOAD=/opt/jemalloc/lib/libjemalloc.so.2 \
 WORKDIR /home/hpcperfstats
 
 COPY --chown=hpcperfstats:hpcperfstats . .
+
+# Codon pyext lands via COPY --from=codon-build (above). Own for pipeline uid.
+RUN test -f /opt/hpcperfstats/codon_parse/hpcperfstats_codon_parse.so \
+  && test -f /opt/hpcperfstats/codon_parse/libcodonrt.so \
+  && chown -R hpcperfstats:hpcperfstats /opt/hpcperfstats/codon_parse
 
 # .git is in the build context for frontend-builder SPA bake only — do not ship history.
 RUN rm -rf /home/hpcperfstats/.git

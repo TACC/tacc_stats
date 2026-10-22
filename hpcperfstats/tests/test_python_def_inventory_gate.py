@@ -104,6 +104,21 @@ def test_inventory_lists_nested_and_exclusions(inv, tmp_path: Path):
   assert "django_migrations" in reasons
 
 
+def test_codon_compile_unit_path_excluded(inv):
+  """Path segment ``codon/`` is out of scope (Codon dialect, not CPython API)."""
+  reason = inv.exclusion_reason_for_path(
+    Path("hpcperfstats/dbload/codon/feed_collapse.py")
+  )
+  assert reason == "codon_compile_unit"
+  # ``experiments`` wins before the ``codon`` segment.
+  exp = inv.exclusion_reason_for_path(Path("experiments/codon/e6_corpus.py"))
+  assert exp == "codon_experiment"
+  bridge = inv.exclusion_reason_for_path(
+    Path("hpcperfstats/dbload/lib/sync_timedb_codon_bridge.py")
+  )
+  assert bridge is None
+
+
 def test_checker_fails_on_missing_args_or_hints(inv, tmp_path: Path):
   """Deliberately incomplete def fails signature and docstring checks."""
   pkg = tmp_path / "hpcperfstats" / "lib"

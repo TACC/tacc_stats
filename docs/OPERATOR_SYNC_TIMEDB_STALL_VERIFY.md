@@ -199,14 +199,26 @@ See also (listend note retained):
 
 ## Codon parse bridge (optional hot path)
 
-When `hpcperfstats_codon_parse` pyext is **not** on `PYTHONPATH` / `LD_LIBRARY_PATH`, ingest stays on CPython `IncrementalStatsParser` (fail-closed). No stall signature change.
+When `hpcperfstats_codon_parse` pyext is **not** on `PYTHONPATH`, ingest stays on CPython `IncrementalStatsParser` (fail-closed). No stall signature change.
 
-**FT ABI note (2026-10-21):** Free-threaded `/opt/python3.14t` loads the class-free Codon module only when built with `experiments/codon/build_codon_ext_in_pipeline.sh` (`codon_pyext_314t=pass`: multi-phase `Py_MOD_GIL_USED` wrapper + `--lib` C-ABI fingerprint, both `.so` files on `PYTHONPATH`). Do **not** deploy stock Codon `--pyext` `PyInit` artifacts (GIL-ABI; FT import/call failures). Pipeline stays fail-closed CPython until those two artifacts are present and the FT smoke passes.
+**In-Dockerfile bake (only supported prod path):** Stage **`codon-build`** in `services-conf/pipeline_web.Dockerfile` downloads pinned Codon 0.20.4, runs `hpcperfstats/dbload/codon/build_codon_ext.sh` (`codon_pyext_314t=pass`: multi-phase `Py_MOD_GIL_USED` + `--lib` C-ABI with fingerprint **and** `parse_stats_lines_codon`, `--mcpu=native` + ThinLTO, bundled `libcodonrt.so`/`libomp.so` with `$ORIGIN` rpath). Runtime **`COPY --from=codon-build`** → `/opt/hpcperfstats/codon_parse` on supervisord `PYTHONPATH` for `sync_timedb`. Rebuild with `./scripts/rebuild_pipeline.sh`. Do **not** host-prebuild, stage `codon_parse_image/`, or copy `.so` into the build context; do **not** deploy stock Codon `--pyext` `PyInit` artifacts (GIL-ABI). Bridge fails closed if the baked module is missing/unloadable. T0/T1 stall signatures are unchanged when Codon is absent or fails closed.
 
-When the extension **is** loaded on a compatible ABI (fingerprint API or full `parse_stats_lines_codon`):
+**Post-redeploy confirm (T0):**
+
+```bash
+# Greppable once at sync_timedb startup (expect status=enabled):
+podman-compose -p hpcperfstats logs pipeline 2>&1 | rg 'codon_parse status='
+# Or one-off against the rebuilt image:
+podman run --rm --entrypoint /bin/bash localhost/hpcperfstats:latest -lc \
+  'export PYTHONPATH=/opt/hpcperfstats/codon_parse; \
+   /opt/python3.14t/bin/python -c \
+   "from hpcperfstats.dbload.lib.sync_timedb_codon_bridge import log_codon_parse_startup; print(log_codon_parse_startup())"'
+```
+
+When the extension **is** loaded (`codon_parse status=enabled … api=parse_stats_lines_codon`):
 
 1. Confirm process ABI is still **`/opt/python3.14t/bin/python`** (`readlink /proc/<sync_timedb pid>/exe`) and that Codon import does **not** crash the worker.
-2. Grep for Codon fallback warnings: `codon feed_and_collapse failed` / `codon parse extension unavailable` — sustained flood means disable via `HPCPERFSTATS_CODON_PARSE_DISABLE=1` (test/soak) or remove the `.so` and redeploy CPython-only.
+2. Grep for Codon fallback warnings: `codon feed_and_collapse failed` / `codon parse extension unavailable` — sustained flood means disable via `HPCPERFSTATS_CODON_PARSE_DISABLE=1` (test/soak) or rebuild without the bake / fail-closed redeploy.
 3. A/B proof remains offline: `experiments/codon/run_codon_ab_baseline.sh` → `test_runs/codon_ab_*.log` with `gate_1p25x=True` (see `docs/plans/CODON_SYNC_TIMEDB_COMPILE_BASELINE.md`). Do **not** treat Codon as a stall fix for day_close / lock / discover hangs.
 
 ## Pre-deploy (every PR touching sync_timedb)

@@ -123,6 +123,7 @@ HPCPERFSTATS_ROUTER_ENTRIES: list[RouterEntry] = [
     "patterns": [
       "hpcperfstats/dbload/lib/sync_timedb_codon_bridge.py",
       "hpcperfstats/dbload/lib/sync_timedb_parsing.py",
+      "hpcperfstats/dbload/codon/**",
       "experiments/codon/**",
       "hpcperfstats/tests/test_codon_*.py",
       "hpcperfstats/tests/test_sync_timedb_codon_bridge.py",

@@ -3774,6 +3774,9 @@ def parse_stats_file_streaming_incremental(
     ... )
   """
   emission_start = max(int(start_line_idx or 0), int(parse_start_idx or 0))
+  # Codon divert for complete-line parses is in parse_stats_lines via
+  # try_codon_parse_collapse / try_codon_feed_batch_parse. Streaming keeps
+  # IncrementalStatsParser (no whole-file Codon buffer).
   parser = IncrementalStatsParser(emission_start, exclude_types_list)
   pending_flush = False
   use_bytes = flush_max_bytes is not None

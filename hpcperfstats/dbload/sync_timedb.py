@@ -6579,8 +6579,12 @@ if __name__ == "__main__":
     from hpcperfstats.dbload.lib.python_abi_startup_log import (
       log_python_abi_startup,
     )
+    from hpcperfstats.dbload.lib.sync_timedb_codon_bridge import (
+      log_codon_parse_startup,
+    )
 
     log_python_abi_startup()
+    log_codon_parse_startup()
     database_startup()
     from hpcperfstats.dbload.lib.sync_timedb_jid_scope import (
       parse_sync_timedb_jid_cli_arg,

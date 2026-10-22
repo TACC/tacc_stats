@@ -17,7 +17,10 @@ from __future__ import annotations
 import importlib
 import logging
 import os
+from collections.abc import Callable
 from typing import Any
+
+from hpcperfstats.dbload.lib.print_utils import log_print
 
 logger = logging.getLogger(__name__)
 
@@ -76,6 +79,83 @@ def codon_parse_available() -> bool:
     True
   """
   return _load_codon_module() is not None
+
+
+def codon_ingest_parse_enabled() -> bool:
+  """
+  Return whether Codon will divert ``parse_stats_lines`` (full parse API).
+
+  Fingerprint-only modules count as unavailable for ingest divert.
+
+  Returns:
+    bool: True when ``parse_stats_lines_codon`` is present on the loaded ext.
+
+  Examples:
+    >>> isinstance(codon_ingest_parse_enabled(), bool)
+    True
+  """
+  mod = _load_codon_module()
+  return mod is not None and callable(
+    getattr(mod, "parse_stats_lines_codon", None)
+  )
+
+
+def format_codon_parse_startup_line() -> str:
+  """
+  Build a greppable Codon ingest-parse status line for daemon startup.
+
+  Returns:
+    str: ``codon_parse status=enabled|disabled …`` for operator logs.
+
+  Examples:
+    >>> line = format_codon_parse_startup_line()
+    >>> line.startswith("codon_parse status=")
+    True
+  """
+  if _truthy(os.environ.get(CODON_FORCE_DISABLE_ENV)):
+    return "codon_parse status=disabled reason=HPCPERFSTATS_CODON_PARSE_DISABLE"
+  mod = _load_codon_module()
+  if mod is None:
+    return "codon_parse status=disabled reason=extension_unavailable"
+  mod_name = getattr(mod, "__name__", "unknown")
+  if not callable(getattr(mod, "parse_stats_lines_codon", None)):
+    return (
+      "codon_parse status=disabled "
+      f"reason=missing_parse_stats_lines_codon module={mod_name}"
+    )
+  return (
+    f"codon_parse status=enabled module={mod_name} api=parse_stats_lines_codon"
+  )
+
+
+def log_codon_parse_startup(
+  *,
+  printer: Callable[..., Any] | None = None,
+) -> str:
+  """
+  Log Codon ingest-parse status once via ``log_print`` (or a test double).
+
+  Args:
+    printer (Callable[..., Any] | None): Optional print-like callable with
+      ``flush`` support. Defaults to ``log_print``.
+
+  Returns:
+    str: The line that was logged.
+
+  Examples:
+    >>> logged: list[str] = []
+    >>> def _capture(msg: str, flush: bool = False) -> None:
+    ...   logged.append(msg)
+    >>> out = log_codon_parse_startup(printer=_capture)
+    >>> out.startswith("codon_parse status=")
+    True
+    >>> logged == [out]
+    True
+  """
+  line = format_codon_parse_startup_line()
+  emit = log_print if printer is None else printer
+  emit(line, flush=True)
+  return line
 
 
 def _load_codon_module() -> Any | None:
@@ -190,3 +270,27 @@ def try_codon_parse_collapse(lines: list[str]) -> tuple[Any, Any] | None:
       "codon parse_stats_lines_codon failed; using CPython: %s", exc
     )
     return None
+
+
+def try_codon_feed_batch_parse(
+  lines: list[str],
+) -> tuple[Any, Any] | None:
+  """
+  Parse one streaming flush window via ``parse_stats_lines_codon``.
+
+  Schema must be included in ``lines`` (or prior lines in the same call).
+  Fail-closed to None when the extension lacks the full parse export.
+
+  Args:
+    lines (list[str]): Stats lines for one take/finish boundary.
+
+  Returns:
+    tuple[Any, Any] | None: ``(stats_records, proc_rows)`` or None.
+
+  Examples:
+    >>> try_codon_feed_batch_parse([]) is None or isinstance(
+    ...   try_codon_feed_batch_parse([]), tuple
+    ... )
+    True
+  """
+  return try_codon_parse_collapse(lines)
