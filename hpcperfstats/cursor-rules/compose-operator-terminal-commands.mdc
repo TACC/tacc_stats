@@ -570,7 +570,7 @@ j = job_data.objects.filter(jid=jid).values(
 print(\"job\", j)
 if not j:
     raise SystemExit(0)
-print(\"metrics\", list(metrics_data.objects.filter(jid_id=jid).filter(
+print(\"metrics\", list(metrics_data.objects.filter(jid=jid).filter(
     metric__in=[\"max_gpu_power\", \"avg_gpuutil\", \"max_node_power_est_w\",
                 \"avg_node_power_est_w\", \"detail_gpu_util_max\", \"detail_gpu_util_mean\"],
 ).values_list(\"metric\", \"value\", \"units\", \"no_data_reason\")))
@@ -588,6 +588,8 @@ if host0 and t0 and t1:
         print(r.time, r.host, r.dev, r.event, r.value)
 "'
 ```
+
+**Anti-pattern — raw SQL `metrics_data.jid_id` (hpcperfstats04 2026-10-22):** FK column is **`metrics_data.jid`** (`db_column="jid"`). `SELECT … FROM metrics_data m WHERE m.jid_id = …` → **`column m.jid_id does not exist`**. Use **`m.jid`** in raw SQL/`psql`; ORM filter is **`metrics_data.objects.filter(jid=…)`** (not inventing a separate `jid_id` column name in SQL).
 
 **Anti-pattern — broad `host_data` discovery with `ILIKE` / multi-host `ANY` / full-window `GROUP BY`:** do not ship Pending `db` blocks that `ILIKE '%gpu%'`, scan all job hosts, or aggregate every sample in a multi-day accounting window; use the cheapest-first pattern above.
 

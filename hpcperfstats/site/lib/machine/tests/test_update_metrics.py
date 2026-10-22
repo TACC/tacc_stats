@@ -984,7 +984,6 @@ def test_page_rows_needing_live_distinct_refresh_keeps_stale(monkeypatch):
   rows = [
     ("live-stale", et, st, False, 2, ["h1", "h2"]),
     ("live-fresh", et, st, False, 1, ["h1"]),
-    ("no-persisted", et, st, False, 1, ["h1"]),
   ]
 
   class _Vals:
@@ -993,7 +992,6 @@ def test_page_rows_needing_live_distinct_refresh_keeps_stale(monkeypatch):
       return [
         ("live-stale", 10),
         ("live-fresh", 20),
-        ("no-persisted", None),
       ]
 
   class _Mgr:
@@ -1005,10 +1003,56 @@ def test_page_rows_needing_live_distinct_refresh_keeps_stale(monkeypatch):
   monkeypatch.setattr(
     update_metrics,
     "get_live_distinct_time_count_for_jid",
-    lambda jid: {"live-stale": 15, "live-fresh": 20, "no-persisted": 5}[jid],
+    lambda jid: {"live-stale": 15, "live-fresh": 20}[jid],
   )
   kept = update_metrics._page_rows_needing_live_distinct_refresh(rows)
   assert [row[0] for row in kept] == ["live-stale"]
+
+
+@pytest.mark.machine_unit_mock
+def test_page_rows_needing_live_distinct_refresh_heals_zero_persisted(
+  monkeypatch,
+):
+  """Null/zero persisted Sample Count heals via page-bounded SQL probe."""
+  et = datetime(2026, 8, 15, 18, 0, 0, tzinfo=timezone.utc)
+  st = et - timedelta(hours=1)
+  rows = [
+    ("zero-heal", et, st, False, 2, ["h1", "h2"]),
+    ("null-heal", et, st, False, 1, ["h1"]),
+    ("true-zero", et, st, False, 1, ["h1"]),
+  ]
+
+  class _Vals:
+    def values_list(self, *args, **kwargs):
+      del args, kwargs
+      return [
+        ("zero-heal", 0),
+        ("null-heal", None),
+        ("true-zero", 0),
+      ]
+
+  class _Mgr:
+    def filter(self, **kwargs):
+      del kwargs
+      return _Vals()
+
+  monkeypatch.setattr(update_metrics.job_data, "objects", _Mgr())
+
+  def _probe(jid, start, end, hosts=None):
+    del start, end, hosts
+    return {"zero-heal": 12, "null-heal": 8, "true-zero": 0}[str(jid)]
+
+  monkeypatch.setattr(
+    "hpcperfstats.analysis.metrics.lib.metrics_host_data_sql.jid_scoped_distinct_host_time_count",
+    _probe,
+  )
+  monkeypatch.setattr(
+    update_metrics,
+    "get_live_distinct_time_count_for_jid",
+    lambda jid: (_ for _ in ()).throw(AssertionError(f"stub used for {jid}")),
+  )
+  kept = update_metrics._page_rows_needing_live_distinct_refresh(rows)
+  assert [row[0] for row in kept] == ["zero-heal", "null-heal"]
 
 
 @pytest.mark.machine_unit_mock

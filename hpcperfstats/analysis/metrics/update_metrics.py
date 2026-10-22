@@ -2807,10 +2807,13 @@ def _jobs_queryset_artifact_catchup(date: Any, min_time: Any) -> Any:
 
 def _page_rows_needing_live_distinct_refresh(rows: Any) -> list[Any]:
   """
-  Keep Phase A2 page rows whose live distinct exceeds persisted count.
+  Keep Phase A2 page rows that still need a metrics refresh for Sample Count.
 
-  Uses ``get_live_distinct_time_count_for_jid`` per jid on the page
-  (``<= CHUNK_SIZE``) - never embeds correlated live distinct in day keyset SQL.
+  When persisted ``metrics_distinct_time_count`` is ``None`` or ``0``, probe
+  ``jid_scoped_distinct_host_time_count`` for the page row window (``SET LOCAL``
+  timeout) and keep the row if live ``> 0``. Otherwise compare
+  ``get_live_distinct_time_count_for_jid`` to stored (probe may stay off for
+  web). Never embeds correlated live distinct in day keyset SQL.
 
   Args:
     rows (Any): ``values_list`` tuples
@@ -2825,6 +2828,10 @@ def _page_rows_needing_live_distinct_refresh(rows: Any) -> list[Any]:
   """
   if not rows:
     return []
+  from hpcperfstats.analysis.metrics.lib.metrics_host_data_sql import (
+    jid_scoped_distinct_host_time_count,
+  )
+
   jids = [row[0] for row in rows]
   persisted: dict[Any, Any] = {}
   for jid, cnt in job_data.objects.filter(jid__in=jids).values_list(
@@ -2836,11 +2843,30 @@ def _page_rows_needing_live_distinct_refresh(rows: Any) -> list[Any]:
   for row in rows:
     jid = row[0]
     stored = persisted.get(jid)
-    if stored is None:
+    try:
+      stored_i = None if stored is None else int(stored)
+    except TypeError, ValueError:
+      continue
+    if stored_i is None or stored_i == 0:
+      end_time = row[1]
+      start_time = row[2]
+      host_list = row[5] if len(row) > 5 else None
+      try:
+        live = int(
+          jid_scoped_distinct_host_time_count(
+            str(jid),
+            start_time,
+            end_time,
+            hosts=list(host_list) if host_list else None,
+          )
+        )
+      except DatabaseError, OperationalError, TypeError, ValueError:
+        continue
+      if live > 0:
+        out.append(row)
       continue
     try:
       live = int(get_live_distinct_time_count_for_jid(str(jid)))
-      stored_i = int(stored)
     except TypeError, ValueError:
       continue
     if live > stored_i:

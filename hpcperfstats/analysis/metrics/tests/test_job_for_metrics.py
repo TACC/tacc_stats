@@ -181,6 +181,63 @@ def test_job_for_metrics_builds_time_axis_and_host_stats():
   assert abs(cm_cpu[1, 1] - 8.5) < 1e-9
 
 
+def test_compute_metrics_persists_per_host_distinct_sum(monkeypatch):
+  """Sample Count must come from jid_table distinct sum, not stub live getter."""
+
+  class _Qs:
+    def exists(self):
+      return True
+
+  class _Jt(_FakeJidTable):
+    def _host_data_qs(self):
+      return _Qs()
+
+    def get_host_time_df(self):
+      df = self.get_full_host_data_df(
+        ["host", "time", "type", "event", "value"]
+      )
+      return df[["host", "time"]].drop_duplicates()
+
+  @contextlib.contextmanager
+  def _fake_jid_table(jid):
+    del jid
+    yield _Jt()
+
+  monkeypatch.setattr(metrics.jid_table, "jid_table", _fake_jid_table)
+  monkeypatch.setattr(
+    "hpcperfstats.analysis.metrics.lib.gpu_job_detail_summary.compute_job_gpu_summary_tuple",
+    lambda jt: (None, None, None, None),
+  )
+  monkeypatch.setattr(
+    metrics,
+    "compute_job_detail_fsio_metric_rows",
+    lambda jt: [],
+  )
+
+  m = metrics.Metrics()
+  m.simple_metrics_list = {}
+  m.complex_metrics_list = []
+  job = SimpleNamespace(
+    jid=123,
+    telemetry_first_time=None,
+    telemetry_last_time=None,
+    host_data_schema_json=None,
+    save=lambda **kwargs: None,
+  )
+  monkeypatch.setattr(
+    metrics,
+    "_in_window_telemetry_bounds_for_job",
+    lambda job_obj: (None, None),
+  )
+  # Stub getter would wrongly echo 0; persist path must ignore it.
+  monkeypatch.setattr(
+    "hpcperfstats.site.lib.machine.job_plot_artifacts.get_live_distinct_time_count_for_jid",
+    lambda jid: 0,
+  )
+  out = m.compute_metrics(job)
+  assert out["distinct_time_count"] == 4
+
+
 class _FakeJidTableListyLabels:
   """Labels occasionally deserialize as list/tuple; grouping keys must stay hashable."""
 

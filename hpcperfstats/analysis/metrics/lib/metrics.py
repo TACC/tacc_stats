@@ -3458,13 +3458,9 @@ class Metrics:
       simple_metric_cache = {}
       host_data_rows_cache = {}
 
-      from hpcperfstats.site.lib.machine.job_plot_artifacts import (
-        get_live_distinct_time_count_for_jid,
-      )
-
-      distinct_time_count = int(
-        get_live_distinct_time_count_for_jid(str(job.jid))
-      )
+      # Persist Sample Count from jid_table (see return path / _JobForMetrics),
+      # never from stubbed get_live_distinct_time_count_for_jid (probe off → 0).
+      distinct_time_count = 0
       job_view = None
 
       if not jt._host_data_qs().exists():
@@ -3845,6 +3841,14 @@ class Metrics:
 
       if self.complex_metrics_list:
         job_view = _JobForMetrics(jt)
+        distinct_time_count = int(job_view.per_host_distinct_time_sum)
+      else:
+        ht = jt.get_host_time_df()
+        distinct_time_count = (
+          int(ht.groupby("host")["time"].nunique().sum())
+          if ht is not None and not getattr(ht, "empty", True)
+          else 0
+        )
       u = utils(job_view) if job_view is not None else None
 
       for metric_name in self.complex_metrics_list:
