@@ -630,6 +630,80 @@ def test_day_close_phase_done_dual_reclaims_open_tar(tmp_path, monkeypatch):
   assert zst.exists()
 
 
+def test_day_close_phase_done_dual_tar_drops_despite_stale_has_closed(
+  tmp_path, monkeypatch
+):
+  """G3: phase=done dual must not incomplete_raw on stale has_closed_raw."""
+  from hpcperfstats.dbload.lib import (
+    sync_timedb_job_reconstruct as jr,
+    sync_timedb_queue_orchestrator as qo,
+  )
+
+  daily = tmp_path / "daily"
+  daily.mkdir()
+  day = "2020-01-07"
+  tar = daily / (f"{day}.tar")
+  zst = daily / (f"{day}.tar.zst")
+  tar.write_bytes(b"tar")
+  zst.write_bytes(b"zst")
+  has_closed_calls = []
+
+  monkeypatch.setattr(jr, "day_close_is_complete", lambda *a, **k: False)
+  monkeypatch.setattr(jr, "day_close_min_age_elapsed", lambda *a, **k: True)
+  monkeypatch.setattr(qo, "_day_close_min_age_hours", lambda: 0)
+  monkeypatch.setattr(
+    "hpcperfstats.dbload.lib.sync_timedb_archive_helpers.seal_dirty_daily_archives",
+    lambda *a, **k: None,
+  )
+  monkeypatch.setattr(
+    qo, "_day_close_live_ingest_or_populate", lambda *a, **k: False
+  )
+
+  class _Coord:
+    def __init__(self, **_kw):
+      pass
+
+    def phase(self, _tar_path):
+      return "done"
+
+    def should_handoff_to_ingest(self, _tar_path):
+      return False
+
+    def apply_batch_delete(self, _tar_path):
+      return 0
+
+    def run_pre_seal_verify_sync(self, _tar_path, **_kw):
+      return True
+
+    def run_post_seal_verify_sync(self, _tar_path):
+      return True
+
+    def has_closed_raw_on_disk(self, tar_path):
+      has_closed_calls.append(tar_path)
+      return True
+
+    def try_finish_tar_drop_if_ready(self, tar_path):
+      if os.path.isfile(tar_path):
+        os.remove(tar_path)
+      return True
+
+  monkeypatch.setattr(
+    "hpcperfstats.dbload.lib.sync_timedb_day_raw_removal.DayRawRemovalCoordinator",
+    _Coord,
+  )
+  outcome = qo._run_day_close_job(
+    day,
+    tgz_archive_dir=str(daily),
+    archive_data_dir=str(tmp_path),
+    job_store=None,
+    log_fn=lambda *a, **k: None,
+  )
+  assert outcome == "complete"
+  assert not tar.exists()
+  assert zst.exists()
+  assert not has_closed_calls
+
+
 def test_day_close_dc01_stage_order(tmp_path, monkeypatch):
   """DC-01 order: pre-seal -> reconcile -> pre-seal -> dedupe -> seal -> post-seal -> delete."""
   from hpcperfstats.dbload.lib import (

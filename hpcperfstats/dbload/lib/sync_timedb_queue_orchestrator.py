@@ -2500,7 +2500,8 @@ def _run_day_close_job(
 
       H19 append_idle sets ``remaining_raw_cheap`` so giant days do not
       re-call ``has_closed_raw_on_disk`` between seal and post_seal.
-      ``phase_done`` skip_merge does not set cheap - still probes the coord.
+      ``phase=done`` trusts the manifest (skip stale has_closed) so dual
+      tar_drop can reclaim (04 incomplete_raw thrash).
 
       Returns:
         bool: True when remaining closed raw is known or on disk.
@@ -2512,6 +2513,9 @@ def _run_day_close_job(
       """
       if remaining_raw_cheap:
         return True
+      phase_fn = getattr(coord, "phase", None)
+      if callable(phase_fn) and str(phase_fn(tar_path) or "").strip() == "done":
+        return False
       return bool(coord.has_closed_raw_on_disk(tar_path))
 
     remaining_raw = _closed_raw_remains()
@@ -3892,7 +3896,14 @@ def _fill_ingest_band(
           continue
         file_cache_cap_mib = int(effective_cgroup_admit_max_file_cache_mib())
         file_cache_ok = cgroup_admit_file_cache_ok(file_cache_cap_mib)
-        if not alone_progress and not file_cache_ok:
+        # Count-based alone (not byte-sum): sticky cache with one *other*
+        # live ingest may admit one more (04 local_inflight=1 starve).
+        # Same identity already local must not re-admit (overwrite would
+        # leave len(inflight) stuck and spin the fill loop).
+        alone_file_cache = (
+          len(inflight_sizes) <= 1 and claim.identity not in inflight_sizes
+        )
+        if not file_cache_ok and not alone_file_cache:
           _requeue_ingest_fill_skip(
             client,
             claim=claim,
@@ -3920,7 +3931,7 @@ def _fill_ingest_band(
             submitted=submitted,
             alone_oversized=True,
           )
-        elif alone_progress and not file_cache_ok:
+        elif not file_cache_ok:
           _emit_mem_telem_event(
             "admit_alone",
             log_fn,
@@ -4709,10 +4720,11 @@ def _fill_append_slots(
   if not cgroup_admit_file_cache_ok(
     effective_cgroup_admit_max_file_cache_mib()
   ):
-    if inflight:
+    # Parity with ingest: allow up to two under sticky file-cache pressure.
+    if len(inflight) > 1:
       _emit_mem_telem_event("skip_file_cache_pressure", None)
       return 0
-    fill_cap = 1
+    fill_cap = min(2, max(1, fill_cap))
     _emit_mem_telem_event("admit_alone", None, alone_progress=True)
   while len(inflight) < fill_cap:
     submitted += _try_submit_pending_append_days(
