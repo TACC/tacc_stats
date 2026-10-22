@@ -320,6 +320,41 @@ def test_populate_members_from_tar_scan_uses_tvf_not_tarfile():
   assert "tarfile.open" not in src
 
 
+def test_stream_compressed_archive_members_uses_gnu_tvf_not_tarfile():
+  """Sealed census must use GNU tar tvf, not tarfile / _open_tarfile_for_read."""
+  import inspect
+
+  from hpcperfstats.dbload.lib import sync_timedb_archive_helpers as ah
+
+  src = inspect.getsource(ah._stream_compressed_archive_members)
+  assert "_run_gnu_tvf_file_members" in src
+  assert "tarfile.open" not in src
+  assert "_open_tarfile_for_read" not in src
+  assert not hasattr(ah, "_open_tarfile_for_read")
+
+
+def test_iter_sealed_daily_archive_uses_gnu_extract_not_tarfile():
+  """Sealed member extract must use GNU tar -x, not tarfile extractfile."""
+  import inspect
+
+  from hpcperfstats.dbload.lib import sync_timedb_archive_helpers as ah
+
+  spool_src = inspect.getsource(ah._iter_sealed_daily_archive_spooled_members)
+  assert "_gnu_tar_extract_named_member" in spool_src
+  assert "_run_gnu_tvf_file_members" in spool_src
+  assert "extractfile" not in spool_src
+  assert "tarfile.open" not in spool_src
+  for fn in (
+    ah.iter_sealed_daily_archive_member_lines,
+    ah.iter_sealed_daily_archive_member_paths,
+  ):
+    src = inspect.getsource(fn)
+    assert "_iter_sealed_daily_archive_spooled_members" in src
+    assert "extractfile" not in src
+    assert "_open_tarfile_for_read" not in src
+    assert "tarfile.open" not in src
+
+
 def test_iter_tar_file_tasks_uses_tf_not_tarfile():
   """iter_tar_file_tasks must list via GNU tar tf, not tarfile."""
   import inspect

@@ -68,7 +68,6 @@ from typing import Any
 
 import hpcperfstats.dbload.lib.conf_parser as cfg
 from hpcperfstats.dbload.lib.archive_compress import (
-  DAILY_ARCHIVE_GZ_SUFFIX,
   DAILY_ARCHIVE_ZST_SUFFIX,
   archive_gz_members_contained_in_zst,
   archive_member_maps_equivalent,
@@ -100,8 +99,6 @@ from hpcperfstats.dbload.lib.zstd_cli import (
   drop_page_cache_for_paths,
   zstd_compress_tar_to_file,
   zstd_compressed_archive_pipe_readable,
-  zstd_decompress_stdout,
-  zstd_gzip_decompress_stdout,
   zstd_gzip_supported,
   zstd_test,
 )
@@ -4238,47 +4235,6 @@ def _tar_list_executable() -> Any:
 
 
 @contextlib.contextmanager
-def _open_tarfile_for_read(
-  path: str,
-  num_threads: Any,
-  *,
-  apply_priority_wrap: bool = True,
-) -> Iterator[Any]:
-  """
-  Open a tar or compressed daily archive for sequential reads.
-
-  Args:
-    path (str): String for path.
-    num_threads (Any): Num threads passed to this helper.
-    apply_priority_wrap (bool): Boolean flag for apply priority wrap.
-
-  Yields:
-    Iterator[Any]: Value produced by this call (type depends on inputs).
-
-  Examples:
-    >>> _open_tarfile_for_read("x", None, True)  # doctest: +SKIP
-  """
-  if path.endswith(DAILY_ARCHIVE_ZST_SUFFIX) and shutil.which("zstd"):
-    with zstd_decompress_stdout(
-      path,
-      num_threads,
-      apply_priority_wrap=apply_priority_wrap,
-    ) as stdout:
-      with tarfile.open(fileobj=stdout, mode="r|") as tf:
-        yield tf
-  elif path.endswith(DAILY_ARCHIVE_GZ_SUFFIX) and zstd_gzip_supported():
-    with zstd_gzip_decompress_stdout(
-      path,
-      num_threads,
-      apply_priority_wrap=apply_priority_wrap,
-    ) as stdout:
-      with tarfile.open(fileobj=stdout, mode="r|") as tf:
-        yield tf
-  else:
-    with tarfile.open(path, "r") as tf:
-      yield tf
-
-
 def _iter_tar_members(tf: Any) -> Iterator[Any]:
   """
   Yield tar members without forcing a full in-memory member list.
@@ -4308,8 +4264,7 @@ def verify_tar_archive_readable(
   Return True if ``tar_path`` is a readable archive (full scan via ``tar tf``).
 
   For ``.tar.zst`` / ``.tar.gz``, uses ``zstd -d -c | tar tf -`` when zstd is
-  available; otherwise ``tar tf`` on the file (or :mod:`tarfile` if ``tar`` is
-  missing).
+  available; otherwise ``tar tf`` on the file. No ``tarfile`` fallback.
 
   When ``assume_write_lock_held`` is True, skip ``file_read_lock_wait`` (caller
   holds ``file_write_lock`` on ``tar_path``).
@@ -5928,26 +5883,29 @@ def _stream_compressed_archive_members(
   result = (False, {}, False, None)
   try:
     with lock_cm:
-      with _open_tarfile_for_read(
+      tvf_rows, rc, stderr_text = _run_gnu_tvf_file_members(
         compressed_path,
-        zstd_thread_count_for_wrap(apply_priority_wrap),
         apply_priority_wrap=apply_priority_wrap,
-      ) as tf:
+      )
+      if rc != 0:
+        err = RuntimeError(
+          f"gnu tar tvf failed rc={rc} stderr={stderr_text!r}",
+        )
+        result = (False, {}, False, err)
+      else:
         members: dict[str, int] = {}
         seen_names: set[str] = set()
         saw_duplicates = False
-        for m in _iter_tar_members(tf):
-          if not m.isfile():
-            continue
-          if m.name in seen_names:
+        for name, size_i in tvf_rows:
+          if name in seen_names:
             saw_duplicates = True
-          seen_names.add(m.name)
-          prev = members.get(m.name)
-          size_i = int(m.size)
-          if prev is None or size_i > prev:
-            members[m.name] = size_i
+          seen_names.add(name)
+          prev = members.get(name)
+          size_int = int(size_i)
+          if prev is None or size_int > prev:
+            members[name] = size_int
           if on_member is not None and not defer_on_member:
-            on_member(m.name, m.size)
+            on_member(name, size_int)
         result = (True, members, saw_duplicates, None)
     if defer_on_member and on_member is not None and result[0]:
       for name, size in result[1].items():
@@ -6385,14 +6343,77 @@ def restore_tar_from_sealed_if_unreadable(
   return False
 
 
-def _run_gnu_tvf_file_members(
-  tar_path: str,
-) -> tuple[list[tuple[str, int]], int, str]:
+def _gnu_sealed_decompress_cmd(
+  archive_path: str,
+  thread_count: Any,
+  *,
+  apply_priority_wrap: bool = True,
+) -> list[str] | None:
   """
-  Run ``tar tvf`` and parse every file-member line.
+  Build ``zstd -d -c`` argv for a sealed ``.tar.zst`` / ``.tar.gz``.
 
   Args:
-    tar_path (str): Path to an uncompressed daily ``.tar``.
+    archive_path (str): Sealed archive path.
+    thread_count (Any): Zstd ``-T`` thread count for the decompress child.
+    apply_priority_wrap (bool): When True, wrap with archive nice/ionice.
+
+  Returns:
+    list[str] | None: Decompress command argv, or ``None`` when unsupported.
+
+  Examples:
+    >>> _gnu_sealed_decompress_cmd("/missing.tar.zst", 1)
+    None
+  """
+  fmt = detect_compressed_format(archive_path)
+  if fmt not in ("zst", "gz"):
+    return None
+  from hpcperfstats.dbload.lib.zstd_cli import (
+    _maybe_wrap_zstd_cmd,
+    _thread_args,
+    zstd_executable,
+  )
+
+  zstd_bin = zstd_executable()
+  if fmt == "zst" and shutil.which("zstd"):
+    return _maybe_wrap_zstd_cmd(
+      [
+        zstd_bin,
+        "-d",
+        "-c",
+        *_thread_args(thread_count),
+        "-q",
+        archive_path,
+      ],
+      apply_priority_wrap=apply_priority_wrap,
+    )
+  if fmt == "gz" and zstd_gzip_supported():
+    return _maybe_wrap_zstd_cmd(
+      [
+        zstd_bin,
+        "-d",
+        "--format=gzip",
+        "-c",
+        *_thread_args(thread_count),
+        "-q",
+        archive_path,
+      ],
+      apply_priority_wrap=apply_priority_wrap,
+    )
+  return None
+
+
+def _run_gnu_tvf_file_members(
+  tar_path: str,
+  *,
+  apply_priority_wrap: bool = True,
+) -> tuple[list[tuple[str, int]], int, str]:
+  """
+  Run ``tar tvf`` (plain or sealed decompress pipe) and parse file members.
+
+  Args:
+    tar_path (str): Uncompressed daily ``.tar`` or sealed ``.tar.zst`` /
+      ``.tar.gz``.
+    apply_priority_wrap (bool): Nice/ionice wrap for sealed zstd decompress.
 
   Returns:
     tuple[list[tuple[str, int]], int, str]: Occurrences ``(name, size)`` in
@@ -6407,13 +6428,68 @@ def _run_gnu_tvf_file_members(
   if not os.path.isfile(tar_path):
     return [], 1, ""
   tar_bin = _tar_list_executable()
+  fmt = detect_compressed_format(tar_path)
+  occurrences: list[tuple[str, int]] = []
+  if fmt in ("zst", "gz"):
+    decompress_cmd = _gnu_sealed_decompress_cmd(
+      tar_path,
+      zstd_thread_count_for_wrap(apply_priority_wrap),
+      apply_priority_wrap=apply_priority_wrap,
+    )
+    if decompress_cmd is None:
+      return [], 1, "unsupported compressed archive format"
+    p_decomp = subprocess.Popen(
+      decompress_cmd,
+      stdout=subprocess.PIPE,
+      stderr=subprocess.PIPE,
+      text=True,
+    )
+    try:
+      p_tar = subprocess.Popen(
+        [tar_bin, "tvf", "-"],
+        stdin=p_decomp.stdout,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+      )
+    except (FileNotFoundError, OSError) as exc:
+      p_decomp.kill()
+      with contextlib.suppress(OSError, subprocess.SubprocessError):
+        p_decomp.wait(timeout=30)
+      return [], 1, str(exc)
+    if p_decomp.stdout is not None:
+      p_decomp.stdout.close()
+    stderr_text = ""
+    try:
+      if p_tar.stdout is None:
+        raise RuntimeError("subprocess stdout pipe missing")
+      for raw_line in p_tar.stdout:
+        parsed = _parse_tar_tvf_size_and_name(raw_line)
+        if parsed is None:
+          continue
+        occurrences.append(parsed)
+    finally:
+      tar_stderr = ""
+      if p_tar.stderr is not None:
+        tar_stderr = p_tar.stderr.read() or ""
+      tar_rc = p_tar.wait()
+      decomp_stderr = ""
+      try:
+        _out, decomp_stderr = p_decomp.communicate(timeout=30)
+      except OSError, subprocess.SubprocessError:
+        p_decomp.kill()
+        with contextlib.suppress(OSError, subprocess.SubprocessError):
+          p_decomp.wait(timeout=30)
+      stderr_text = (tar_stderr or "") + (decomp_stderr or "")
+      rc = 0 if (tar_rc == 0 and p_decomp.returncode == 0) else 1
+    return occurrences, rc, stderr_text
+
   proc = subprocess.Popen(
     [tar_bin, "tvf", tar_path],
     stdout=subprocess.PIPE,
     stderr=subprocess.PIPE,
     text=True,
   )
-  occurrences: list[tuple[str, int]] = []
   try:
     if proc.stdout is None:
       raise RuntimeError("subprocess stdout pipe missing")
@@ -6450,38 +6526,12 @@ def _run_gnu_tf_member_names(archive_path: str) -> tuple[list[str], int, str]:
   tar_bin = _tar_list_executable()
   fmt = detect_compressed_format(archive_path)
   if fmt in ("zst", "gz"):
-    from hpcperfstats.dbload.lib.zstd_cli import (
-      _maybe_wrap_zstd_cmd,
-      _thread_args,
-      zstd_executable,
+    decompress_cmd = _gnu_sealed_decompress_cmd(
+      archive_path,
+      get_archive_zstd_thread_count(),
+      apply_priority_wrap=True,
     )
-
-    thread_count = get_archive_zstd_thread_count()
-    zstd_bin = zstd_executable()
-    if fmt == "zst" and shutil.which("zstd"):
-      decompress_cmd = _maybe_wrap_zstd_cmd(
-        [
-          zstd_bin,
-          "-d",
-          "-c",
-          *_thread_args(thread_count),
-          "-q",
-          archive_path,
-        ]
-      )
-    elif fmt == "gz" and zstd_gzip_supported():
-      decompress_cmd = _maybe_wrap_zstd_cmd(
-        [
-          zstd_bin,
-          "-d",
-          "--format=gzip",
-          "-c",
-          *_thread_args(thread_count),
-          "-q",
-          archive_path,
-        ]
-      )
-    else:
+    if decompress_cmd is None:
       return [], 1, "unsupported compressed archive format"
     p_decomp = subprocess.Popen(
       decompress_cmd,
@@ -8752,15 +8802,18 @@ def _gnu_tar_extract_named_member(
   extract_dir: str,
   *,
   from_zst: bool = False,
+  apply_priority_wrap: bool = True,
 ) -> bool:
   """
-  Extract one named member with GNU/BSD ``tar -x`` (zst via ``zstd -d -c``).
+  Extract one named member with GNU/BSD ``tar -x`` (sealed via ``zstd -d -c``).
 
   Args:
-    source_path (str): Open ``.tar`` or sealed ``.tar.zst`` path.
+    source_path (str): Open ``.tar`` or sealed ``.tar.zst`` / ``.tar.gz``.
     member_name (str): Member to extract (not a full archive scan).
     extract_dir (str): Destination directory for the member file.
-    from_zst (bool): True when ``source_path`` is zstd-compressed.
+    from_zst (bool): True when caller knows ``source_path`` is sealed zst
+      (also auto-detected from path suffix).
+    apply_priority_wrap (bool): Nice/ionice wrap for sealed zstd decompress.
 
   Returns:
     bool: True when tar extract exited 0.
@@ -8775,15 +8828,19 @@ def _gnu_tar_extract_named_member(
     run_subprocess_with_progress,
   )
 
-  if from_zst:
-    from hpcperfstats.dbload.lib.zstd_cli import zstd_executable
-
-    zstd_bin = zstd_executable()
-    if not zstd_bin:
+  fmt = detect_compressed_format(source_path)
+  use_pipe = from_zst or fmt in ("zst", "gz")
+  if use_pipe:
+    decompress_cmd = _gnu_sealed_decompress_cmd(
+      source_path,
+      zstd_thread_count_for_wrap(apply_priority_wrap),
+      apply_priority_wrap=apply_priority_wrap,
+    )
+    if decompress_cmd is None:
       return False
     try:
       decomp = subprocess.Popen(
-        [zstd_bin, "-d", "-c", "-q", source_path],
+        decompress_cmd,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
       )
@@ -9761,13 +9818,94 @@ def resolve_sealed_archive_path_for_ingest(
   return None
 
 
+def _iter_sealed_daily_archive_spooled_members(
+  sealed_path: str,
+  spool_root: str,
+  *,
+  max_bytes: int,
+  on_member_skipped: Any | None = None,
+) -> Iterator[tuple[str, str]]:
+  """
+  Yield ``(member_name, spool_path)`` via GNU ``tar tvf`` + named ``tar -x``.
+
+  Caller must hold any required read lock around the full iteration. Oversize
+  members are skipped (and ``on_member_skipped`` invoked when provided).
+
+  Args:
+    sealed_path (str): Sealed ``.tar.zst`` / ``.tar.gz`` path.
+    spool_root (str): Directory for extracted member files.
+    max_bytes (int): Skip members larger than this when ``max_bytes > 0``.
+    on_member_skipped (Any | None): Optional callback for each skipped member.
+
+  Yields:
+    Iterator[tuple[str, str]]: Member archive name and absolute spool path.
+
+  Raises:
+    RuntimeError: When GNU ``tar tvf`` fails for the sealed archive.
+
+  Examples:
+    >>> list(
+    ...   _iter_sealed_daily_archive_spooled_members(
+    ...     "/missing.tar.zst", "/tmp", max_bytes=0
+    ...   )
+    ... )  # doctest: +SKIP
+    []
+  """
+  tvf_rows, rc, stderr_text = _run_gnu_tvf_file_members(
+    sealed_path,
+    apply_priority_wrap=True,
+  )
+  if rc != 0:
+    raise RuntimeError(
+      f"gnu tar tvf failed for sealed extract rc={rc} stderr={stderr_text!r}",
+    )
+  size_by_name: dict[str, int] = {}
+  for name, size_i in tvf_rows:
+    prev = size_by_name.get(name)
+    size_int = int(size_i)
+    if prev is None or size_int > prev:
+      size_by_name[name] = size_int
+  for member_name, size_int in size_by_name.items():
+    if max_bytes > 0 and size_int > max_bytes:
+      log_print(
+        f"sync_timedb_archive: skip oversize member {member_name} "
+        f"({size_int} bytes > {max_bytes})",
+        flush=True,
+      )
+      if on_member_skipped is not None:
+        on_member_skipped()
+      continue
+    rel_path = _member_spool_relative_path(member_name)
+    dest = os.path.join(spool_root, rel_path)
+    os.makedirs(os.path.dirname(dest), exist_ok=True)
+    if not _gnu_tar_extract_named_member(
+      sealed_path,
+      member_name,
+      spool_root,
+      apply_priority_wrap=True,
+    ):
+      if on_member_skipped is not None:
+        on_member_skipped()
+      continue
+    extracted = _resolved_extracted_member_path(spool_root, member_name)
+    if not extracted or not os.path.isfile(extracted):
+      if on_member_skipped is not None:
+        on_member_skipped()
+      continue
+    if os.path.abspath(extracted) != os.path.abspath(dest):
+      with contextlib.suppress(OSError):
+        if os.path.isfile(dest):
+          os.remove(dest)
+      os.replace(extracted, dest)
+    yield member_name, dest
+
+
 def iter_sealed_daily_archive_member_lines(sealed_path: str) -> Iterator[Any]:
   """
-  Yield ``(member_name, lines)`` from a sealed daily archive via in-memory zstd.
+  Yield ``(member_name, lines)`` from a sealed daily archive via GNU tar extract.
 
-    stream.
-
-  Does not read uncompressed ``.tar`` or write decompress artifacts to disk.
+  Members are spooled under ``.sync_archive_ingest_spool`` then read and
+  unlinked. Does not leave uncompressed daily ``.tar`` siblings.
 
   Args:
     sealed_path (str): String for sealed path.
@@ -9780,6 +9918,7 @@ def iter_sealed_daily_archive_member_lines(sealed_path: str) -> Iterator[Any]:
     hits a ``FileNotFoundError`` failure path.
     ValueError: Raised when ``iter_sealed_daily_archive_member_lines`` hits a
     ``ValueError`` failure path.
+    RuntimeError: When GNU ``tar tvf`` / extract fails for the sealed archive.
 
   Examples:
     >>> iter_sealed_daily_archive_member_lines("x")  # doctest: +SKIP
@@ -9792,35 +9931,29 @@ def iter_sealed_daily_archive_member_lines(sealed_path: str) -> Iterator[Any]:
   if not os.path.isfile(sealed_path):
     raise FileNotFoundError(sealed_path)
   max_bytes = cfg.get_sync_ingest_max_file_read_bytes()
+  spool_root = _archive_ingest_spool_root(sealed_path=sealed_path)
   with file_read_lock_wait(sealed_path):
-    with _open_tarfile_for_read(
+    for member_name, dest in _iter_sealed_daily_archive_spooled_members(
       sealed_path,
-      get_archive_zstd_thread_count(),
-      apply_priority_wrap=True,
-    ) as archive_tar:
-      for member_info in _iter_tar_members(archive_tar):
-        if not member_info.isfile():
-          continue
-        if max_bytes > 0 and member_info.size > max_bytes:
-          log_print(
-            f"sync_timedb_archive: skip oversize member {member_info.name} ({member_info.size} bytes > {max_bytes})",
-            flush=True,
-          )
-          continue
-        fobj = archive_tar.extractfile(member_info)
-        if fobj is None:
-          continue
-        raw = fobj.read()
-        if not raw:
-          content = []
+      spool_root,
+      max_bytes=max_bytes,
+    ):
+      try:
+        with open(dest, "rb") as fobj:
+          raw = fobj.read()
+      finally:
+        with contextlib.suppress(OSError):
+          os.remove(dest)
+      if not raw:
+        content = []
+      else:
+        text = raw.decode("utf-8")
+        if text.endswith("\n"):
+          content = text.splitlines(keepends=True)
         else:
-          text = raw.decode("utf-8")
-          if text.endswith("\n"):
-            content = text.splitlines(keepends=True)
-          else:
-            lines = text.splitlines(keepends=True)
-            content = lines if lines else [text]
-        yield member_info.name, content
+          lines = text.splitlines(keepends=True)
+          content = lines if lines else [text]
+      yield member_name, content
 
 
 def _archive_ingest_spool_root(
@@ -9924,41 +10057,12 @@ def iter_sealed_daily_archive_member_paths(
   max_bytes = cfg.get_sync_ingest_max_file_read_bytes()
   spool_root = _archive_ingest_spool_root(spool_dir, sealed_path=sealed_path)
   with file_read_lock_wait(sealed_path):
-    with _open_tarfile_for_read(
+    yield from _iter_sealed_daily_archive_spooled_members(
       sealed_path,
-      get_archive_zstd_thread_count(),
-      apply_priority_wrap=True,
-    ) as archive_tar:
-      for member_info in _iter_tar_members(archive_tar):
-        if not member_info.isfile():
-          continue
-        if max_bytes > 0 and member_info.size > max_bytes:
-          log_print(
-            f"sync_timedb_archive: skip oversize member {member_info.name} ({member_info.size} bytes > {max_bytes})",
-            flush=True,
-          )
-          if on_member_skipped is not None:
-            on_member_skipped()
-          continue
-        fobj = archive_tar.extractfile(member_info)
-        if fobj is None:
-          if on_member_skipped is not None:
-            on_member_skipped()
-          continue
-        rel_path = _member_spool_relative_path(member_info.name)
-        dest = os.path.join(spool_root, rel_path)
-        os.makedirs(os.path.dirname(dest), exist_ok=True)
-        try:
-          with open(dest, "wb") as out:
-            while True:
-              chunk = fobj.read(1 << 20)
-              if not chunk:
-                break
-              out.write(chunk)
-        finally:
-          with contextlib.suppress(Exception):
-            fobj.close()
-        yield member_info.name, dest
+      spool_root,
+      max_bytes=max_bytes,
+      on_member_skipped=on_member_skipped,
+    )
 
 
 def iter_archive_ingest_tasks(

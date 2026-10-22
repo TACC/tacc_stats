@@ -5872,21 +5872,20 @@ def test_sealed_stream_uses_zstd_priority_wrap(monkeypatch, tmp_path):
   wrap_calls = []
   from hpcperfstats.dbload.lib import sync_timedb_archive_helpers as helpers
 
-  real_open = helpers._open_tarfile_for_read
+  real_cmd = helpers._gnu_sealed_decompress_cmd
 
-  @contextlib.contextmanager
-  def _spy_open(path, num_threads, *, apply_priority_wrap=True):
+  def _spy_cmd(path, thread_count, *, apply_priority_wrap=True):
     wrap_calls.append(apply_priority_wrap)
-    with real_open(
+    return real_cmd(
       path,
-      num_threads,
+      thread_count,
       apply_priority_wrap=apply_priority_wrap,
-    ) as tf:
-      yield tf
+    )
 
-  monkeypatch.setattr(helpers, "_open_tarfile_for_read", _spy_open)
+  monkeypatch.setattr(helpers, "_gnu_sealed_decompress_cmd", _spy_cmd)
   list(iter_sealed_daily_archive_member_lines(zst_p))
-  assert wrap_calls == [True]
+  assert wrap_calls
+  assert all(v is True for v in wrap_calls)
 
 
 def test_zstd_thread_count_for_wrap_splits_ingest_and_archive(monkeypatch):
@@ -5904,21 +5903,19 @@ def test_unniced_stream_uses_ingest_zstd_thread_count(monkeypatch, tmp_path):
   thread_calls = []
   from hpcperfstats.dbload.lib import sync_timedb_archive_helpers as helpers
 
-  real_open = helpers._open_tarfile_for_read
+  real_cmd = helpers._gnu_sealed_decompress_cmd
 
-  @contextlib.contextmanager
-  def _spy_open(path, num_threads, *, apply_priority_wrap=True):
-    thread_calls.append((num_threads, apply_priority_wrap))
-    with real_open(
+  def _spy_cmd(path, thread_count, *, apply_priority_wrap=True):
+    thread_calls.append((thread_count, apply_priority_wrap))
+    return real_cmd(
       path,
-      num_threads,
+      thread_count,
       apply_priority_wrap=apply_priority_wrap,
-    ) as tf:
-      yield tf
+    )
 
   monkeypatch.setattr(helpers, "get_archive_zstd_thread_count", lambda: 0)
   monkeypatch.setattr(helpers, "get_ingest_zstd_thread_count", lambda: 4)
-  monkeypatch.setattr(helpers, "_open_tarfile_for_read", _spy_open)
+  monkeypatch.setattr(helpers, "_gnu_sealed_decompress_cmd", _spy_cmd)
   helpers._stream_compressed_archive_members(
     zst_p,
     apply_priority_wrap=False,

@@ -272,24 +272,11 @@ def test_sealed_on_member_lock_hold_after_shared_lock(tmp_path, monkeypatch):
     finally:
       held["n"] -= 1
 
-  class FakeMember:
-    def __init__(self, name, size):
-      self.name = name
-      self.size = size
-
-    def isfile(self):
-      return True
-
-  @contextmanager
-  def fake_open(*_a, **_k):
-    yield object()
-
   monkeypatch.setattr(helpers, "_archive_file_read_lock_wait", tracking_lock)
-  monkeypatch.setattr(helpers, "_open_tarfile_for_read", fake_open)
   monkeypatch.setattr(
     helpers,
-    "_iter_tar_members",
-    lambda _tf: [FakeMember("h/1", 4)],
+    "_run_gnu_tvf_file_members",
+    lambda _p, *, apply_priority_wrap=True: ([("h/1", 4)], 0, ""),
   )
   monkeypatch.setattr(helpers, "detect_compressed_format", lambda _p: "zst")
   seen = []
@@ -326,24 +313,11 @@ def test_sealed_on_member_lock_hold_in_stream_early_exit(tmp_path, monkeypatch):
     finally:
       held["n"] -= 1
 
-  class FakeMember:
-    def __init__(self, name, size):
-      self.name = name
-      self.size = size
-
-    def isfile(self):
-      return True
-
-  @contextmanager
-  def fake_open(*_a, **_k):
-    yield object()
-
   monkeypatch.setattr(helpers, "_archive_file_read_lock_wait", tracking_lock)
-  monkeypatch.setattr(helpers, "_open_tarfile_for_read", fake_open)
   monkeypatch.setattr(
     helpers,
-    "_iter_tar_members",
-    lambda _tf: [FakeMember("h/1", 4)],
+    "_run_gnu_tvf_file_members",
+    lambda _p, *, apply_priority_wrap=True: ([("h/1", 4)], 0, ""),
   )
   monkeypatch.setattr(helpers, "detect_compressed_format", lambda _p: "zst")
 
