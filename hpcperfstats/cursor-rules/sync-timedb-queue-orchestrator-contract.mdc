@@ -34,6 +34,7 @@ Production coordinator for `sync_timedb` is **`run_sync_timedb_queue_orchestrato
 | Bare drain TimeoutError | `_drain_ingest_ready` must **not** soft-requeue bare `TimeoutError` (no stage/elapsed); leave local inflight maps (H7) and replace the Future with `_IngestTimeoutSentinel`. Exclude sentinel identities (and their leases) from `_ingest_reaper_skip_identities` so store TTL can expire. Soft-requeue packed `outcome=timeout` / rich escapes only |
 | Lock sidecars | Discover skips `*.fnctl.lock`; fill ACK-drops claimed lock identities |
 | Idle stall soft-kill | `sync_ingest_stall_idle_s` (default 1800); internal wall soft-kill names are deleted; no coordinator watchdog fallback |
+| Write-stage statement_timeout | `start_ingest_write_stage(..., worker_setup=_apply_ingest_session_statement_timeout)` — raise Postgres session timeout to `sync_ingest_per_file_timeout_max_s` (default 86400s) on write threads (host_data COPY→ON CONFLICT). Parse path already SETs via `_ingest_parse_worker`. listend uses `worker_setup=_apply_listend_db_ingest_statement_timeout` (`listend-live-db-ingest-contract.mdc`). Do not rely on portal `db_statement_timeout_ms` (120s) for write-stage DML |
 | Fail-closed death | Unexpected coordinator thread death → log + `os._exit(1)` (or injected exit). **No** silent restart with empty local inflight maps |
 | Kind-scoped reaper | Each coordinator calls `_reap_stale_inflight(kinds=(own,), skip_identities=local maps)`. Boot may still reap all kinds once before threads start. `reconstruct-coordinator` reaps `JOB_KIND_DISCOVER` only. Append reap protection covers stats-file identities in `append_leases` batches and `AppendDayClaimLists.claim_identities()`, reusing the existing deadline extend |
 | Append gate-skip drain | When append worker returns `ArchiveAppendOutcome(gate_skipped=True, skipped_paths=…)`, `_drain_append_ready` must `_handoff_retryable_paths_to_ingest` **before** `ack_job` — never ACK-drop uningested paths. A successful outcome also hands `ingest_pending_paths` to ingest before ACK. `soft_requeue` → `requeue_job` without ACK |
@@ -79,3 +80,4 @@ Production coordinator for `sync_timedb` is **`run_sync_timedb_queue_orchestrato
 - Regression battery: `sync-timedb-change-regression-gate.mdc`
 - Day-close A worker laws (B tick retired): `sync-timedb-archive-janitor-contract.mdc`
 - Hot-path yield: `sync-timedb-hot-path-janitor-lock-priority.mdc`
+- listend write-stage timeout parity: `listend-live-db-ingest-contract.mdc`

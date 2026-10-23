@@ -1670,7 +1670,22 @@ print(\"max_s\", cfg.get_sync_ingest_per_file_timeout_max_s())
 
 ### T0 / T1 — ingest per-file timeout floor 3600 (throughput near-miss, 2026-07)
 
-**Archaeology (wall B deleted 2026-08-29):** internal per-file SIGALRM / size-proportional soft-kill is **removed** — not demoted. Grep `advancing=false` / `idle_stall` / `tar append idle stall` instead of wall-timeout primary signatures. Postgres `statement_timeout` remains the external ceiling.
+**Archaeology (wall B deleted 2026-08-29):** internal per-file SIGALRM / size-proportional soft-kill is **removed** — not demoted. Grep `advancing=false` / `idle_stall` / `tar append idle stall` instead of wall-timeout primary signatures. Postgres `statement_timeout` remains the external ceiling **and must be raised on write-stage sessions** (below).
+
+### T0 — host_data INSERT canceling statement due to statement timeout (write stage)
+
+**Failure signature (pre-fix):** `ERROR: canceling statement due to statement timeout` on `INSERT INTO host_data … FROM host_data_ingest_stage ON CONFLICT … DO NOTHING`. Portal / compose GUC is **120s** (`SHOW statement_timeout` → `2min`). Parse workers call `_apply_ingest_session_statement_timeout`; write-stage threads did not until `worker_setup=_apply_ingest_session_statement_timeout` on sync `start_ingest_write_stage`.
+
+**Acceptance (post-deploy):**
+
+- Source fingerprint: `worker_setup=_apply_ingest_session_statement_timeout` in orchestrator `start_ingest_write_stage` call.
+- Filtered pipeline logs should not show new `canceling statement` / `host_data_ingest_stage` timeouts under normal catch-up (compressed-chunk DML can still be slow but must finish within the file budget).
+- Do **not** raise global portal `db_statement_timeout_ms` for this.
+
+```bash
+podman-compose -p hpcperfstats exec db psql -h localhost -U hpcperfstats -c "SHOW statement_timeout;"
+podman-compose -p hpcperfstats logs pipeline 2>&1 | grep -E 'canceling statement|host_data_ingest_stage|ingest write stage started' | tail -40
+```
 
 **Failure signature (pre-fix / old floor 900):** under `ingest_pool_processes=32`, many paths die with `ERROR: ingest per-file timeout … stage=ingest` / `outcome=timeout` at **elapsed == size-scaled budget** (~925–1654s for small/mid files). Slow cohort can still finish on retry (e.g. ~14 MiB in **2304.7s**). Not an idle/stall class if `remaining` advances.
 

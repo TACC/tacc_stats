@@ -405,6 +405,17 @@ def test_ingest_worker_raises_session_statement_timeout():
   assert "get_sync_ingest_per_file_timeout_max_s" in src
 
 
+def test_orchestrator_write_stage_raises_session_statement_timeout():
+  """Write-stage threads must lift statement_timeout (host_data ON CONFLICT INSERT)."""
+  import inspect
+
+  from hpcperfstats.dbload.lib import sync_timedb_queue_orchestrator as qo
+
+  src = inspect.getsource(qo.run_sync_timedb_queue_orchestrator)
+  assert "worker_setup=_apply_ingest_session_statement_timeout" in src
+  assert "start_ingest_write_stage" in src
+
+
 def test_arch_no_internal_wall_timers_append_and_ingest():
   """Forbidden: wall soft-kill on tar append / ingest timed / stall abort."""
   import inspect

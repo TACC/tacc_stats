@@ -6570,6 +6570,9 @@ def run_sync_timedb_queue_orchestrator(
       start_ingest_write_stage,
       stop_ingest_write_stage,
     )
+    from hpcperfstats.dbload.sync_timedb import (
+      _apply_ingest_session_statement_timeout,
+    )
 
     write_pool_n = max(1, int(cfg.get_sync_ingest_write_pool_processes()))
     parse_q_max = max(1, int(cfg.get_sync_ingest_parse_queue_max()))
@@ -6577,6 +6580,7 @@ def run_sync_timedb_queue_orchestrator(
       write_workers=write_pool_n,
       queue_max=parse_q_max,
       process_title="sync_timedb.py",
+      worker_setup=_apply_ingest_session_statement_timeout,
     )
     _log(
       f"queue_orchestrator ingest write stage started write_pool={write_pool_n} parse_queue_max={parse_q_max}",
