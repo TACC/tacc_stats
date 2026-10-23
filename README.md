@@ -406,9 +406,10 @@ This is a container orchestration with Django/PostgreSQL, ingest/archival tools,
    (process/http tunables: **`worker_processes auto`**, affinity, sendfile/tcp_*,
    open_file_cache) and **`./services-conf/nginx.conf`** to **`/etc/nginx/http.d/default.conf`**
    on **`proxy`**, and bind-mounts the shared snippets (**`nginx-static-files.conf`**,
-   **`nginx-django-proxy-common.inc`**, **`nginx-compress-proxy.inc`**,
-   **`nginx-compress-static.inc`**, **`nginx-edge-security-headers.inc`**,
-   **`nginx-csp-no-active.inc`**, **`nginx-csp-django-html.inc`**) as the **only**
+   **`nginx-api-route-allowlist.inc`**, **`nginx-django-proxy-common.inc`**,
+   **`nginx-compress-proxy.inc`**, **`nginx-compress-static.inc`**,
+   **`nginx-edge-security-headers.inc`**, **`nginx-csp-no-active.inc`**,
+   **`nginx-csp-django-html.inc`**) as the **only**
    runtime source for those snippets (they are **not** baked into **`proxy.Dockerfile`**).
 
    Full-stack image rebuilds (including **proxy** and homemade **db_pg18**) use **`./scripts/rebuild_full_site.sh`**, which **`podman build`**s **web**, **proxy**, and **`db_pg18`** (Clang **22** ThinLTO via **`services-conf/bake_clang_flags.sh`** on Alpine **db/proxy** and Debian **`python-build`**), then **`podman-compose down`** and **`up -d --no-build`**. CPython always bakes with upstream **`--enable-optimizations`** (no custom Clang profile-guided rebuild flags). See **`docs/upgrade.md`**.
@@ -457,10 +458,16 @@ This is a container orchestration with Django/PostgreSQL, ingest/archival tools,
    **`services-conf/nginx-static-files.conf`**; nginx serves **`/static/`** and
    **`/media/`** directly, shells the SPA under **`/machine/`** and **`/pub/`**,
    and proxies only an explicit Django URL prefix list (shared **`proxy_*`**
-   directives in **`services-conf/nginx-django-proxy-common.inc`**); every other
-   path gets **404** from nginx. When you add a new top-level Django route,
-   extend the allowlist in **`nginx-static-files.conf`** and keep it aligned with
-   Django’s root **`urlpatterns`**.
+   directives in **`services-conf/nginx-django-proxy-common.inc`**; nested
+   **`/api/`** locations come from generated
+   **`services-conf/nginx-api-route-allowlist.inc`**, regenerated from
+   **`EXPECTED_ROUTE_TEMPLATES`** via
+   **`write_nginx_api_route_allowlist_include.py`** — unknown **`/api/...`**
+   paths return **404** at the edge); every other path gets **404** from nginx.
+   When you add a new top-level Django route, extend the allowlist in
+   **`nginx-static-files.conf`**. When you add nested **`api/`** routes, update
+   the route catalog and regenerate **`nginx-api-route-allowlist.inc`** in the
+   same task.
 
    **Production:** browsers must load **`/static/*` through the `proxy` service**
    (ports 80/443); nginx reads the **`staticfiles_ram`** tmpfs volume at

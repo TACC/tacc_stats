@@ -566,7 +566,14 @@ def test_docker_compose_proxy_runtime_tls_mount_and_entrypoint_materialize():
     "./services-conf/nginx-csp-django-html.inc:/etc/nginx/nginx-csp-django-html.inc:ro"
     in content
   )
+  assert (
+    "./services-conf/nginx-api-route-allowlist.inc:/etc/nginx/nginx-api-route-allowlist.inc:ro"
+    in content
+  )
   assert (repo_root / "services-conf" / "nginx-static-files.conf").exists()
+  assert (
+    repo_root / "services-conf" / "nginx-api-route-allowlist.inc"
+  ).exists()
   assert (
     repo_root / "services-conf" / "nginx-django-proxy-common.inc"
   ).exists()
@@ -577,6 +584,9 @@ def test_docker_compose_proxy_runtime_tls_mount_and_entrypoint_materialize():
   ).exists()
   assert (
     repo_root / "services-conf" / "write_nginx_proxy_allowed_hosts_include.py"
+  ).exists()
+  assert (
+    repo_root / "services-conf" / "write_nginx_api_route_allowlist_include.py"
   ).exists()
   assert (
     repo_root / "services-conf" / "write_nginx_resolver_include.py"
@@ -597,6 +607,7 @@ def test_docker_compose_proxy_runtime_tls_mount_and_entrypoint_materialize():
   entrypoint = (repo_root / "services-conf" / "proxy_entrypoint.sh").read_text()
   # Mount-only snippets must not also be COPY'd (single source of truth = compose volumes).
   assert "COPY services-conf/nginx-static-files.conf" not in dockerfile
+  assert "COPY services-conf/nginx-api-route-allowlist.inc" not in dockerfile
   assert "COPY services-conf/nginx-edge-security-headers.inc" not in dockerfile
   assert "COPY services-conf/nginx-csp-no-active.inc" not in dockerfile
   assert "COPY services-conf/nginx-csp-django-html.inc" not in dockerfile
@@ -868,6 +879,7 @@ def test_proxy_dockerfile_source_builds_nginx_with_pinned_deps():
     "nginx-csp-no-active.inc",
     "nginx-csp-django-html.inc",
     "nginx-static-files.conf",
+    "nginx-api-route-allowlist.inc",
     "nginx-django-proxy-common.inc",
     "nginx-compress-proxy.inc",
     "nginx-compress-static.inc",

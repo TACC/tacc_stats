@@ -237,7 +237,8 @@ def test_nginx_static_files_conf_allowlists_django_prefixes_and_default_404():
   assert "try_files $uri $uri/ /machine/index.html =503" in conf
   for needle in (
     "\nlocation = / {\n",
-    "location ^~ /api/",
+    "include /etc/nginx/nginx-api-route-allowlist.inc;",
+    "\nlocation /api/ {\n",
     "location = /robots.txt",
     "location ^~ /csp-report/",
     "location ^~ /api-key/",
@@ -254,6 +255,11 @@ def test_nginx_static_files_conf_allowlists_django_prefixes_and_default_404():
     "return 404;",
   ):
     assert needle in conf
+  # Nested API allowlist replaces the former blanket ^~ /api/ proxy.
+  assert "location ^~ /api/ {" not in conf
+  # Catch-all /api/ must 404 (scanner probes) after the include.
+  api_catch = conf.split("location /api/ {", 1)[1].split("}", 1)[0]
+  assert "return 404;" in api_catch
 
 
 def test_nginx_django_proxy_common_hides_upstream_security_headers():
@@ -273,9 +279,15 @@ def test_nginx_django_proxy_common_hides_upstream_security_headers():
   assert "proxy_hide_header Set-Cookie" not in common
   assert "proxy_hide_header Cache-Control" not in common
   conf = (_SERVICES / "nginx-static-files.conf").read_text(encoding="utf-8")
-  assert "location ^~ /api/" in conf
+  assert "include /etc/nginx/nginx-api-route-allowlist.inc;" in conf
+  assert "location ^~ /api/ {" not in conf
   assert conf.count("include /etc/nginx/nginx-csp-no-active.inc") >= 5
   assert "include /etc/nginx/nginx-csp-django-html.inc" in conf
+  allowlist = (_SERVICES / "nginx-api-route-allowlist.inc").read_text(
+    encoding="utf-8"
+  )
+  assert "location ^~ /api/jobs/" in allowlist
+  assert "proxy_pass http://django_server;" in allowlist
 
 
 def test_nginx_conf_completes_ocsp_stapling_contract():

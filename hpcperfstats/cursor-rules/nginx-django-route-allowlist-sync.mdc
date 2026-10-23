@@ -8,35 +8,40 @@ globs: services-conf/nginx*
 
 **Activation:** `alwaysApply: false` — when triggers in `agent-discipline-core.mdc` match, **Read this file before editing**. Triggered rules are mandatory, not optional.
 
-Production **`proxy`** nginx answers **`/static/`**, **`/media/`**, SPA shells under **`/machine/`** and **`/pub/`**, and **`/favicon.ico`** without involving Gunicorn. Every **other** request either matches an explicit **Gunicorn allowlist** in **`services-conf/nginx-static-files.conf`** or nginx returns **404** immediately.
+Production **`proxy`** nginx answers **`/static/`**, **`/media/`**, SPA shells under **`/machine/`** and **`/pub/`**, and **`/favicon.ico`** without involving Gunicorn. Every **other** request either matches an explicit **Gunicorn allowlist** in **`services-conf/nginx-static-files.conf`** (plus generated **`nginx-api-route-allowlist.inc`** for nested **`/api/`**) or nginx returns **404** immediately.
 
-This allowlist must stay aligned with **top-level routes intended to hit Django/DRF** through the proxy.
+This allowlist must stay aligned with **top-level routes intended to hit Django/DRF** through the proxy, and nested **`api/`** routes with **`EXPECTED_ROUTE_TEMPLATES`**.
 
 ## Trigger conditions (same task as the code change)
 
 - **Add, remove, or rename** any **`path(...)`** at the **root** of **`hpcperfstats/site/hpcperfstats_site/urls.py`** (anything that defines a new first URL segment, e.g. **`/new-prefix/`**, **`new_exact`**, or **`""`** for **`/`**).
-- **Add or remove** an **`include(...)`** at the root whose mount prefix is not already covered by an existing nginx **`location`** (today **`api/`** is covered by **`location ^~ /api/`**).
-- **Change** **`services-conf/nginx-static-files.conf`** allowlisted **`location`** blocks or **`services-conf/nginx-django-proxy-common.inc`** in a way that affects which URIs reach Gunicorn.
+- **Add or remove** an **`include(...)`** at the root whose mount prefix is not already covered by an existing nginx **`location`** (nested **`api/`** is covered by **`nginx-api-route-allowlist.inc`**, not a blanket **`^~ /api/`**).
+- **Add, remove, or rename** nested routes under **`path("api/", include(...))`** / **`api_urls.py`**: update **`EXPECTED_ROUTE_TEMPLATES`** and **regenerate** **`services-conf/nginx-api-route-allowlist.inc`** in the same task.
+- **Change** **`services-conf/nginx-static-files.conf`** allowlisted **`location`** blocks, **`nginx-api-route-allowlist.inc`**, or **`services-conf/nginx-django-proxy-common.inc`** in a way that affects which URIs reach Gunicorn.
 
 ## Out of scope (no nginx allowlist update)
 
 - **React-only** navigation: new or removed routes under **`/machine/`** or **`/pub/`** are still served by the SPA shell **`try_files`** block; they do **not** add Django HTTP endpoints unless you also add matching **`urlpatterns`** at the site root.
-- **Nested API routes** under **`path("api/", include(...))`** in **`api_urls.py`**: already covered by **`location ^~ /api/`** unless you introduce routes **outside** **`/api/`**.
+- **Nested API routes** are **not** covered by a blanket **`location ^~ /api/`** anymore. Unknown **`/api/...`** paths (scanner probes) hit **`location /api/ { return 404; }`** in **`nginx-static-files.conf`**.
 
 ## Required actions
 
 1. **`services-conf/nginx-static-files.conf`**
    - For each **root** Django segment that must reach Gunicorn via **`proxy`**, add or adjust a **`location`** (exact-match **`location = ...`** for paths like **`/login_prompt`**; prefix **`location ^~ ...`** for paths like **`/oauth_callback/`**). Paths answered only from nginx static files (for example **`/robots.txt`**) must **not** use **`proxy_pass`**.
    - If you **remove** a root route from Django, remove the corresponding **`location`** (or stale probes keep forwarding useless traffic).
-2. **`hpcperfstats/site/hpcperfstats_site/tests/test_nginx_static_wsgi_contract.py`**
-   - Extend or shrink **`test_nginx_static_files_conf_allowlists_django_prefixes_and_default_404`** string markers so the test continues to lock the allowlist contract whenever prefixes change.
-3. **`docker-compose.yaml`**
-   - If introducing a **new** included snippet path for nginx, add the matching **`proxy`** **`volumes`** mount (today **`nginx-static-files.conf`**, **`nginx-django-proxy-common.inc`**, **`nginx-compress-proxy.inc`**, **`nginx-compress-static.inc`**, **`nginx-edge-security-headers.inc`**, **`nginx-csp-no-active.inc`**, and **`nginx-csp-django-html.inc`** are mounted; SPA hash CSP includes arrive via the **`staticfiles_data`** volume). Do **not** also **`COPY`** those mount-only snippets in **`proxy.Dockerfile`**.
+2. **Nested `/api/` (same task as catalog / `api_urls` changes)**
+   - Update **`hpcperfstats/tests/urlconf_route_catalog.py`** **`EXPECTED_ROUTE_TEMPLATES`** (see **`pipeline-endpoint-matrix-drift-guard.mdc`**).
+   - Regenerate **`services-conf/nginx-api-route-allowlist.inc`** with **`services-conf/write_nginx_api_route_allowlist_include.py`** (or fail **`test_write_nginx_api_route_allowlist_include.py`** drift).
+   - Do **not** restore a blanket **`location ^~ /api/`** proxy.
+3. **`hpcperfstats/site/hpcperfstats_site/tests/test_nginx_static_wsgi_contract.py`**
+   - Extend or shrink **`test_nginx_static_files_conf_allowlists_django_prefixes_and_default_404`** string markers so the test continues to lock the allowlist contract whenever prefixes change (include path + catch-all **`/api/`** 404).
+4. **`docker-compose.defaults.yaml`**
+   - If introducing a **new** included snippet path for nginx, add the matching **`proxy`** **`volumes`** mount (today **`nginx-static-files.conf`**, **`nginx-api-route-allowlist.inc`**, **`nginx-django-proxy-common.inc`**, **`nginx-compress-proxy.inc`**, **`nginx-compress-static.inc`**, **`nginx-edge-security-headers.inc`**, **`nginx-csp-no-active.inc`**, and **`nginx-csp-django-html.inc`** are mounted; SPA hash CSP includes arrive via the **`staticfiles_data`** volume). Do **not** also **`COPY`** those mount-only snippets in **`proxy.Dockerfile`**. Never place nginx config under **`/srv/static`**.
 
 ## Verification
 
-- Run **`hpcperfstats/site/hpcperfstats_site/tests/test_nginx_static_wsgi_contract.py`** (host pytest is sufficient).
-- After edits to **`nginx-static-files.conf`** or **`nginx-django-proxy-common.inc`**, **`nginx -t`** inside the **proxy** image (or deployment nginx reload) must succeed before closing the task.
+- Run **`hpcperfstats/site/hpcperfstats_site/tests/test_nginx_static_wsgi_contract.py`** and **`hpcperfstats/tests/test_write_nginx_api_route_allowlist_include.py`** (host pytest is sufficient).
+- After edits to **`nginx-static-files.conf`**, **`nginx-api-route-allowlist.inc`**, or **`nginx-django-proxy-common.inc`**, **`nginx -t`** inside the **proxy** image (or deployment nginx reload) must succeed before closing the task.
 
 ## Documentation sync
 
@@ -45,4 +50,4 @@ This allowlist must stay aligned with **top-level routes intended to hit Django/
 ## Overlap
 
 - **`nginx-static-url-prefix.mdc`** — **`/static/`**, SPA shell ownership, and compose volume wiring.
-- **`pipeline-endpoint-matrix-drift-guard.mdc`** — canonical **`EXPECTED_ROUTE_TEMPLATES`** and pipeline HTTP matrix when routes change; **still update that catalog** for observable endpoints; this rule adds the **nginx allowlist** layer for **`proxy`** traffic only (direct **`web:8000`** hits are unaffected).
+- **`pipeline-endpoint-matrix-drift-guard.mdc`** — canonical **`EXPECTED_ROUTE_TEMPLATES`** and pipeline HTTP matrix when routes change; **still update that catalog** for observable endpoints; this rule adds the **nginx allowlist** layer for **`proxy`** traffic only (direct **`web:8000`** hits are unaffected). Regenerating **`nginx-api-route-allowlist.inc`** is part of the same-task checklist whenever **`api/`** templates change.
