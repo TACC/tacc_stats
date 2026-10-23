@@ -93,6 +93,18 @@ def test_refill_corpus_epochs_mixes_small_medium_large(tmp_path):
   assert sizes[-1] >= sizes[0] * 10
 
 
+def test_loaded48_supervisor_child_hard_exits():
+  """Child module must os._exit so FT pytest never tears down Codon."""
+  from pathlib import Path
+
+  child = (
+      Path(__file__).resolve().parent / "loaded48_supervisor_child.py"
+  )
+  text = child.read_text(encoding="utf-8")
+  assert "os._exit" in text
+  assert "shutdown_codon_parse_pool" in text
+
+
 def test_loaded48_helpers_hours_occupancy_manifest():
   """Host-safe loaded48 helper contracts (no compose)."""
   from tests.sync_timedb_benchmark import screening_runner as mod

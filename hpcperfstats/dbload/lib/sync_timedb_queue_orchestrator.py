@@ -5287,33 +5287,6 @@ def _drain_day_close_ready(
   return done, cooperative_only
 
 
-def _join_callable_into_event(
-  join_fn: Callable[[], Any],
-  done: threading.Event,
-) -> None:
-  """
-  Call ``join_fn`` (errors suppressed) then set ``done``.
-
-  Used so MainThread can wait on ingest-pool join with a wall timeout.
-
-  Args:
-    join_fn (Callable[[], Any]): Pool ``join`` callable.
-    done (threading.Event): Set after ``join_fn`` returns or raises.
-
-  Returns:
-    None
-
-  Examples:
-    >>> ev = threading.Event()
-    >>> _join_callable_into_event(lambda: None, ev)
-    >>> ev.is_set()
-    True
-  """
-  with contextlib.suppress(Exception):
-    join_fn()
-  done.set()
-
-
 def _release_claims_on_shutdown(
   client: Any,
   claim_maps: Iterable[tuple[str, dict[str, Any]]],
@@ -6858,24 +6831,9 @@ def run_sync_timedb_queue_orchestrator(
       # Closes whichever pool object is current, including one installed by a
       # watchdog recycle (a `with` block would only close the first).
       current_pool = pool_ref.get() if "pool_ref" in locals() else ingest_pool
+      # Terminate only — never join. Under FT, pool.join after Codon-touched
+      # workers can spin MainThread (sched_yield); process exit reaps orphans.
       with contextlib.suppress(Exception):
         term = getattr(current_pool, "terminate", None)
         if callable(term):
           term()
-      # Timed join: native Codon workers can ignore cooperative cancel.
-      join = getattr(current_pool, "join", None)
-      if callable(join):
-        done = threading.Event()
-
-        thr = threading.Thread(
-          target=_join_callable_into_event,
-          args=(join, done),
-          name="ingest-pool-join",
-          daemon=True,
-        )
-        thr.start()
-        if not done.wait(30.0):
-          _log(
-            "queue_orchestrator ingest pool join timeout; abandoning",
-            log_fn=log_fn,
-          )

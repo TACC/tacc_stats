@@ -1,0 +1,101 @@
+"""loaded48 soak supervisor child — owns Codon; exits via ``os._exit``.
+
+Parent pytest must not import ``hpcperfstats_codon_parse``. Parent SIGTERMs this
+process at the soak deadline; cooperative handlers request shutdown. After the
+supervisor returns, kill Codon Popen workers and ``os._exit`` so FT interpreter
+teardown never runs with Codon mapped in the pytest process.
+"""
+
+from __future__ import annotations
+
+import json
+import os
+import time
+from pathlib import Path
+
+
+def main() -> int:
+  """
+  Run ``run_sync_timedb_supervisor_from_parsed`` then hard-exit.
+
+  Env:
+    HPCPERFSTATS_LOADED48_INGEST_WIDTH: monkeypatch ingest pool width.
+    HPCPERFSTATS_LOADED48_OCC_PATH: optional JSON path for occupancy samples.
+    HPCPERFSTATS_LOADED48_DONE_PATH: optional marker written before ``os._exit``.
+
+  Returns:
+    int: Unused — process ends via ``os._exit``.
+  """
+  width_raw = os.environ.get("HPCPERFSTATS_LOADED48_INGEST_WIDTH", "").strip()
+  occ_path = os.environ.get("HPCPERFSTATS_LOADED48_OCC_PATH", "").strip()
+  done_path = os.environ.get("HPCPERFSTATS_LOADED48_DONE_PATH", "").strip()
+
+  import hpcperfstats.dbload.lib.conf_parser as cfg
+  from hpcperfstats.dbload.lib import sync_timedb_queue_orchestrator as orch
+  from hpcperfstats.dbload.sync_timedb import (
+    database_startup,
+    run_sync_timedb_supervisor_from_parsed,
+  )
+
+  if width_raw:
+    width = int(width_raw)
+    cfg.get_sync_ingest_pool_processes = (  # type: ignore[method-assign]
+      lambda: width
+    )
+
+  occupancy_samples: list[list[float | int]] = []
+  t0 = time.monotonic()
+  if occ_path:
+    orig_fill = orch._ingest_coordinator_fill_tick
+    orig_drain = orch._drain_ingest_ready
+
+    def _fill_tick_with_occ(*args, **kwargs):
+      result = orig_fill(*args, **kwargs)
+      inflight = kwargs.get("ingest_inflight")
+      if inflight is None and len(args) >= 6:
+        inflight = args[5]
+      n = len(inflight) if isinstance(inflight, dict) else 0
+      submitted = int(result[0]) if result else 0
+      zcard = int(result[2]) if result and len(result) > 2 else 0
+      occupancy_samples.append(
+        [time.monotonic() - t0, int(n), int(zcard), int(submitted)]
+      )
+      return result
+
+    def _drain_with_occ(*args, **kwargs):
+      inflight = kwargs.get("inflight")
+      n = len(inflight) if isinstance(inflight, dict) else 0
+      occupancy_samples.append(
+        [time.monotonic() - t0, int(n), 1 if n else 0, 0]
+      )
+      return orig_drain(*args, **kwargs)
+
+    orch._ingest_coordinator_fill_tick = (  # type: ignore[method-assign]
+      _fill_tick_with_occ
+    )
+    orch._drain_ingest_ready = _drain_with_occ  # type: ignore[method-assign]
+
+  rc = 0
+  try:
+    database_startup()
+    run_sync_timedb_supervisor_from_parsed(False, None, None)
+  except BaseException:
+    rc = 1
+  if occ_path:
+    Path(occ_path).write_text(json.dumps(occupancy_samples), encoding="utf-8")
+  try:
+    from hpcperfstats.dbload.lib.sync_timedb_codon_bridge import (
+      shutdown_codon_parse_pool,
+    )
+
+    shutdown_codon_parse_pool()
+  except Exception:
+    pass
+  if done_path:
+    Path(done_path).write_text(f"rc={rc}\n", encoding="utf-8")
+  # Hard exit — skip FT interpreter teardown with Codon/.so mapped.
+  os._exit(rc)
+
+
+if __name__ == "__main__":
+  main()

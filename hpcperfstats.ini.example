@@ -206,8 +206,8 @@ daily_archive_dir = %(data_dir)s/daily_archive
 # Absolute sync_timedb ingest **parse** pool size (default 64; threads on 3.14t).
 # sync_ingest_pool_processes = 64
 
-# Codon stripe slots as fraction of parse pool (default 0.125 → N=8 when parse=64).
-# sync_codon_context_pool_fraction = 0.125
+# Codon stripe slots as fraction of parse pool (default 0.5 → N=32 when parse=64).
+# sync_codon_context_pool_fraction = 0.5
 
 # Ingest write-pool width / max concurrent ingest DB sessions (default 0 = max(1, parse//4)).
 # sync_ingest_write_pool_processes = 0
@@ -311,7 +311,7 @@ daily_archive_dir = %(data_dir)s/daily_archive
 
 # Process-tree defer roof as percent of pipeline cgroup memory.max (0–100; 0 off).
 # Default 40 → ~52428 MiB effective roof on 128g compose; ingest raw-byte budget
-# = effective_roof_bytes / 2.5 (~20971 MiB at default; no separate budget INI).
+# = effective_roof_bytes / PEAK 1.0 (~52428 MiB at default; no separate budget INI).
 # sync_process_tree_rss_limit_cgroup_pct = 40
 
 # Hard exit when process-tree RSS exceeds this percent of memory.max; 0 off.

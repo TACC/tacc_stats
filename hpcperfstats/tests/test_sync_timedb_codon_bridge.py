@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import sys
 from types import ModuleType
+from typing import Any
 
 import pytest
 
@@ -41,6 +42,22 @@ def test_benchmark_inner_keeps_codon_parse_on_pythonpath() -> None:
   )
   assert "/opt/hpcperfstats/codon_parse" in text
   assert 'PYTHONPATH="/opt/hpcperfstats/codon_parse:' in text
+
+
+def test_loaded48_soak_isolates_codon_in_subprocess() -> None:
+  """Parent pytest must not map Codon .so; child hard-exits after drain."""
+  from pathlib import Path
+
+  soak = Path("tests/sync_timedb_benchmark/test_loaded48_soak.py").read_text(
+    encoding="utf-8"
+  )
+  child = Path(
+    "tests/sync_timedb_benchmark/loaded48_supervisor_child.py"
+  ).read_text(encoding="utf-8")
+  assert "subprocess.Popen" in soak
+  assert "loaded48_supervisor_child" in soak
+  assert "os._exit" in child
+  assert "shutdown_codon_parse_pool" in child
 
 
 def test_missing_extension_returns_none(
@@ -145,6 +162,11 @@ def test_format_codon_parse_startup_line_enabled_with_parse_api(
   monkeypatch.setenv(bridge.CODON_EXT_ENV, "fake_codon_parse_startup")
   monkeypatch.delenv(bridge.CODON_FORCE_DISABLE_ENV, raising=False)
   bridge.reset_codon_bridge_for_tests()
+  monkeypatch.setattr(
+    bridge,
+    "configure_codon_context_pool_from_ini",
+    lambda: bridge._configure_slot_pool(8),
+  )
   bridge._configure_slot_pool(8)
   line = bridge.format_codon_parse_startup_line()
   assert line == (
@@ -182,9 +204,94 @@ def test_sync_timedb_main_logs_codon_parse_startup() -> None:
 
 
 def test_derive_codon_context_pool_size_fraction() -> None:
+  assert bridge.derive_codon_context_pool_size(64, 0.5) == 32
+  assert bridge.derive_codon_context_pool_size(64) == 32
   assert bridge.derive_codon_context_pool_size(64, 0.125) == 8
   assert bridge.derive_codon_context_pool_size(1, 0.125) == 1
   assert bridge.derive_codon_context_pool_size(96, 0.125) == 12
+
+
+def test_codon_ipc_binary_roundtrip_no_pickle() -> None:
+  """Parent/child framing uses UTF-8 + JSON/struct; no pickle/msgpack."""
+  from pathlib import Path
+
+  from hpcperfstats.dbload.lib import codon_process_worker as worker
+
+  for path in (
+    Path(bridge.__file__),
+    Path(worker.__file__),
+  ):
+    text = path.read_text(encoding="utf-8")
+    assert "import pickle" not in text
+    assert "pickle." not in text
+    assert "import msgpack" not in text
+  req = worker.encode_request("parse", ["a", "b"])
+  assert worker.decode_request(req) == ("parse", ["a", "b"])
+  fp_frame = worker.encode_response_ok("fp", (10, 5, 1.5, 2.0))
+  assert worker.decode_response("fp", fp_frame) == (10, 5, 1.5, 2.0)
+  parse_body = ([{"event": "user", "value": 1.0}], [{"proc": "x"}])
+  parse_frame = worker.encode_response_ok("parse", parse_body)
+  decoded = worker.decode_response("parse", parse_frame)
+  assert decoded[0][0]["event"] == "user"
+  assert decoded[1][0]["proc"] == "x"
+  err = worker.encode_response_err("boom")
+  try:
+    worker.decode_response("parse", err)
+  except RuntimeError as exc:
+    assert "boom" in str(exc)
+  else:
+    raise AssertionError("expected RuntimeError")
+
+
+def test_streaming_incremental_diverts_flush_to_codon(
+  tmp_path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+  """Flush windows call try_codon_feed_batch_parse when Codon is enabled."""
+  from hpcperfstats.dbload.lib.sync_timedb_parsing import (
+    parse_stats_file_streaming_incremental,
+  )
+
+  calls: list[list[str]] = []
+  mod = ModuleType("fake_codon_stream_divert")
+
+  def _fp(lines: list[str], slot: int = 0) -> tuple[int, int, float, float]:
+    return (1, 1, 1.0, 0.0)
+
+  def _parse(lines: list[str], slot: int = 0) -> tuple[list[dict], list]:
+    calls.append(list(lines))
+    return (
+      [{"type": "cpu", "event": "user", "value": 1.0, "time": 1000.0}],
+      [],
+    )
+
+  mod.feed_and_collapse_fingerprint = _fp  # type: ignore[attr-defined]
+  mod.parse_stats_lines_codon = _parse  # type: ignore[attr-defined]
+  monkeypatch.setitem(sys.modules, "fake_codon_stream_divert", mod)
+  monkeypatch.setenv(bridge.CODON_EXT_ENV, "fake_codon_stream_divert")
+  monkeypatch.delenv(bridge.CODON_FORCE_DISABLE_ENV, raising=False)
+  bridge.reset_codon_bridge_for_tests()
+  monkeypatch.setattr(
+    "hpcperfstats.dbload.lib.sync_timedb_codon_bridge.try_codon_feed_batch_parse",
+    lambda lines: calls.append(list(lines)) or _parse(lines),
+  )
+  stats_path = tmp_path / "host"
+  stats_path.write_text(
+    "!cpu user,W=64,U=1\n"
+    "1000.0 J1 h1\n"
+    "cpu 0 @full 1.0\n"
+    "1001.0 J1 h1\n"
+    "cpu 0 @full 2.0\n",
+    encoding="utf-8",
+  )
+  chunks: list[Any] = []
+  parse_stats_file_streaming_incremental(
+    str(stats_path),
+    flush_rows=1,
+    on_chunk=lambda s, p: chunks.append((s, p)),
+  )
+  assert calls, "expected Codon divert on streaming flush"
+  assert any(line.startswith("!") for line in calls[0])
+  assert chunks
 
 
 def test_codonrt_serialize_default_off() -> None:

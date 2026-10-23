@@ -7,9 +7,9 @@ a fingerprint mismatch sentinel, callers keep the CPython
 
 Native Codon entry uses a **spawn process pool** of size ``N`` (one codonrt
 per worker) so concurrent callers never share one process-global codonrt.
-``N = max(1, round(parse_pool * fraction))`` (fraction default ``0.125``).
-Host unit tests / fake modules keep in-process per-slot locks. No process-wide
-serialize lock in the parent.
+``N = max(1, round(parse_pool * fraction))`` (fraction default ``0.5`` →
+N=32 at parse width 64). Host unit tests / fake modules keep in-process
+per-slot locks. No process-wide serialize lock in the parent.
 
 Attributes:
   logger: Module logger for import/runtime Codon bridge diagnostics.
@@ -38,7 +38,6 @@ import contextlib
 import importlib
 import logging
 import os
-import pickle
 import struct
 import subprocess
 import sys
@@ -46,6 +45,11 @@ import threading
 from collections.abc import Callable
 from typing import Any
 
+from hpcperfstats.dbload.lib.codon_process_worker import (
+  _RESP_HDR,
+  decode_response,
+  encode_request,
+)
 from hpcperfstats.dbload.lib.print_utils import log_print
 
 logger = logging.getLogger(__name__)
@@ -56,7 +60,7 @@ CODON_PROCESS_POOL_ENV = "HPCPERFSTATS_CODON_PROCESS_POOL"
 # Dockerfile codon-build install dir (supervisord PYTHONPATH; also self-wired).
 CODON_PARSE_DIR = "/opt/hpcperfstats/codon_parse"
 MAX_CODON_SLOTS = 32
-DEFAULT_CONTEXT_POOL_FRACTION = 0.125
+DEFAULT_CONTEXT_POOL_FRACTION = 0.5
 
 _codon_mod: Any | bool | None = None
 _codon_probe_done: bool = False
@@ -142,16 +146,16 @@ def derive_codon_context_pool_size(
 
   Args:
     parse_pool (int): ``sync_ingest_pool_processes`` (or test override).
-    fraction (float): ``sync_codon_context_pool_fraction`` (default 0.125).
+    fraction (float): ``sync_codon_context_pool_fraction`` (default 0.5).
 
   Returns:
     int: ``N`` in ``[1, MAX_CODON_SLOTS]``.
 
   Examples:
+    >>> derive_codon_context_pool_size(64, 0.5)
+    32
     >>> derive_codon_context_pool_size(64, 0.125)
     8
-    >>> derive_codon_context_pool_size(1, 0.125)
-    1
   """
   pool = max(1, int(parse_pool))
   frac = float(fraction)
@@ -328,7 +332,7 @@ def _use_codon_process_pool() -> bool:
     return False
   if os.environ.get(CODON_EXT_ENV):
     return False
-  # Opt out for FT soak / debug when Popen workers wedge pytest teardown.
+  # Opt out (``HPCPERFSTATS_CODON_PROCESS_POOL=0``) forces in-process N=1.
   raw = os.environ.get(CODON_PROCESS_POOL_ENV)
   if raw is not None and raw.strip().lower() in {"0", "false", "no", "off"}:
     return False
@@ -387,10 +391,11 @@ def _get_codon_pool() -> list[dict[str, Any]]:
 
 def _popen_rpc(kind: str, lines: list[str]) -> Any:
   """
-  Send ``(kind, lines)`` to a free Codon Popen worker; return result.
+  Send binary ``kind``/lines frame to a free Codon Popen worker; return body.
 
   Occupancy (``_slot_held``) increments only while a worker is checked out,
-  so ``held`` never exceeds ``N``.
+  so ``held`` never exceeds ``N``. Wire format is length-prefixed UTF-8 /
+  JSON (pickle forbidden); see ``codon_process_worker``.
 
   Args:
     kind (str): ``fp`` or ``parse``.
@@ -400,7 +405,7 @@ def _popen_rpc(kind: str, lines: list[str]) -> Any:
     Any: Worker return payload.
 
   Raises:
-    RuntimeError: When the worker returns an error envelope.
+    RuntimeError: When the worker returns an error or EOF.
 
   Examples:
     >>> callable(_popen_rpc)
@@ -429,23 +434,19 @@ def _popen_rpc(kind: str, lines: list[str]) -> Any:
       if proc.poll() is not None:
         worker["proc"] = _spawn_codon_worker()["proc"]
         proc = worker["proc"]
-      payload = pickle.dumps(
-        (kind, list(lines)), protocol=pickle.HIGHEST_PROTOCOL
-      )
       if proc.stdin is None or proc.stdout is None:
         raise RuntimeError("codon worker pipes missing")
-      proc.stdin.write(struct.pack("!I", len(payload)))
-      proc.stdin.write(payload)
+      frame = encode_request(kind, list(lines))
+      proc.stdin.write(frame)
       proc.stdin.flush()
-      raw_len = proc.stdout.read(4)
-      if not raw_len or len(raw_len) < 4:
+      hdr = proc.stdout.read(_RESP_HDR.size)
+      if not hdr or len(hdr) < _RESP_HDR.size:
         raise RuntimeError("codon worker EOF")
-      (n,) = struct.unpack("!I", raw_len)
-      blob = proc.stdout.read(n)
-      status, body = pickle.loads(blob)  # noqa: S301 — trusted child
-      if status != "ok":
-        raise RuntimeError(str(body))
-      return body
+      _ver, _status, n = struct.unpack_from("!BBI", hdr, 0)
+      body = proc.stdout.read(n) if n else b""
+      if len(body) < n:
+        raise RuntimeError("codon worker EOF")
+      return decode_response(kind, hdr + body)
   finally:
     with _slot_held_lock:
       _slot_held = max(0, _slot_held - 1)
@@ -504,7 +505,7 @@ def _shutdown_codon_pool() -> None:
 
 def shutdown_codon_parse_pool() -> None:
   """
-  Public teardown for Codon spawn workers (supervisor exit / soak finally).
+  Public teardown for Codon spawn workers (supervisor exit / process finally).
 
   Returns:
     None
@@ -640,9 +641,8 @@ def _ensure_codon_parse_dir_on_sys_path() -> None:
   """
   Put the baked Codon pyext directory on ``sys.path`` when present.
 
-  Supervisord sets ``PYTHONPATH=/opt/hpcperfstats/codon_parse``, but compose
-  pytest fallbacks often overwrite ``PYTHONPATH`` with the repo root only.
-  Self-wiring keeps Arm-B / pipeline imports fail-closed to the real ``.so``.
+  Supervisord sets ``PYTHONPATH=/opt/hpcperfstats/codon_parse``; self-wire
+  when that env is missing so the baked ``.so`` still loads.
 
   Returns:
     None

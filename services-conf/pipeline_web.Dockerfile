@@ -801,7 +801,7 @@ COPY --from=python-build /opt/python3.14 /opt/python3.14
 COPY --from=python-build /opt/python3.14t /opt/python3.14t
 # Bust when codon-build output changes but Buildah reuses a stale COPY --from layer.
 ARG HPCPERFSTATS_CODON_CACHEBUST=0
-#COPY --from=codon-build /opt/hpcperfstats/codon_parse /opt/hpcperfstats/codon_parse
+COPY --from=codon-build /opt/hpcperfstats/codon_parse /opt/hpcperfstats/codon_parse
 
 # Default syslog-ng allowlist fragment (render overwrites at container start).
 RUN /bin/bash -o pipefail -c "printf '%s\n' \
@@ -877,9 +877,9 @@ WORKDIR /home/hpcperfstats
 COPY --chown=hpcperfstats:hpcperfstats . .
 
 # Codon pyext lands via COPY --from=codon-build (above). Own for pipeline uid.
-#RUN test -f /opt/hpcperfstats/codon_parse/hpcperfstats_codon_parse.so \
-#  && test -f /opt/hpcperfstats/codon_parse/libcodonrt.so \
-#  && chown -R hpcperfstats:hpcperfstats /opt/hpcperfstats/codon_parse
+RUN test -f /opt/hpcperfstats/codon_parse/hpcperfstats_codon_parse.so \
+  && test -f /opt/hpcperfstats/codon_parse/libcodonrt.so \
+  && chown -R hpcperfstats:hpcperfstats /opt/hpcperfstats/codon_parse
 
 # .git is in the build context for frontend-builder SPA bake only — do not ship history.
 RUN rm -rf /home/hpcperfstats/.git

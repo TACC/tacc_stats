@@ -1,8 +1,12 @@
 """Compose-backed loaded-48 continuous-refill soak at fixed ingest width."""
 from __future__ import annotations
 
+import json
 import os
+import signal
+import subprocess
 import sys
+import tempfile
 import threading
 import time
 from pathlib import Path
@@ -67,12 +71,7 @@ def test_loaded48_continuous_fill_soak(monkeypatch):
       reset_job_queue_script_cache_for_tests,
   )
   from hpcperfstats.dbload.lib.sync_timedb_queue_orchestrator import (
-      request_shutdown,
       reset_shutdown_for_tests,
-  )
-  from hpcperfstats.dbload.sync_timedb import (
-      database_startup,
-      run_sync_timedb_supervisor_from_parsed,
   )
   from hpcperfstats.site.lib.machine.models import host_data
 
@@ -106,44 +105,11 @@ def test_loaded48_continuous_fill_soak(monkeypatch):
       lambda: int(ingest_width),
   )
 
-  occupancy_samples: list[tuple[float, int, int, int]] = []
-  occupancy_lock = threading.Lock()
   complete_counts: list[int] = []
   stop = threading.Event()
   t0 = time.monotonic()
-
-  orig_fill = orch._ingest_coordinator_fill_tick
-  orig_drain = orch._drain_ingest_ready
-
-  def _fill_tick_with_occ(*args, **kwargs):
-    result = orig_fill(*args, **kwargs)
-    inflight = kwargs.get("ingest_inflight")
-    if inflight is None and len(args) >= 6:
-      inflight = args[5]
-    n = len(inflight) if isinstance(inflight, dict) else 0
-    submitted = int(result[0]) if result else 0
-    zcard = int(result[2]) if result and len(result) > 2 else 0
-    with occupancy_lock:
-      occupancy_samples.append(
-          (time.monotonic() - t0, int(n), int(zcard), int(submitted)),
-      )
-    return result
-
-  def _drain_with_occ(*args, **kwargs):
-    inflight = kwargs.get("inflight")
-    if inflight is None and args:
-      inflight = kwargs.get("inflight")
-    # Signature uses inflight= keyword.
-    n = len(inflight) if isinstance(inflight, dict) else 0
-    with occupancy_lock:
-      # Drain runs after fill; force busy when anything is still tracked.
-      occupancy_samples.append(
-          (time.monotonic() - t0, int(n), 1 if n else 0, 0),
-      )
-    return orig_drain(*args, **kwargs)
-
-  monkeypatch.setattr(orch, "_ingest_coordinator_fill_tick", _fill_tick_with_occ)
-  monkeypatch.setattr(orch, "_drain_ingest_ready", _drain_with_occ)
+  # Occupancy is sampled in the supervisor child (Codon stays out of pytest).
+  _ = orch  # keep import for monkeypatched width above
 
   def _clear_orm(planted: list[str]) -> None:
     host_data.objects.filter(host__in=list(planted)).delete()
@@ -252,51 +218,52 @@ def test_loaded48_continuous_fill_soak(monkeypatch):
       complete_counts.append(_count_complete())
       time.sleep(1.0)
 
-  def _watch_deadline() -> None:
-    deadline = t0 + wall_s
-    while not stop.is_set() and time.monotonic() < deadline:
-      time.sleep(1.0)
-    request_shutdown()
+  child_mod = (
+      Path(__file__).resolve().parent / "loaded48_supervisor_child.py"
+  )
+  occ_file = Path(tempfile.mkstemp(prefix="loaded48_occ_", suffix=".json")[1])
+  done_file = Path(tempfile.mkstemp(prefix="loaded48_done_", suffix=".txt")[1])
+  child_env = os.environ.copy()
+  child_env["HPCPERFSTATS_LOADED48_INGEST_WIDTH"] = str(int(ingest_width))
+  child_env["HPCPERFSTATS_LOADED48_OCC_PATH"] = str(occ_file)
+  child_env["HPCPERFSTATS_LOADED48_DONE_PATH"] = str(done_file)
 
   refill_thr = threading.Thread(target=_refill_loop, name="loaded48-refill", daemon=True)
-  watch_thr = threading.Thread(target=_watch_deadline, name="loaded48-watch", daemon=True)
   refill_thr.start()
-  watch_thr.start()
 
-  # Bound supervisor join: Codon-on can hang native workers past drain.
-  supervisor_error: list[BaseException] = []
-
-  def _run_supervisor() -> None:
-    try:
-      run_sync_timedb_supervisor_from_parsed(False, None, None)
-    except BaseException as exc:  # noqa: BLE001 — surface in parent
-      supervisor_error.append(exc)
-
+  child = subprocess.Popen(
+      [sys.executable, str(child_mod)],
+      env=child_env,
+      stdout=subprocess.DEVNULL,
+      stderr=subprocess.PIPE,
+  )
   try:
-    database_startup()
-    sup_thr = threading.Thread(
-        target=_run_supervisor, name="loaded48-supervisor", daemon=True
-    )
-    sup_thr.start()
-    # wall + drain budget + margin (SHUTDOWN_DRAIN_TIMEOUT_S is 120s).
-    sup_thr.join(timeout=float(wall_s) + 180.0)
-    if sup_thr.is_alive():
-      request_shutdown()
-      sup_thr.join(timeout=30.0)
+    deadline = t0 + wall_s
+    while time.monotonic() < deadline and child.poll() is None:
+      time.sleep(1.0)
+    if child.poll() is None:
+      # Cooperative drain via SIGTERM (handlers → request_shutdown).
+      child.send_signal(signal.SIGTERM)
+      try:
+        child.wait(timeout=180.0)
+      except subprocess.TimeoutExpired:
+        child.kill()
+        child.wait(timeout=30.0)
   finally:
     stop.set()
-    request_shutdown()
-    # Codon Popen workers: do not tear down from soak under FT (spins).
-    # Container/process exit reaps them.
+    if child.poll() is None:
+      child.kill()
+      child.wait(timeout=10.0)
     refill_thr.join(timeout=5.0)
-    watch_thr.join(timeout=5.0)
-    if sup_thr.is_alive():
-      request_shutdown()
-      # Daemon supervisor — do not join forever if it is wedged.
-      sup_thr.join(timeout=2.0)
 
-  if supervisor_error:
-    raise supervisor_error[0]
+  if child.returncode not in (0, -signal.SIGTERM) and not done_file.is_file():
+    err = b""
+    if child.stderr is not None:
+      err = child.stderr.read() or b""
+    pytest.fail(
+        "loaded48 supervisor child failed rc=%s stderr=%r"
+        % (child.returncode, err[:2000])
+    )
 
   elapsed = max(1e-6, time.monotonic() - t0)
   finals = complete_counts[-1] if complete_counts else _count_complete()
@@ -311,8 +278,20 @@ def test_loaded48_continuous_fill_soak(monkeypatch):
       [files_per_s],
       long_lock_wait=False,
   )
-  with occupancy_lock:
-    samples = list(occupancy_samples)
+  samples: list[tuple[float, int, int, int]] = []
+  if occ_file.is_file():
+    try:
+      raw = json.loads(occ_file.read_text(encoding="utf-8"))
+      samples = [
+          (float(r[0]), int(r[1]), int(r[2]), int(r[3])) for r in raw
+      ]
+    except Exception:
+      samples = []
+  for p in (occ_file, done_file):
+    try:
+      p.unlink(missing_ok=True)
+    except Exception:
+      pass
   buckets: dict[int, int] = {}
   for row in samples:
     if float(row[0]) < warmup_s:

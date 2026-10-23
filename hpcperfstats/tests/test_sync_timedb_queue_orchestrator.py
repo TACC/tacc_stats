@@ -4139,6 +4139,19 @@ def test_drain_timeout_terminates_before_requeue():
   )
 
 
+def test_orchestrator_finally_terminates_ingest_pool_without_join():
+  """FT Codon soak: finally must terminate ingest pool and never join."""
+  src = inspect.getsource(qo.run_sync_timedb_queue_orchestrator)
+  marker = "Closes whichever pool object is current"
+  idx = src.find(marker)
+  assert idx != -1
+  chunk = src[idx : idx + 700]
+  assert "terminate" in chunk
+  assert "_join_callable_into_event" not in chunk
+  assert 'getattr(current_pool, "join"' not in chunk
+  assert "getattr(current_pool, 'join'" not in chunk
+
+
 def test_drain_deadline_armed_even_if_coordinator_set_draining_first():
   """Shutdown must arm drain_deadline even when barrier.draining is already set.
 

@@ -3774,24 +3774,100 @@ def parse_stats_file_streaming_incremental(
     ... )
   """
   emission_start = max(int(start_line_idx or 0), int(parse_start_idx or 0))
-  # Codon divert for complete-line parses is in parse_stats_lines via
-  # try_codon_parse_collapse / try_codon_feed_batch_parse. Streaming keeps
-  # IncrementalStatsParser (no whole-file Codon buffer).
+  # Codon-primary streaming: when divert is allowed and Codon is enabled, do
+  # not dual-feed IncrementalStatsParser (that erased the parse-kernel win).
+  # Fail-closed to CPython IncrementalStatsParser when Codon returns None.
   parser = IncrementalStatsParser(emission_start, exclude_types_list)
   pending_flush = False
   use_bytes = flush_max_bytes is not None
   flush_rows_n = max(1, int(flush_rows or 1))
   flush_bytes_n = max(1, int(flush_max_bytes or 1))
+  can_codon_divert = emission_start == 0 and exclude_types_list is None
+  codon_primary = False
+  if can_codon_divert:
+    from hpcperfstats.dbload.lib.sync_timedb_codon_bridge import (
+      codon_ingest_parse_enabled,
+    )
+
+    codon_primary = bool(codon_ingest_parse_enabled())
+  schema_lines: list[str] = []
+  window_lines: list[str] = []
+  window_sample_n = 0
+  line_index = 0
   from hpcperfstats.dbload.lib.zstd_cli import (
     advise_sequential_read_for_paths,
   )
+
+  def _flush_marks_from_lines(lines: list[str]) -> None:
+    """
+    Feed schema/sample/``%`` lines into a marks parser and flush side tables.
+
+    Args:
+      lines (list[str]): Schema + window lines for one flush.
+
+    Returns:
+      None: Always ``None``.
+
+    Examples:
+      >>> callable(_flush_marks_from_lines)
+      True
+    """
+    mark_parser = IncrementalStatsParser(0, None)
+    for raw in lines:
+      s = raw.lstrip() if raw else ""
+      if not s:
+        continue
+      if s[0] in "%!" or s[0].isdigit():
+        mark_parser.feed_line(raw)
+    _flush_incremental_side_marks(mark_parser)
+
+  def _emit_codon_or_cpython_window() -> tuple[Any, Any] | None:
+    """
+    Emit one buffered window via Codon, else CPython parse of the window.
+
+    Returns:
+      tuple[Any, Any] | None: Payload for ``on_chunk``, or ``None`` if empty.
+
+    Examples:
+      >>> callable(_emit_codon_or_cpython_window)
+      True
+    """
+    nonlocal window_lines, window_sample_n
+    if not window_lines and not schema_lines:
+      return None
+    bundled = schema_lines + window_lines
+    if codon_primary:
+      from hpcperfstats.dbload.lib.sync_timedb_codon_bridge import (
+        try_codon_feed_batch_parse,
+      )
+
+      codon = try_codon_feed_batch_parse(bundled)
+      if codon is not None:
+        _flush_marks_from_lines(bundled)
+        window_lines = []
+        window_sample_n = 0
+        return codon
+    # Fail-closed (or Codon disabled): parse window with IncrementalStatsParser.
+    fb = IncrementalStatsParser(0, exclude_types_list)
+    fb.feed_lines(bundled)
+    stats_chunk = fb.take_stats_columns()
+    proc_chunk = fb.take_proc_stats_columns()
+    _flush_incremental_side_marks(fb)
+    window_lines = []
+    window_sample_n = 0
+    if (
+      stats_payload_row_count(stats_chunk) == 0
+      and stats_payload_row_count(proc_chunk) == 0
+    ):
+      return None
+    return stats_chunk, proc_chunk
 
   advise_sequential_read_for_paths(stats_file)
   try:
     with open(stats_file, "rb") as fd:
       window_start = int(fd.tell())
       while True:
-        emit: list[tuple[Any, list]] = []
+        emit: list[tuple[Any, Any]] = []
         batch = _read_stats_line_batch_decode_after_lock(
           fd,
           stats_file,
@@ -3802,6 +3878,38 @@ def parse_stats_file_streaming_incremental(
         batch_end = int(fd.tell())
         with _held_parse_stage("feed_s"):
           for line in batch:
+            if codon_primary:
+              over_threshold = (
+                (batch_end - window_start) >= flush_bytes_n
+                if use_bytes
+                else window_sample_n >= flush_rows_n
+              )
+              starts = _line_starts_time_sample(
+                line, line_index, emission_start
+              )
+              if starts and (pending_flush or over_threshold) and window_lines:
+                taken = _emit_codon_or_cpython_window()
+                if taken is not None:
+                  emit.append(taken)
+                window_start = batch_end
+                pending_flush = False
+              if line.startswith("!"):
+                schema_lines.append(line)
+              else:
+                window_lines.append(line)
+              if starts:
+                window_sample_n += 1
+              line_index += 1
+              over_after = (
+                (batch_end - window_start) >= flush_bytes_n
+                if use_bytes
+                else window_sample_n >= flush_rows_n
+              )
+              if over_after:
+                pending_flush = True
+              continue
+
+            # CPython IncrementalStatsParser path (Codon off / resume / excludes).
             over_threshold = (
               (batch_end - window_start) >= flush_bytes_n
               if use_bytes
@@ -3811,8 +3919,6 @@ def parse_stats_file_streaming_incremental(
               line, parser._line_index, parser.start_idx
             ) and (pending_flush or over_threshold):
               if parser.stats_len or parser._proc_by_key:
-                # take_cols stays inside feed_s (must flush before next
-                # sample); mid-flush take is attributed to feed_s.
                 emit.append(
                   (
                     parser.take_stats_columns(),
@@ -3831,13 +3937,20 @@ def parse_stats_file_streaming_incremental(
               pending_flush = True
         for stats_chunk, proc_chunk in emit:
           on_chunk(stats_chunk, proc_chunk)
-        _flush_incremental_side_marks(parser)
-    if parser.stats_len or parser._proc_by_key:
+        if not codon_primary:
+          _flush_incremental_side_marks(parser)
+    if codon_primary:
+      if window_lines:
+        with _held_parse_stage("take_cols_s"):
+          _final = _emit_codon_or_cpython_window()
+        if _final is not None:
+          on_chunk(_final[0], _final[1])
+    elif parser.stats_len or parser._proc_by_key:
       with _held_parse_stage("take_cols_s"):
         _final_stats = parser.take_stats_columns()
         _final_proc = parser.take_proc_stats_columns()
       on_chunk(_final_stats, _final_proc)
-    _flush_incremental_side_marks(parser)
+      _flush_incremental_side_marks(parser)
     pending_flush = False
   except FileNotFoundError:
     return
